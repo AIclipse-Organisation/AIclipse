@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: media } }
+  template:
+    metadata: { labels: { app: media } }
+    spec:
+      containers:
+        - name: media
+          image: aiclipse/media
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef: { name: app-mongo-sec, key: MONGO_URI }
+            - { name: S3_ENDPOINT, value: "http://s3-srv:9000" }
+            - name: S3_PUBLIC_ENDPOINT
+              valueFrom:
+                configMapKeyRef: { name: app-config, key: S3_PUBLIC_ENDPOINT }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef: { name: s3-sec, key: MINIO_ROOT_USER }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD }
+            - { name: S3_BUCKET, value: "media" }
+            - { name: REDIS_HOST, value: "redis-srv" }
+            - { name: REDIS_PORT, value: "6379" }
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: redis-sec, key: REDIS_PASSWORD }
+          ports: [{ name: http, containerPort: 3000 }]
+          readinessProbe:
+            { httpGet: { path: /healthz, port: 3000 }, initialDelaySeconds: 5 }
+          livenessProbe:
+            { httpGet: { path: /healthz, port: 3000 }, initialDelaySeconds: 15 }
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "300m", memory: "512Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: media-srv
+spec:
+  type: ClusterIP
+  selector: { app: media }
+  ports: [{ name: http, port: 3000, targetPort: 3000 }]

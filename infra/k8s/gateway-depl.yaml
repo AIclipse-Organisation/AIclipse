@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: gateway } }
+  template:
+    metadata: { labels: { app: gateway } }
+    spec:
+      containers:
+        - name: gateway
+          image: aiclipse/gateway
+          env:
+            - { name: PORT, value: "8080" }
+            - { name: AUTH_BASE_URL, value: "http://auth-srv:3000" }
+            - { name: MEDIA_BASE_URL, value: "http://media-srv:3000" }
+            - { name: JOBS_BASE_URL, value: "http://jobs-srv:3000" }
+            - { name: PLANS_BASE_URL, value: "http://plans-srv:3000" }
+            - { name: BILLING_BASE_URL, value: "http://billing-srv:3000" }
+            - { name: REDIS_HOST, value: "redis-srv" }
+            - { name: REDIS_PORT, value: "6379" }
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: redis-sec, key: REDIS_PASSWORD }
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe:
+            { httpGet: { path: /healthz, port: 8080 }, initialDelaySeconds: 5 }
+          livenessProbe:
+            { httpGet: { path: /healthz, port: 8080 }, initialDelaySeconds: 15 }
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "300m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-srv
+spec:
+  type: ClusterIP
+  selector: { app: gateway }
+  ports: [{ name: http, port: 8080, targetPort: 8080 }]

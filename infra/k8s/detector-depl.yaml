@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detector-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: detector } }
+  template:
+    metadata: { labels: { app: detector } }
+    spec:
+      containers:
+        - name: detector
+          image: aiclipse/detector
+          env:
+            - { name: REDIS_HOST, value: "redis-srv" }
+            - { name: REDIS_PORT, value: "6379" }
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: redis-sec, key: REDIS_PASSWORD }
+            - { name: S3_ENDPOINT, value: "http://s3-srv:9000" }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef: { name: s3-sec, key: MINIO_ROOT_USER }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD }
+            - { name: S3_BUCKET, value: "media" }
+            - { name: JOBS_BASE_URL, value: "http://jobs-srv:3000" }
+          ports: [{ name: http, containerPort: 3000 }]
+          readinessProbe:
+            { httpGet: { path: /healthz, port: 3000 }, initialDelaySeconds: 5 }
+          livenessProbe:
+            { httpGet: { path: /healthz, port: 3000 }, initialDelaySeconds: 15 }
+          resources:
+            requests: { cpu: "200m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: detector-srv
+spec:
+  type: ClusterIP
+  selector: { app: detector }
+  ports: [{ name: http, port: 3000, targetPort: 3000 }]

@@ -1,37 +1,36 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth-depl
+  name: plans-depl
 spec:
   replicas: 1
-  selector: { matchLabels: { app: auth } }
+  selector: { matchLabels: { app: plans } }
   template:
-    metadata: { labels: { app: auth } }
+    metadata: { labels: { app: plans } }
     spec:
       containers:
-        - name: auth
-          image: aiclipse/auth
+        - name: plans
+          image: aiclipse/plans
           env:
-            - name: MONGO_URI
+            - { name: REDIS_HOST, value: "redis-srv" }
+            - { name: REDIS_PORT, value: "6379" }
+            - name: REDIS_PASSWORD
               valueFrom:
-                secretKeyRef: { name: app-mongo-sec, key: MONGO_URI }
-            - name: JWT_KEY
-              valueFrom:
-                secretKeyRef: { name: jwt-sec, key: JWT_KEY }
+                secretKeyRef: { name: redis-sec, key: REDIS_PASSWORD }
           ports: [{ name: http, containerPort: 3000 }]
           readinessProbe:
             { httpGet: { path: /healthz, port: 3000 }, initialDelaySeconds: 5 }
           livenessProbe:
             { httpGet: { path: /healthz, port: 3000 }, initialDelaySeconds: 15 }
           resources:
-            requests: { cpu: "50m", memory: "64Mi" }
-            limits: { cpu: "250m", memory: "256Mi" }
+            requests: { cpu: "25m", memory: "64Mi" }
+            limits: { cpu: "200m", memory: "256Mi" }
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: auth-srv
+  name: plans-srv
 spec:
   type: ClusterIP
-  selector: { app: auth }
+  selector: { app: plans }
   ports: [{ name: http, port: 3000, targetPort: 3000 }]

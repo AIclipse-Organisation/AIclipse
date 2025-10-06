@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: observer-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: observer }
+  template:
+    metadata:
+      labels: { app: observer }
+    spec:
+      containers:
+        - name: observer
+          image: aiclipse/observer
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef: { name: app-mongo-sec, key: MONGO_URI }
+            - { name: REDIS_HOST, value: "redis-srv" }
+            - { name: REDIS_PORT, value: "6379" }
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: redis-sec, key: REDIS_PASSWORD }
+          ports:
+            - { name: http, containerPort: 3000 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 3000 }
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: 3000 }
+            initialDelaySeconds: 15
+          resources:
+            requests: { cpu: "25m", memory: "64Mi" }
+            limits: { cpu: "200m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: observer-srv
+spec:
+  type: ClusterIP
+  selector: { app: observer }
+  ports:
+    - { name: http, port: 3000, targetPort: 3000 }
