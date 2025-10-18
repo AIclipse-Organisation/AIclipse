@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Algorithm Demo</title>
+  <style>
+ 
+  </style>
+</head>
+<body>
+  <h1>Algorithm Demo</h1>
+  <pre id="output">Loading data...</pre>
+
+  <script>
+    fetch('DummyData.json')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(data => {
+        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+      })
+      .catch(error => {
+        document.getElementById('output').textContent = 'Error fetching data: ' + error;
+      });
+  </script>
+</body>
+</html>

@@ -1,0 +1,366 @@
+{
+  "images": [
+    {
+      "image_id": 1001,
+      "user_id": 9999,
+      "s3_key": "AWS/post_1001.jpg",
+      "is_ai": true,
+      "livelihood": 85,
+      "uploaded_at": 1739853000,
+      "is_reported": false
+    },
+    {
+      "image_id": 1002,
+      "user_id": 9998,
+      "s3_key": "AWS/post_1002.jpg",
+      "is_ai": true,
+      "livelihood": 87,
+      "uploaded_at": 1739856600,
+      "is_reported": false
+    },
+    {
+      "image_id": 1003,
+      "user_id": 9997,
+      "s3_key": "AWS/post_1003.jpg",
+      "is_ai": true,
+      "livelihood": 91,
+      "uploaded_at": 1739860200,
+      "is_reported": false
+    },
+    {
+      "image_id": 1004,
+      "user_id": 9996,
+      "s3_key": "AWS/post_1004.jpg",
+      "is_ai": false,
+      "livelihood": 77,
+      "uploaded_at": 1739863800,
+      "is_reported": false
+    },
+    {
+      "image_id": 1005,
+      "user_id": 9995,
+      "s3_key": "AWS/post_1005.jpg",
+      "is_ai": true,
+      "livelihood": 83,
+      "uploaded_at": 1739867400,
+      "is_reported": false
+    },
+    {
+      "image_id": 1006,
+      "user_id": 9994,
+      "s3_key": "AWS/post_1006.jpg",
+      "is_ai": false,
+      "livelihood": 80,
+      "uploaded_at": 1739871000,
+      "is_reported": false
+    },
+    {
+      "image_id": 1007,
+      "user_id": 9993,
+      "s3_key": "AWS/post_1007.jpg",
+      "is_ai": true,
+      "livelihood": 90,
+      "uploaded_at": 1739874600,
+      "is_reported": true
+    },
+    {
+      "image_id": 1008,
+      "user_id": 9992,
+      "s3_key": "AWS/post_1008.jpg",
+      "is_ai": true,
+      "livelihood": 86,
+      "uploaded_at": 1739878200,
+      "is_reported": false
+    },
+    {
+      "image_id": 1009,
+      "user_id": 9991,
+      "s3_key": "AWS/post_1009.jpg",
+      "is_ai": false,
+      "livelihood": 75,
+      "uploaded_at": 1739881800,
+      "is_reported": false
+    },
+    {
+      "image_id": 1010,
+      "user_id": 9990,
+      "s3_key": "AWS/post_1010.jpg",
+      "is_ai": true,
+      "livelihood": 92,
+      "uploaded_at": 1739885400,
+      "is_reported": false
+    }
+  ],
+  "posts": [
+    {
+      "post_id": 2001,
+      "user_id": 9999,
+      "image_id": 1001,
+      "text": "Beware of this thing",
+      "likedBy": [9998, 9997, 9996],
+      "comments_id": [3001, 3002],
+      "clicks_count": 325,
+      "up_vote_count": 140,
+      "down_vote_count": 2,
+      "opinion": 1,
+      "created_at": 1739853000
+    },
+    {
+      "post_id": 2002,
+      "user_id": 9998,
+      "image_id": 1002,
+      "text": "Whoever created this is creative ngl",
+      "likedBy": [9999, 9997, 9995],
+      "comments_id": [3003],
+      "clicks_count": 410,
+      "up_vote_count": 52,
+      "down_vote_count": 6,
+      "opinion": 1,
+      "created_at": 1739856600
+    },
+    {
+      "post_id": 2003,
+      "user_id": 9997,
+      "image_id": 1003,
+      "text": "He's a rapper??",
+      "likedBy": [9999, 9998, 9996, 9994],
+      "comments_id": [3004, 3005],
+      "clicks_count": 562,
+      "up_vote_count": 67,
+      "down_vote_count": 5,
+      "opinion": 1,
+      "created_at": 1739860200
+    },
+    {
+      "post_id": 2004,
+      "user_id": 9996,
+      "image_id": 1004,
+      "text": "Ain't no way",
+      "likedBy": [9999, 9995],
+      "comments_id": [3006],
+      "clicks_count": 290,
+      "up_vote_count": 33,
+      "down_vote_count": 3,
+      "opinion": 0,
+      "created_at": 1739863800
+    },
+    {
+      "post_id": 2005,
+      "user_id": 9995,
+      "image_id": 1005,
+      "text": "Please tell me this is fake...",
+      "likedBy": [9998, 9997, 9994],
+      "comments_id": [3007],
+      "clicks_count": 378,
+      "up_vote_count": 48,
+      "down_vote_count": 1,
+      "opinion": 1,
+      "created_at": 1739867400
+    },
+    {
+      "post_id": 2006,
+      "user_id": 9994,
+      "image_id": 1006,
+      "text": "Sometimes i'm just scared of 2025",
+      "likedBy": [9999, 9993],
+      "comments_id": [3008, 3009],
+      "clicks_count": 205,
+      "up_vote_count": 25,
+      "down_vote_count": 4,
+      "opinion": 0,
+      "created_at": 1739871000
+    },
+    {
+      "post_id": 2007,
+      "user_id": 9993,
+      "image_id": 1007,
+      "text": "Wasn’t sure whether to post this, but here it is. What do yall think?",
+      "likedBy": [9994, 9992],
+      "comments_id": [3010],
+      "clicks_count": 155,
+      "up_vote_count": 18,
+      "down_vote_count": 20,
+      "opinion": -1,
+      "created_at": 1739874600
+    },
+    {
+      "post_id": 2008,
+      "user_id": 9992,
+      "image_id": 1008,
+      "text": "I'd say #slay but this is weird",
+      "likedBy": [9999, 9995, 9993],
+      "comments_id": [3011, 3012],
+      "clicks_count": 440,
+      "up_vote_count": 58,
+      "down_vote_count": 3,
+      "opinion": 1,
+      "created_at": 1739878200
+    },
+    {
+      "post_id": 2009,
+      "user_id": 9991,
+      "image_id": 1009,
+      "text": "This fooled my grandma fr fr 😂",
+      "likedBy": [9992, 9994],
+      "comments_id": [3013],
+      "clicks_count": 298,
+      "up_vote_count": 29,
+      "down_vote_count": 8,
+      "opinion": 0,
+      "created_at": 1739881800
+    },
+    {
+      "post_id": 2010,
+      "user_id": 9990,
+      "image_id": 1010,
+      "text": "Red carpet looks weird ngl",
+      "likedBy": [9991, 9992, 9993, 9994],
+      "comments_id": [3014, 3015],
+      "clicks_count": 650,
+      "up_vote_count": 90,
+      "down_vote_count": 2,
+      "opinion": 1,
+      "created_at": 1739885400
+    }
+  ], 
+  "comments": [
+    {
+      "comment_id": 3001,
+      "user_id": 8881,
+      "text": "This looks real but scary 😳",
+      "created_at": 1739853100,
+      "parent_comment_id": null,
+      "up_vote_count": 48,
+      "down_vote_count": 3
+    },
+    {
+      "comment_id": 3002,
+      "user_id": 8882,
+      "text": "Nah bro it’s obviously AI 😂",
+      "created_at": 1739853200,
+      "parent_comment_id": 3001,
+      "up_vote_count": 62,
+      "down_vote_count": 1
+    },
+    {
+      "comment_id": 3003,
+      "user_id": 8883,
+      "text": "Honestly, whoever made that... mad skills",
+      "created_at": 1739856700,
+      "parent_comment_id": null,
+      "up_vote_count": 75,
+      "down_vote_count": 2
+    },
+    {
+      "comment_id": 3004,
+      "user_id": 8884,
+      "text": "Wait, he actually raps?",
+      "created_at": 1739860300,
+      "parent_comment_id": null,
+      "up_vote_count": 30,
+      "down_vote_count": 98
+    },
+    {
+      "comment_id": 3005,
+      "user_id": 8885,
+      "text": "Yeah he dropped a track last week!",
+      "created_at": 1739860350,
+      "parent_comment_id": 3004,
+      "up_vote_count": 10,
+      "down_vote_count": 13
+    },
+    {
+      "comment_id": 3006,
+      "user_id": 8886,
+      "text": "Bro this can’t be real 😭",
+      "created_at": 1739863900,
+      "parent_comment_id": null,
+      "up_vote_count": 56,
+      "down_vote_count": 24
+    },
+    {
+      "comment_id": 3007,
+      "user_id": 8887,
+      "text": "Yup... definitely fake lol",
+      "created_at": 1739867500,
+      "parent_comment_id": null,
+      "up_vote_count": 38,
+      "down_vote_count": 2
+    },
+    {
+      "comment_id": 3008,
+      "user_id": 8888,
+      "text": "2025 is a brainrot",
+      "created_at": 1739871100,
+      "parent_comment_id": null,
+      "up_vote_count": 82,
+      "down_vote_count": 4
+    },
+    {
+      "comment_id": 3009,
+      "user_id": 8889,
+      "text": "Fr this year’s been wild",
+      "created_at": 1739871150,
+      "parent_comment_id": 3008,
+      "up_vote_count": 47,
+      "down_vote_count": 5
+    },
+    {
+      "comment_id": 3010,
+      "user_id": 8890,
+      "text": "I think it’s edited but still cool",
+      "created_at": 1739874700,
+      "parent_comment_id": null,
+      "up_vote_count": 64,
+      "down_vote_count": 76
+    },
+    {
+      "comment_id": 3011,
+      "user_id": 8891,
+      "text": "Weird ",
+      "created_at": 1739878300,
+      "parent_comment_id": null,
+      "up_vote_count": 2,
+      "down_vote_count": 0
+    },
+    {
+      "comment_id": 3012,
+      "user_id": 8892,
+      "text": "Right?? I can’t stop looking at it 😭",
+      "created_at": 1739878350,
+      "parent_comment_id": 3011,
+      "up_vote_count": 37,
+      "down_vote_count": 56
+    },
+    {
+      "comment_id": 3013,
+      "user_id": 8893,
+      "text": "lol granny",
+      "created_at": 1739881900,
+      "parent_comment_id": null,
+      "up_vote_count": 5,
+      "down_vote_count": 0
+    },
+    {
+      "comment_id": 3014,
+      "user_id": 101,
+      "text": "Definitely fake",
+      "created_at": 1739885500,
+      "parent_comment_id": 3015,
+      "up_vote_count": 24,
+      "down_vote_count": 0
+    },
+    {
+      "comment_id": 3015,
+      "user_id": 102,
+      "text": "Fake?",
+      "created_at": 1739885400,
+      "parent_comment_id": null,
+      "up_vote_count": 33,
+      "down_vote_count": 0
+    }
+  ]
+}
+
+  
+
