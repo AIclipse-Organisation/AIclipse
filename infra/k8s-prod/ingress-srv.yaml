@@ -11,16 +11,16 @@ metadata:
 spec:
   ingressClassName: nginx
   tls:
-  - hosts: [www.aiclipse.com]
-    secretName: yourdomain-tls
+    - hosts: [www.aiclipse.com]
+      secretName: yourdomain-tls
   rules:
-  - host: www.aiclipse.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: gateway-srv
-            port:
-              number: 8080
+    - host: www.aiclipse.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-srv
+                port:
+                  number: 8080

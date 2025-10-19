@@ -1,20 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth-depl
+  name: observer-depl
 spec:
   replicas: 1
-  selector: { matchLabels: { app: auth } }
+  selector:
+    matchLabels: { app: observer }
   template:
-    metadata: { labels: { app: auth } }
+    metadata:
+      labels: { app: observer }
     spec:
       containers:
-        - name: auth
-          image: aiclipse/auth
+        - name: observer
+          image: aiclipse/observer
           env:
-            - name: JWT_KEY
-              valueFrom: { secretKeyRef: { name: jwt-sec, key: JWT_KEY } }
-          ports: [{ name: http, containerPort: 3000 }]
+            - name: REDIS_URI
+              valueFrom: { secretKeyRef: { name: redis-sec, key: REDIS_URI } }
+            - name: STREAM
+              value: "jobs"
+            - name: GROUP
+              value: "observer"
+          ports:
+            - { name: http, containerPort: 3000 }
           readinessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }
             initialDelaySeconds: 2
@@ -33,14 +40,15 @@ spec:
             periodSeconds: 1
             failureThreshold: 60 
           resources:
-            requests: { cpu: "50m", memory: "64Mi" }
-            limits: { cpu: "250m", memory: "256Mi" }
+            requests: { cpu: "25m", memory: "64Mi" }
+            limits: { cpu: "200m", memory: "256Mi" }
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: auth-srv
+  name: observer-srv
 spec:
   type: ClusterIP
-  selector: { app: auth }
-  ports: [{ name: http, port: 3000, targetPort: 3000 }]
+  selector: { app: observer }
+  ports:
+    - { name: http, port: 3000, targetPort: 3000 }
