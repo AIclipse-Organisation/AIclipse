@@ -1,31 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Algorithm Demo</title>
-  <style>
- 
-  </style>
-</head>
-<body>
-  <h1>Algorithm Demo</h1>
-  <pre id="output">Loading data...</pre>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Algorithm Demo</title>
+    <style>
+      .main-conatainer {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: space-around;
+        width: -webkit-fill-available;
+      }
 
-  <script>
-    fetch('DummyData.json')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        return response.json();
-      })
-      .then(data => {
-        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
-      })
-      .catch(error => {
-        document.getElementById('output').textContent = 'Error fetching data: ' + error;
+      .data-column {
+        max-width: 28%;
+        min-width: 28%;
+        border: 1px solid blue;
+        margin: 5vh;
+        overflow-y: auto;
+        overflow-x: auto;
+        max-height: 60vh;
+      }
+      .top-container {
+        width: 100%;
+        text-align: center;
+      }
+
+      .basic-info-container{
+        width: 90%;
+        margin: auto;
+        border: 1px solid green;
+        padding: 10px;
+      }
+
+      .basic-info-container h3{
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top-container">
+      <h1>Algorithm Demo</h1>
+    </div>
+
+    <div class="main-conatainer">
+      <div class="data-column">
+        <h2>Images</h2>
+        <pre id="images-data-box">Loading...</pre>
+      </div>
+      <div class="data-column">
+        <h2>Posts</h2>
+        <pre id="posts-data-box">Loading...</pre>
+      </div>
+      <div class="data-column">
+        <h2>Comments</h2>
+        <pre id="comments-data-box">Loading...</pre>
+      </div>
+    </div>
+
+    <div class="top-container">
+      <h1>Calculations</h1>
+    </div>
+
+    <div class="basic-info-container">
+      <h3>Basic info</h3>
+
+    </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        fetch("DummyData.json")
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Network response was not ok");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            const images = data.images || [];
+            console.log("Images:", images);
+            const posts = data.posts || [];
+            console.log("posts:", posts);
+            const comments = data.comments || [];
+            console.log("comments:", comments);
+
+            document.getElementById("images-data-box").textContent =
+              JSON.stringify(images, null, 2);
+            document.getElementById("posts-data-box").textContent =
+              JSON.stringify(posts, null, 2);
+            document.getElementById("comments-data-box").textContent =
+              JSON.stringify(comments, null, 2);
+          })
+          .catch((error) => {
+            const msg = "Error fetching data: " + error;
+            document.getElementById("images-data-box").textContent = msg;
+            document.getElementById("posts-data-box").textContent = msg;
+            document.getElementById("comments-data-box").textContent = msg;
+          });
       });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
