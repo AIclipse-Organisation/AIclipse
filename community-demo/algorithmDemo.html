@@ -4,40 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Algorithm Demo</title>
-    <style>
-      .main-conatainer {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        justify-content: space-around;
-        width: -webkit-fill-available;
-      }
-
-      .data-column {
-        max-width: 28%;
-        min-width: 28%;
-        border: 1px solid blue;
-        margin: 5vh;
-        overflow-y: auto;
-        overflow-x: auto;
-        max-height: 60vh;
-      }
-      .top-container {
-        width: 100%;
-        text-align: center;
-      }
-
-      .basic-info-container{
-        width: 90%;
-        margin: auto;
-        border: 1px solid green;
-        padding: 10px;
-      }
-
-      .basic-info-container h3{
-        text-align: center;
-      }
-    </style>
+    <link rel="stylesheet" href="styles/main.css" />
   </head>
   <body>
     <div class="top-container">
@@ -59,45 +26,23 @@
       </div>
     </div>
 
-    <div class="top-container">
-      <h1>Calculations</h1>
-    </div>
-
     <div class="basic-info-container">
       <h3>Basic info</h3>
-
+      <button id="openPdfBtn">Open PDF for more details</button>
     </div>
-    <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        fetch("DummyData.json")
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error("Network response was not ok");
-            }
-            return response.json();
-          })
-          .then((data) => {
-            const images = data.images || [];
-            console.log("Images:", images);
-            const posts = data.posts || [];
-            console.log("posts:", posts);
-            const comments = data.comments || [];
-            console.log("comments:", comments);
 
-            document.getElementById("images-data-box").textContent =
-              JSON.stringify(images, null, 2);
-            document.getElementById("posts-data-box").textContent =
-              JSON.stringify(posts, null, 2);
-            document.getElementById("comments-data-box").textContent =
-              JSON.stringify(comments, null, 2);
-          })
-          .catch((error) => {
-            const msg = "Error fetching data: " + error;
-            document.getElementById("images-data-box").textContent = msg;
-            document.getElementById("posts-data-box").textContent = msg;
-            document.getElementById("comments-data-box").textContent = msg;
-          });
-      });
-    </script>
+    <div class="calculations-container">
+      <h1>Calculations</h1>
+
+      <h3>Step 1: Post normalisation</h3>
+
+      <div class="calculation-avg-box">
+        <div id="summary-box" class="avg-summary-box"></div>
+        <div id="normalized-box" class="normalized-summary-box"></div>
+      </div>
+    
+    </div>
+    <script src="js/calculations.js"></script>
+    <script src="js/setup.js"></script>
   </body>
 </html>

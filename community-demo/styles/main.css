@@ -1,0 +1,89 @@
+ body {
+     background: #121212;
+ }
+
+ h1 {
+     text-align: center;
+     color: rgb(255, 106, 0);
+ }
+
+ .main-conatainer {
+     display: flex;
+     flex-direction: row;
+     flex-wrap: nowrap;
+     justify-content: space-around;
+     width: -webkit-fill-available;
+ }
+
+ .data-column {
+     max-width: 28%;
+     min-width: 28%;
+     border: 1px solid blue;
+     margin: 5vh;
+     overflow-y: auto;
+     overflow-x: auto;
+     max-height: 60vh;
+     background: #e8a96a;
+ }
+
+ .calculations-container {
+     width: 90%;
+     margin: auto;
+     margin-top: 5vh;
+     padding: 10px;
+     display: flex;
+     flex-direction: column;
+     align-items: center;
+     text-align: center;
+
+     color: #e8a96a;
+ }
+
+ .basic-info-container {
+     width: 90%;
+     margin: auto;
+     padding: 10px;
+     display: flex;
+     flex-direction: column;
+     align-items: center;
+     background: #e8a96a;
+ }
+
+ .basic-info-container h3 {
+     text-align: center;
+ }
+
+ /* AVG */
+ .calculation-avg-box {
+     width: 100%;
+     display: flex;
+     flex-direction: row;
+     justify-content: space-evenly;
+ }
+
+ .avg-summary-box {
+     margin: 20px;
+     padding: 10px;
+     border-radius: 8px;
+     border: 1px solid orangered;
+     color: rgb(255, 255, 255);
+ }
+
+ .normalized-summary-box {
+     margin: 20px;
+     padding: 10px;
+     border-radius: 8px;
+     border: 1px solid orangered;
+     color: rgb(255, 255, 255);
+     max-height: 50vh;
+     overflow-y: overlay;
+ }
+
+ .normalized-post-box-card {
+     margin-bottom: 10px;
+     border: 1px solid orangered;
+     padding: 8px;
+     border-radius: 6px;
+     background: #e8a96a;
+     color: #000000;
+ }
