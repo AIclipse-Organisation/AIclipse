@@ -11,11 +11,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const posts = data.posts || [];
       const comments = data.comments || [];
 
-      console.log("Images:", images);
-      console.log("Posts:", posts);
-      console.log("Comments:", comments);
+      // console.log("Images:", images);
+      // console.log("Posts:", posts);
+      // console.log("Comments:", comments);
 
-      // --- Calc averages ---
+      // Calc avgs
       const totalClicks = posts.reduce(
         (sum, post) => sum + post.clicks_count,
         0
@@ -85,8 +85,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const gravity = 1.2;
 
       var postFinalScore;
-      
-      var postScores = {}
+
+      var postScores = {};
 
       posts.forEach((post, index) => {
         numOfVotes = post.up_vote_count + post.down_vote_count;
@@ -106,17 +106,14 @@ document.addEventListener("DOMContentLoaded", () => {
         //Time Decay Calculation
         postTime = post.created_at;
 
-        const hoursSincePost = (currentTime - post.created_at) / 3600;
+        const hoursSincePost = ((currentTime - post.created_at) / 3600);
         const gravitatedTime = Math.pow(
           hoursSincePost + constantOffset,
           gravity
         );
 
-        postFinalScore = (weightedTotal / gravitatedTime).toFixed(9);
-
-        //store in map
+        postFinalScore = weightedTotal / gravitatedTime;
         postScores[post.post_id] = postFinalScore;
-        console.log(`Post ID: ${post.post_id} - Score: ${postFinalScore}`);
 
         normalizedHTML += `
           <div class="normalized-post-box-card">
@@ -136,6 +133,55 @@ document.addEventListener("DOMContentLoaded", () => {
 
       normalizedBox.innerHTML = normalizedHTML;
       normalizedBox.style.display = "block";
+
+      const postsSorted = Object.entries(postScores).sort(
+        (a, b) => b[1] - a[1]
+      );
+      console.log("sorted posts: ", postsSorted);
+
+      const sortedPostsBox = document.getElementById("sorted-posts-box");
+      let sortedHTML = "";
+
+      postsSorted.forEach(([postId, score], index) => {
+        const post = posts.find((p) => p.post_id == postId);
+        const image = images.find((img) => img.image_id == post.image_id);
+
+        sortedHTML += `
+          <div class="sorted-post-card">
+            <div>Score: ${score.toFixed(9)}</div>
+            <div class="post-above-image">
+            Post ID: ${post.post_id}
+            Posted by: ${post.user_id}
+            </div>
+             <div class="sorted-posts-image"></div>
+
+            <div class="post-description">"${post.text}"</div>
+
+            <div class="post-under-image">
+            Clicks: <p class="data-number-post-card">${post.clicks_count} <p>
+            N.O. comments: <p class="data-number-post-card">${
+              post.comments_id.length
+            }<p>
+            </div>
+            <div class="post-under-image">
+
+            Upvotes: <p class="data-number-post-card">${post.up_vote_count} <p>
+            Downvotes: <p class="data-number-post-card">${
+              post.down_vote_count
+            }<p>
+            </div>
+           
+            <div class="post-under-image">
+            Total votes: <p class="data-number-post-card">${
+              post.up_vote_count + post.down_vote_count
+            } <p>
+            </div>
+          </div><br>
+        `;
+      });
+
+      sortedPostsBox.innerHTML = sortedHTML;
+      sortedPostsBox.style.display = "flex";
     })
     .catch((error) => {
       const msg = "Error fetching data: " + error;

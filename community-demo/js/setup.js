@@ -8,11 +8,11 @@
           })
           .then((data) => {
             const images = data.images || [];
-            console.log("Images:", images);
+            // console.log("Images:", images);
             const posts = data.posts || [];
-            console.log("posts:", posts);
+            // console.log("posts:", posts);
             const comments = data.comments || [];
-            console.log("comments:", comments);
+            // console.log("comments:", comments);
 
             document.getElementById("images-data-box").textContent =
               JSON.stringify(images, null, 2);
