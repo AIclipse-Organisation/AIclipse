@@ -1,0 +1,105 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+
+build:
+  local:
+    push: false
+  artifacts:
+    - image: aiclipse/auth
+      context: auth
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/gateway
+      context: gateway
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/media
+      context: media
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/jobs
+      context: jobs
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/detector
+      context: detector
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/plans
+      context: plans
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/billing
+      context: billing
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/client
+      context: client
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+          - src: "**/*.html"
+            dest: .
+    - image: aiclipse/observer
+      context: observer
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+manifests:
+  kustomize:
+    paths:
+      - infra
+
+deploy:
+  kubectl: {}
+
+profiles:
+  - name: dev
+    activation:
+      - kubeContext: docker-desktop
+portForward:
+  - resourceType: service
+    resourceName: mongo-srv
+    namespace: default
+    port: 27017
+    localPort: 27017
+  - resourceType: service
+    resourceName: redis-srv
+    namespace: default
+    port: 6379
+    localPort: 6379
+  - resourceType: service
+    resourceName: s3-srv
+    namespace: default
+    port: 9001
+    localPort: 9001
+  - resourceType: service
+    resourceName: s3-srv
+    namespace: default
+    port: 9000
+    localPort: 9000

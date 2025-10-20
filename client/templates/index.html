@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Photo AI Check — Simulation Client</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 24px; }
+      pre {
+        /* Wrap long log lines so messages stay visible without horizontal scroll */
+        background: #111; color: #eee; padding: 12px; border-radius: 6px; min-height: 140px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      button { padding: 8px 12px; }
+    </style>
+    <!-- All frontend calls must route through Gateway to respect service isolation -->
+    <script>window.GATEWAY_URL = '/api';</script>
+  </head>
+  <body>
+    <h1>Photo AI Check — Simulation Client</h1>
+    <!-- Phase 1 simulation: login → upload URL → create check → SSE progress/complete → fetch job -->
+    <p>Phase 1 demo. All calls go through Gateway.</p>
+    <p><button id="start">Start Simulation</button></p>
+    <pre id="log"></pre>
+    <script>
+      // Simple log helper. Consider auto-scrolling to keep the latest line in view.
+      const logEl = document.getElementById('log');
+      const log = (msg) => { logEl.textContent += msg + '\n'; };
+      // Gateway base URL. Ingress maps /api → gateway-srv:8080.
+      const GW = window.GATEWAY_URL || '/api';
+
+      async function run() {
+        log('Starting simulation...');
+
+        // Step 1: Obtain JWT via Gateway proxy to Auth (/client/login → /login).
+        let token;
+        try {
+          const r = await fetch(`${GW}/client/login`, {method:'POST'});
+          const j = await r.json();
+          token = j.token; if (!token) throw new Error('no token');
+          log('Got JWT via gateway.');
+        } catch (e) { log('Auth failed: ' + e.message); return; }
+
+        // Step 2: Request upload URL via Gateway → Media. Media validates basic constraints.
+        let assetId, uploadUrl;
+        try {
+          const r = await fetch(`${GW}/media/uploads`, {method:'POST', headers:{Authorization:`Bearer ${token}`}});
+          const j = await r.json();
+          assetId = j.asset_id || 'asset_'+Math.random().toString(16).slice(2); // fallback for demo
+          uploadUrl = j.uploadUrl || j.upload_url || j.url; // support multiple shapes in stubs
+          log('Obtained upload URL.');
+        } catch (e) { log('Upload URL error: ' + e.message); return; }
+
+        // Demo shortcut: skip actual PUT to storage; Phase 1 focuses on orchestration.
+        if (uploadUrl) { log('Skipping real PUT in demo.'); }
+
+        // Step 3: Create a check via Gateway → Jobs. Include Idempotency-Key to satisfy idempotent create.
+        let jobId;
+        try {
+          const r = await fetch(`${GW}/checks`, {
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json',
+              'Authorization':`Bearer ${token}`,
+              'Idempotency-Key': 'demo-' + Date.now() // client-provided idempotency token
+            },
+            body: JSON.stringify({asset_id: assetId, params: {}})
+          });
+          const j = await r.json();
+          jobId = j.job_id; log('Job created: ' + jobId);
+        } catch (e) { log('Create check failed: ' + e.message); return; }
+
+        // Step 4: Subscribe to Gateway SSE bridge. It relays Redis Stream events as SSE.
+        // Note: token in query is acceptable for demo; prefer Authorization headers in production.
+        const es = new EventSource(`${GW}/events?token=${encodeURIComponent(token)}`);
+        es.addEventListener('jobs.progress', (ev) => log('progress: ' + ev.data));
+        es.addEventListener('jobs.completed', async (ev) => {
+          // Step 5: On completion, fetch final job details via Gateway with owner check enforcement.
+          log('completed: ' + ev.data);
+          es.close();
+          const r = await fetch(`${GW}/jobs/${jobId}`, {headers:{Authorization:`Bearer ${token}`}});
+          const j = await r.json();
+          log('final: ' + JSON.stringify(j));
+        });
+        es.onerror = () => {
+          // Close or retry if desired; errors may occur on reconnects.
+          log('SSE error');
+        };
+      }
+
+      // Start button triggers the full simulation flow through Gateway.
+      document.getElementById('start').addEventListener('click', run);
+    </script>
+  </body>
+</html>

@@ -1,19 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth-depl
+  name: billing-depl
 spec:
   replicas: 1
-  selector: { matchLabels: { app: auth } }
+  selector: { matchLabels: { app: billing } }
   template:
-    metadata: { labels: { app: auth } }
+    metadata: { labels: { app: billing } }
     spec:
       containers:
-        - name: auth
-          image: aiclipse/auth
+        - name: billing
+          image: aiclipse/billing
           env:
-            - name: JWT_KEY
-              valueFrom: { secretKeyRef: { name: jwt-sec, key: JWT_KEY } }
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+            - name: MONGO_DB
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
           ports: [{ name: http, containerPort: 3000 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }
@@ -21,7 +23,6 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 1
             failureThreshold: 3
-
           livenessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }
             initialDelaySeconds: 40
@@ -33,14 +34,14 @@ spec:
             periodSeconds: 1
             failureThreshold: 60 
           resources:
-            requests: { cpu: "50m", memory: "64Mi" }
-            limits: { cpu: "250m", memory: "256Mi" }
+            requests: { cpu: "25m", memory: "64Mi" }
+            limits: { cpu: "200m", memory: "256Mi" }
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: auth-srv
+  name: billing-srv
 spec:
   type: ClusterIP
-  selector: { app: auth }
+  selector: { app: billing }
   ports: [{ name: http, port: 3000, targetPort: 3000 }]
