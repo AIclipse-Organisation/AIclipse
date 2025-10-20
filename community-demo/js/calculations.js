@@ -59,25 +59,77 @@ document.addEventListener("DOMContentLoaded", () => {
       summaryBox.style.display = "block";
 
       const normalizedBox = document.getElementById("normalized-box");
-      let normalizedHTML = "<h3> Normalized Data per Post</h3>";
+      let normalizedHTML = "<h3> Data per Post</h3>";
+
+      var clicksNorm;
+      var votesNorm;
+      var commentsNorm;
+
+      var numOfVotes;
+      var numOfClicks;
+      var numOfComments;
+
+      const commentsWeight = 0.3;
+      const clicksWeight = 0.1;
+      const votesWeight = 0.6;
+
+      var weightedVotes;
+      var weightedClicks;
+      var weightedComments;
+      var weightedTotal;
+
+      var currentTime = Math.floor(Date.now() / 1000); //UNIX
+      var postTime;
+      var timeResult;
+      const constantOffset = 2;
+      const gravity = 1.2;
+
+      var postFinalScore;
+      
+      var postScores = {}
 
       posts.forEach((post, index) => {
-        const clicksNorm = (post.clicks_count / avgClicks).toFixed(2);
-        const votesNorm = (
-          (post.up_vote_count + post.down_vote_count) /
-          avgVotes
-        ).toFixed(2);
-        const commentsNorm = (
-          (post.comments_id ? post.comments_id.length : 0) / avgComments
-        ).toFixed(2);
+        numOfVotes = post.up_vote_count + post.down_vote_count;
+        numOfClicks = post.clicks_count;
+        numOfComments = post.comments_id ? post.comments_id.length : 0;
+
+        clicksNorm = Number((numOfClicks / avgClicks).toFixed(2));
+        votesNorm = Number((numOfVotes / avgVotes).toFixed(2));
+        commentsNorm = Number((numOfComments / avgComments).toFixed(2));
+
+        //Weighted Scores
+        weightedVotes = votesNorm * votesWeight;
+        weightedClicks = clicksNorm * clicksWeight;
+        weightedComments = commentsNorm * commentsWeight;
+        weightedTotal = weightedVotes + weightedClicks + weightedComments;
+
+        //Time Decay Calculation
+        postTime = post.created_at;
+
+        const hoursSincePost = (currentTime - post.created_at) / 3600;
+        const gravitatedTime = Math.pow(
+          hoursSincePost + constantOffset,
+          gravity
+        );
+
+        postFinalScore = (weightedTotal / gravitatedTime).toFixed(9);
+
+        //store in map
+        postScores[post.post_id] = postFinalScore;
+        console.log(`Post ID: ${post.post_id} - Score: ${postFinalScore}`);
 
         normalizedHTML += `
           <div class="normalized-post-box-card">
             <b>Post ${index + 1}</b><br>
-            Post ID: ${post.post_id}<br>
-            Normalized Clicks: ${clicksNorm}<br>
-            Normalized Votes: ${votesNorm}<br>
-            Normalized Comments: ${commentsNorm}
+            Post ID: ${post.post_id}
+            <br><br>
+            Number of Votes: ${numOfVotes}<br>
+            Number of Comments: ${numOfClicks}<br>
+            Number of Clicks: ${numOfComments}<br>
+            <br><br>
+
+            Final Score: ${postFinalScore}<br><br>
+      
           </div>
         `;
       });
