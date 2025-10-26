@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   auth:
-    uses: ./.github/workflows/templates/k3d-smoke.yml
+    uses: ./.github/workflows/k3d-smoke.yml
     with:
       svc_name: auth
       context: ./auth
