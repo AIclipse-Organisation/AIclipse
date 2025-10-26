@@ -1,0 +1,120 @@
+name: k3d-smoke-template
+
+on:
+  workflow_call:
+    inputs:
+      svc_name:           { type: string,  required: true }
+      context:            { type: string,  required: true }
+      dockerfile:         { type: string,  required: true }
+      image_name:         { type: string,  required: true }
+      deployment_yaml:    { type: string,  required: true }
+      deployment_name:    { type: string,  required: true }
+      container_name:     { type: string,  required: true }
+      service_name:       { type: string,  required: true }
+      service_port:       { type: number,  required: true }
+      health_path:        { type: string,  required: true }
+      secrets_yaml:       { type: string,  required: true }
+      readiness_selector: { type: string,  required: true }
+      extra_manifests:    { type: string,  required: false, default: "" }
+      rollout_timeout:    { type: string,  required: false, default: "180s" }
+      namespace:          { type: string,  required: false, default: "default" }
+      k3d_version:        { type: string,  required: false, default: "v5.7.4" }
+      k3s_image:          { type: string,  required: false, default: "rancher/k3s:v1.32.2-k3s1" }
+      kubectl_version:    { type: string,  required: false, default: "v1.32.2" }
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ci-${{ github.sha }}
+      CLUSTER: ci-${{ inputs.svc_name }}
+      SVC_PORT: ${{ inputs.service_port }}
+      NAMESPACE: ${{ inputs.namespace }}
+      K3D_VERSION: ${{ inputs.k3d_version }}
+      K3S_IMAGE: ${{ inputs.k3s_image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (load locally, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          platforms: linux/amd64
+          tags: ${{ inputs.image_name }}:${{ env.IMAGE_TAG }}
+          load: true
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install k3d (pinned + checksum)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/k3d "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
+          curl -fsSL -o /tmp/checksums.txt "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/checksums.txt" || \
+          curl -fsSL -o /tmp/checksums.txt "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/sha256sum.txt"
+          EXP=$(grep 'k3d-linux-amd64' /tmp/checksums.txt | head -n1 | awk '{print $1}')
+          ACT=$(sha256sum /tmp/k3d | awk '{print $1}')
+          test "$EXP" = "$ACT"
+          install -m 0755 /tmp/k3d /usr/local/bin/k3d
+          k3d version
+
+      - name: Setup kubectl (pinned)
+        uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ inputs.kubectl_version }}
+
+      - name: Create cluster (pinned k3s)
+        run: |
+          k3d cluster create "$CLUSTER" --image "$K3S_IMAGE" --agents 1 --wait --timeout 120s
+          kubectl cluster-info
+
+      - name: Import image into cluster
+        run: k3d image import ${{ inputs.image_name }}:${{ env.IMAGE_TAG }} -c "$CLUSTER"
+
+      - name: Apply dev secrets
+        run: kubectl apply -n "$NAMESPACE" -f "${{ inputs.secrets_yaml }}"
+
+      - name: Apply extra manifests
+        if: ${{ inputs.extra_manifests != '' }}
+        shell: bash
+        run: |
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            kubectl apply -n "$NAMESPACE" -f "$f"
+          done <<'EOF'
+          ${{ inputs.extra_manifests }}
+          EOF
+
+      - name: Deploy service
+        run: |
+          kubectl apply -n "$NAMESPACE" -f "${{ inputs.deployment_yaml }}"
+          kubectl set image -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} \
+            ${{ inputs.container_name }}=${{ inputs.image_name }}:${IMAGE_TAG}
+          kubectl patch -n "$NAMESPACE" deployment ${{ inputs.deployment_name }} \
+            --type='strategic' \
+            -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.container_name }}","imagePullPolicy":"IfNotPresent"}]}}}}'
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} --timeout=${{ inputs.rollout_timeout }}
+          kubectl wait -n "$NAMESPACE" --for=condition=ready pod -l '${{ inputs.readiness_selector }}' --timeout=${{ inputs.rollout_timeout }}
+
+      - name: Start curl pod
+        run: |
+          kubectl run -n "$NAMESPACE" smoke --image=curlimages/curl:8.7.1 --restart=Never -- sh -c "sleep 300"
+          kubectl wait -n "$NAMESPACE" --for=condition=Ready pod/smoke --timeout=60s
+
+      - name: Health check
+        run: kubectl exec -n "$NAMESPACE" smoke -- sh -c 'curl -fsS http://${{ inputs.service_name }}:${SVC_PORT}${{ inputs.health_path }} >/dev/null'
+
+      - name: Logs on failure
+        if: failure()
+        run: kubectl logs -n "$NAMESPACE" deploy/${{ inputs.deployment_name }} --all-containers=true --tail=-1
+
+      - name: Cleanup
+        if: always()
+        run: k3d cluster delete "$CLUSTER"

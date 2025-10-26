@@ -1,13 +1,35 @@
-# name: tests-auth
+name: tests-auth
 
-# on:
-#   pull_request:
-#     paths:
-#       - 'auth/**'
+on:
+  pull_request:
+    paths:
+      - 'auth/**'
+      - 'infra/k8s/auth-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
 
-# jobs:
-#   build:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v3
-#       - run: cd auth && npm install && npm run test:ci
+concurrency:
+  group: tests-auth-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  auth:
+    uses: ./.github/workflows/templates/k3d-smoke.yml
+    with:
+      svc_name: auth
+      context: ./auth
+      dockerfile: auth/Dockerfile
+      image_name: aiclipse/auth
+      deployment_yaml: infra/k8s/auth-depl.yaml
+      deployment_name: auth-depl
+      container_name: auth
+      service_name: auth-srv
+      service_port: 3000
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=auth
+      # extra_manifests: |
+      #   infra/k8s/mongo-depl.yaml
+      #   infra/k8s/redis-depl.yaml
+      #   infra/k8s/s3-depl.yaml
