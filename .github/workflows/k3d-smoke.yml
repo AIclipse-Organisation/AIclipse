@@ -15,7 +15,6 @@ on:
       health_path:        { type: string,  required: true }
       secrets_yaml:       { type: string,  required: true }
       readiness_selector: { type: string,  required: true }
-      extra_manifests:    { type: string,  required: false, default: "" }
       rollout_timeout:    { type: string,  required: false, default: "150s" }
       namespace:          { type: string,  required: false, default: "default" }
       k3d_version:        { type: string,  required: false, default: "v5.7.4" }
@@ -93,12 +92,10 @@ jobs:
       - name: Apply dev secrets
         run: kubectl apply -n "$NAMESPACE" -f "${{ inputs.secrets_yaml }}"
 
-      - name: Apply extra manifests
-        if: ${{ inputs.extra_manifests != '' }}
+      - name: Apply Redis, Mongo, S3
         shell: bash
         run: |
           set -euo pipefail
-
           apply_filtered() {
             local f="$1"
             awk '
@@ -115,52 +112,49 @@ jobs:
             END { emit(buf) }
             ' "$f" | kubectl apply -n "$NAMESPACE" -f -
           }
-
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            if grep -qE '(^|[[:space:]]+)kind:[[:space:]]*StorageClass' "$f"; then
-              apply_filtered "$f"
-            else
-              kubectl apply -n "$NAMESPACE" -f "$f"
-            fi
-          done <<'EOF'
-          ${{ inputs.extra_manifests }}
-          EOF
+          apply_filtered infra/k8s/mongo-depl.yaml
+          kubectl apply -n "$NAMESPACE" -f infra/k8s/redis-depl.yaml
+          kubectl apply -n "$NAMESPACE" -f infra/k8s/s3-depl.yaml
 
       - name: Wait storage (PVC Bound)
         shell: bash
         run: |
           set -euo pipefail
-          DEPS="${{ inputs.extra_manifests }}"
-          TO="${{ inputs.rollout_timeout }}"
-          if echo "$DEPS" | grep -q 'redis-depl.yaml'; then
-            kubectl wait -n "$NAMESPACE" --for=condition=Bound pvc/data-redis-0 --timeout="$TO" || \
-            { kubectl describe -n "$NAMESPACE" pvc/data-redis-0; exit 1; }
-          fi
-          if echo "$DEPS" | grep -q 'mongo-depl.yaml'; then
-            kubectl wait -n "$NAMESPACE" --for=condition=Bound pvc/data-mongo-0 --timeout="$TO" || \
-            { kubectl describe -n "$NAMESPACE" pvc/data-mongo-0; exit 1; }
-          fi
-          if echo "$DEPS" | grep -q 's3-depl.yaml'; then
-            kubectl wait -n "$NAMESPACE" --for=condition=Bound pvc/s3-pvc --timeout="$TO" || \
-            { kubectl describe -n "$NAMESPACE" pvc/s3-pvc; exit 1; }
-          fi
+          TO_SEC=$(echo '${{ inputs.rollout_timeout }}' | sed 's/s$//')
+          wait_pvc() {
+            local name="$1"
+            local deadline=$(( $(date +%s) + TO_SEC ))
+            echo ">> waiting PVC/$name"
+            while true; do
+              if kubectl -n "$NAMESPACE" get pvc "$name" >/dev/null 2>&1; then
+                phase=$(kubectl -n "$NAMESPACE" get pvc "$name" -o jsonpath='{.status.phase}')
+                if [ "$phase" = "Bound" ]; then
+                  echo "OK PVC/$name Bound"
+                  return 0
+                fi
+              fi
+              if [ $(date +%s) -ge $deadline ]; then
+                echo "timeout PVC/$name"
+                kubectl -n "$NAMESPACE" get sc,pv,pvc || true
+                kubectl -n "$NAMESPACE" describe pvc "$name" || true
+                kubectl -n kube-system get pods | grep local-path || true
+                kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
+                return 1
+              fi
+              sleep 2
+            done
+          }
+          for claim in data-redis-0 data-mongo-0 s3-pvc; do
+            wait_pvc "$claim"
+          done
 
       - name: Wait deps
         shell: bash
         run: |
           set -euo pipefail
-          DEPS="${{ inputs.extra_manifests }}"
-          wait_ro() { kubectl rollout status -n "$NAMESPACE" "$1" --timeout=${{ inputs.rollout_timeout }}; }
-          if echo "$DEPS" | grep -q 'redis-depl.yaml'; then
-            kubectl get statefulset/redis -n "$NAMESPACE" >/dev/null 2>&1 && wait_ro statefulset/redis
-          fi
-          if echo "$DEPS" | grep -q 'mongo-depl.yaml'; then
-            kubectl get statefulset/mongo -n "$NAMESPACE" >/dev/null 2>&1 && wait_ro statefulset/mongo
-          fi
-          if echo "$DEPS" | grep -q 's3-depl.yaml'; then
-            kubectl get deployment/s3-depl -n "$NAMESPACE"  >/dev/null 2>&1 && wait_ro deployment/s3-depl
-          fi
+          kubectl rollout status -n "$NAMESPACE" statefulset/redis --timeout=${{ inputs.rollout_timeout }}
+          kubectl rollout status -n "$NAMESPACE" statefulset/mongo --timeout=${{ inputs.rollout_timeout }}
+          kubectl rollout status -n "$NAMESPACE" deployment/s3-depl --timeout=${{ inputs.rollout_timeout }}
 
       - name: Deploy service
         shell: bash
@@ -198,7 +192,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          kubectl -n "$NAMESPACE" get sc,pvc,pods || true
+          kubectl -n "$NAMESPACE" get sc,pv,pvc,pods || true
           kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
           if kubectl -n "$NAMESPACE" get deploy/${{ inputs.deployment_name }} >/dev/null 2>&1; then
             kubectl logs -n "$NAMESPACE" deploy/${{ inputs.deployment_name }} --all-containers=true --tail=-1 || true
