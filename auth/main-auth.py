@@ -77,6 +77,6 @@ class _HealthzFilter(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(_HealthzFilter())
 
 
-@app.get("/healthzz")
+@app.get("/healthz")
 def healthz():
     return {"status": "ok"}
