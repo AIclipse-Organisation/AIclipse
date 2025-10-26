@@ -96,24 +96,23 @@ jobs:
           apply_filtered() {
             local f="$1"
             awk '
-            BEGIN{doc=""; sep=""}
-            /^---[[:space:]]*$/ {
-              if (doc != "") {
-                if (!(doc ~ /kind:[[:space:]]*StorageClass/ && doc ~ /name:[[:space:]]*hostpath-retain/)) { print sep doc }
-              }
-              doc=""; sep="---"; next
+            function emit(buf,   first){
+              if (buf == "") return
+              if (buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return
+              if (printed) printf("---\n")
+              printf("%s", buf)
+              printed=1
             }
-            { doc = doc $0 ORS }
-            END{
-              if (doc != "") {
-                if (!(doc ~ /kind:[[:space:]]*StorageClass/ && doc ~ /name:[[:space:]]*hostpath-retain/)) { print sep doc }
-              }
-            }' "$f" | kubectl apply -n "$NAMESPACE" -f -
+            BEGIN { buf=""; printed=0 }
+            /^---[[:space:]]*$/ { emit(buf); buf=""; next }
+            { buf = buf $0 ORS }
+            END { emit(buf) }
+            ' "$f" | kubectl apply -n "$NAMESPACE" -f -
           }
 
           while IFS= read -r f; do
             [ -z "$f" ] && continue
-            if grep -qE '^kind:[[:space:]]*StorageClass|^apiVersion: storage.k8s.io' "$f"; then
+            if grep -qE '(^|[[:space:]]+)kind:[[:space:]]*StorageClass' "$f"; then
               apply_filtered "$f"
             else
               kubectl apply -n "$NAMESPACE" -f "$f"
