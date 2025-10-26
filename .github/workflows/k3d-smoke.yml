@@ -1,5 +1,6 @@
 # Goal: spin up a throwaway k3d cluster, create StorageClass compatible with k3d,
 # deploy Redis/Mongo/S3 as deps, deploy the target service, and probe health.
+# Images are always used locally (no pulls).
 
 name: k3d-smoke-template
 
@@ -40,7 +41,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Build image (load locally, no push)
-        # Build once, load into the runner’s Docker, import into k3d later.
+        # Build once, load into the runner’s Docker; we will import into all k3d nodes.
         uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.context }}
@@ -95,9 +96,17 @@ jobs:
           fi
           kubectl get sc
 
-      - name: Import image into cluster
-        # Makes the built image available inside k3d without pushing to a registry.
-        run: k3d image import ${{ inputs.image_name }}:${{ env.IMAGE_TAG }} -c "$CLUSTER"
+      - name: Import image into all k3d nodes
+        # Ensure every node has the CI image so kubelet never pulls from Docker Hub.
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
+          for NODE in $(k3d node list "$CLUSTER" | awk 'NR>1 {print $1}'); do
+            echo "importing $IMG into $NODE"
+            k3d image import "$IMG" -c "$CLUSTER" --nodes "$NODE"
+          done
+          kubectl get nodes -o name
 
       - name: Apply dev secrets
         # Supplies creds/URIs for deps and the service under test.
@@ -182,6 +191,15 @@ jobs:
           TMP="/tmp/depl.yaml"
           sed "s|image: ${{ inputs.image_name }}|image: ${IMG}|g" "$DEP" > "$TMP"
           kubectl apply -n "$NAMESPACE" -f "$TMP"
+
+      - name: Force local image usage
+        # Guarantee kubelet never pulls from a registry. Fail fast if image is missing.
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n "$NAMESPACE" patch deployment/${{ inputs.deployment_name }} \
+            --type=strategic \
+            -p '{"spec":{"template":{"spec":{"containers":[{"name":"'"${{ inputs.container_name }}"'","imagePullPolicy":"Never"}]}}}}'
 
       - name: Wait for rollout
         # The app must be ready before probing.
