@@ -72,6 +72,15 @@ jobs:
           k3d cluster create "$CLUSTER" --image "$K3S_IMAGE" --agents 1 --wait --timeout 120s
           kubectl cluster-info
 
+      - name: Ensure hostpath-retain StorageClass
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! kubectl get sc hostpath-retain >/dev/null 2>&1; then
+            kubectl apply -f .github/workflows/storageclass-hostpath-retain.yaml
+          fi
+          kubectl get sc
+
       - name: Import image into cluster
         run: k3d image import ${{ inputs.image_name }}:${{ env.IMAGE_TAG }} -c "$CLUSTER"
 
@@ -88,6 +97,25 @@ jobs:
           done <<'EOF'
           ${{ inputs.extra_manifests }}
           EOF
+
+      - name: Wait storage (PVC Bound)
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEPS="${{ inputs.extra_manifests }}"
+          TO="${{ inputs.rollout_timeout }}"
+          if echo "$DEPS" | grep -q 'redis-depl.yaml'; then
+            kubectl wait -n "$NAMESPACE" --for=condition=Bound pvc/data-redis-0 --timeout="$TO" || \
+            { kubectl describe -n "$NAMESPACE" pvc/data-redis-0; exit 1; }
+          fi
+          if echo "$DEPS" | grep -q 'mongo-depl.yaml'; then
+            kubectl wait -n "$NAMESPACE" --for=condition=Bound pvc/data-mongo-0 --timeout="$TO" || \
+            { kubectl describe -n "$NAMESPACE" pvc/data-mongo-0; exit 1; }
+          fi
+          if echo "$DEPS" | grep -q 's3-depl.yaml'; then
+            kubectl wait -n "$NAMESPACE" --for=condition=Bound pvc/s3-pvc --timeout="$TO" || \
+            { kubectl describe -n "$NAMESPACE" pvc/s3-pvc; exit 1; }
+          fi
 
       - name: Wait deps
         shell: bash
