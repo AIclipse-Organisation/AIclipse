@@ -1,6 +1,7 @@
 name: tests-auth
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'auth/**'
