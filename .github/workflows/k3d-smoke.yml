@@ -97,15 +97,26 @@ jobs:
           kubectl get sc
 
       - name: Import image into all k3d nodes
-        # Ensure every node has the CI image so kubelet never pulls from Docker Hub.
+        # Ensure every node has the CI image so kubelet never pulls from a registry.
         shell: bash
         run: |
           set -euo pipefail
           IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
-          for NODE in $(k3d node list "$CLUSTER" | awk 'NR>1 {print $1}'); do
-            echo "importing $IMG into $NODE"
-            k3d image import "$IMG" -c "$CLUSTER" --nodes "$NODE"
-          done
+          if k3d image import --help | grep -q -- '--all-nodes'; then
+            # Preferred path on newer k3d
+            k3d image import "$IMG" --cluster "$CLUSTER" --all-nodes
+          else
+            # Fallback: enumerate nodes for this cluster and import into each
+            NODES=$(k3d node list --cluster "$CLUSTER" 2>/dev/null | awk 'NR>1 {print $1}')
+            if [ -z "${NODES:-}" ]; then
+              # Older k3d without --cluster filter: grep by cluster column
+              NODES=$(k3d node list 2>/dev/null | awk -v c="$CLUSTER" 'NR>1 && $3==c {print $1}')
+            end
+            for NODE in $NODES; do
+              echo "importing $IMG into $NODE"
+              k3d image import "$IMG" --cluster "$CLUSTER" --nodes "$NODE"
+            done
+          fi
           kubectl get nodes -o name
 
       - name: Apply dev secrets
