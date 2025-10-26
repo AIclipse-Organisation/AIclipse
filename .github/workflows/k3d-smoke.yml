@@ -90,13 +90,15 @@ jobs:
           EOF
 
       - name: Deploy service
+        shell: bash
         run: |
-          kubectl apply -n "$NAMESPACE" -f "${{ inputs.deployment_yaml }}"
-          kubectl set image -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} \
-            ${{ inputs.container_name }}=${{ inputs.image_name }}:${IMAGE_TAG}
-          kubectl patch -n "$NAMESPACE" deployment ${{ inputs.deployment_name }} \
-            --type='strategic' \
-            -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.container_name }}","imagePullPolicy":"IfNotPresent"}]}}}}'
+          set -euo pipefail
+          IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
+          DEP="${{ inputs.deployment_yaml }}"
+          CONTAINER="${{ inputs.container_name }}"
+          kubectl create -f "$DEP" --dry-run=client -o yaml \
+          | kubectl set image --local -f - "${CONTAINER}=${IMG}" -o yaml \
+          | kubectl apply -n "$NAMESPACE" -f -
 
       - name: Wait for rollout
         run: kubectl rollout status -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} --timeout=${{ inputs.rollout_timeout }}
