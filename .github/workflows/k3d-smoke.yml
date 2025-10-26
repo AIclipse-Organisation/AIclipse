@@ -91,9 +91,33 @@ jobs:
         if: ${{ inputs.extra_manifests != '' }}
         shell: bash
         run: |
+          set -euo pipefail
+
+          apply_filtered() {
+            local f="$1"
+            awk '
+            BEGIN{doc=""; sep=""}
+            /^---[[:space:]]*$/ {
+              if (doc != "") {
+                if (!(doc ~ /kind:[[:space:]]*StorageClass/ && doc ~ /name:[[:space:]]*hostpath-retain/)) { print sep doc }
+              }
+              doc=""; sep="---"; next
+            }
+            { doc = doc $0 ORS }
+            END{
+              if (doc != "") {
+                if (!(doc ~ /kind:[[:space:]]*StorageClass/ && doc ~ /name:[[:space:]]*hostpath-retain/)) { print sep doc }
+              }
+            }' "$f" | kubectl apply -n "$NAMESPACE" -f -
+          }
+
           while IFS= read -r f; do
             [ -z "$f" ] && continue
-            kubectl apply -n "$NAMESPACE" -f "$f"
+            if grep -qE '^kind:[[:space:]]*StorageClass|^apiVersion: storage.k8s.io' "$f"; then
+              apply_filtered "$f"
+            else
+              kubectl apply -n "$NAMESPACE" -f "$f"
+            fi
           done <<'EOF'
           ${{ inputs.extra_manifests }}
           EOF
