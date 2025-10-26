@@ -89,27 +89,18 @@ jobs:
           ${{ inputs.extra_manifests }}
           EOF
 
-      - name: Wait deps (if declared)
+      - name: Wait deps (deployments)
         shell: bash
         run: |
           set -euo pipefail
-          wait_svc() {
-            local svc="$1" tries=60
-            for i in $(seq 1 $tries); do
-              if kubectl get endpoints "$svc" -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '^[0-9]'; then
-                echo "svc $svc has endpoints"; return 0
-              fi
-              sleep 2
-            done
-            echo "svc $svc has no endpoints"; return 1
-          }
-          # autodetect by filename substrings
-          MANIFESTS='${{ inputs.extra_manifests }}'
-          echo "$MANIFESTS"
-          if echo "$MANIFESTS" | grep -q 'redis-depl.yaml'; then wait_svc redis-srv; fi
-          if echo "$MANIFESTS" | grep -q 'mongo-depl.yaml'; then wait_svc mongo-srv; fi
-          if echo "$MANIFESTS" | grep -q 's3-depl.yaml';    then wait_svc s3-srv; fi
-          
+          DEPS="${{ inputs.extra_manifests }}"
+          wait_dep() { kubectl rollout status -n "$NAMESPACE" "deployment/$1" --timeout=${{ inputs.rollout_timeout }}; }
+
+          echo "$DEPS"
+          grep -q 'redis-depl.yaml' <<< "$DEPS" && wait_dep redis-depl
+          grep -q 'mongo-depl.yaml' <<< "$DEPS" && wait_dep mongo-depl
+          grep -q 's3-depl.yaml'    <<< "$DEPS" && wait_dep s3-depl
+
       - name: Deploy service
         shell: bash
         run: |
