@@ -107,11 +107,11 @@ jobs:
             k3d image import "$IMG" --cluster "$CLUSTER" --all-nodes
           else
             # Fallback: enumerate nodes for this cluster and import into each
-            NODES=$(k3d node list --cluster "$CLUSTER" 2>/dev/null | awk 'NR>1 {print $1}')
+            NODES=$(k3d node list 2>/dev/null | awk -v c="$CLUSTER" 'NR>1 && $3==c {print $1}')
             if [ -z "${NODES:-}" ]; then
-              # Older k3d without --cluster filter: grep by cluster column
-              NODES=$(k3d node list 2>/dev/null | awk -v c="$CLUSTER" 'NR>1 && $3==c {print $1}')
-            end
+              # Static fallback for the default topology (1 server, 1 agent)
+              NODES="k3d-$CLUSTER-server-0 k3d-$CLUSTER-agent-0"
+            fi
             for NODE in $NODES; do
               echo "importing $IMG into $NODE"
               k3d image import "$IMG" --cluster "$CLUSTER" --nodes "$NODE"
