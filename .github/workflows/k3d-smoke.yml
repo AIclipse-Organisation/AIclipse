@@ -89,17 +89,21 @@ jobs:
           ${{ inputs.extra_manifests }}
           EOF
 
-      - name: Wait deps (deployments)
+      - name: Wait deps
         shell: bash
         run: |
           set -euo pipefail
           DEPS="${{ inputs.extra_manifests }}"
-          wait_dep() { kubectl rollout status -n "$NAMESPACE" "deployment/$1" --timeout=${{ inputs.rollout_timeout }}; }
-
-          echo "$DEPS"
-          grep -q 'redis-depl.yaml' <<< "$DEPS" && wait_dep redis-depl
-          grep -q 'mongo-depl.yaml' <<< "$DEPS" && wait_dep mongo-depl
-          grep -q 's3-depl.yaml'    <<< "$DEPS" && wait_dep s3-depl
+          wait_ro() { kubectl rollout status -n "$NAMESPACE" "$1" --timeout=${{ inputs.rollout_timeout }}; }
+          if echo "$DEPS" | grep -q 'redis-depl.yaml'; then
+            kubectl get statefulset/redis -n "$NAMESPACE" >/dev/null 2>&1 && wait_ro statefulset/redis
+          fi
+          if echo "$DEPS" | grep -q 'mongo-depl.yaml'; then
+            kubectl get statefulset/mongo -n "$NAMESPACE" >/dev/null 2>&1 && wait_ro statefulset/mongo
+          fi
+          if echo "$DEPS" | grep -q 's3-depl.yaml'; then
+            kubectl get deployment/s3-depl -n "$NAMESPACE"  >/dev/null 2>&1 && wait_ro deployment/s3-depl
+          fi
 
       - name: Deploy service
         shell: bash
@@ -134,7 +138,7 @@ jobs:
 
       - name: Logs on failure
         if: failure()
-        run: kubectl logs -n "$NAMESPACE" deploy/${{ inputs.deployment_name }} --all-containers=true --tail=-1
+        run: kubectl logs -n "$NAMESPACE" deploy/${{ inputs.deployment_name }} --all-containers=true --tail=-1 || true
 
       - name: Cleanup
         if: always()
