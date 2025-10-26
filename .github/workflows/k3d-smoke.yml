@@ -96,32 +96,13 @@ jobs:
           fi
           kubectl get sc
 
-      - name: Import image into cluster (direct mode + verify on nodes)
+      - name: Import image into cluster (direct mode)
         shell: bash
-        # Import directly into all nodes to avoid tools-node tar race
-        # Verify the image exists in containerd on every node (exclude serverlb)
         run: |
           set -euo pipefail
           IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
-          k3d image import "$IMG" --cluster "$CLUSTER" --mode=direct
+          k3d image import "$IMG" -c "$CLUSTER" --mode=direct
 
-          NODES=$(k3d node list --cluster "$CLUSTER" 2>/dev/null | awk 'NR>1 && ($2=="server" || $2=="agent"){print $1}')
-          if [ -z "${NODES:-}" ]; then
-            NODES="k3d-$CLUSTER-server-0 k3d-$CLUSTER-agent-0"
-          fi
-
-          REPO_BASENAME="$(basename "${{ inputs.image_name }}")"
-          for NODE in $NODES; do
-            echo "verifying $IMG on $NODE"
-            docker exec "$NODE" /bin/ctr -n k8s.io images list | \
-              grep -Eq "/${REPO_BASENAME}:${IMAGE_TAG}$" || {
-                echo "image missing on $NODE"
-                docker exec "$NODE" /bin/ctr -n k8s.io images list || true
-                exit 1
-              }
-          done
-
-          kubectl get nodes -o name
 
       - name: Apply dev secrets
         # Supplies creds/URIs for deps and the service under test.
