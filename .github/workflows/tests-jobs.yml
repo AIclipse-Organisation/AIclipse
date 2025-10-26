@@ -30,7 +30,3 @@ jobs:
       health_path: /healthz
       secrets_yaml: infra/k8s-dev/dev-secrets.yaml
       readiness_selector: app=jobs
-      extra_manifests: |
-        infra/k8s/mongo-depl.yaml
-        infra/k8s/redis-depl.yaml
-      #   infra/k8s/s3-depl.yaml
