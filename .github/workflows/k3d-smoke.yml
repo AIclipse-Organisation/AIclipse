@@ -95,17 +95,9 @@ jobs:
           set -euo pipefail
           IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
           DEP="${{ inputs.deployment_yaml }}"
-          TMP=/tmp/kust
-          mkdir -p "$TMP"
-          cat > "$TMP/kustomization.yaml" <<EOF
-          resources:
-            - $DEP
-          images:
-            - name: ${{ inputs.image_name }}
-              newName: ${{ inputs.image_name }}
-              newTag: ${IMAGE_TAG}
-          EOF
-          kubectl apply -n "$NAMESPACE" -k "$TMP"
+          TMP="/tmp/depl.yaml"
+          sed "s|image: ${{ inputs.image_name }}|image: ${IMG}|g" "$DEP" > "$TMP"
+          kubectl apply -n "$NAMESPACE" -f "$TMP"
 
       - name: Wait for rollout
         run: kubectl rollout status -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} --timeout=${{ inputs.rollout_timeout }}
