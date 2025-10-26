@@ -72,6 +72,12 @@ jobs:
           k3d cluster create "$CLUSTER" --image "$K3S_IMAGE" --agents 1 --wait --timeout 120s
           kubectl cluster-info
 
+      - name: Wait local-path-provisioner
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n kube-system rollout status deploy/local-path-provisioner --timeout=90s
+
       - name: Ensure hostpath-retain StorageClass
         shell: bash
         run: |
@@ -96,7 +102,7 @@ jobs:
           apply_filtered() {
             local f="$1"
             awk '
-            function emit(buf,   first){
+            function emit(buf){
               if (buf == "") return
               if (buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return
               if (printed) printf("---\n")
@@ -189,7 +195,14 @@ jobs:
 
       - name: Logs on failure
         if: failure()
-        run: kubectl logs -n "$NAMESPACE" deploy/${{ inputs.deployment_name }} --all-containers=true --tail=-1 || true
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n "$NAMESPACE" get sc,pvc,pods || true
+          kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
+          if kubectl -n "$NAMESPACE" get deploy/${{ inputs.deployment_name }} >/dev/null 2>&1; then
+            kubectl logs -n "$NAMESPACE" deploy/${{ inputs.deployment_name }} --all-containers=true --tail=-1 || true
+          fi
 
       - name: Cleanup
         if: always()
