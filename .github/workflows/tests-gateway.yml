@@ -1,0 +1,36 @@
+name: tests-gateway
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'gateway/**'
+      - 'infra/k8s/gateway-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-gateway-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gateway:
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: gateway
+      context: ./gateway
+      dockerfile: gateway/Dockerfile
+      image_name: aiclipse/gateway
+      deployment_yaml: infra/k8s/gateway-depl.yaml
+      deployment_name: gateway-depl
+      container_name: gateway
+      service_name: gateway-srv
+      service_port: 8080
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=gateway
+      extra_manifests: |
+        infra/k8s/redis-depl.yaml
+      #   infra/k8s/mongo-depl.yaml
+      #   infra/k8s/s3-depl.yaml
