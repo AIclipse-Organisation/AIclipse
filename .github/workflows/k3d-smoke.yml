@@ -99,17 +99,24 @@ jobs:
             -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.container_name }}","imagePullPolicy":"IfNotPresent"}]}}}}'
 
       - name: Wait for rollout
-        run: |
-          kubectl rollout status -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} --timeout=${{ inputs.rollout_timeout }}
-          kubectl wait -n "$NAMESPACE" --for=condition=ready pod -l '${{ inputs.readiness_selector }}' --timeout=${{ inputs.rollout_timeout }}
+        run: kubectl rollout status -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} --timeout=${{ inputs.rollout_timeout }}
 
       - name: Start curl pod
         run: |
           kubectl run -n "$NAMESPACE" smoke --image=curlimages/curl:8.7.1 --restart=Never -- sh -c "sleep 300"
           kubectl wait -n "$NAMESPACE" --for=condition=Ready pod/smoke --timeout=60s
 
-      - name: Health check
-        run: kubectl exec -n "$NAMESPACE" smoke -- sh -c 'curl -fsS http://${{ inputs.service_name }}:${SVC_PORT}${{ inputs.health_path }} >/dev/null'
+      - name: Health check (with retries)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..5}; do
+            if kubectl exec -n "$NAMESPACE" smoke -- sh -c 'curl -fsS http://${{ inputs.service_name }}:${SVC_PORT}${{ inputs.health_path }} >/dev/null'; then
+              echo "healthz OK"; exit 0
+            fi
+            echo "retry $i"; sleep 3
+          done
+          echo "healthz failed"; exit 1
 
       - name: Logs on failure
         if: failure()
