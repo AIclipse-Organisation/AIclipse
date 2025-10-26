@@ -110,8 +110,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          URL="http://${{ inputs.service_name }}:${{ inputs.service_port }}${{ inputs.health_path }}"
           for i in {1..5}; do
-            if kubectl exec -n "$NAMESPACE" smoke -- sh -c 'curl -fsS http://${{ inputs.service_name }}:${SVC_PORT}${{ inputs.health_path }} >/dev/null'; then
+            if kubectl exec -n "$NAMESPACE" smoke -- sh -c "curl -fsS $URL >/dev/null"; then
               echo "healthz OK"; exit 0
             fi
             echo "retry $i"; sleep 3
