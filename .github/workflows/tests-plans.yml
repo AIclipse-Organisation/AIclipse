@@ -1,0 +1,36 @@
+name: tests-plans
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'plans/**'
+      - 'infra/k8s/plans-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-plans-${{ github.ref }}
+  cancel-in-progress: true
+
+plans:
+  plans:
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: plans
+      context: ./plans
+      dockerfile: plans/Dockerfile
+      image_name: aiclipse/plans
+      deployment_yaml: infra/k8s/plans-depl.yaml
+      deployment_name: plans-depl
+      container_name: plans
+      service_name: plans-srv
+      service_port: 3000
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=plans
+      extra_manifests: |
+        infra/k8s/mongo-depl.yaml
+      #   infra/k8s/redis-depl.yaml
+      #   infra/k8s/s3-depl.yaml

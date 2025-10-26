@@ -1,0 +1,36 @@
+name: tests-media
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'media/**'
+      - 'infra/k8s/media-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-media-${{ github.ref }}
+  cancel-in-progress: true
+
+media:
+  media:
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: media
+      context: ./media
+      dockerfile: media/Dockerfile
+      image_name: aiclipse/media
+      deployment_yaml: infra/k8s/media-depl.yaml
+      deployment_name: media-depl
+      container_name: media
+      service_name: media-srv
+      service_port: 3000
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=media
+      extra_manifests: |
+        infra/k8s/mongo-depl.yaml
+        infra/k8s/redis-depl.yaml
+      #   infra/k8s/s3-depl.yaml

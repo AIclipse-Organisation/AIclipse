@@ -1,0 +1,36 @@
+name: tests-billing
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'billing/**'
+      - 'infra/k8s/billing-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-billing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  billing:
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: billing
+      context: ./billing
+      dockerfile: billing/Dockerfile
+      image_name: aiclipse/billing
+      deployment_yaml: infra/k8s/billing-depl.yaml
+      deployment_name: billing-depl
+      container_name: billing
+      service_name: billing-srv
+      service_port: 3000
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=billing
+      extra_manifests: |
+        infra/k8s/mongo-depl.yaml
+      #   infra/k8s/redis-depl.yaml
+      #   infra/k8s/s3-depl.yaml

@@ -1,0 +1,36 @@
+name: tests-observer
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'observer/**'
+      - 'infra/k8s/observer-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-observer-${{ github.ref }}
+  cancel-in-progress: true
+
+observer:
+  observer:
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: observer
+      context: ./observer
+      dockerfile: observer/Dockerfile
+      image_name: aiclipse/observer
+      deployment_yaml: infra/k8s/observer-depl.yaml
+      deployment_name: observer-depl
+      container_name: observer
+      service_name: observer-srv
+      service_port: 3000
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=observer
+      extra_manifests: |
+        infra/k8s/redis-depl.yaml
+      #   infra/k8s/mongo-depl.yaml
+      #   infra/k8s/s3-depl.yaml
