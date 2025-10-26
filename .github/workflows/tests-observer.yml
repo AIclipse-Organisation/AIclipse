@@ -14,7 +14,7 @@ concurrency:
   group: tests-observer-${{ github.ref }}
   cancel-in-progress: true
 
-observer:
+jobs:
   observer:
     uses: ./.github/workflows/k3d-smoke.yml
     with:

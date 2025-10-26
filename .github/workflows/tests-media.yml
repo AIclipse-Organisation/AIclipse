@@ -14,7 +14,7 @@ concurrency:
   group: tests-media-${{ github.ref }}
   cancel-in-progress: true
 
-media:
+jobs:
   media:
     uses: ./.github/workflows/k3d-smoke.yml
     with:

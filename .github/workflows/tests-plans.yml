@@ -14,7 +14,7 @@ concurrency:
   group: tests-plans-${{ github.ref }}
   cancel-in-progress: true
 
-plans:
+jobs:
   plans:
     uses: ./.github/workflows/k3d-smoke.yml
     with:
