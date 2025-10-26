@@ -21,6 +21,7 @@ on:
       k3d_version:        { type: string,  required: false, default: "v5.7.4" }
       k3s_image:          { type: string,  required: false, default: "rancher/k3s:v1.32.2-k3s1" }
       kubectl_version:    { type: string,  required: false, default: "v1.32.2" }
+      curl_image:         { type: string,  required: false, default: "curlimages/curl:8.7.1" }
 
 jobs:
   smoke:
@@ -89,21 +90,32 @@ jobs:
           ${{ inputs.extra_manifests }}
           EOF
 
-      - name: Deploy service
+      - name: Install yq
         run: |
-          kubectl apply -n "$NAMESPACE" -f "${{ inputs.deployment_yaml }}"
-          kubectl set image -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} \
-            ${{ inputs.container_name }}=${{ inputs.image_name }}:${IMAGE_TAG}
-          kubectl patch -n "$NAMESPACE" deployment ${{ inputs.deployment_name }} \
-            --type='strategic' \
-            -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.container_name }}","imagePullPolicy":"IfNotPresent"}]}}}}'
+          curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Deploy service (rendered with CI image, Recreate)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
+          export CONTAINER="${{ inputs.container_name }}"
+          export DEP="${{ inputs.deployment_yaml }}"
+          yq -y '
+            .spec.strategy.type = "Recreate" |
+            (.spec.template.spec.containers[] | select(.name == env(CONTAINER)).image) = env(IMG) |
+            (.spec.template.spec.containers[] | select(.name == env(CONTAINER)).imagePullPolicy) = "IfNotPresent"
+          ' "$DEP" > /tmp/depl.yaml
+          kubectl apply -n "$NAMESPACE" -f /tmp/depl.yaml
 
       - name: Wait for rollout
         run: kubectl rollout status -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} --timeout=${{ inputs.rollout_timeout }}
 
       - name: Start curl pod
         run: |
-          kubectl run -n "$NAMESPACE" smoke --image=curlimages/curl:8.7.1 --restart=Never -- sh -c "sleep 300"
+          kubectl run -n "$NAMESPACE" smoke --image=${{ inputs.curl_image }} --restart=Never -- sh -c "sleep 300"
           kubectl wait -n "$NAMESPACE" --for=condition=Ready pod/smoke --timeout=60s
 
       - name: Health check (with retries)
