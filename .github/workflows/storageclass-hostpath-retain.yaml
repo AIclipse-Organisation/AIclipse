@@ -1,8 +1,8 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: hostpath-retain
-provisioner: rancher.io/local-path
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: false
+  name: hostpath-retain               # Name referenced by Redis/Mongo PVCs
+provisioner: rancher.io/local-path    # k3d/k3s built-in provisioner
+reclaimPolicy: Retain                 # Keep PVs after PVC deletion (easier debug)
+volumeBindingMode: WaitForFirstConsumer  # Required for local-path so the scheduler picks a node before PV creation
+allowVolumeExpansion: false           # No volume resize in smoke tests
