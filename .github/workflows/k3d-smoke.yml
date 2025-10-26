@@ -103,7 +103,7 @@ jobs:
           export IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
           export CONTAINER="${{ inputs.container_name }}"
           export DEP="${{ inputs.deployment_yaml }}"
-          yq -y '
+          yq eval -o=yaml '
             .spec.strategy.type = "Recreate" |
             (.spec.template.spec.containers[] | select(.name == env(CONTAINER)).image) = env(IMG) |
             (.spec.template.spec.containers[] | select(.name == env(CONTAINER)).imagePullPolicy) = "IfNotPresent"
