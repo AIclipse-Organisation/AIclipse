@@ -16,7 +16,7 @@ on:
       secrets_yaml:       { type: string,  required: true }
       readiness_selector: { type: string,  required: true }
       extra_manifests:    { type: string,  required: false, default: "" }
-      rollout_timeout:    { type: string,  required: false, default: "90s" }
+      rollout_timeout:    { type: string,  required: false, default: "150s" }
       namespace:          { type: string,  required: false, default: "default" }
       k3d_version:        { type: string,  required: false, default: "v5.7.4" }
       k3s_image:          { type: string,  required: false, default: "rancher/k3s:v1.32.2-k3s1" }
