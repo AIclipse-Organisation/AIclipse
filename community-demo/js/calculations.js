@@ -87,8 +87,18 @@ document.addEventListener("DOMContentLoaded", () => {
       var postFinalScore;
 
       var postScores = {};
+      var commentsHTML = "";
+
+      var parentChildCommentsMap = {};
+      var postComments = [];
+
+      var commentsPerPost = {};
+
 
       posts.forEach((post, index) => {
+        commentsHTML = "";
+        postComments = post.comments_id || [];
+
         numOfVotes = post.up_vote_count + post.down_vote_count;
         numOfClicks = post.clicks_count;
         numOfComments = post.comments_id ? post.comments_id.length : 0;
@@ -106,7 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
         //Time Decay Calculation
         postTime = post.created_at;
 
-        const hoursSincePost = ((currentTime - post.created_at) / 3600);
+        const hoursSincePost = (currentTime - post.created_at) / 3600;
         const gravitatedTime = Math.pow(
           hoursSincePost + constantOffset,
           gravity
@@ -115,6 +125,43 @@ document.addEventListener("DOMContentLoaded", () => {
         postFinalScore = weightedTotal / gravitatedTime;
         postScores[post.post_id] = postFinalScore;
 
+        // COMMENTS
+        parentChildCommentsMap = {};
+
+        // find parents first
+        postComments.forEach((cid) => {
+          const comment = comments.find((c) => c.comment_id === cid);
+          if (comment && comment.parent_comment_id === null) {
+            parentChildCommentsMap[comment.comment_id] = [];
+          }
+        });
+
+        // assign children
+        postComments.forEach((cid) => {
+          const comment = comments.find((c) => c.comment_id === cid);
+          if (comment && comment.parent_comment_id !== null) {
+            if (parentChildCommentsMap[comment.parent_comment_id]) {
+              parentChildCommentsMap[comment.parent_comment_id].push(
+                comment.comment_id
+              );
+            }
+          }
+        });
+
+        // Build HTML for comments
+        for (const [parent, children] of Object.entries(
+          parentChildCommentsMap
+        )) {
+          if (children.length > 0) {
+            commentsHTML += `Parent: ${parent}, Child: ${children.join(
+              ", "
+            )}<br>`;
+          } else {
+            commentsHTML += `Parent: ${parent}<br>`;
+          }
+        }
+
+        commentsPerPost[post.post_id] = postComments
         normalizedHTML += `
           <div class="normalized-post-box-card">
             <b>Post ${index + 1}</b><br>
@@ -123,9 +170,9 @@ document.addEventListener("DOMContentLoaded", () => {
             Number of Votes: ${numOfVotes}<br>
             Number of Comments: ${numOfClicks}<br>
             Number of Clicks: ${numOfComments}<br>
-            <br><br>
 
-            Final Score: ${postFinalScore}<br><br>
+            <b>Comments:</b><br>
+            ${commentsHTML}
       
           </div>
         `;
@@ -176,6 +223,10 @@ document.addEventListener("DOMContentLoaded", () => {
               post.up_vote_count + post.down_vote_count
             } <p>
             </div>
+
+
+              <b>Comments:</b><br>
+
           </div><br>
         `;
       });
