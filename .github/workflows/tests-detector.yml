@@ -1,0 +1,32 @@
+name: tests-detector
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'detector/**'
+      - 'infra/k8s/detector-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-detector-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detector:
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: detector
+      context: ./detector
+      dockerfile: detector/Dockerfile
+      image_name: aiclipse/detector
+      deployment_yaml: infra/k8s/detector-depl.yaml
+      deployment_name: detector-depl
+      container_name: detector
+      service_name: detector-srv
+      service_port: 3000
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=detector
