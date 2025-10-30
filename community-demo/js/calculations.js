@@ -15,6 +15,20 @@ document.addEventListener("DOMContentLoaded", () => {
       // console.log("Posts:", posts);
       // console.log("Comments:", comments);
 
+      //comments score calculation
+      const postCommentScores = calculateCommentScores(posts, comments);
+
+      const totalCommentScore = Object.values(postCommentScores).reduce(
+        (sum, s) => sum + s,
+        0
+      );
+      const avgCommentScore = totalCommentScore / posts.length || 1;
+
+      console.log("calculations.js start *****");
+      console.log("postCommentScores: ", postCommentScores);
+      console.log("totalCommentScore: ", totalCommentScore);
+      console.log("avgCommentScore: ", avgCommentScore);
+
       // Calc avgs
       const totalClicks = posts.reduce(
         (sum, post) => sum + post.clicks_count,
@@ -24,14 +38,14 @@ document.addEventListener("DOMContentLoaded", () => {
         (sum, post) => sum + post.up_vote_count + post.down_vote_count,
         0
       );
-      const totalComments = posts.reduce(
-        (sum, post) => sum + (post.comments_id ? post.comments_id.length : 0),
-        0
-      );
+      // const totalComments = posts.reduce(
+      //   (sum, post) => sum + (post.comments_id ? post.comments_id.length : 0),
+      //   0
+      // );
 
       const avgClicks = totalClicks / posts.length;
       const avgVotes = totalVotes / posts.length;
-      const avgComments = totalComments / posts.length;
+      // const avgComments = totalComments / posts.length;
 
       document.getElementById("images-data-box").textContent = JSON.stringify(
         images,
@@ -54,7 +68,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <h3>Averages</h3>
         <p><b>Average Clicks:</b> ${avgClicks.toFixed(2)}</p>
         <p><b>Average Votes (Up + Down):</b> ${avgVotes.toFixed(2)}</p>
-        <p><b>Average Comments per Post:</b> ${avgComments.toFixed(2)}</p>
       `;
       summaryBox.style.display = "block";
 
@@ -95,17 +108,22 @@ document.addEventListener("DOMContentLoaded", () => {
       var commentsPerPost = {};
 
 
+
+
       posts.forEach((post, index) => {
+
         commentsHTML = "";
         postComments = post.comments_id || [];
 
         numOfVotes = post.up_vote_count + post.down_vote_count;
         numOfClicks = post.clicks_count;
-        numOfComments = post.comments_id ? post.comments_id.length : 0;
 
         clicksNorm = Number((numOfClicks / avgClicks).toFixed(2));
         votesNorm = Number((numOfVotes / avgVotes).toFixed(2));
-        commentsNorm = Number((numOfComments / avgComments).toFixed(2));
+
+        //comments
+        const commentScore = postCommentScores[post.post_id] || 0;
+        commentsNorm = Number((commentScore / avgCommentScore).toFixed(2));
 
         //Weighted Scores
         weightedVotes = votesNorm * votesWeight;
@@ -161,7 +179,9 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
-        commentsPerPost[post.post_id] = postComments
+
+        commentsPerPost[post.post_id] = postComments;
+
         normalizedHTML += `
           <div class="normalized-post-box-card">
             <b>Post ${index + 1}</b><br>
@@ -178,6 +198,8 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
       });
 
+
+
       normalizedBox.innerHTML = normalizedHTML;
       normalizedBox.style.display = "block";
 
@@ -189,50 +211,48 @@ document.addEventListener("DOMContentLoaded", () => {
       const sortedPostsBox = document.getElementById("sorted-posts-box");
       let sortedHTML = "";
 
-      postsSorted.forEach(([postId, score], index) => {
-        const post = posts.find((p) => p.post_id == postId);
-        const image = images.find((img) => img.image_id == post.image_id);
 
-        sortedHTML += `
-          <div class="sorted-post-card">
-            <div>Score: ${score.toFixed(9)}</div>
-            <div class="post-above-image">
-            Post ID: ${post.post_id}
-            Posted by: ${post.user_id}
-            </div>
-             <div class="sorted-posts-image"></div>
+   postsSorted.forEach(([postId, score], index) => {
+    const post = posts.find((p) => p.post_id == postId);
+    const image = images.find((img) => img.image_id == post.image_id);
 
-            <div class="post-description">"${post.text}"</div>
+    // get comment score
+    const commentScore = postCommentScores[postId] || 0;
 
-            <div class="post-under-image">
-            Clicks: <p class="data-number-post-card">${post.clicks_count} <p>
-            N.O. comments: <p class="data-number-post-card">${
-              post.comments_id.length
-            }<p>
-            </div>
-            <div class="post-under-image">
+    sortedHTML += `
+      <div class="sorted-post-card">
+        <div>Post Score: ${score.toFixed(9)}</div>
+        <div class="post-above-image">
+          Post ID: ${post.post_id} | Posted by: ${post.user_id}
+        </div>
+        <div class="sorted-posts-image">
+          ${image ? `<img src="${image.url}" alt="Post Image" />` : ""}
+        </div>
+        <div class="post-description">"${post.text}"</div>
 
-            Upvotes: <p class="data-number-post-card">${post.up_vote_count} <p>
-            Downvotes: <p class="data-number-post-card">${
-              post.down_vote_count
-            }<p>
-            </div>
-           
-            <div class="post-under-image">
-            Total votes: <p class="data-number-post-card">${
-              post.up_vote_count + post.down_vote_count
-            } <p>
-            </div>
+        <div class="post-under-image">
+          Clicks: <p class="data-number-post-card">${post.clicks_count}</p>
+          Comments: <p class="data-number-post-card">${post.comments_id ? post.comments_id.length : 0}</p>
+          Comment Score: <p class="data-number-post-card">${commentScore.toFixed(2)}</p>
+        </div>
 
+        <div class="post-under-image">
+          Upvotes: <p class="data-number-post-card">${post.up_vote_count}</p>
+          Downvotes: <p class="data-number-post-card">${post.down_vote_count}</p>
+        </div>
 
-              <b>Comments:</b><br>
+        <div class="post-under-image">
+          Total Votes: <p class="data-number-post-card">${post.up_vote_count + post.down_vote_count}</p>
+        </div>
+      </div><br>
+    `;
+});
 
-          </div><br>
-        `;
-      });
 
       sortedPostsBox.innerHTML = sortedHTML;
       sortedPostsBox.style.display = "flex";
+
+      console.log("postsSorted", postsSorted)
     })
     .catch((error) => {
       const msg = "Error fetching data: " + error;
