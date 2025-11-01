@@ -59,11 +59,6 @@ jobs:
             --from-literal=JWT_KEY="$JWT_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Restart apps after secrets change
-        run: |
-          kubectl -n default rollout restart deploy/auth deploy/gateway deploy/media deploy/jobs \
-            deploy/detector deploy/plans deploy/billing deploy/observer deploy/client
-
       - name: Apply data layer
         run: |
           kubectl -n default apply -f infra/k8s/mongo-depl.yaml
@@ -87,6 +82,11 @@ jobs:
           kubectl -n default apply -f infra/k8s/billing-depl.yaml
           kubectl -n default apply -f infra/k8s/observer-depl.yaml
           kubectl -n default apply -f infra/k8s/client-depl.yaml
+
+      - name: Restart apps to pick up secrets
+        run: |
+          kubectl -n default rollout restart deploy/auth deploy/gateway deploy/media deploy/jobs \
+            deploy/detector deploy/plans deploy/billing deploy/observer deploy/client --ignore-not-found=true
 
       - name: Wait core rollouts
         run: |
