@@ -114,8 +114,8 @@ jobs:
 
       - name: Wait core rollouts
         run: |
-          kubectl -n default rollout status deploy/gateway --timeout=300s
-          kubectl -n default rollout status deploy/client  --timeout=300s
+          kubectl -n default rollout status deploy/gateway-depl --timeout=300s
+          kubectl -n default rollout status deploy/client-depl  --timeout=300s
 
       - name: Apply prod ingress
         run: |
