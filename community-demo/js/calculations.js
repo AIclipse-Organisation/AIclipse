@@ -15,6 +15,19 @@ document.addEventListener("DOMContentLoaded", () => {
       // console.log("Posts:", posts);
       // console.log("Comments:", comments);
 
+      //comments score calculation
+      const postCommentScores = calculateCommentScores(posts, comments);
+      const totalCommentScore = Object.values(postCommentScores).reduce(
+        (sum, p) => sum + p.totalScore,
+        0
+      );
+      const avgCommentScore = totalCommentScore / posts.length || 1;
+
+      // console.log("calculations.js start *****");
+      // console.log("postCommentScores: ", postCommentScores);
+      // console.log("totalCommentScore: ", totalCommentScore);
+      // console.log("avgCommentScore: ", avgCommentScore);
+
       // Calc avgs
       const totalClicks = posts.reduce(
         (sum, post) => sum + post.clicks_count,
@@ -24,14 +37,14 @@ document.addEventListener("DOMContentLoaded", () => {
         (sum, post) => sum + post.up_vote_count + post.down_vote_count,
         0
       );
-      const totalComments = posts.reduce(
-        (sum, post) => sum + (post.comments_id ? post.comments_id.length : 0),
-        0
-      );
+      // const totalComments = posts.reduce(
+      //   (sum, post) => sum + (post.comments_id ? post.comments_id.length : 0),
+      //   0
+      // );
 
       const avgClicks = totalClicks / posts.length;
       const avgVotes = totalVotes / posts.length;
-      const avgComments = totalComments / posts.length;
+      // const avgComments = totalComments / posts.length;
 
       document.getElementById("images-data-box").textContent = JSON.stringify(
         images,
@@ -49,12 +62,17 @@ document.addEventListener("DOMContentLoaded", () => {
         2
       );
 
+      const totalCommentsNoComAlg = posts.reduce(
+        (sum, post) => sum + (post.comments_id ? post.comments_id.length : 0),
+        0
+      );
+      const avgCommentsNoComAlg = totalCommentsNoComAlg / posts.length;
+
       const summaryBox = document.getElementById("summary-box");
       summaryBox.innerHTML = `
         <h3>Averages</h3>
         <p><b>Average Clicks:</b> ${avgClicks.toFixed(2)}</p>
         <p><b>Average Votes (Up + Down):</b> ${avgVotes.toFixed(2)}</p>
-        <p><b>Average Comments per Post:</b> ${avgComments.toFixed(2)}</p>
       `;
       summaryBox.style.display = "block";
 
@@ -77,6 +95,8 @@ document.addEventListener("DOMContentLoaded", () => {
       var weightedClicks;
       var weightedComments;
       var weightedTotal;
+      var weightedCommentsJustSum;
+      var weightedTotalWithoutCommentAlg;
 
       var currentTime = Math.floor(Date.now() / 1000); //UNIX
       var postTime;
@@ -85,28 +105,56 @@ document.addEventListener("DOMContentLoaded", () => {
       const gravity = 1.2;
 
       var postFinalScore;
+      var postFinalScoreNoComAlg;
 
       var postScores = {};
+      var postScoresNoComAlg = {};
+
+      var commentsHTML = "";
+
+      var parentChildCommentsMap = {};
+      var postComments = [];
+
+      var commentsPerPost = {};
 
       posts.forEach((post, index) => {
+        commentsHTML = "";
+        postComments = post.comments_id || [];
+
         numOfVotes = post.up_vote_count + post.down_vote_count;
         numOfClicks = post.clicks_count;
-        numOfComments = post.comments_id ? post.comments_id.length : 0;
 
         clicksNorm = Number((numOfClicks / avgClicks).toFixed(2));
         votesNorm = Number((numOfVotes / avgVotes).toFixed(2));
-        commentsNorm = Number((numOfComments / avgComments).toFixed(2));
 
+        //comments
+        console.log("post: ", index);
+        const commentScore = postCommentScores[post.post_id] || 0;
+
+        commentsNorm = Number(
+          (commentScore.totalScore / avgCommentScore).toFixed(2)
+        );
+
+        console.log("commentScore: ", commentScore.totalScore);
         //Weighted Scores
         weightedVotes = votesNorm * votesWeight;
         weightedClicks = clicksNorm * clicksWeight;
         weightedComments = commentsNorm * commentsWeight;
         weightedTotal = weightedVotes + weightedClicks + weightedComments;
 
+        numOfComments = post.comments_id ? post.comments_id.length : 0;
+        console.log("test22: ");
+
+        commentsNorm = Number((numOfComments / avgCommentsNoComAlg).toFixed(2));
+        weightedCommentsJustSum = commentsNorm * commentsWeight;
+
+        weightedTotalWithoutCommentAlg =
+          weightedVotes + weightedClicks + weightedCommentsJustSum;
+
         //Time Decay Calculation
         postTime = post.created_at;
 
-        const hoursSincePost = ((currentTime - post.created_at) / 3600);
+        const hoursSincePost = (currentTime - post.created_at) / 3600;
         const gravitatedTime = Math.pow(
           hoursSincePost + constantOffset,
           gravity
@@ -114,6 +162,50 @@ document.addEventListener("DOMContentLoaded", () => {
 
         postFinalScore = weightedTotal / gravitatedTime;
         postScores[post.post_id] = postFinalScore;
+
+        postFinalScoreNoComAlg =
+          weightedTotalWithoutCommentAlg / gravitatedTime;
+        postScoresNoComAlg[post.post_id] = postFinalScoreNoComAlg;
+
+        console.log("postFinalScoreNoComAlg: ", postFinalScoreNoComAlg);
+
+        // COMMENTS
+        parentChildCommentsMap = {};
+
+        // find parents first
+        postComments.forEach((cid) => {
+          const comment = comments.find((c) => c.comment_id === cid);
+          if (comment && comment.parent_comment_id === null) {
+            parentChildCommentsMap[comment.comment_id] = [];
+          }
+        });
+
+        // assign children
+        postComments.forEach((cid) => {
+          const comment = comments.find((c) => c.comment_id === cid);
+          if (comment && comment.parent_comment_id !== null) {
+            if (parentChildCommentsMap[comment.parent_comment_id]) {
+              parentChildCommentsMap[comment.parent_comment_id].push(
+                comment.comment_id
+              );
+            }
+          }
+        });
+
+        // Build HTML for comments
+        for (const [parent, children] of Object.entries(
+          parentChildCommentsMap
+        )) {
+          if (children.length > 0) {
+            commentsHTML += `Parent: ${parent}, Child: ${children.join(
+              ", "
+            )}<br>`;
+          } else {
+            commentsHTML += `Parent: ${parent}<br>`;
+          }
+        }
+
+        commentsPerPost[post.post_id] = postComments;
 
         normalizedHTML += `
           <div class="normalized-post-box-card">
@@ -123,10 +215,12 @@ document.addEventListener("DOMContentLoaded", () => {
             Number of Votes: ${numOfVotes}<br>
             Number of Comments: ${numOfClicks}<br>
             Number of Clicks: ${numOfComments}<br>
-            <br><br>
 
-            Final Score: ${postFinalScore}<br><br>
+            <b>Comments:</b><br>
+            ${commentsHTML}
       
+             Final Score: ${postFinalScore}<br><br>
+
           </div>
         `;
       });
@@ -143,45 +237,57 @@ document.addEventListener("DOMContentLoaded", () => {
       let sortedHTML = "";
 
       postsSorted.forEach(([postId, score], index) => {
+        const postScoreNoComAlg = postScoresNoComAlg[postId] || 0;
+
+        const postScoreObj = postCommentScores[postId] || {
+          totalScore: 0,
+          comments: [],
+        };
         const post = posts.find((p) => p.post_id == postId);
         const image = images.find((img) => img.image_id == post.image_id);
 
         sortedHTML += `
-          <div class="sorted-post-card">
-            <div>Score: ${score.toFixed(9)}</div>
-            <div class="post-above-image">
-            Post ID: ${post.post_id}
-            Posted by: ${post.user_id}
-            </div>
-             <div class="sorted-posts-image"></div>
+        <div class="sorted-post-card">
+          <div>Post Score (with comment alg): ${score.toFixed(9)}</div>
+         <div>Post Score (no comment alg): ${postScoreNoComAlg.toFixed(9)}</div>
 
-            <div class="post-description">"${post.text}"</div>
+          <div class="post-above-image">
+            Post ID: ${post.post_id} | Posted by: ${post.user_id}
+          </div>
+        
+          <div class="post-description">${post.text}</div>
+
+          <div class="post-under-image">
+            Clicks: <p class="data-number-post-card">${post.clicks_count}</p>
+            Comments: <p class="data-number-post-card">${
+              post.comments_id ? post.comments_id.length : 0
+            }</p>
+            Comment Score: <p class="data-number-post-card">${postScoreObj.totalScore.toFixed(
+              2
+            )}</p>
+          </div>
 
             <div class="post-under-image">
-            Clicks: <p class="data-number-post-card">${post.clicks_count} <p>
-            N.O. comments: <p class="data-number-post-card">${
-              post.comments_id.length
-            }<p>
-            </div>
-            <div class="post-under-image">
-
-            Upvotes: <p class="data-number-post-card">${post.up_vote_count} <p>
-            Downvotes: <p class="data-number-post-card">${
-              post.down_vote_count
-            }<p>
-            </div>
-           
-            <div class="post-under-image">
-            Total votes: <p class="data-number-post-card">${
-              post.up_vote_count + post.down_vote_count
-            } <p>
-            </div>
-          </div><br>
-        `;
+                <b>Breakdown per comment:</b><br>
+                ${postScoreObj.comments
+                  .map(
+                    (c) =>
+                      `ID:${c.comment_id} → Score:${c.score.toFixed(
+                        2
+                      )} (bl:${c.bl.toFixed(2)}, br:${c.br.toFixed(
+                        2
+                      )}, bv:${c.bv.toFixed(2)})`
+                  )
+                  .join("<br>")}
+              </div>
+        </div><br>
+      `;
       });
 
       sortedPostsBox.innerHTML = sortedHTML;
       sortedPostsBox.style.display = "flex";
+
+      console.log("postsSorted", postsSorted);
     })
     .catch((error) => {
       const msg = "Error fetching data: " + error;
