@@ -1,4 +1,5 @@
 name: prod-deploy
+
 on:
   push:
     branches: [ftr/DevOps/61129/CDPipeline]
@@ -8,21 +9,78 @@ concurrency:
   group: prod-deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REG: ghcr.io/AIclipse-Organisation
+
 jobs:
-  deploy:
+  build:
     runs-on: [self-hosted, prod, k8s]
+    strategy:
+      fail-fast: false
+      matrix:
+        svc:
+          - { name: auth,     context: auth,     dockerfile: auth/Dockerfile }
+          - { name: gateway,  context: gateway,  dockerfile: gateway/Dockerfile }
+          - { name: media,    context: media,    dockerfile: media/Dockerfile }
+          - { name: jobs,     context: jobs,     dockerfile: jobs/Dockerfile }
+          - { name: detector, context: detector, dockerfile: detector/Dockerfile }
+          - { name: plans,    context: plans,    dockerfile: plans/Dockerfile }
+          - { name: billing,  context: billing,  dockerfile: billing/Dockerfile }
+          - { name: client,   context: client,   dockerfile: client/Dockerfile }
+          - { name: observer, context: observer, dockerfile: observer/Dockerfile }
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Apply StorageClass (idempotent)
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+
+      - name: Build & push ${{ matrix.svc.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.svc.context }}
+          file: ${{ matrix.svc.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REG }}/aiclipse/${{ matrix.svc.name }}:${{ github.sha }}
+            ${{ env.REG }}/aiclipse/${{ matrix.svc.name }}:latest
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, prod, k3s]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply StorageClass
         run: |
           set -euo pipefail
           kubectl get sc hostpath-retain >/dev/null 2>&1 || \
             kubectl -n default apply -f infra/storageclass-hostpath-retain.yaml
-
           kubectl get sc
+
+      - name: Ensure GHCR imagePullSecret
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN:    ${{ secrets.GHCR_TOKEN }}
+        run: |
+          set -euo pipefail
+          kubectl -n default delete secret ghcr-creds >/dev/null 2>&1 || true
+          kubectl -n default create secret docker-registry ghcr-creds \
+            --docker-server=ghcr.io \
+            --docker-username="$GHCR_USERNAME" \
+            --docker-password="$GHCR_TOKEN"
+          kubectl -n default patch serviceaccount default \
+            -p '{"imagePullSecrets":[{"name":"ghcr-creds"}]}' >/dev/null
 
       - name: Ensure secrets
         env:
@@ -63,15 +121,7 @@ jobs:
             --from-literal=JWT_KEY="$JWT_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Restart apps after secrets change
-        run: |
-          set +e
-          for d in auth gateway media jobs detector plans billing observer client; do
-            kubectl -n default rollout restart deploy/$d || true
-          done
-          set -e
-
-      - name: Apply data layer
+      - name: Apply data layer (filter SC)
         shell: bash
         run: |
           set -euo pipefail
@@ -112,19 +162,31 @@ jobs:
           kubectl -n default apply -f infra/k8s/observer-depl.yaml
           kubectl -n default apply -f infra/k8s/client-depl.yaml
 
+      - name: Point deployments to new images
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          kubectl -n default set image deploy/auth-depl     auth=${REG}/aiclipse/auth:${SHA}
+          kubectl -n default set image deploy/gateway-depl  gateway=${REG}/aiclipse/gateway:${SHA}
+          kubectl -n default set image deploy/media-depl    media=${REG}/aiclipse/media:${SHA}
+          kubectl -n default set image deploy/jobs-depl     jobs=${REG}/aiclipse/jobs:${SHA}
+          kubectl -n default set image deploy/detector-depl detector=${REG}/aiclipse/detector:${SHA}
+          kubectl -n default set image deploy/plans-depl    plans=${REG}/aiclipse/plans:${SHA}
+          kubectl -n default set image deploy/billing-depl  billing=${REG}/aiclipse/billing:${SHA}
+          kubectl -n default set image deploy/observer-depl observer=${REG}/aiclipse/observer:${SHA}
+          kubectl -n default set image deploy/client-depl   client=${REG}/aiclipse/client:${SHA}
+
       - name: Wait core rollouts
         run: |
           kubectl -n default rollout status deploy/gateway-depl --timeout=300s
           kubectl -n default rollout status deploy/client-depl  --timeout=300s
 
       - name: Apply prod ingress
-        run: |
-          kubectl -n default apply -f infra/k8s-prod/ingress-srv.yaml
+        run: kubectl -n default apply -f infra/k8s-prod/ingress-srv.yaml
 
       - name: Smoke test
         run: |
           set -e
-          echo "Testing https://aiclipse.online"
-          curl -sS -I https://aiclipse.online | head -n1 || exit 1
-          echo "Testing https://storage.aiclipse.online"
+          curl -sS -I https://aiclipse.online | head -n1
           curl -sS -I https://storage.aiclipse.online | head -n1 || true
