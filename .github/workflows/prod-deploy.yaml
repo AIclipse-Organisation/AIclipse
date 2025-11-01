@@ -1,0 +1,106 @@
+name: prod-deploy
+on:
+  push:
+    branches: [ftr/DevOps/61129/CDPipeline]
+  workflow_dispatch: {}
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, prod, k8s]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply StorageClass
+        run: |
+          kubectl -n default apply -f infra/k8s/storageclass-hostpath-retain.yaml
+          kubectl get sc
+
+      - name: Ensure secrets
+        env:
+          MONGO_INITDB_ROOT_USERNAME: ${{ secrets.MONGO_INITDB_ROOT_USERNAME }}
+          MONGO_INITDB_ROOT_PASSWORD: ${{ secrets.MONGO_INITDB_ROOT_PASSWORD }}
+          MONGO_DB: ${{ secrets.MONGO_DB }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_URI: ${{ secrets.REDIS_URI }}
+          MINIO_ROOT_USER: ${{ secrets.MINIO_ROOT_USER }}
+          MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_PUBLIC_ENDPOINT: ${{ secrets.S3_PUBLIC_ENDPOINT }}
+          JWT_KEY: ${{ secrets.JWT_KEY }}
+        run: |
+          set -euo pipefail
+          kubectl -n default create secret generic mongo-sec \
+            --from-literal=MONGO_INITDB_ROOT_USERNAME="$MONGO_INITDB_ROOT_USERNAME" \
+            --from-literal=MONGO_INITDB_ROOT_PASSWORD="$MONGO_INITDB_ROOT_PASSWORD" \
+            --from-literal=MONGO_DB="$MONGO_DB" \
+            --from-literal=MONGO_URI="$MONGO_URI" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n default create secret generic redis-sec \
+            --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
+            --from-literal=REDIS_HOST="$REDIS_HOST" \
+            --from-literal=REDIS_PORT="$REDIS_PORT" \
+            --from-literal=REDIS_URI="$REDIS_URI" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n default create secret generic s3-sec \
+            --from-literal=MINIO_ROOT_USER="$MINIO_ROOT_USER" \
+            --from-literal=MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD" \
+            --from-literal=S3_ENDPOINT="$S3_ENDPOINT" \
+            --from-literal=S3_PUBLIC_ENDPOINT="$S3_PUBLIC_ENDPOINT" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n default create secret generic jwt-sec \
+            --from-literal=JWT_KEY="$JWT_KEY" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Restart apps after secrets change
+        run: |
+          kubectl -n default rollout restart deploy/auth deploy/gateway deploy/media deploy/jobs \
+            deploy/detector deploy/plans deploy/billing deploy/observer deploy/client
+
+      - name: Apply data layer
+        run: |
+          kubectl -n default apply -f infra/k8s/mongo-depl.yaml
+          kubectl -n default apply -f infra/k8s/redis-depl.yaml
+          kubectl -n default apply -f infra/k8s/s3-depl.yaml
+
+      - name: Wait statefuls
+        run: |
+          kubectl -n default rollout status statefulset/mongo  --timeout=300s
+          kubectl -n default rollout status statefulset/redis  --timeout=300s
+          kubectl -n default rollout status deploy/s3-depl     --timeout=300s
+
+      - name: Apply app services
+        run: |
+          kubectl -n default apply -f infra/k8s/auth-depl.yaml
+          kubectl -n default apply -f infra/k8s/gateway-depl.yaml
+          kubectl -n default apply -f infra/k8s/media-depl.yaml
+          kubectl -n default apply -f infra/k8s/jobs-depl.yaml
+          kubectl -n default apply -f infra/k8s/detector-depl.yaml
+          kubectl -n default apply -f infra/k8s/plans-depl.yaml
+          kubectl -n default apply -f infra/k8s/billing-depl.yaml
+          kubectl -n default apply -f infra/k8s/observer-depl.yaml
+          kubectl -n default apply -f infra/k8s/client-depl.yaml
+
+      - name: Wait core rollouts
+        run: |
+          kubectl -n default rollout status deploy/gateway --timeout=300s
+          kubectl -n default rollout status deploy/client  --timeout=300s
+
+      - name: Apply prod ingress
+        run: |
+          kubectl -n default apply -f infra/k8s-prod/ingress-srv.yaml
+
+      - name: Smoke test
+        run: |
+          set -e
+          echo "Testing https://aiclipse.online"
+          curl -sS -I https://aiclipse.online | head -n1
+          echo "Testing https://storage.aiclipse.online"
+          curl -sS -I https://storage.aiclipse.online | head -n1
