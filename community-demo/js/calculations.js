@@ -183,18 +183,23 @@ document.addEventListener("DOMContentLoaded", () => {
         if (ageInHours < 48) {
           //first 2 days: strong boost
           timeBonus = 2;
-        } else if (ageInHours < 96) {
+        } else if (ageInHours < 96 && ageInHours > 48) {
           //2–4 days: medium boost
           timeBonus = 1.5;
-        } else if (ageInHours < 168) {
+        } else if (ageInHours < 168 && ageInHours > 96) {
           //4–7 days: light boost
           timeBonus = 1;
-        } else if (ageInHours < 240) {
+          weightedTotal = weightedTotal * 0.7
+        } else if (ageInHours < 240 && ageInHours > 168) {
           //7–10 days: fading
           timeBonus = 0.5;
+          weightedTotal = weightedTotal * 0.6
         } else {
           //older than 10 days: no time bonus
           timeBonus = 0;
+          weightedTotal=0;
+          weightedTotalWithoutCommentAlg=0;
+          weightedTotal = 0
         }
 
         //Final score
@@ -315,6 +320,8 @@ document.addEventListener("DOMContentLoaded", () => {
                   )
                   .join("<br>")}
               </div>
+
+          <div class="post-description">Uploaded: ${timeAgo(post.created_at)}</div>
         </div><br>
       `;
       });
@@ -331,3 +338,23 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("comments-data-box").textContent = msg;
     });
 });
+
+
+function timeAgo(timestamp) {
+  const seconds = Math.floor(Date.now() / 1000) - timestamp;
+  const intervalsOfSeconds = {
+    year: 31536000,
+    month: 2592000,
+    week: 604800,
+    day: 86400,
+    hour: 3600,
+    minute: 60
+  };
+
+  for (const [unit, value] of Object.entries(intervalsOfSeconds)) {
+    const count = Math.floor(seconds / value);
+    if (count >= 1) return `${count} ${unit}${count > 1 ? 's' : ''} ago`;
+  }
+  return 'just now';
+}
+
