@@ -1,7 +1,7 @@
 name: prod-deploy
 on:
   push:
-    branches: [ftr/DevOps/61129/CDPipeline]
+    branches: [main]
   workflow_dispatch: {}
 
 concurrency:
@@ -11,13 +11,17 @@ concurrency:
 jobs:
   deploy:
     runs-on: [self-hosted, prod, k8s]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Apply StorageClass
+      - name: Apply StorageClass (idempotent)
         run: |
-          kubectl -n default apply -f infra/k8s/storageclass-hostpath-retain.yaml
+          set -euo pipefail
+          kubectl get sc hostpath-retain >/dev/null 2>&1 || \
+            kubectl -n default apply -f .github/workflows/storageclass-hostpath-retain.yaml
+
           kubectl get sc
 
       - name: Ensure secrets
@@ -59,11 +63,36 @@ jobs:
             --from-literal=JWT_KEY="$JWT_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Apply data layer
+      - name: Restart apps after secrets change
         run: |
-          kubectl -n default apply -f infra/k8s/mongo-depl.yaml
-          kubectl -n default apply -f infra/k8s/redis-depl.yaml
-          kubectl -n default apply -f infra/k8s/s3-depl.yaml
+          set +e
+          for d in auth gateway media jobs detector plans billing observer client; do
+            kubectl -n default rollout restart deploy/$d || true
+          done
+          set -e
+
+      - name: Apply data layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          apply_filtered() {
+            local f="$1"
+            awk '
+            function emit(buf){
+              if (buf == "") return
+              if (buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return
+              if (printed) printf("---\n")
+              printf("%s", buf); printed=1
+            }
+            BEGIN { buf=""; printed=0 }
+            /^---[[:space:]]*$/ { emit(buf); buf=""; next }
+            { buf = buf $0 ORS }
+            END { emit(buf) }
+            ' "$f" | kubectl -n default apply -f -
+          }
+          apply_filtered infra/k8s/mongo-depl.yaml
+          apply_filtered infra/k8s/redis-depl.yaml
+          apply_filtered infra/k8s/s3-depl.yaml
 
       - name: Wait statefuls
         run: |
@@ -83,11 +112,6 @@ jobs:
           kubectl -n default apply -f infra/k8s/observer-depl.yaml
           kubectl -n default apply -f infra/k8s/client-depl.yaml
 
-      - name: Restart apps to pick up secrets
-        run: |
-          kubectl -n default rollout restart deploy/auth deploy/gateway deploy/media deploy/jobs \
-            deploy/detector deploy/plans deploy/billing deploy/observer deploy/client --ignore-not-found=true
-
       - name: Wait core rollouts
         run: |
           kubectl -n default rollout status deploy/gateway --timeout=300s
@@ -101,6 +125,6 @@ jobs:
         run: |
           set -e
           echo "Testing https://aiclipse.online"
-          curl -sS -I https://aiclipse.online | head -n1
+          curl -sS -I https://aiclipse.online | head -n1 || exit 1
           echo "Testing https://storage.aiclipse.online"
-          curl -sS -I https://storage.aiclipse.online | head -n1
+          curl -sS -I https://storage.aiclipse.online | head -n1 || true
