@@ -20,7 +20,7 @@ jobs:
         run: |
           set -euo pipefail
           kubectl get sc hostpath-retain >/dev/null 2>&1 || \
-            kubectl -n default apply -f .github/workflows/storageclass-hostpath-retain.yaml
+            kubectl -n default apply -f infra/storageclass-hostpath-retain.yaml
 
           kubectl get sc
 
