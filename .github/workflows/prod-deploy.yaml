@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ORG=AIclipse-Organisation
+          ORG=${{ secrets.GHCR_USERNAME }}
           TAG=${GITHUB_SHA}
           imgs=(
             "auth=auth"
@@ -147,7 +147,7 @@ jobs:
 
       - name: Point deployments to new images
         env:
-          ORG: AIclipse-Organisation
+          ORG: ${{ secrets.GHCR_USERNAME }}
           TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
