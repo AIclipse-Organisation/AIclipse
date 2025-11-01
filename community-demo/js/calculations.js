@@ -182,7 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (ageInHours < 48) {
           //first 2 days: strong boost
-          timeBonus = 2;
+          timeBonus = 999;
         } else if (ageInHours < 96 && ageInHours > 48) {
           //2–4 days: medium boost
           timeBonus = 1.5;
