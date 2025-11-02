@@ -90,29 +90,41 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          kubectl run dns-smoke --image=alpine:3.20 --restart=Never -- \
-            sh -lc 'set -e; apk add --no-cache bind-tools >/dev/null 2>&1; \
-                    nslookup kubernetes.default.svc.cluster.local >/dev/null; \
-                    nslookup redis-srv.default.svc.cluster.local >/dev/null'
+          kubectl -n "$NS" delete job dns-smoke --ignore-not-found=true
 
-          for i in {1..60}; do
-            phase=$(kubectl get pod dns-smoke -o jsonpath="{.status.phase}" 2>/dev/null || true)
-            case "$phase" in
-              Running|Succeeded|Failed) break;;
-            esac
-            sleep 2
-          done
+          cat <<'YAML' | NS="$NS" envsubst | kubectl apply -f -
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: dns-smoke
+            namespace: ${NS}
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: check
+                    image: busybox:1.36
+                    command: ["sh","-lc"]
+                    args:
+                      - >
+                        set -e;
+                        nslookup kubernetes.default.svc.cluster.local >/dev/null &&
+                        nslookup redis-srv.default.svc.cluster.local >/dev/null
+          YAML
 
-          kubectl logs dns-smoke --tail=-1 || true
-
-          phase=$(kubectl get pod dns-smoke -o jsonpath="{.status.phase}")
-          if [ "$phase" != "Succeeded" ]; then
-            kubectl describe pod dns-smoke || true
-            echo "dns-smoke phase=$phase"; exit 1
+          if ! kubectl -n "$NS" wait --for=condition=complete job/dns-smoke --timeout=180s; then
+            echo "DNS smoke failed"
+            kubectl -n "$NS" get pods -l job-name=dns-smoke -o wide || true
+            P=$(kubectl -n "$NS" get pods -l job-name=dns-smoke -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+            kubectl -n "$NS" logs "$P" --tail=-1 || true
+            kubectl -n "$NS" describe pod "$P" || true
+            exit 1
           fi
 
-          kubectl delete pod dns-smoke --wait=true --ignore-not-found
-
+          kubectl -n "$NS" logs job/dns-smoke --tail=-1 || true
+          kubectl -n "$NS" delete job dns-smoke --ignore-not-found=true
 
       - name: Ensure Ingress-NGINX controller (idempotent)
         run: |
