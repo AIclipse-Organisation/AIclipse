@@ -241,6 +241,15 @@ jobs:
           kubectl -n "$NS" apply -f infra/k8s/observer-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/client-depl.yaml
 
+      - name: Ensure admin UIs (RedisInsight, Mongo Express)
+        run: |
+          set -euo pipefail
+          kubectl apply -f infra/k8s-prod/redisinsight.yaml
+          kubectl apply -f infra/k8s-prod/mongo-express.yaml
+          kubectl -n "$NS" rollout status deploy/redisinsight --timeout=180s
+          kubectl -n "$NS" rollout status deploy/mongo-express --timeout=180s
+          kubectl get ingress | grep -E 'redisui|mongoui|minio'
+
       - name: Pin images to this commit
         run: |
           set -euo pipefail
