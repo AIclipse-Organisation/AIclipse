@@ -152,10 +152,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          kubectl run --rm -it curl --image=alpine:3.20 --restart=Never -- \
+          kubectl run curl --image=alpine:3.20 --restart=Never --command -- \
             sh -lc 'apk add --no-cache curl >/dev/null; \
                     curl -sI -H "Host: aiclipse.online"  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local | head -n1; \
                     curl -sI -H "Host: storage.aiclipse.online" http://ingress-nginx-controller.ingress-nginx.svc.cluster.local | head -n1'
+          kubectl logs curl --tail=-1 || true
+          kubectl delete pod curl --wait=true --ignore-not-found
 
       - name: Ensure app Secrets
         env:
@@ -290,7 +292,18 @@ jobs:
           
       - name: Smoke test
         run: |
-          set -e
-          curl -sS -I https://aiclipse.online           | head -n1 || true
-          curl -sS -I https://storage.aiclipse.online    | head -n1 || true
-          
+          set -euo pipefail
+          OK='^2|^3'
+
+          for i in {1..30}; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "https://aiclipse.online" || echo 000)
+            printf '%s  try %02d  -> %s\n' "$(date +%H:%M:%S)" "$i" "$code"
+            if echo "$code" | grep -Eq "$OK"; then
+              echo "ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "not ready after 60s"
+          exit 1 
