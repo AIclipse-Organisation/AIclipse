@@ -134,7 +134,28 @@ jobs:
           kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.3/deploy/static/provider/cloud/deploy.yaml
 
           kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=300s
+          kubectl -n ingress-nginx get svc ingress-nginx-controller
+
+      - name: Expose ingress on NodePort for cloudflared
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n ingress-nginx patch svc ingress-nginx-controller -p '{
+            "spec":{"type":"NodePort",
+              "ports":[
+                {"name":"http","port":80,"targetPort":80,"nodePort":30080},
+                {"name":"https","port":443,"targetPort":443,"nodePort":30443}
+              ]}}' || true
           kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
+
+      - name: Ingress smoke via NodePort
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl run --rm -it curl --image=alpine:3.20 --restart=Never -- \
+            sh -lc 'apk add --no-cache curl >/dev/null; \
+                    curl -sI -H "Host: aiclipse.online"  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local | head -n1; \
+                    curl -sI -H "Host: storage.aiclipse.online" http://ingress-nginx-controller.ingress-nginx.svc.cluster.local | head -n1'
 
       - name: Ensure app Secrets
         env:
