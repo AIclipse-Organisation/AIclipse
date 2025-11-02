@@ -15,12 +15,15 @@ jobs:
       contents: read
       packages: write
 
+    env:
+      ORG: ${{ secrets.GHCR_USERNAME }}
+      TAG: ${{ github.sha }}
+      NS:  default
+      IMAGES: "auth gateway media jobs detector plans billing observer client"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -29,34 +32,41 @@ jobs:
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build & push images
+      - name: Build & push images (skip if tag exists)
         shell: bash
         run: |
           set -euo pipefail
-          ORG=${{ secrets.GHCR_USERNAME }}
-          TAG=${GITHUB_SHA}
-          imgs=(
-            "auth=auth"
-            "gateway=gateway"
-            "media=media"
-            "jobs=jobs"
-            "detector=detector"
-            "plans=plans"
-            "billing=billing"
-            "observer=observer"
-            "client=client"
-          )
-          for pair in "${imgs[@]}"; do
-            dir="${pair%%=*}"; name="${pair#*=}"
+          for name in $IMAGES; do
             ref="ghcr.io/${ORG}/${name}:${TAG}"
-            docker buildx build --platform linux/amd64 --push -t "${ref}" "${dir}"
+            if docker manifest inspect "${ref}" >/dev/null 2>&1; then
+              echo "SKIP build ${ref} (tag exists)"
+              continue
+            fi
+            echo "BUILD ${ref}"
+            docker buildx build \
+              --platform linux/amd64 \
+              --tag "${ref}" \
+              --push \
+              "./${name}"
           done
+
+      - name: Ensure k8s pull secret for GHCR
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" create secret docker-registry ghcr-pull \
+            --docker-server=ghcr.io \
+            --docker-username="${ORG}" \
+            --docker-password="${{ secrets.GHCR_TOKEN }}" \
+            --docker-email="ci@example.local" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n "$NS" patch serviceaccount default \
+            -p '{"imagePullSecrets":[{"name":"ghcr-pull"}]}' || true
 
       - name: Apply StorageClass (idempotent)
         run: |
           set -euo pipefail
           kubectl get sc hostpath-retain >/dev/null 2>&1 || \
-            kubectl -n default apply -f infra/k8s/storageclass-hostpath-retain.yaml
+            kubectl -n "$NS" apply -f infra/storageclass-hostpath-retain.yaml
           kubectl get sc
 
       - name: Ensure app Secrets
@@ -76,110 +86,101 @@ jobs:
           JWT_KEY:                    ${{ secrets.JWT_KEY }}
         run: |
           set -euo pipefail
-          kubectl -n default create secret generic mongo-sec \
+          kubectl -n "$NS" create secret generic mongo-sec \
             --from-literal=MONGO_INITDB_ROOT_USERNAME="$MONGO_INITDB_ROOT_USERNAME" \
             --from-literal=MONGO_INITDB_ROOT_PASSWORD="$MONGO_INITDB_ROOT_PASSWORD" \
             --from-literal=MONGO_DB="$MONGO_DB" \
             --from-literal=MONGO_URI="$MONGO_URI" \
             --dry-run=client -o yaml | kubectl apply -f -
-          kubectl -n default create secret generic redis-sec \
+
+          kubectl -n "$NS" create secret generic redis-sec \
             --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
             --from-literal=REDIS_HOST="$REDIS_HOST" \
             --from-literal=REDIS_PORT="$REDIS_PORT" \
             --from-literal=REDIS_URI="$REDIS_URI" \
             --dry-run=client -o yaml | kubectl apply -f -
-          kubectl -n default create secret generic s3-sec \
+
+          kubectl -n "$NS" create secret generic s3-sec \
             --from-literal=MINIO_ROOT_USER="$MINIO_ROOT_USER" \
             --from-literal=MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD" \
             --from-literal=S3_ENDPOINT="$S3_ENDPOINT" \
             --from-literal=S3_PUBLIC_ENDPOINT="$S3_PUBLIC_ENDPOINT" \
             --dry-run=client -o yaml | kubectl apply -f -
-          kubectl -n default create secret generic jwt-sec \
+
+          kubectl -n "$NS" create secret generic jwt-sec \
             --from-literal=JWT_KEY="$JWT_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Create/patch GHCR pull secret and bind to SA
-        env:
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_TOKEN:    ${{ secrets.GHCR_TOKEN }}
-        run: |
-          set -euo pipefail
-          kubectl -n default create secret docker-registry ghcr-pull \
-            --docker-server=ghcr.io \
-            --docker-username="${GHCR_USERNAME}" \
-            --docker-password="${GHCR_TOKEN}" \
-            --docker-email="noreply@example.com" \
-            --dry-run=client -o yaml | kubectl apply -f -
-          kubectl -n default patch serviceaccount default \
-            -p '{"imagePullSecrets":[{"name":"ghcr-pull"}]}' || true
 
       - name: Apply data layer
         shell: bash
         run: |
           set -euo pipefail
-          apply_filtered() {
-            local f="$1"
+          filter_sc () {
             awk '
-            function emit(buf){
-              if (buf == "") return
-              if (buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return
-              if (printed) printf("---\n")
-              printf("%s", buf); printed=1
-            }
-            BEGIN { buf=""; printed=0 }
-            /^---[[:space:]]*$/ { emit(buf); buf=""; next }
-            { buf = buf $0 ORS }
-            END { emit(buf) }
-            ' "$f" | kubectl -n default apply -f -
+              function emit(buf){ if(buf=="")return; if(buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return;
+                                  if(printed) printf("---\n"); printf("%s",buf); printed=1 }
+              BEGIN{buf=""; printed=0}
+              /^---[[:space:]]*$/ {emit(buf); buf=""; next}
+              {buf=buf $0 ORS}
+              END{emit(buf)}
+            ' "$1" | kubectl -n "$NS" apply -f -
           }
-          apply_filtered infra/k8s/mongo-depl.yaml
-          apply_filtered infra/k8s/redis-depl.yaml
-          apply_filtered infra/k8s/s3-depl.yaml
+          filter_sc infra/k8s/mongo-depl.yaml
+          filter_sc infra/k8s/redis-depl.yaml
+          filter_sc infra/k8s/s3-depl.yaml
 
-      - name: Wait statefuls
+      - name: Wait deps ready
         run: |
-          kubectl -n default rollout status statefulset/mongo  --timeout=300s
-          kubectl -n default rollout status statefulset/redis  --timeout=300s
-          kubectl -n default rollout status deploy/s3-depl     --timeout=300s
+          kubectl -n "$NS" rollout status statefulset/mongo  --timeout=300s
+          kubectl -n "$NS" rollout status statefulset/redis  --timeout=300s
+          kubectl -n "$NS" rollout status deploy/s3-depl     --timeout=300s
 
-      - name: Apply app services
+      - name: Apply app deployments/services
         run: |
-          kubectl -n default apply -f infra/k8s/auth-depl.yaml
-          kubectl -n default apply -f infra/k8s/gateway-depl.yaml
-          kubectl -n default apply -f infra/k8s/media-depl.yaml
-          kubectl -n default apply -f infra/k8s/jobs-depl.yaml
-          kubectl -n default apply -f infra/k8s/detector-depl.yaml
-          kubectl -n default apply -f infra/k8s/plans-depl.yaml
-          kubectl -n default apply -f infra/k8s/billing-depl.yaml
-          kubectl -n default apply -f infra/k8s/observer-depl.yaml
-          kubectl -n default apply -f infra/k8s/client-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/auth-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/gateway-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/media-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/jobs-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/detector-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/plans-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/billing-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/observer-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/client-depl.yaml
 
-      - name: Point deployments to new images
-        env:
-          ORG: ${{ secrets.GHCR_USERNAME }}
-          TAG: ${{ github.sha }}
+      - name: Pin images to this commit
         run: |
           set -euo pipefail
-          kubectl -n default set image deploy/auth-depl      auth=ghcr.io/$ORG/auth:$TAG
-          kubectl -n default set image deploy/gateway-depl   gateway=ghcr.io/$ORG/gateway:$TAG
-          kubectl -n default set image deploy/media-depl     media=ghcr.io/$ORG/media:$TAG
-          kubectl -n default set image deploy/jobs-depl      jobs=ghcr.io/$ORG/jobs:$TAG
-          kubectl -n default set image deploy/detector-depl  detector=ghcr.io/$ORG/detector:$TAG
-          kubectl -n default set image deploy/plans-depl     plans=ghcr.io/$ORG/plans:$TAG
-          kubectl -n default set image deploy/billing-depl   billing=ghcr.io/$ORG/billing:$TAG
-          kubectl -n default set image deploy/observer-depl  observer=ghcr.io/$ORG/observer:$TAG
-          kubectl -n default set image deploy/client-depl    client=ghcr.io/$ORG/client:$TAG
+          for name in $IMAGES; do
+            kubectl -n "$NS" set image "deploy/${name}-depl" \
+              "${name}=ghcr.io/${ORG}/${name}:${TAG}"
+          done
 
-      - name: Wait core rollouts
+      - name: Cleanup old ReplicaSets (keep newest)
+        shell: bash
         run: |
-          kubectl -n default rollout status deploy/gateway-depl --timeout=300s
-          kubectl -n default rollout status deploy/client-depl  --timeout=300s
+          set -euo pipefail
+          for app in $IMAGES; do
+            LIST=$(kubectl -n "$NS" get rs -l app=$app \
+              -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}' \
+              | sort -k2)
+            KEEP=$(echo "$LIST" | tail -n1 | cut -f1)
+            TODEL=$(echo "$LIST" | head -n -1 | cut -f1 || true)
+            [ -n "${TODEL:-}" ] && kubectl -n "$NS" delete rs $TODEL || true
+            echo "keep $KEEP for $app"
+          done
+
+      - name: Wait app rollouts
+        run: |
+          set -euo pipefail
+          for name in $IMAGES; do
+            kubectl -n "$NS" rollout status "deploy/${name}-depl" --timeout=300s
+          done
 
       - name: Apply prod ingress
-        run: kubectl -n default apply -f infra/k8s-prod/ingress-srv.yaml
+        run: kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv.yaml
 
       - name: Smoke test
         run: |
           set -e
-          curl -sS -I https://aiclipse.online | head -n1 || true
-          curl -sS -I https://storage.aiclipse.online | head -n1 || true
+          curl -sS -I https://aiclipse.online           | head -n1 || true
+          curl -sS -I https://storage.aiclipse.online    | head -n1 || true
