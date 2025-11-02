@@ -20,6 +20,7 @@ jobs:
       TAG: ${{ github.sha }}
       NS:  default
       IMAGES: "auth gateway media jobs detector plans billing observer client"
+      KUBE_DNS_IP: 10.43.0.10
 
     steps:
       - name: Checkout
@@ -69,6 +70,30 @@ jobs:
             kubectl -n "$NS" apply -f infra/storageclass-hostpath-retain.yaml
           kubectl get sc
 
+      - name: Ensure CoreDNS (idempotent)
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n kube-system get deploy coredns >/dev/null 2>&1 || \
+            kubectl apply -f infra/coredns.yaml
+
+          if ! kubectl -n kube-system get svc kube-dns >/dev/null 2>&1; then
+            sed "s/CLUSTER_DNS_IP/${KUBE_DNS_IP}/" infra/kube-dns-svc.yaml | kubectl apply -f -
+          else
+            echo "kube-dns Service exists, skipping create"
+          fi
+
+          kubectl -n kube-system rollout status deploy/coredns --timeout=180s
+
+      - name: DNS smoke inside cluster
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl run --rm -it dns-smoke --image=alpine:3.20 --restart=Never -- \
+            sh -lc 'apk add --no-cache bind-tools >/dev/null 2>&1; \
+                    nslookup kubernetes.default.svc.cluster.local && \
+                    nslookup redis-srv.default.svc.cluster.local'
+
       - name: Ensure app Secrets
         env:
           MONGO_INITDB_ROOT_USERNAME: ${{ secrets.MONGO_INITDB_ROOT_USERNAME }}
@@ -117,8 +142,12 @@ jobs:
           set -euo pipefail
           filter_sc () {
             awk '
-              function emit(buf){ if(buf=="")return; if(buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return;
-                                  if(printed) printf("---\n"); printf("%s",buf); printed=1 }
+              function emit(buf){
+                if(buf=="")return;
+                if(buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return;
+                if(printed) printf("---\n");
+                printf("%s",buf); printed=1
+              }
               BEGIN{buf=""; printed=0}
               /^---[[:space:]]*$/ {emit(buf); buf=""; next}
               {buf=buf $0 ORS}
@@ -179,6 +208,20 @@ jobs:
       - name: Apply prod ingress
         run: kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv.yaml
 
+      - name: Garbage collection (evicted/failed & test pods)
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl get pods --all-namespaces -o json \
+            | jq -r '.items[] | select(.status.reason=="Evicted" or .status.phase=="Failed") | "\(.metadata.namespace) \(.metadata.name)"' \
+            | while read ns name; do
+                kubectl -n "$ns" delete pod "$name" --ignore-not-found || true;
+              done
+
+      - name: Summary
+        run: |
+          kubectl -n "$NS" get pods,svc,deploy,rs,sts
+          
       - name: Smoke test
         run: |
           set -e
