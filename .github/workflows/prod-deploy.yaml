@@ -84,15 +84,27 @@ jobs:
           fi
 
           kubectl -n kube-system rollout status deploy/coredns --timeout=180s
+          kubectl -n kube-system get svc kube-dns
 
       - name: DNS smoke inside cluster
         shell: bash
         run: |
           set -euo pipefail
-          kubectl run --rm -it dns-smoke --image=alpine:3.20 --restart=Never -- \
+          kubectl run dns-smoke --image=alpine:3.20 --restart=Never -- \
             sh -lc 'apk add --no-cache bind-tools >/dev/null 2>&1; \
                     nslookup kubernetes.default.svc.cluster.local && \
                     nslookup redis-srv.default.svc.cluster.local'
+          kubectl logs dns-smoke --tail=-1
+          kubectl delete pod dns-smoke --wait=true
+
+      - name: Ensure Ingress-NGINX controller (idempotent)
+        run: |
+          set -euo pipefail
+          if ! kubectl -n ingress-nginx get deploy ingress-nginx-controller >/dev/null 2>&1 || \
+             ! kubectl -n ingress-nginx get svc ingress-nginx-controller-admission >/dev/null 2>&1; then
+            kubectl apply -f infra/ingress-nginx.yaml
+          fi
+          kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=300s
 
       - name: Ensure app Secrets
         env:
@@ -217,7 +229,8 @@ jobs:
             | while read ns name; do
                 kubectl -n "$ns" delete pod "$name" --ignore-not-found || true;
               done
-
+          kubectl delete pod dns-smoke --ignore-not-found=true
+          
       - name: Summary
         run: |
           kubectl -n "$NS" get pods,svc,deploy,rs,sts
