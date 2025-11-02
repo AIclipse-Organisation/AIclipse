@@ -126,14 +126,15 @@ jobs:
           kubectl -n "$NS" logs job/dns-smoke --tail=-1 || true
           kubectl -n "$NS" delete job dns-smoke --ignore-not-found=true
 
-      - name: Ensure Ingress-NGINX controller (idempotent)
+      - name: Ensure Ingress-NGINX controller (official)
+        shell: bash
         run: |
           set -euo pipefail
-          if ! kubectl -n ingress-nginx get deploy ingress-nginx-controller >/dev/null 2>&1 || \
-             ! kubectl -n ingress-nginx get svc ingress-nginx-controller-admission >/dev/null 2>&1; then
-            kubectl apply -f infra/ingress-nginx.yaml
-          fi
+          # apply upstream manifest
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.3/deploy/static/provider/cloud/deploy.yaml
+
           kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=300s
+          kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
 
       - name: Ensure app Secrets
         env:
