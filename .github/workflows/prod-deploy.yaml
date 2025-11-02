@@ -91,11 +91,28 @@ jobs:
         run: |
           set -euo pipefail
           kubectl run dns-smoke --image=alpine:3.20 --restart=Never -- \
-            sh -lc 'apk add --no-cache bind-tools >/dev/null 2>&1; \
-                    nslookup kubernetes.default.svc.cluster.local && \
-                    nslookup redis-srv.default.svc.cluster.local'
-          kubectl logs dns-smoke --tail=-1
-          kubectl delete pod dns-smoke --wait=true
+            sh -lc 'set -e; apk add --no-cache bind-tools >/dev/null 2>&1; \
+                    nslookup kubernetes.default.svc.cluster.local >/dev/null; \
+                    nslookup redis-srv.default.svc.cluster.local >/dev/null'
+
+          for i in {1..60}; do
+            phase=$(kubectl get pod dns-smoke -o jsonpath="{.status.phase}" 2>/dev/null || true)
+            case "$phase" in
+              Running|Succeeded|Failed) break;;
+            esac
+            sleep 2
+          done
+
+          kubectl logs dns-smoke --tail=-1 || true
+
+          phase=$(kubectl get pod dns-smoke -o jsonpath="{.status.phase}")
+          if [ "$phase" != "Succeeded" ]; then
+            kubectl describe pod dns-smoke || true
+            echo "dns-smoke phase=$phase"; exit 1
+          fi
+
+          kubectl delete pod dns-smoke --wait=true --ignore-not-found
+
 
       - name: Ensure Ingress-NGINX controller (idempotent)
         run: |
@@ -220,16 +237,18 @@ jobs:
       - name: Apply prod ingress
         run: kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv.yaml
 
-      - name: Garbage collection (evicted/failed & test pods)
+      - name: Garbage collection
         shell: bash
         run: |
           set -euo pipefail
-          kubectl get pods --all-namespaces -o json \
-            | jq -r '.items[] | select(.status.reason=="Evicted" or .status.phase=="Failed") | "\(.metadata.namespace) \(.metadata.name)"' \
-            | while read ns name; do
-                kubectl -n "$ns" delete pod "$name" --ignore-not-found || true;
-              done
+          # failed
+          kubectl get pods -A --field-selector=status.phase=Failed -o name | xargs -r kubectl delete
+          # evicted
+          kubectl get pods -A | awk '$4=="Evicted"{print $1, $2}' | while read ns pod; do
+            kubectl -n "$ns" delete pod "$pod" --ignore-not-found || true
+          done
           kubectl delete pod dns-smoke --ignore-not-found=true
+
           
       - name: Summary
         run: |
