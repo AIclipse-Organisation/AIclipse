@@ -1,7 +1,7 @@
 name: prod-deploy
 on:
   push:
-    branches: [ftr/DevOps/61129/CDPipeline]
+    branches: [main]
   workflow_dispatch: {}
 
 concurrency:
