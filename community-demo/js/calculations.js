@@ -128,14 +128,17 @@ document.addEventListener("DOMContentLoaded", () => {
         votesNorm = Number((numOfVotes / avgVotes).toFixed(2));
 
         //comments
-        console.log("post: ", index);
-        const commentScore = postCommentScores[post.post_id] || 0;
+        const commentScoreObj = postCommentScores[post.post_id];
+        const commentTotalScore =
+          commentScoreObj && commentScoreObj.totalScore
+            ? commentScoreObj.totalScore
+            : 0;
 
-        commentsNorm = Number(
-          (commentScore.totalScore / avgCommentScore).toFixed(2)
-        );
+        commentsNorm =
+          avgCommentScore > 0
+            ? Number((commentTotalScore / avgCommentScore).toFixed(2))
+            : 0;
 
-        console.log("commentScore: ", commentScore.totalScore);
         //Weighted Scores
         weightedVotes = votesNorm * votesWeight;
         weightedClicks = clicksNorm * clicksWeight;
@@ -152,27 +155,64 @@ document.addEventListener("DOMContentLoaded", () => {
           weightedVotes + weightedClicks + weightedCommentsJustSum;
 
         //Time Decay Calculation
-        postTime = post.created_at;
-
-        const hoursSincePost = (currentTime - post.created_at) / 3600;
-        const gravitatedTime = Math.pow(
-          hoursSincePost + constantOffset,
-          gravity
+        // Time Decay Calculation
+        console.log(
+          "Post",
+          post.post_id,
+          "weightedVotes:",
+          weightedVotes,
+          "weightedClicks:",
+          weightedClicks,
+          "weightedComments:",
+          weightedComments,
+          "weightedTotal:",
+          weightedTotal
         );
 
-        postFinalScore = weightedTotal / gravitatedTime;
+        console.log("ageInSeconds:", currentTime - post.created_at);
+        console.log("post.created_at:", post.created_at);
+
+        //post time bonus
+        postTime = post.created_at;
+
+        const ageInSeconds = Math.max(currentTime - postTime, 0);
+        const ageInHours = ageInSeconds / 3600;
+
+        let timeBonus = 0;
+
+        if (ageInHours < 48) {
+          //first 2 days: strong boost
+          timeBonus = 999;
+        } else if (ageInHours < 96 && ageInHours > 48) {
+          //2–4 days: medium boost
+          timeBonus = 1.5;
+        } else if (ageInHours < 168 && ageInHours > 96) {
+          //4–7 days: light boost
+          timeBonus = 1;
+          weightedTotal = weightedTotal * 0.7
+        } else if (ageInHours < 240 && ageInHours > 168) {
+          //7–10 days: fading
+          timeBonus = 0.5;
+          weightedTotal = weightedTotal * 0.6
+        } else {
+          //older than 10 days: no time bonus
+          timeBonus = 0;
+          weightedTotal=0;
+          weightedTotalWithoutCommentAlg=0;
+          weightedTotal = 0
+        }
+
+        //Final score
+        postFinalScore = weightedTotal + timeBonus;
         postScores[post.post_id] = postFinalScore;
 
-        postFinalScoreNoComAlg =
-          weightedTotalWithoutCommentAlg / gravitatedTime;
+        postFinalScoreNoComAlg = weightedTotalWithoutCommentAlg + timeBonus;
         postScoresNoComAlg[post.post_id] = postFinalScoreNoComAlg;
 
-        console.log("postFinalScoreNoComAlg: ", postFinalScoreNoComAlg);
-
-        // COMMENTS
+        //COMMENTS
         parentChildCommentsMap = {};
 
-        // find parents first
+        //find parents first
         postComments.forEach((cid) => {
           const comment = comments.find((c) => c.comment_id === cid);
           if (comment && comment.parent_comment_id === null) {
@@ -180,7 +220,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         });
 
-        // assign children
+        //assign children
         postComments.forEach((cid) => {
           const comment = comments.find((c) => c.comment_id === cid);
           if (comment && comment.parent_comment_id !== null) {
@@ -192,7 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         });
 
-        // Build HTML for comments
+        //Build HTML for comments
         for (const [parent, children] of Object.entries(
           parentChildCommentsMap
         )) {
@@ -280,6 +320,8 @@ document.addEventListener("DOMContentLoaded", () => {
                   )
                   .join("<br>")}
               </div>
+
+          <div class="post-description">Uploaded: ${timeAgo(post.created_at)}</div>
         </div><br>
       `;
       });
@@ -296,3 +338,23 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("comments-data-box").textContent = msg;
     });
 });
+
+
+function timeAgo(timestamp) {
+  const seconds = Math.floor(Date.now() / 1000) - timestamp;
+  const intervalsOfSeconds = {
+    year: 31536000,
+    month: 2592000,
+    week: 604800,
+    day: 86400,
+    hour: 3600,
+    minute: 60
+  };
+
+  for (const [unit, value] of Object.entries(intervalsOfSeconds)) {
+    const count = Math.floor(seconds / value);
+    if (count >= 1) return `${count} ${unit}${count > 1 ? 's' : ''} ago`;
+  }
+  return 'just now';
+}
+
