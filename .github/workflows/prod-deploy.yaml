@@ -1,0 +1,318 @@
+name: prod-deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, prod, k8s]
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      ORG: ${{ secrets.GHCR_USERNAME }}
+      TAG: ${{ github.sha }}
+      NS:  default
+      IMAGES: "auth gateway media jobs detector plans billing observer client"
+      KUBE_DNS_IP: 10.43.0.10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build & push images (skip if tag exists)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in $IMAGES; do
+            ref="ghcr.io/${ORG}/${name}:${TAG}"
+            if docker manifest inspect "${ref}" >/dev/null 2>&1; then
+              echo "SKIP build ${ref} (tag exists)"
+              continue
+            fi
+            echo "BUILD ${ref}"
+            docker buildx build \
+              --platform linux/amd64 \
+              --tag "${ref}" \
+              --push \
+              "./${name}"
+          done
+
+      - name: Ensure k8s pull secret for GHCR
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" create secret docker-registry ghcr-pull \
+            --docker-server=ghcr.io \
+            --docker-username="${ORG}" \
+            --docker-password="${{ secrets.GHCR_TOKEN }}" \
+            --docker-email="ci@example.local" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n "$NS" patch serviceaccount default \
+            -p '{"imagePullSecrets":[{"name":"ghcr-pull"}]}' || true
+
+      - name: Apply StorageClass (idempotent)
+        run: |
+          set -euo pipefail
+          kubectl get sc hostpath-retain >/dev/null 2>&1 || \
+            kubectl -n "$NS" apply -f infra/storageclass-hostpath-retain.yaml
+          kubectl get sc
+
+      - name: Ensure CoreDNS (idempotent)
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n kube-system get deploy coredns >/dev/null 2>&1 || \
+            kubectl apply -f infra/coredns.yaml
+
+          if ! kubectl -n kube-system get svc kube-dns >/dev/null 2>&1; then
+            sed "s/CLUSTER_DNS_IP/${KUBE_DNS_IP}/" infra/kube-dns-svc.yaml | kubectl apply -f -
+          else
+            echo "kube-dns Service exists, skipping create"
+          fi
+
+          kubectl -n kube-system rollout status deploy/coredns --timeout=180s
+          kubectl -n kube-system get svc kube-dns
+
+      - name: DNS smoke inside cluster
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" delete job dns-smoke --ignore-not-found=true
+
+          cat <<'YAML' | NS="$NS" envsubst | kubectl apply -f -
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: dns-smoke
+            namespace: ${NS}
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: check
+                    image: busybox:1.36
+                    command: ["sh","-lc"]
+                    args:
+                      - >
+                        set -e;
+                        nslookup kubernetes.default.svc.cluster.local >/dev/null &&
+                        nslookup redis-srv.default.svc.cluster.local >/dev/null
+          YAML
+
+          if ! kubectl -n "$NS" wait --for=condition=complete job/dns-smoke --timeout=180s; then
+            echo "DNS smoke failed"
+            kubectl -n "$NS" get pods -l job-name=dns-smoke -o wide || true
+            P=$(kubectl -n "$NS" get pods -l job-name=dns-smoke -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+            kubectl -n "$NS" logs "$P" --tail=-1 || true
+            kubectl -n "$NS" describe pod "$P" || true
+            exit 1
+          fi
+
+          kubectl -n "$NS" logs job/dns-smoke --tail=-1 || true
+          kubectl -n "$NS" delete job dns-smoke --ignore-not-found=true
+
+      - name: Ensure Ingress-NGINX controller (official)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # apply upstream manifest
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.3/deploy/static/provider/cloud/deploy.yaml
+
+          kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=300s
+          kubectl -n ingress-nginx get svc ingress-nginx-controller
+
+      - name: Expose ingress on NodePort for cloudflared
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n ingress-nginx patch svc ingress-nginx-controller -p '{
+            "spec":{"type":"NodePort",
+              "ports":[
+                {"name":"http","port":80,"targetPort":80,"nodePort":30080},
+                {"name":"https","port":443,"targetPort":443,"nodePort":30443}
+              ]}}' || true
+          kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
+
+      - name: Ingress smoke via NodePort
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl run curl --image=alpine:3.20 --restart=Never --command -- \
+            sh -lc 'apk add --no-cache curl >/dev/null; \
+                    curl -sI -H "Host: aiclipse.online"  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local | head -n1; \
+                    curl -sI -H "Host: storage.aiclipse.online" http://ingress-nginx-controller.ingress-nginx.svc.cluster.local | head -n1'
+          kubectl logs curl --tail=-1 || true
+          kubectl delete pod curl --wait=true --ignore-not-found
+
+      - name: Ensure app Secrets
+        env:
+          MONGO_INITDB_ROOT_USERNAME: ${{ secrets.MONGO_INITDB_ROOT_USERNAME }}
+          MONGO_INITDB_ROOT_PASSWORD: ${{ secrets.MONGO_INITDB_ROOT_PASSWORD }}
+          MONGO_DB:                   ${{ secrets.MONGO_DB }}
+          MONGO_URI:                  ${{ secrets.MONGO_URI }}
+          REDIS_PASSWORD:             ${{ secrets.REDIS_PASSWORD }}
+          REDIS_HOST:                 ${{ secrets.REDIS_HOST }}
+          REDIS_PORT:                 ${{ secrets.REDIS_PORT }}
+          REDIS_URI:                  ${{ secrets.REDIS_URI }}
+          MINIO_ROOT_USER:            ${{ secrets.MINIO_ROOT_USER }}
+          MINIO_ROOT_PASSWORD:        ${{ secrets.MINIO_ROOT_PASSWORD }}
+          S3_ENDPOINT:                ${{ secrets.S3_ENDPOINT }}
+          S3_PUBLIC_ENDPOINT:         ${{ secrets.S3_PUBLIC_ENDPOINT }}
+          JWT_KEY:                    ${{ secrets.JWT_KEY }}
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" create secret generic mongo-sec \
+            --from-literal=MONGO_INITDB_ROOT_USERNAME="$MONGO_INITDB_ROOT_USERNAME" \
+            --from-literal=MONGO_INITDB_ROOT_PASSWORD="$MONGO_INITDB_ROOT_PASSWORD" \
+            --from-literal=MONGO_DB="$MONGO_DB" \
+            --from-literal=MONGO_URI="$MONGO_URI" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic redis-sec \
+            --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
+            --from-literal=REDIS_HOST="$REDIS_HOST" \
+            --from-literal=REDIS_PORT="$REDIS_PORT" \
+            --from-literal=REDIS_URI="$REDIS_URI" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic s3-sec \
+            --from-literal=MINIO_ROOT_USER="$MINIO_ROOT_USER" \
+            --from-literal=MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD" \
+            --from-literal=S3_ENDPOINT="$S3_ENDPOINT" \
+            --from-literal=S3_PUBLIC_ENDPOINT="$S3_PUBLIC_ENDPOINT" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic jwt-sec \
+            --from-literal=JWT_KEY="$JWT_KEY" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply data layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          filter_sc () {
+            awk '
+              function emit(buf){
+                if(buf=="")return;
+                if(buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return;
+                if(printed) printf("---\n");
+                printf("%s",buf); printed=1
+              }
+              BEGIN{buf=""; printed=0}
+              /^---[[:space:]]*$/ {emit(buf); buf=""; next}
+              {buf=buf $0 ORS}
+              END{emit(buf)}
+            ' "$1" | kubectl -n "$NS" apply -f -
+          }
+          filter_sc infra/k8s/mongo-depl.yaml
+          filter_sc infra/k8s/redis-depl.yaml
+          filter_sc infra/k8s/s3-depl.yaml
+
+      - name: Wait deps ready
+        run: |
+          kubectl -n "$NS" rollout status statefulset/mongo  --timeout=300s
+          kubectl -n "$NS" rollout status statefulset/redis  --timeout=300s
+          kubectl -n "$NS" rollout status deploy/s3-depl     --timeout=300s
+
+      - name: Apply app deployments/services
+        run: |
+          kubectl -n "$NS" apply -f infra/k8s/auth-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/gateway-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/media-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/jobs-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/detector-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/plans-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/billing-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/observer-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/client-depl.yaml
+
+      - name: Ensure admin UIs (RedisInsight, Mongo Express)
+        run: |
+          set -euo pipefail
+          kubectl apply -f infra/k8s-prod/redisinsight.yaml
+          kubectl apply -f infra/k8s-prod/mongo-express.yaml
+          kubectl -n "$NS" rollout status deploy/redisinsight --timeout=180s
+          kubectl -n "$NS" rollout status deploy/mongo-express --timeout=180s
+          kubectl get ingress | grep -E 'redisui|mongoui|minio'
+
+      - name: Pin images to this commit
+        run: |
+          set -euo pipefail
+          for name in $IMAGES; do
+            kubectl -n "$NS" set image "deploy/${name}-depl" \
+              "${name}=ghcr.io/${ORG}/${name}:${TAG}"
+          done
+
+      - name: Cleanup old ReplicaSets (keep newest)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for app in $IMAGES; do
+            LIST=$(kubectl -n "$NS" get rs -l app=$app \
+              -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}' \
+              | sort -k2)
+            KEEP=$(echo "$LIST" | tail -n1 | cut -f1)
+            TODEL=$(echo "$LIST" | head -n -1 | cut -f1 || true)
+            [ -n "${TODEL:-}" ] && kubectl -n "$NS" delete rs $TODEL || true
+            echo "keep $KEEP for $app"
+          done
+
+      - name: Wait app rollouts
+        run: |
+          set -euo pipefail
+          for name in $IMAGES; do
+            kubectl -n "$NS" rollout status "deploy/${name}-depl" --timeout=300s
+          done
+
+      - name: Apply prod ingress
+        run: kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv.yaml
+
+      - name: Garbage collection
+        shell: bash
+        run: |
+          set -euo pipefail
+          # failed
+          kubectl get pods -A --field-selector=status.phase=Failed -o name | xargs -r kubectl delete
+          # evicted
+          kubectl get pods -A | awk '$4=="Evicted"{print $1, $2}' | while read ns pod; do
+            kubectl -n "$ns" delete pod "$pod" --ignore-not-found || true
+          done
+          kubectl delete pod dns-smoke --ignore-not-found=true
+
+          
+      - name: Summary
+        run: |
+          kubectl -n "$NS" get pods,svc,deploy,rs,sts
+          
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          OK='^2|^3'
+
+          for i in {1..30}; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "https://aiclipse.online" || echo 000)
+            printf '%s  try %02d  -> %s\n' "$(date +%H:%M:%S)" "$i" "$code"
+            if echo "$code" | grep -Eq "$OK"; then
+              echo "ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "not ready after 60s"
+          exit 1 

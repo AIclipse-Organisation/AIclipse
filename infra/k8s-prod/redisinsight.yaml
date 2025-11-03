@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: redisinsight }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: redisinsight } }
+  template:
+    metadata: { labels: { app: redisinsight } }
+    spec:
+      containers:
+        - name: redisinsight
+          image: redislabs/redisinsight:latest
+          ports: [{ containerPort: 5540 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redisinsight-srv }
+spec:
+  selector: { app: redisinsight }
+  ports: [{ port: 5540, targetPort: 5540 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: redisinsight-ing
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: redisui.aiclipse.online
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: redisinsight-srv
+                port: { number: 5540 }
