@@ -7,10 +7,15 @@ document.addEventListener("DOMContentLoaded", () => {
       return response.json();
     })
     .then((data) => {
+    
+
       const images = data.images || [];
       const posts = data.posts || [];
       const comments = data.comments || [];
 
+      console.log("contraversial zone")
+      contraversialZone(posts)
+      console.log("contraversial zone closed")
       // console.log("Images:", images);
       // console.log("Posts:", posts);
       // console.log("Comments:", comments);
@@ -146,7 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
         weightedTotal = weightedVotes + weightedClicks + weightedComments;
 
         numOfComments = post.comments_id ? post.comments_id.length : 0;
-        console.log("test22: ");
+        // console.log("test22: ");
 
         commentsNorm = Number((numOfComments / avgCommentsNoComAlg).toFixed(2));
         weightedCommentsJustSum = commentsNorm * commentsWeight;
@@ -156,21 +161,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         //Time Decay Calculation
         // Time Decay Calculation
-        console.log(
-          "Post",
-          post.post_id,
-          "weightedVotes:",
-          weightedVotes,
-          "weightedClicks:",
-          weightedClicks,
-          "weightedComments:",
-          weightedComments,
-          "weightedTotal:",
-          weightedTotal
-        );
+        // console.log(
+        //   "Post",
+        //   post.post_id,
+        //   "weightedVotes:",
+        //   weightedVotes,
+        //   "weightedClicks:",
+        //   weightedClicks,
+        //   "weightedComments:",
+        //   weightedComments,
+        //   "weightedTotal:",
+        //   weightedTotal
+        // );
 
-        console.log("ageInSeconds:", currentTime - post.created_at);
-        console.log("post.created_at:", post.created_at);
+        // console.log("ageInSeconds:", currentTime - post.created_at);
+        // console.log("post.created_at:", post.created_at);
 
         //post time bonus
         postTime = post.created_at;
@@ -271,7 +276,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const postsSorted = Object.entries(postScores).sort(
         (a, b) => b[1] - a[1]
       );
-      console.log("sorted posts: ", postsSorted);
+      // console.log("sorted posts: ", postsSorted);
 
       const sortedPostsBox = document.getElementById("sorted-posts-box");
       let sortedHTML = "";
@@ -329,7 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
       sortedPostsBox.innerHTML = sortedHTML;
       sortedPostsBox.style.display = "flex";
 
-      console.log("postsSorted", postsSorted);
+      // console.log("postsSorted", postsSorted);
     })
     .catch((error) => {
       const msg = "Error fetching data: " + error;
