@@ -13,9 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const posts = data.posts || [];
       const comments = data.comments || [];
 
-      console.log("contraversial zone")
-      contraversialZone(posts)
-      console.log("contraversial zone closed")
+      
       // console.log("Images:", images);
       // console.log("Posts:", posts);
       // console.log("Comments:", comments);
@@ -121,8 +119,13 @@ document.addEventListener("DOMContentLoaded", () => {
       var postComments = [];
 
       var commentsPerPost = {};
-
+      var postContraversial;
+      
       posts.forEach((post, index) => {
+        postContraversial = false
+        console.log("contraversial zone")
+        postContraversial = contraversialZone(post)
+        console.log("contraversial zone closed: postContraversial: ", postContraversial)
         commentsHTML = "";
         postComments = post.comments_id || [];
 
@@ -208,10 +211,22 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         //Final score
+        postFinalScore=0
         postFinalScore = weightedTotal + timeBonus;
-        postScores[post.post_id] = postFinalScore;
 
+        postFinalScoreNoComAlg=0
         postFinalScoreNoComAlg = weightedTotalWithoutCommentAlg + timeBonus;
+
+        console.log(post.post_id, postContraversial)
+        if(postContraversial) {
+          postFinalScore = postFinalScore +999
+          postFinalScoreNoComAlg = postFinalScoreNoComAlg + 999         
+        }else{
+            postFinalScore= postFinalScore
+            postFinalScoreNoComAlg = postFinalScoreNoComAlg
+        }
+
+        postScores[post.post_id] = postFinalScore;
         postScoresNoComAlg[post.post_id] = postFinalScoreNoComAlg;
 
         //COMMENTS
@@ -295,7 +310,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="sorted-post-card">
           <div>Post Score (with comment alg): ${score.toFixed(9)}</div>
          <div>Post Score (no comment alg): ${postScoreNoComAlg.toFixed(9)}</div>
-
           <div class="post-above-image">
             Post ID: ${post.post_id} | Posted by: ${post.user_id}
           </div>

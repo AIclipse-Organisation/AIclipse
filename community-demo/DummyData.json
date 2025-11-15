@@ -101,10 +101,10 @@
       "comments_id": [3001, 3002],
       "clicks_count": 325,
       "up_vote_count": 1405,
-      "down_vote_count": 2,
+      "down_vote_count": 1400,
       "opinion": 1,
       "created_at": 1761753591,
-      "controversial_since": null
+      "controversial_since": 1763056548
     },
     {
       "post_id": 2002,
