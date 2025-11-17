@@ -13,5 +13,25 @@ def login():
 def home():
     return render_template("home.html")
 
+@app.route("/scans")
+def scans():
+    return render_template("scans.html")
+
+@app.route("/upload")
+def upload():
+    return render_template("upload.html")
+
+@app.route("/notification")
+def notification():
+    return render_template("notification.html")
+
+@app.route("/plan")
+def plan():
+    return render_template("plan.html")
+
+@app.route("/profile")
+def profile():
+    return render_template("profile.html")
+
 if __name__ == "__main__":
     app.run(debug=True)
