@@ -42,7 +42,7 @@ paths:
                 properties:
                   user_id:
                     type: string
-                    description: Application-level user identifier (matches users.user_id).
+                    description: Application-level user identifier.
                   user_name:
                     type: string
                   email:
@@ -136,19 +136,13 @@ paths:
                       properties:
                         kty:
                           type: string
-                          description: Key type (e.g., RSA, EC)
                         kid:
                           type: string
-                          description: Key ID used in JWT header
                         use:
                           type: string
-                          description: Intended use (e.g., sig)
                         alg:
                           type: string
-                          description: Algorithm (e.g., RS256)
                         n:
                           type: string
-                          description: RSA modulus (if RSA)
                         e:
                           type: string
-                          description: RSA exponent (if RSA)

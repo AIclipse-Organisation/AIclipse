@@ -140,7 +140,6 @@ paths:
                 properties:
                   is_ai:
                     type: boolean
-                    description: True if image is detected as AI-generated / deepfake.
                   score:
                     type: number
                     format: float
@@ -148,8 +147,7 @@ paths:
                   detection_token:
                     type: string
                     description: >
-                      Signed token issued by the backend that binds this detection result
-                      to the exact image bytes and user. Required when saving the image.
+                      Signed token that binds this detection result to the exact image bytes and user.
         "400":
           description: Missing or invalid file
         "401":
@@ -165,11 +163,11 @@ paths:
 
   /upload/image:
     post:
-      summary: Analyze and save image (history / community)
+      summary: Save image (history / community)
       description: >
         Save an image and its detection result to the user's history.
         The detection result is taken from a signed detection_token previously returned
-        by the /checks endpoint. The image is stored in MinIO and metadata in Media.
+        by the /checks endpoint. The image is stored in Media.
       security:
         - bearerAuth: []
       requestBody:
@@ -230,7 +228,7 @@ paths:
       summary: Get current user's images (history)
       description: >
         Return images that belong to the authenticated user.
-        Only images for the current user are returned (no global private listing).
+        Only images for the current user are returned.
       security:
         - bearerAuth: []
       parameters:
@@ -262,7 +260,7 @@ paths:
       summary: Get single image metadata
       description: >
         Return metadata for a single saved image.
-        For now, only the owner can access the image by ID.
+        Only the owner can access the image by ID.
       security:
         - bearerAuth: []
       parameters:
@@ -305,23 +303,18 @@ components:
       properties:
         image_id:
           type: string
-          description: Identifier of the saved image.
         is_ai:
           type: boolean
         score:
           type: number
           format: float
-          description: >
-            Raw model score in range [0, 1] at the time of saving.
+          description: Raw model score in range [0, 1] at the time of saving.
         likelihood:
           type: number
           format: float
-          description: >
-            Normalized likelihood value derived from the model score (e.g. percentage).
+          description: Normalized likelihood value derived from the model score (e.g. percentage).
         is_public:
           type: boolean
-          description: >
-            Whether this image is visible in the community feed.
         uploaded_at:
           type: string
           format: date-time

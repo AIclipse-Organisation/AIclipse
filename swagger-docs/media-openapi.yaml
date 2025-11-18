@@ -14,12 +14,6 @@ paths:
         Intended to be called by Gateway after detection result has been validated.
       parameters:
         - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
-          description: ID of the user that owns the image.
-        - in: header
           name: X-Request-Id
           required: true
           schema:
@@ -33,6 +27,7 @@ paths:
               type: object
               required:
                 - file
+                - user_id
                 - is_ai
                 - score
                 - is_public
@@ -41,6 +36,9 @@ paths:
                   type: string
                   format: binary
                   description: Image file (JPEG/PNG) to store.
+                user_id:
+                  type: string
+                  description: Owner user ID (from Gateway after JWT validation).
                 is_ai:
                   type: boolean
                   description: Detection result from Detector service (validated by Gateway).
@@ -50,8 +48,7 @@ paths:
                   description: Raw model score in range [0, 1] from Detector service.
                 is_public:
                   type: boolean
-                  description: >
-                    Whether the image should be public (community) or private (history).
+                  description: Whether the image should be public (community) or private (history).
       responses:
         "201":
           description: Image stored and metadata created
@@ -60,7 +57,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ImageRecord"
         "400":
-          description: Invalid image or missing required fields/headers
+          description: Invalid image or missing required fields
         "500":
           description: Internal error when storing image or writing to DB
 
@@ -75,8 +72,7 @@ paths:
           name: user_id
           schema:
             type: string
-          description: >
-            Owner user ID. When provided, filters images by this user.
+          description: Owner user ID. When provided, filters images by this user.
         - in: query
           name: is_public
           schema:
@@ -104,7 +100,7 @@ paths:
       description: >
         Return metadata for a single image.
         Media service enforces that either:
-        - the image belongs to the provided user_id, or
+        - the image belongs to the provided user_id (when given), or
         - the image is public (is_public=true).
       parameters:
         - in: path
@@ -113,8 +109,8 @@ paths:
           schema:
             type: string
           description: Image ID.
-        - in: header
-          name: X-User-Id
+        - in: query
+          name: user_id
           required: false
           schema:
             type: string
