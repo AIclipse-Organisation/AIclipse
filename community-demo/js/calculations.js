@@ -7,13 +7,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return response.json();
     })
     .then((data) => {
-    
-
       const images = data.images || [];
       const posts = data.posts || [];
       const comments = data.comments || [];
 
-      
       // console.log("Images:", images);
       // console.log("Posts:", posts);
       // console.log("Comments:", comments);
@@ -120,12 +117,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       var commentsPerPost = {};
       var postContraversial;
-      
+
       posts.forEach((post, index) => {
-        postContraversial = false
-        console.log("contraversial zone")
-        postContraversial = contraversialZone(post)
-        console.log("contraversial zone closed: postContraversial: ", postContraversial)
+        postContraversial = false;
+        console.log("contraversial zone");
+        postContraversial = contraversialZone(post);
+        console.log(
+          "contraversial zone closed: postContraversial: ",
+          postContraversial
+        );
         commentsHTML = "";
         postComments = post.comments_id || [];
 
@@ -156,7 +156,7 @@ document.addEventListener("DOMContentLoaded", () => {
         numOfComments = post.comments_id ? post.comments_id.length : 0;
         // console.log("test22: ");
 
-        commentsNorm = Number((numOfComments / avgCommentsNoComAlg).toFixed(2));
+        // commentsNorm = Number((numOfComments / avgCommentsNoComAlg).toFixed(2));
         weightedCommentsJustSum = commentsNorm * commentsWeight;
 
         weightedTotalWithoutCommentAlg =
@@ -185,49 +185,65 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const ageInSeconds = Math.max(currentTime - postTime, 0);
         const ageInHours = ageInSeconds / 3600;
+        const engagement =
+          clicksNorm * clicksWeight +
+          votesNorm * votesWeight +
+          commentsNorm * commentsWeight;
+        const timeFactor = Math.pow(ageInHours + constantOffset, gravity);
 
-        let timeBonus = 0;
+        let score = engagement / timeFactor;
+        console.log("score: ", score * 1000)
 
-        if (ageInHours < 48) {
-          //first 2 days: strong boost
-          timeBonus = 999;
-        } else if (ageInHours < 96 && ageInHours > 48) {
-          //2–4 days: medium boost
-          timeBonus = 1.5;
-        } else if (ageInHours < 168 && ageInHours > 96) {
-          //4–7 days: light boost
-          timeBonus = 1;
-          weightedTotal = weightedTotal * 0.7
-        } else if (ageInHours < 240 && ageInHours > 168) {
-          //7–10 days: fading
-          timeBonus = 0.5;
-          weightedTotal = weightedTotal * 0.6
-        } else {
-          //older than 10 days: no time bonus
-          timeBonus = 0;
-          weightedTotal=0;
-          weightedTotalWithoutCommentAlg=0;
-          weightedTotal = 0
-        }
+        if (ageInHours < 24) score *= 1.2;
+        console.log("score: after ageInHours: ", score* 1000)
 
-        //Final score
-        postFinalScore=0
-        postFinalScore = weightedTotal + timeBonus;
+        if (postContraversial) score *= 1.5;
 
-        postFinalScoreNoComAlg=0
-        postFinalScoreNoComAlg = weightedTotalWithoutCommentAlg + timeBonus;
+        console.log("score: after postContraversial: ", score* 1000)
 
-        console.log(post.post_id, postContraversial)
-        if(postContraversial) {
-          postFinalScore = postFinalScore +999
-          postFinalScoreNoComAlg = postFinalScoreNoComAlg + 999         
-        }else{
-            postFinalScore= postFinalScore
-            postFinalScoreNoComAlg = postFinalScoreNoComAlg
-        }
+        // let timeBonus = 0;
 
-        postScores[post.post_id] = postFinalScore;
-        postScoresNoComAlg[post.post_id] = postFinalScoreNoComAlg;
+        // if (ageInHours < 48) {
+        //   //first 2 days: strong boost
+        //   timeBonus = 999;
+        // } else if (ageInHours < 96 && ageInHours > 48) {
+        //   //2–4 days: medium boost
+        //   timeBonus = 1.5;
+        // } else if (ageInHours < 168 && ageInHours > 96) {
+        //   //4–7 days: light boost
+        //   timeBonus = 1;
+        //   weightedTotal = weightedTotal * 0.7;
+        // } else if (ageInHours < 240 && ageInHours > 168) {
+        //   //7–10 days: fading
+        //   timeBonus = 0.5;
+        //   weightedTotal = weightedTotal * 0.6;
+        // } else {
+        //   //older than 10 days: no time bonus
+        //   timeBonus = 0;
+        //   weightedTotal = 0;
+        //   weightedTotalWithoutCommentAlg = 0;
+        //   weightedTotal = 0;
+        // }
+
+        // //Final score
+        // postFinalScore = score ;
+        // // postFinalScore = weightedTotal + timeBonus;
+
+        // postFinalScoreNoComAlg = score* 1000;
+        // postFinalScoreNoComAlg = weightedTotalWithoutCommentAlg + timeBonus;
+
+        console.log(post.post_id, postContraversial);
+        // if (postContraversial) {
+        //   postFinalScore = postFinalScore + 999;
+        //   postFinalScoreNoComAlg = postFinalScoreNoComAlg + 999;
+        // } else {
+        //   postFinalScore = postFinalScore;
+        //   postFinalScoreNoComAlg = postFinalScoreNoComAlg;
+        // }
+
+        postScores[post.post_id] = score* 10000;
+        postScoresNoComAlg[post.post_id] = score* 10000;
+
 
         //COMMENTS
         parentChildCommentsMap = {};
@@ -305,11 +321,11 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         const post = posts.find((p) => p.post_id == postId);
         const image = images.find((img) => img.image_id == post.image_id);
-
+        // <div>Post Score (no comment alg): ${postScoreNoComAlg.toFixed(9)}</div>
         sortedHTML += `
         <div class="sorted-post-card">
           <div>Post Score (with comment alg): ${score.toFixed(9)}</div>
-         <div>Post Score (no comment alg): ${postScoreNoComAlg.toFixed(9)}</div>
+         
           <div class="post-above-image">
             Post ID: ${post.post_id} | Posted by: ${post.user_id}
           </div>
@@ -340,7 +356,9 @@ document.addEventListener("DOMContentLoaded", () => {
                   .join("<br>")}
               </div>
 
-          <div class="post-description">Uploaded: ${timeAgo(post.created_at)}</div>
+          <div class="post-description">Uploaded: ${timeAgo(
+            post.created_at
+          )}</div>
         </div><br>
       `;
       });
@@ -358,7 +376,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-
 function timeAgo(timestamp) {
   const seconds = Math.floor(Date.now() / 1000) - timestamp;
   const intervalsOfSeconds = {
@@ -367,13 +384,12 @@ function timeAgo(timestamp) {
     week: 604800,
     day: 86400,
     hour: 3600,
-    minute: 60
+    minute: 60,
   };
 
   for (const [unit, value] of Object.entries(intervalsOfSeconds)) {
     const count = Math.floor(seconds / value);
-    if (count >= 1) return `${count} ${unit}${count > 1 ? 's' : ''} ago`;
+    if (count >= 1) return `${count} ${unit}${count > 1 ? "s" : ""} ago`;
   }
-  return 'just now';
+  return "just now";
 }
-
