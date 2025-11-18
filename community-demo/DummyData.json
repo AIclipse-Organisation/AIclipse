@@ -101,9 +101,10 @@
       "comments_id": [3001, 3002],
       "clicks_count": 325,
       "up_vote_count": 1405,
-      "down_vote_count": 2,
+      "down_vote_count": 1400,
       "opinion": 1,
-      "created_at": 1761753591    
+      "created_at": 1761753591,
+      "controversial_since": 1763056548
     },
     {
       "post_id": 2002,
@@ -116,7 +117,8 @@
       "up_vote_count": 52,
       "down_vote_count": 6,
       "opinion": 1,
-      "created_at": 1762012791  
+      "created_at": 1762012791,  
+      "controversial_since": null
     },
     {
       "post_id": 2003,
@@ -129,7 +131,8 @@
       "up_vote_count": 67,
       "down_vote_count": 5,
       "opinion": 1,
-      "created_at": 1761418577  
+      "created_at": 1761418577,
+      "controversial_since": null
     },
     {
       "post_id": 2004,
@@ -142,7 +145,8 @@
       "up_vote_count": 33,
       "down_vote_count": 3,
       "opinion": 0,
-      "created_at": 1761418577  
+      "created_at": 1761418577,
+      "controversial_since": null
     },
     {
       "post_id": 2005,
@@ -155,7 +159,8 @@
       "up_vote_count": 48,
       "down_vote_count": 1,
       "opinion": 1,
-      "created_at": 1761418577  
+      "created_at": 1761418577,
+      "controversial_since": null
     },
     {
       "post_id": 2006,
@@ -168,7 +173,8 @@
       "up_vote_count": 25,
       "down_vote_count": 4,
       "opinion": 0,
-      "created_at": 1761418577  
+      "created_at": 1761418577,
+      "controversial_since": null
     },
     {
       "post_id": 2007,
@@ -181,7 +187,8 @@
       "up_vote_count": 18,
       "down_vote_count": 20,
       "opinion": -1,
-      "created_at": 1761418577  
+      "created_at": 1761418577,
+      "controversial_since": null
     },
     {
       "post_id": 2008,
@@ -194,7 +201,8 @@
       "up_vote_count": 58,
       "down_vote_count": 3,
       "opinion": 1,
-      "created_at": 1761418577  
+      "created_at": 1761418577,
+      "controversial_since": null
     },
     {
       "post_id": 2009,
@@ -207,7 +215,8 @@
       "up_vote_count": 29,
       "down_vote_count": 8,
       "opinion": 0,
-      "created_at": 1761418577  
+      "created_at": 1761418577,
+      "controversial_since": null
     },
     {
       "post_id": 2010,
@@ -220,7 +229,8 @@
       "up_vote_count": 90,
       "down_vote_count": 2,
       "opinion": 1,
-      "created_at": 1735747191  
+      "created_at": 1735747191,
+      "controversial_since": null
     }
   ], 
   "comments": [
