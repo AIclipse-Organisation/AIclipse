@@ -1,0 +1,56 @@
+openapi: 3.0.3
+info:
+  title: Aiclipse Detector Service API
+  version: "1.0.0"
+servers:
+  - url: http://detector-srv:3000
+
+paths:
+  /checks:
+    post:
+      summary: Run image detection
+      description: Accept raw image bytes and return AI/Deepfake detection result.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+          description: >
+            ID of the user that triggered the detection.
+            Required for all calls from Gateway.
+        - in: header
+          name: X-Request-Id
+          required: true
+          schema:
+            type: string
+          description: >
+            Correlation ID for logs and tracing.
+            Gateway always sends it;
+      responses:
+        "200":
+          description: Detection result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [is_ai, score]
+                properties:
+                  is_ai:
+                    type: boolean
+                  score:
+                    type: number
+                    format: float
+        "400":
+          description: Invalid image or missing required headers
+        "413":
+          description: Image too large
+        "500":
+          description: Internal error during model inference

@@ -1,0 +1,165 @@
+openapi: 3.0.3
+info:
+  title: Gateway Service
+  version: "0.0.1"
+servers:
+  - url: http://gateway-srv:8080
+
+paths:
+  /auth/signup:
+    post:
+      summary: User signup
+      description: Register a new user account via Gateway (proxy to Auth Service).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_name, email, password]
+              properties:
+                user_name:
+                  type: string
+                  minLength: 1
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [user_id, user_name, email, is_admin, plan, created_at]
+                properties:
+                  user_id:
+                    type: string
+                  user_name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  is_admin:
+                    type: boolean
+                    default: false
+                  plan:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    default: 0
+                  created_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Invalid payload
+        "409":
+          description: Email already registered
+
+  /auth/login:
+    post:
+      summary: User login
+      description: Authenticate and obtain a JWT access token via Gateway (proxy to Auth Service).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, user]
+                properties:
+                  token:
+                    type: string
+                  user:
+                    type: object
+                    required: [user_id, user_name, email, is_admin, plan]
+                    properties:
+                      user_id:
+                        type: string
+                      user_name:
+                        type: string
+                      email:
+                        type: string
+                        format: email
+                      is_admin:
+                        type: boolean
+                      plan:
+                        type: integer
+                        format: int32
+        "401":
+          description: Invalid credentials
+
+  /checks:
+    post:
+      summary: Analyze an image
+      description: >
+        Upload an image and get AI/Deepfake detection result.
+        No image or result is persisted.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG/PNG) to analyze.
+      responses:
+        "200":
+          description: Detection result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [is_ai, score]
+                properties:
+                  is_ai:
+                    type: boolean
+                    description: True if image is detected as AI-generated / deepfake.
+                  score:
+                    type: number
+                    format: float
+                    description: Confidence score in range [0, 1].
+        "400":
+          description: Missing or invalid file
+        "401":
+          description: Unauthorized (invalid or missing JWT)
+        "413":
+          description: Image too large
+        "415":
+          description: Unsupported media type
+        "502":
+          description: Detector service error
+        "504":
+          description: Detector timeout
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

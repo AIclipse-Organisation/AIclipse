@@ -1,0 +1,154 @@
+openapi: 3.0.3
+info:
+  title: Auth Service
+  version: "0.0.1"
+servers:
+  - url: http://auth-srv:3000
+
+paths:
+  /signup:
+    post:
+      summary: Create user
+      description: Create a new user account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_name, email, password]
+              properties:
+                user_name:
+                  type: string
+                  minLength: 1
+                  description: Display name of the user.
+                email:
+                  type: string
+                  format: email
+                  description: Unique email address.
+                password:
+                  type: string
+                  format: password
+                  description: Plain-text password to be hashed on the server.
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [user_id, user_name, email, is_admin, plan, created_at]
+                properties:
+                  user_id:
+                    type: string
+                    description: Application-level user identifier (matches users.user_id).
+                  user_name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  is_admin:
+                    type: boolean
+                    default: false
+                  plan:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    default: 0
+                  created_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Invalid payload
+        "409":
+          description: Email already registered
+
+  /login:
+    post:
+      summary: Issue JWT
+      description: Validate credentials and issue a JWT access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, user]
+                properties:
+                  token:
+                    type: string
+                    description: JWT access token.
+                  user:
+                    type: object
+                    required: [user_id, user_name, email, is_admin, plan]
+                    properties:
+                      user_id:
+                        type: string
+                      user_name:
+                        type: string
+                      email:
+                        type: string
+                        format: email
+                      is_admin:
+                        type: boolean
+                      plan:
+                        type: integer
+                        format: int32
+        "401":
+          description: Invalid credentials
+
+  /.well-known/jwks.json:
+    get:
+      summary: JSON Web Key Set (JWKS)
+      description: >
+        Return public keys used to verify JWT signatures issued by Auth Service.
+        Gateway fetches and caches these keys to validate tokens locally.
+      responses:
+        "200":
+          description: JWKS document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      description: JSON Web Key
+                      properties:
+                        kty:
+                          type: string
+                          description: Key type (e.g., RSA, EC)
+                        kid:
+                          type: string
+                          description: Key ID used in JWT header
+                        use:
+                          type: string
+                          description: Intended use (e.g., sig)
+                        alg:
+                          type: string
+                          description: Algorithm (e.g., RS256)
+                        n:
+                          type: string
+                          description: RSA modulus (if RSA)
+                        e:
+                          type: string
+                          description: RSA exponent (if RSA)
