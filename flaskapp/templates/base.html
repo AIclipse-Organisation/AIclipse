@@ -12,11 +12,13 @@
 
     <div class="app-container">
 
-        {% include "navbar.html" %}
+        {% include "topbar.html" %}
 
         <main class="screen">
             {% block content %}{% endblock %}
         </main>
+
+        {% include "navbar.html" %}
 
     </div>
 
