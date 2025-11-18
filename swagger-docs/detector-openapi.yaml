@@ -9,31 +9,35 @@ paths:
   /checks:
     post:
       summary: Run image detection
-      description: Accept raw image bytes and return AI/Deepfake detection result.
-      requestBody:
-        required: true
-        content:
-          application/octet-stream:
-            schema:
-              type: string
-              format: binary
+      description: >
+        Accept an image file as multipart/form-data and return AI/Deepfake detection result.
+        Intended to be called by Gateway.
       parameters:
         - in: header
           name: X-User-Id
           required: true
           schema:
             type: string
-          description: >
-            ID of the user that triggered the detection.
-            Required for all calls from Gateway.
+          description: ID of the user that triggered the detection. Gateway always sends it.
         - in: header
           name: X-Request-Id
           required: true
           schema:
             type: string
-          description: >
-            Correlation ID for logs and tracing.
-            Gateway always sends it;
+          description: Correlation ID for logs and tracing. Gateway always sends it.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG/PNG) to analyze.
       responses:
         "200":
           description: Detection result
@@ -49,7 +53,7 @@ paths:
                     type: number
                     format: float
         "400":
-          description: Invalid image or missing required headers
+          description: Invalid image, missing file or required headers
         "413":
           description: Image too large
         "500":

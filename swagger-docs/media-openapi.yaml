@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  title: Media Service
+  version: "0.0.1"
+servers:
+  - url: http://media-srv:3000
+
+paths:
+  /upload/image:
+    post:
+      summary: Store image and metadata
+      description: >
+        Store an image in MinIO and create a metadata record in the images collection.
+        Intended to be called by Gateway after detection result has been validated.
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+          description: ID of the user that owns the image.
+        - in: header
+          name: X-Request-Id
+          required: true
+          schema:
+            type: string
+          description: Correlation ID for logs and tracing.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - is_ai
+                - score
+                - is_public
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG/PNG) to store.
+                is_ai:
+                  type: boolean
+                  description: Detection result from Detector service (validated by Gateway).
+                score:
+                  type: number
+                  format: float
+                  description: Raw model score in range [0, 1] from Detector service.
+                is_public:
+                  type: boolean
+                  description: >
+                    Whether the image should be public (community) or private (history).
+      responses:
+        "201":
+          description: Image stored and metadata created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageRecord"
+        "400":
+          description: Invalid image or missing required fields/headers
+        "500":
+          description: Internal error when storing image or writing to DB
+
+  /images:
+    get:
+      summary: List images for a user or public images
+      description: >
+        Return images filtered either by user_id (for history) or by is_public=true (for community).
+        There is no endpoint that returns all private images globally.
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+          description: >
+            Owner user ID. When provided, filters images by this user.
+        - in: query
+          name: is_public
+          schema:
+            type: boolean
+          description: >
+            If true, return only public images.
+            If false, return only private images for the given user_id.
+            If omitted with user_id, return all images for that user.
+      responses:
+        "200":
+          description: List of images
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ImageRecord"
+
+  /image/{image_id}:
+    get:
+      summary: Get single image metadata
+      description: >
+        Return metadata for a single image.
+        Media service enforces that either:
+        - the image belongs to the provided user_id, or
+        - the image is public (is_public=true).
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+          description: Image ID.
+        - in: header
+          name: X-User-Id
+          required: false
+          schema:
+            type: string
+          description: ID of the user requesting the image (for private access checks).
+      responses:
+        "200":
+          description: Image metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageRecord"
+        "404":
+          description: Image not found or not accessible for this user
+
+components:
+  schemas:
+    ImageRecord:
+      type: object
+      description: Image document stored in the images collection.
+      required:
+        - image_id
+        - user_id
+        - s3_key
+        - is_ai
+        - is_public
+        - likelihood
+        - uploaded_at
+        - is_reported
+      properties:
+        image_id:
+          type: string
+        user_id:
+          type: string
+        s3_key:
+          type: string
+          description: Key of the object stored in MinIO (S3-compatible).
+        is_ai:
+          type: boolean
+        is_public:
+          type: boolean
+        likelihood:
+          type: number
+          format: float
+        uploaded_at:
+          type: string
+          format: date-time
+        is_reported:
+          type: boolean
+        url:
+          type: string
+          format: uri
+          description: Resolved URL built from s3_key (for convenience).
