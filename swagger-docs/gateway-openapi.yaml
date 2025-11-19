@@ -1,0 +1,324 @@
+openapi: 3.0.3
+info:
+  title: Gateway Service
+  version: "0.0.1"
+servers:
+  - url: http://gateway-srv:8080
+
+paths:
+  /auth/signup:
+    post:
+      summary: User signup
+      description: Register a new user account via Gateway (proxy to Auth Service).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_name, email, password]
+              properties:
+                user_name:
+                  type: string
+                  minLength: 1
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [user_id, user_name, email, is_admin, plan, created_at]
+                properties:
+                  user_id:
+                    type: string
+                  user_name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  is_admin:
+                    type: boolean
+                    default: false
+                  plan:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    default: 0
+                  created_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Invalid payload
+        "409":
+          description: Email already registered
+
+  /auth/login:
+    post:
+      summary: User login
+      description: Authenticate and obtain a JWT access token via Gateway (proxy to Auth Service).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, user]
+                properties:
+                  token:
+                    type: string
+                  user:
+                    type: object
+                    required: [user_id, user_name, email, is_admin, plan]
+                    properties:
+                      user_id:
+                        type: string
+                      user_name:
+                        type: string
+                      email:
+                        type: string
+                        format: email
+                      is_admin:
+                        type: boolean
+                      plan:
+                        type: integer
+                        format: int32
+        "401":
+          description: Invalid credentials
+
+  /checks:
+    post:
+      summary: Analyze an image (no saving)
+      description: >
+        Upload an image and get AI/Deepfake detection result.
+        No image or result is persisted.
+        A signed detection_token is returned to bind this result to the exact image bytes.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG/PNG) to analyze.
+      responses:
+        "200":
+          description: Detection result (not persisted)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [is_ai, score, detection_token]
+                properties:
+                  is_ai:
+                    type: boolean
+                  score:
+                    type: number
+                    format: float
+                    description: Confidence score in range [0, 1].
+                  detection_token:
+                    type: string
+                    description: >
+                      Signed token that binds this detection result to the exact image bytes and user.
+        "400":
+          description: Missing or invalid file
+        "401":
+          description: Unauthorized (invalid or missing JWT)
+        "413":
+          description: Image too large
+        "415":
+          description: Unsupported media type
+        "502":
+          description: Detector service error
+        "504":
+          description: Detector timeout
+
+  /upload/image:
+    post:
+      summary: Save image (history / community)
+      description: >
+        Save an image and its detection result to the user's history.
+        The detection result is taken from a signed detection_token previously returned
+        by the /checks endpoint. The image is stored in Media.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, detection_token]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG/PNG) to save.
+                detection_token:
+                  type: string
+                  description: >
+                    Signed detection token obtained from /checks for this exact image.
+                    Must match the uploaded image bytes and the current user.
+                is_public:
+                  type: boolean
+                  description: >
+                    If true, the image is public (community post).
+                    If false or omitted, the image is private (history only).
+      responses:
+        "201":
+          description: Image saved with validated detection result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [is_ai, score, image]
+                properties:
+                  is_ai:
+                    type: boolean
+                    description: Detection result extracted from the validated token.
+                  score:
+                    type: number
+                    format: float
+                    description: Detection score extracted from the validated token.
+                  image:
+                    $ref: "#/components/schemas/SavedImage"
+        "400":
+          description: Missing or invalid file, or invalid detection_token
+        "401":
+          description: Unauthorized (invalid or missing JWT)
+        "413":
+          description: Image too large
+        "415":
+          description: Unsupported media type
+        "502":
+          description: Upstream service error (Media)
+        "504":
+          description: Upstream timeout (Media)
+
+  /images:
+    get:
+      summary: Get current user's images (history)
+      description: >
+        Return images that belong to the authenticated user.
+        Only images for the current user are returned.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: is_public
+          schema:
+            type: boolean
+          description: >
+            Optional filter. If true, return only public images of the user.
+            If false, return only private images.
+            If omitted, return all images belonging to the user.
+      responses:
+        "200":
+          description: List of user's images
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SavedImage"
+        "401":
+          description: Unauthorized (invalid or missing JWT)
+
+  /image/{image_id}:
+    get:
+      summary: Get single image metadata
+      description: >
+        Return metadata for a single saved image.
+        Only the owner can access the image by ID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+          description: ID of the saved image.
+      responses:
+        "200":
+          description: Saved image metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedImage"
+        "401":
+          description: Unauthorized (invalid or missing JWT)
+        "404":
+          description: Image not found or does not belong to the user
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SavedImage:
+      type: object
+      description: Saved image in user's history or community.
+      required:
+        - image_id
+        - is_ai
+        - likelihood
+        - is_public
+        - uploaded_at
+        - url
+      properties:
+        image_id:
+          type: string
+        is_ai:
+          type: boolean
+        score:
+          type: number
+          format: float
+          description: Raw model score in range [0, 1] at the time of saving.
+        likelihood:
+          type: number
+          format: float
+          description: Normalized likelihood value derived from the model score (e.g. percentage).
+        is_public:
+          type: boolean
+        uploaded_at:
+          type: string
+          format: date-time
+        url:
+          type: string
+          format: uri
+          description: URL to access the image bytes (direct or signed).
