@@ -1,0 +1,301 @@
+openapi: 3.0.3
+info:
+  title: Posts Service API
+  version: "1.0.0"
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /posts:
+    post:
+      summary: Create a new post
+      description: Create a post with image and detection result.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, image_id, Description]
+              properties:
+                user_id:
+                  type: string
+                  description: ID of the user creating the post.
+                image_id:
+                  type: string
+                  description: ID of the associated image.
+                Description:
+                  type: string
+                  description: Post description or caption.
+                Results:
+                  type: number
+                  format: float
+                  description: Algorithm detection result for the image.
+      responses:
+        "201":
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          description: Missing required fields
+        "500":
+          description: Internal server error
+
+    get:
+      summary: List posts
+      description: Retrieve posts sorted by newest first. Optionally filter by user.
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+          description: Filter posts by user ID.
+      responses:
+        "200":
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Post"
+        "500":
+          description: Internal server error
+
+  /posts/{post_id}:
+    get:
+      summary: Get single post
+      description: Fetch a post with all .
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: string
+          description: Post ID.
+      responses:
+        "200":
+          description: Post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          description: Post not found
+        "500":
+          description: Internal server error
+
+    patch:
+      summary: Update post
+      description: Update post fields (post_id immutable; Description, Results, controversial_since editable).
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: string
+          description: Post ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Description:
+                  type: string
+                Results:
+                  type: number
+                  format: float
+                controversial_since:
+                  type: number
+                  format: double
+      responses:
+        "200":
+          description: Post updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          description: Invalid input or update operators not allowed
+        "404":
+          description: Post not found
+        "500":
+          description: Internal server error
+
+    delete:
+      summary: Delete post
+      description: Permanently remove a post.
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: string
+          description: Post ID.
+      responses:
+        "200":
+          description: Post deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  post:
+                    $ref: "#/components/schemas/Post"
+        "404":
+          description: Post not found
+        "500":
+          description: Internal server error
+
+  /posts/{post_id}/vote:
+    post:
+      summary: Vote on a post
+      description: Increment up or down vote count.
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: string
+          description: Post ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vote]
+              properties:
+                vote:
+                  type: string
+                  enum: [up, down]
+                  description: Vote direction.
+      responses:
+        "200":
+          description: Vote recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          description: Invalid vote value
+        "404":
+          description: Post not found
+        "500":
+          description: Internal server error
+
+  /posts/{post_id}/click:
+    post:
+      summary: Track post engagement
+      description: Increment click counter for analytics.
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: string
+          description: Post ID.
+      responses:
+        "200":
+          description: Click tracked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          description: Post not found
+        "500":
+          description: Internal server error
+
+  /posts/{post_id}/comments:
+    post:
+      summary: Add comment to post
+      description: Append a comment ID to the post's comment array.
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: string
+          description: Post ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment_id]
+              properties:
+                comment_id:
+                  type: string
+                  description: Comment ID to add.
+      responses:
+        "200":
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          description: Missing comment_id
+        "404":
+          description: Post not found
+        "500":
+          description: Internal server error
+
+components:
+  schemas:
+    Post:
+      type: object
+      required: [post_id, user_id, image_id, Description, created_at]
+      properties:
+        post_id:
+          type: string
+          description: Unique post identifier.
+        user_id:
+          type: string
+          description: User ID of post creator.
+        image_id:
+          type: string
+          description: Associated image ID.
+        Description:
+          type: string
+          description: Post caption or description.
+        Results:
+          type: number
+          format: float
+          description: Algorithm detection result.
+        likedBy:
+          type: integer
+          description: Count of likes.
+        comments_id:
+          type: array
+          items:
+            type: string
+          description: Array of comment IDs.
+        clicks_count:
+          type: integer
+          description: Total click count.
+        up_vote_count:
+          type: integer
+          description: Upvote count.
+        down_vote_count:
+          type: integer
+          description: Downvote count.
+        controversial_since:
+          type: number
+          format: double
+          description: Timestamp when post became controversial.
+        created_at:
+          type: string
+          format: date-time
+          description: Post creation timestamp.

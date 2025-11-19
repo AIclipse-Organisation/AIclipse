@@ -1,0 +1,175 @@
+openapi: 3.0.3
+info:
+  title: Logs Service API
+  version: "1.0.0"
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /logs:
+    post:
+      summary: Create audit log entry
+      description: Log a user action for audit trail.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, action]
+              properties:
+                user_id:
+                  type: string
+                  description: ID of user performing the action.
+                image_id:
+                  type: string
+                  description: Associated image ID (optional).
+                action:
+                  type: string
+                  description: Description of the action performed.
+      responses:
+        "201":
+          description: Log entry created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "400":
+          description: Missing required fields
+        "500":
+          description: Internal server error
+
+    get:
+      summary: List audit logs
+      description: Retrieve logs sorted by newest first. Optionally filter by user or image.
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+          description: Filter logs by user ID.
+        - in: query
+          name: image_id
+          schema:
+            type: string
+          description: Filter logs by image ID.
+      responses:
+        "200":
+          description: List of logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Log"
+        "500":
+          description: Internal server error
+
+  /logs/{log_id}:
+    get:
+      summary: Get single log entry
+      description: Fetch a log entry .
+      parameters:
+        - in: path
+          name: log_id
+          required: true
+          schema:
+            type: string
+          description: Log ID.
+      responses:
+        "200":
+          description: Log entry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: Log not found
+        "500":
+          description: Internal server error
+
+    patch:
+      summary: Update log entry
+      description: Update log action field (log_id immutable; action editable).
+      parameters:
+        - in: path
+          name: log_id
+          required: true
+          schema:
+            type: string
+          description: Log ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+      responses:
+        "200":
+          description: Log updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "400":
+          description: Invalid input or update operators not allowed
+        "404":
+          description: Log not found
+        "500":
+          description: Internal server error
+
+    delete:
+      summary: Delete log entry
+      description: Permanently remove a log entry.
+      parameters:
+        - in: path
+          name: log_id
+          required: true
+          schema:
+            type: string
+          description: Log ID.
+      responses:
+        "200":
+          description: Log deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  log:
+                    $ref: "#/components/schemas/Log"
+        "404":
+          description: Log not found
+        "500":
+          description: Internal server error
+
+components:
+  schemas:
+    Log:
+      type: object
+      required: [log_id, user_id, action, created_at]
+      properties:
+        log_id:
+          type: string
+          description: Unique log identifier.
+        user_id:
+          type: string
+          description: User ID who performed the action.
+        image_id:
+          type: string
+          description: Associated image ID (if applicable).
+        action:
+          type: string
+          description: Action performed.
+        created_at:
+          type: string
+          format: date-time
+          description: Log creation timestamp.

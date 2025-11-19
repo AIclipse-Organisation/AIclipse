@@ -1,0 +1,187 @@
+openapi: 3.0.3
+info:
+  title: Images Service API
+  version: "1.0.0"
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /images:
+    post:
+      summary: Create image 
+      description: Create an image record with S3 key reference (s3_key required, no URL).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [s3_key]
+              properties:
+                s3_key:
+                  type: string
+                  description: S3 object key for the image file.
+                is_public:
+                  type: boolean
+                  description: Whether image is publicly visible.
+                is_reported:
+                  type: boolean
+                  description: Whether image has been reported.
+      responses:
+        "201":
+          description: Image created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Image"
+        "400":
+          description: Missing s3_key
+        "500":
+          description: Internal server error
+
+    get:
+      summary: List images
+      description: Retrieve images sorted by newest first. Optionally filter by user.
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+          description: Filter images by user ID.
+      responses:
+        "200":
+          description: List of images
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Image"
+        "500":
+          description: Internal server error
+
+  /images/{image_id}:
+    get:
+      summary: Get single image
+      description: Fetch image with all detection results.
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+          description: Image ID.
+      responses:
+        "200":
+          description: Image 
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Image"
+        "404":
+          description: Image not found
+        "500":
+          description: Internal server error
+
+    patch:
+      summary: Update image 
+      description: Update image fields (image_id immutable; is_ai, likelihood, is_public, is_reported editable).
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+          description: Image ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_ai:
+                  type: boolean
+                likelihood:
+                  type: number
+                  format: float
+                is_public:
+                  type: boolean
+                is_reported:
+                  type: boolean
+      responses:
+        "200":
+          description: Image updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Image"
+        "400":
+          description: Invalid input or update operators not allowed
+        "404":
+          description: Image not found
+        "500":
+          description: Internal server error
+
+    delete:
+      summary: Delete image
+      description: Permanently remove an image record.
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+          description: Image ID.
+      responses:
+        "200":
+          description: Image deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  image:
+                    $ref: "#/components/schemas/Image"
+        "404":
+          description: Image not found
+        "500":
+          description: Internal server error
+
+components:
+  schemas:
+    Image:
+      type: object
+      required: [image_id, s3_key, created_at]
+      properties:
+        image_id:
+          type: string
+          description: Unique image identifier.
+        s3_key:
+          type: string
+          description: S3 object key for the image file.
+        user_id:
+          type: string
+          description: Associated user ID (optional).
+        is_ai:
+          type: boolean
+          description: Whether image is AI-generated.
+        likelihood:
+          type: number
+          format: float
+          description: AI detection likelihood score.
+        is_public:
+          type: boolean
+          description: Public visibility flag.
+        is_reported:
+          type: boolean
+          description: Report flag for moderation.
+        created_at:
+          type: string
+          format: date-time
+          description: Image record creation timestamp.

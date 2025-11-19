@@ -17,9 +17,10 @@ const billingSchema = new mongoose.Schema(
       min: 0,
     },//what plan the user paid for
     status: {
-      type: Boolean,
+      type: String,
       required: true,
-      default: true,
+      enum: ['active', 'inactive','cancelled', 'refunded', 'pending'],
+      default: 'active',
     },// is the subscription still active
     amount: {
       type: Number,

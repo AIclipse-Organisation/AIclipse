@@ -2,6 +2,13 @@ const mongoose = require("mongoose");
 
 const commentSchema = new mongoose.Schema(
   {
+
+    post_id: 
+    { type: String,
+       index: true, 
+       unique: true 
+    },
+
     comment_id: {
       type: String,
       index: true,
@@ -21,7 +28,7 @@ const commentSchema = new mongoose.Schema(
       required: true,
       default: Date.now,
     },
-    Parent_comment_id: {
+    parent_comment_id: {
       type: String,
       default: null,
     },

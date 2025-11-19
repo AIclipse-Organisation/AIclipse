@@ -26,8 +26,8 @@ const imageSchema = new mongoose.Schema(
     },
     likelihood: {
       type: Number,
-      min: 10,
-      max: 90,
+      min: 1,
+      max: 99,
     },
     uploaded_at: {
       type: Date,

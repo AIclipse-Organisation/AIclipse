@@ -18,20 +18,23 @@ const postSchema = new mongoose.Schema(
       required: true,
     }, // ID of the associated image
    
-    Results: {
+    results: {
       type: Number,
       min: 1,
+      max: 99
     }, //Results that out algorithm gave for the image in this post
    
-    Description: {
+    description: {
       type: String,
       required: true,
       minlength: 1,
     },// further datails on the image etc
     
-    likedBy: 
+    like_count: 
       {
         type: Number,
+        min: 0,
+        default: 0
       }
     ,//and count of how many liked the post
     
@@ -62,7 +65,7 @@ const postSchema = new mongoose.Schema(
     },
 
     controversial_since:{
-      type: Number || null,
+      type: Number ,
       min:0 ,
       default: null,
     },

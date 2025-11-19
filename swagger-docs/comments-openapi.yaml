@@ -1,0 +1,175 @@
+openapi: 3.0.3
+info:
+  title: Comments Service API
+  version: "1.0.0"
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /comments:
+    post:
+      summary: Create a comment
+      description: Create a comment on a post.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [post_id, user_id, text]
+              properties:
+                post_id:
+                  type: string
+                  description: ID of the post to comment on.
+                user_id:
+                  type: string
+                  description: ID of the user posting the comment.
+                text:
+                  type: string
+                  description: Comment text content.
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: Missing required fields
+        "500":
+          description: Internal server error
+
+    get:
+      summary: List comments
+      description: Retrieve comments sorted by newest first. Optionally filter by post or username.
+      parameters:
+        - in: query
+          name: post_id
+          schema:
+            type: string
+          description: Filter comments by post ID.
+        - in: query
+          name: user_name
+          schema:
+            type: string
+          description: Filter comments by username (exact match).
+      responses:
+        "200":
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comment"
+        "500":
+          description: Internal server error
+
+  /comments/{comment_id}:
+    get:
+      summary: Get single comment
+      description: Fetch a comment.
+      parameters:
+        - in: path
+          name: comment_id
+          required: true
+          schema:
+            type: string
+          description: Comment ID.
+      responses:
+        "200":
+          description: Comment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "404":
+          description: Comment not found
+        "500":
+          description: Internal server error
+
+    patch:
+      summary: Update comment
+      description: Update comment text (comment_id immutable; text editable).
+      parameters:
+        - in: path
+          name: comment_id
+          required: true
+          schema:
+            type: string
+          description: Comment ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+      responses:
+        "200":
+          description: Comment updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: Invalid input or update operators not allowed
+        "404":
+          description: Comment not found
+        "500":
+          description: Internal server error
+
+    delete:
+      summary: Delete comment
+      description: Permanently remove a comment.
+      parameters:
+        - in: path
+          name: comment_id
+          required: true
+          schema:
+            type: string
+          description: Comment ID.
+      responses:
+        "200":
+          description: Comment deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  comment:
+                    $ref: "#/components/schemas/Comment"
+        "404":
+          description: Comment not found
+        "500":
+          description: Internal server error
+
+components:
+  schemas:
+    Comment:
+      type: object
+      required: [comment_id, post_id, user_id, text, created_at]
+      properties:
+        comment_id:
+          type: string
+          description: Unique comment identifier.
+        post_id:
+          type: string
+          description: Associated post ID.
+        user_id:
+          type: string
+          description: Commenter user ID.
+        text:
+          type: string
+          description: Comment text.
+        created_at:
+          type: string
+          format: date-time
+          description: Comment creation timestamp.

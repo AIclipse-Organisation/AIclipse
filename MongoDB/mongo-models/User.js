@@ -22,7 +22,8 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       index: true,
-      match: /^.+@.+\..+$/,
+      lowercase: true,
+      match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
       trim: true,
     },
     password: {
@@ -34,16 +35,17 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: Date.now,
     },
-    Age: {
+    age: {
       type: Number,
       min: 18,
+      max : 100,
     },
-    Total_Guesses: {
+    total_guesses: {
       type: Number,
       min: 0,
       default: 0,
     },// part of calucating user accuracy 
-    Total_Correct: {
+    total_correct: {
       type: Number,
       min: 0,
       default: 0,

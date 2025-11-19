@@ -17,6 +17,7 @@ const logSchema = new mongoose.Schema(
     action: {
       type: String,
       required: true,
+      enum: ['update', 'delete'],  //(should we add action viewed ?)
     },// What action was performed like a delete/edit
     created_at: {
       type: Date,

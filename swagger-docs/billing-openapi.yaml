@@ -1,0 +1,189 @@
+openapi: 3.0.3
+info:
+  title: Billing Service API
+  version: "1.0.0"
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /billing:
+    post:
+      summary: Create billing record
+      description: Create a billing/subscription transaction record (immutable after creation).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, plan, status, amount, current_period_start, current_period_end]
+              properties:
+                user_id:
+                  type: string
+                  description: Associated user ID.
+                plan:
+                  type: string
+                  description: Subscription plan type.
+                status:
+                  type: string
+                  description: Payment status.
+                amount:
+                  type: number
+                  format: float
+                  description: Transaction amount.
+                current_period_start:
+                  type: string
+                  format: date-time
+                  description: Period start timestamp.
+                current_period_end:
+                  type: string
+                  format: date-time
+                  description: Period end timestamp.
+      responses:
+        "201":
+          description: Billing record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Billing"
+        "400":
+          description: Missing required fields
+        "500":
+          description: Internal server error
+
+    get:
+      summary: List billing records
+      description: Retrieve billing records sorted by newest first. Optionally filter by username.
+      parameters:
+        - in: query
+          name: user_name
+          schema:
+            type: string
+          description: Filter records by username (exact match).
+      responses:
+        "200":
+          description: List of billing records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Billing"
+        "500":
+          description: Internal server error
+
+  /billing/{billing_id}:
+    get:
+      summary: Get single billing record
+      description: Fetch a billing record .
+      parameters:
+        - in: path
+          name: billing_id
+          required: true
+          schema:
+            type: string
+          description: Billing ID.
+      responses:
+        "200":
+          description: Billing record 
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Billing"
+        "404":
+          description: Billing record not found
+        "500":
+          description: Internal server error
+
+    patch:
+      summary: Update billing record
+      description: |
+        Billing records are immutable after creation. All fields are read-only 
+        (billing_id, user_id, plan, status, amount, current_period_start, current_period_end, created_at).
+        This endpoint will reject any update attempts.
+      parameters:
+        - in: path
+          name: billing_id
+          required: true
+          schema:
+            type: string
+          description: Billing ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Any attempt to modify will be rejected.
+      responses:
+        "400":
+          description: Billing records are immutable; no updates allowed
+        "404":
+          description: Billing record not found
+        "500":
+          description: Internal server error
+
+    delete:
+      summary: Delete billing record
+      description: Permanently remove a billing record.
+      parameters:
+        - in: path
+          name: billing_id
+          required: true
+          schema:
+            type: string
+          description: Billing ID.
+      responses:
+        "200":
+          description: Billing record deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  billing:
+                    $ref: "#/components/schemas/Billing"
+        "404":
+          description: Billing record not found
+        "500":
+          description: Internal server error
+
+components:
+  schemas:
+    Billing:
+      type: object
+      required: [billing_id, user_id, plan, status, amount, current_period_start, current_period_end, created_at]
+      properties:
+        billing_id:
+          type: string
+          description: Unique billing record identifier.
+        user_id:
+          type: string
+          description: Associated user ID.
+        plan:
+          type: string
+          description: Subscription plan type (IMMUTABLE).
+        status:
+          type: string
+          description: Payment status (IMMUTABLE).
+        amount:
+          type: number
+          format: float
+          description: Transaction amount (IMMUTABLE).
+        current_period_start:
+          type: string
+          format: date-time
+          description: Billing period start (IMMUTABLE).
+        current_period_end:
+          type: string
+          format: date-time
+          description: Billing period end (IMMUTABLE).
+        created_at:
+          type: string
+          format: date-time
+          description: Record creation timestamp (IMMUTABLE).
