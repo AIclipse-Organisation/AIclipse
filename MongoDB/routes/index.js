@@ -1,16 +1,9 @@
 const express = require('express');
 const router = express.Router();
 
-router.use('/auth', require('./auth'));
-
-router.use('/posts', require('./posts'));
-
-router.use('/logs', require('./logs'));
-
-router.use('/billing', require('./billing'));
-
-router.use('/comments', require('./comments'));
-
-router.use('/images', require('./images'));
+router.use('/auth', require('./auth.users.route'));
+router.use('/posts', require('./community.posts.route'));
+router.use('/comments', require('./community.comments.route'));
+router.use('/images', require('./media.images.route'));
 
 module.exports = router;

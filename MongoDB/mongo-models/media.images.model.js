@@ -38,7 +38,7 @@ const imageSchema = new mongoose.Schema(
       default: false,
     },
   },
-  { collection: "images" }
+  { collection: "media.images" }
 );
 
 module.exports = mongoose.model("Image", imageSchema);
