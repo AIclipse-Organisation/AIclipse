@@ -6,17 +6,20 @@ from detector_modules.io.fetcher import fetch_image_bytes
 from detector_modules.io.decoder import decode_image
 
 
-def predict_from_url(url: str):
+def _predict_from_image(img):
     model, class_names, device = get_model()
-
-    img_bytes = fetch_image_bytes(url)
-
-    img = decode_image(img_bytes)
-
     tensor = to_tensor(img, device)
-
     probs = predict_probability(model, tensor)
-
     _, confidence, label = build_prediction(probs, class_names)
-
     return label, confidence
+
+
+def predict_from_url(url: str):
+    img_bytes = fetch_image_bytes(url)
+    img = decode_image(img_bytes)
+    return _predict_from_image(img)
+
+
+def predict_from_bytes(image_bytes: bytes):
+    img = decode_image(image_bytes)
+    return _predict_from_image(img)
