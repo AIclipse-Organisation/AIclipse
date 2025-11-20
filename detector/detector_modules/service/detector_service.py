@@ -10,8 +10,8 @@ def _predict_from_image(img):
     model, class_names, device = get_model()
     tensor = to_tensor(img, device)
     probs = predict_probability(model, tensor)
-    _, confidence, label = build_prediction(probs, class_names)
-    return label, confidence
+    verdict, confidence, label = build_prediction(probs, class_names)
+    return verdict, confidence, label
 
 
 def predict_from_url(url: str):
