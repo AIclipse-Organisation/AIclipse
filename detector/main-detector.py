@@ -147,9 +147,10 @@ def test_detector():
     Pulls a dummy MinIO image and runs inference.
     """
     try:
-        label, confidence = predict_from_url(TEST_URL)
+        verdict, confidence, label = predict_from_url(TEST_URL)
         return {
             "status": "ok",
+            "verdict": verdict,
             "label": label,
             "confidence": confidence
         }
