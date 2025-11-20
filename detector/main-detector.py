@@ -91,10 +91,6 @@ def process_jobs():
                         r.xadd(STREAM, {"type": "jobs.completed", "data": json.dumps({"job_id": job_id, "outputs": out["outputs"], "metrics": metrics})})
                         r.xack(STREAM, GROUP, msg_id)
                         continue
-                    # Emit coarse-grained progress
-                    r.xadd(STREAM, {"type": "jobs.progress", "data": json.dumps({"job_id": job_id, "progress": 0.0, "message": "starting"})})
-                    time.sleep(0.5)
-                    r.xadd(STREAM, {"type": "jobs.progress", "data": json.dumps({"job_id": job_id, "progress": 0.5, "message": "processing"})})
                     # Simulated inference signal
                     x = random.random()
                     is_ai = bool(x >= thr)
@@ -139,6 +135,26 @@ def start():
         except Exception:
             time.sleep(1)
     threading.Thread(target=process_jobs, daemon=True).start()
+
+from detector_modules.service.detector_service import predict_from_url
+
+TEST_URL = "https://thispersondoesnotexist.com"
+
+@app.get("/test-detector")
+def test_detector():
+    """
+    Manual test endpoint to verify the detector module works in Skaffold.
+    Pulls a dummy MinIO image and runs inference.
+    """
+    try:
+        label, confidence = predict_from_url(TEST_URL)
+        return {
+            "status": "ok",
+            "label": label,
+            "confidence": confidence
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 class _HealthzFilter(logging.Filter):
     # Hide /healthz from access logs

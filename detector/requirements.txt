@@ -3,3 +3,9 @@ uvicorn[standard]
 pymongo
 redis
 requests
+transformers
+Pillow
+httpx
+numpy
+pydantic
+pytest
