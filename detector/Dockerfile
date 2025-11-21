@@ -2,12 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-
-COPY detector/detector_modules/ detector_modules/
-
-
-COPY detector/main-detector.py .
-COPY detector/requirements.txt .
+COPY detector_modules/ detector_modules/
+COPY main-detector.py .
+COPY requirements.txt .
 
 RUN pip install --no-cache-dir \
     torch==2.3.1 \
@@ -15,9 +12,6 @@ RUN pip install --no-cache-dir \
     torchaudio==2.3.1 \
     --index-url https://download.pytorch.org/whl/cpu
 
-
 RUN pip install --no-cache-dir -r requirements.txt
-
-
 
 CMD ["uvicorn", "main-detector:app", "--host", "0.0.0.0", "--port", "3000"]

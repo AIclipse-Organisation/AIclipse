@@ -34,13 +34,12 @@ build:
           - src: "**/*.py"
             dest: .
     - image: aiclipse/detector
-      context: .
-      docker:
-        dockerfile: detector/Dockerfile
+      context: detector
+      docker: { dockerfile: Dockerfile }
       sync:
         manual:
-          - src: detector/**/*.py
-            dest: detector/
+          - src: "**/*.py"
+            dest: .
     - image: aiclipse/plans
       context: plans
       docker: { dockerfile: Dockerfile }
