@@ -6,64 +6,48 @@ const postSchema = new mongoose.Schema(
       type: String,
       index: true,
       unique: true,
-    },  // Added unique index to each post
-   
+      required: true,
+    }, 
+
     user_id: {
       type: String,
       required: true,
-    }, // ID of the user who created the post
-   
+    }, 
+
     image_id: {
       type: String,
       required: true,
     }, // ID of the associated image
-   
-    Results: {
-      type: Number,
-      min: 1,
-    }, //Results that out algorithm gave for the image in this post
-   
-    Description: {
+
+
+    description: {
       type: String,
       required: true,
       minlength: 1,
-    },// further datails on the image etc
-    
-    likedBy: 
-      {
-        type: Number,
-      }
-    ,//and count of how many liked the post
-    
-    comments_id: 
-    [
-      {
-        type: String,
-      }
-    ]
-    ,// Array of comments ids that others made on this post 
-    
+      trim: true,
+    },
+
+
     clicks_count: {
       type: Number,
       min: 0,
       default: 0,
     },
-    
+
     up_vote_count: {
       type: Number,
       min: 0,
       default: 0,
     },
-    
+
     down_vote_count: {
       type: Number,
       min: 0,
       default: 0,
     },
 
-    controversial_since:{
-      type: Number || null,
-      min:0 ,
+    controversial_since: {
+      type: Number, 
       default: null,
     },
     
@@ -72,8 +56,14 @@ const postSchema = new mongoose.Schema(
       required: true,
       default: Date.now,
     },
+
+    is_reported: {
+      type: Boolean,
+      default: false,
+    },
+
   },
-  { collection: "posts" }
+  { collection: "community.posts" }
 );
 
 module.exports = mongoose.model("Post", postSchema);

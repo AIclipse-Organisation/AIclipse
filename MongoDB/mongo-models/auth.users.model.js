@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema(
   {
     user_id: {
       type: String,
+      required: true,
       unique: true,
       index: true,
     },
@@ -22,7 +23,8 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       index: true,
-      match: /^.+@.+\..+$/,
+      lowercase: true,
+      match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
       trim: true,
     },
     password: {
@@ -34,36 +36,33 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: Date.now,
     },
-    Age: {
+    age: {
       type: Number,
       min: 18,
+      max: 100,
     },
-    Total_Guesses: {
+    total_guesses: {
       type: Number,
       min: 0,
       default: 0,
-    },// part of calucating user accuracy 
-    Total_Correct: {
+    },
+    total_correct: {
       type: Number,
       min: 0,
       default: 0,
-    },// part of calucating user accuracy 
-    strikes: {
-      type: Number,
-      min: 0,
-      default: 0,
-    },// number of reports that were true
-    is_blacklisted: {
-      type: Boolean,
-      default: false,
-    },// if so we restrict their perms? 
+    },
+
+    // current subscription plan; 0 = free. Real billing logic will come later.
     plan: {
       type: Number,
       min: 0,
       default: 0,
     },
+
+    //leave strikes, is_blacklisted for future use
+
   },
-  { collection: "users" }
+  { collection: "auth.users" }
 );
 
 module.exports = mongoose.model("User", userSchema);
