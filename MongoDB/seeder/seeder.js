@@ -21,9 +21,9 @@ async function runSeeder() {
     await Comment.deleteMany({});
 
     // --------------------
-    // USER
+    // USERS
     // --------------------
-    const user = await User.create({
+    const user1 = await User.create({
       user_id: "1001",
       is_admin: false,
       user_name: "alice",
@@ -33,14 +33,30 @@ async function runSeeder() {
       created_at: new Date(),
     });
 
-    console.log("User inserted:", user.user_id);
+    const user2 = await User.create({
+      user_id: "1002",
+      is_admin: false,
+      user_name: "bob",
+      email: "bob@example.com",
+      password: "AnotherTestingPassword",
+      age: 30,
+      created_at: new Date(),
+    });
+
+    console.log("Users inserted:", user1.user_id, user2.user_id);
 
     // --------------------
     // IMAGE 
     // --------------------
     const image = await Image.create({
       image_id: "50001",
+      user_id: user1.user_id,
       s3_key: "uploads/2025/10/31/alice-50001.jpg",
+      is_ai: true,
+      score: 0.82,      
+      likelihood: 82,   
+
+      is_public: true,  
     });
 
     console.log("Image inserted:", image.image_id);
@@ -50,11 +66,9 @@ async function runSeeder() {
     // --------------------
     const post = await Post.create({
       post_id: "9001",
-      user_id: user.user_id,
+      user_id: user1.user_id,
       image_id: image.image_id,
       description: "My first AI-generated image!",
-      result: 82,
-      is_public: true,
       clicks_count: 34,
       up_vote_count: 20,
       down_vote_count: 2,
@@ -69,9 +83,11 @@ async function runSeeder() {
     // --------------------
     const comment = await Comment.create({
       comment_id: "2001",
-      parent_post_id: post.post_id,
-      user_id: "1002",
+      post_id: post.post_id,          
+      parent_comment_id: null,        
+      user_id: user2.user_id,         
       text: "This is awesome!",
+      
     });
 
     console.log("Comment inserted:", comment.comment_id);

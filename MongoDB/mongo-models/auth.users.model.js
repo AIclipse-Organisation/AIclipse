@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema(
   {
     user_id: {
       type: String,
+      required: true,
       unique: true,
       index: true,
     },
@@ -38,7 +39,7 @@ const userSchema = new mongoose.Schema(
     age: {
       type: Number,
       min: 18,
-      max : 100,
+      max: 100,
     },
     total_guesses: {
       type: Number,
@@ -51,7 +52,14 @@ const userSchema = new mongoose.Schema(
       default: 0,
     },
 
-    //leave strikes, is_blacklisted and plan for future use
+    // current subscription plan; 0 = free. Real billing logic will come later.
+    plan: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    //leave strikes, is_blacklisted for future use
 
   },
   { collection: "auth.users" }

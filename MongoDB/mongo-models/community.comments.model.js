@@ -10,7 +10,15 @@ const commentSchema = new mongoose.Schema(
       index: true,
     },
 
-    parent_post_id: { // Id for the post this comment belongs to
+    // Post this comment belongs to (always required)
+    post_id: {
+      type: String,
+      required: true,
+      index: true,
+    },
+
+    // For replies: which comment this is replying to (null for top-level comments)
+    parent_comment_id: {
       type: String,
       default: null,
     },

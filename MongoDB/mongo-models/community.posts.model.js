@@ -6,6 +6,7 @@ const postSchema = new mongoose.Schema(
       type: String,
       index: true,
       unique: true,
+      required: true,
     }, 
 
     user_id: {
@@ -18,12 +19,6 @@ const postSchema = new mongoose.Schema(
       required: true,
     }, // ID of the associated image
 
-    // Detector result / score for the image in this post
-    result: {
-      type: Number,
-      min: 1,
-      max: 99,
-    },
 
     description: {
       type: String,
@@ -32,10 +27,6 @@ const postSchema = new mongoose.Schema(
       trim: true,
     },
 
-    is_public: {
-      type: Boolean,
-      default: false,
-    }, // Whether the post is on the community feed or just stored in history
 
     clicks_count: {
       type: Number,
@@ -56,10 +47,10 @@ const postSchema = new mongoose.Schema(
     },
 
     controversial_since: {
-      type: Number,
+      type: Number, 
       default: null,
     },
-
+    
     created_at: {
       type: Date,
       required: true,
