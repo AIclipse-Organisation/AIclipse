@@ -103,3 +103,8 @@ portForward:
     namespace: default
     port: 9000
     localPort: 9000
+  - resourceType: service
+    resourceName: detector-srv
+    namespace: default
+    port: 3000
+    localPort: 3000
