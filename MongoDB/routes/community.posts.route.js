@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /posts - List posts (can still filter by ?user_id for now,
-// but in real SOA Gateway should decide what the caller can see)
+
 router.get('/', async (req, res) => {
   try {
     const { user_id } = req.query || {};
@@ -65,7 +65,7 @@ router.get('/:post_id', async (req, res) => {
 });
 
 // POST /posts/:post_id/vote - Increment up/down vote count
-// NOTE: Gateway must ensure req.user is present (authenticated).
+
 router.post('/:post_id/vote', async (req, res) => {
   try {
     const authUser = req.user;
@@ -79,11 +79,7 @@ router.post('/:post_id/vote', async (req, res) => {
       return res.status(400).json({ error: "Invalid vote (must be 'up' or 'down')" });
     }
 
-    // TODO: enforce one vote per user per post at the schema/logic level.
-    const update =
-      vote === 'up'
-        ? { $inc: { up_vote_count: 1 } }
-        : { $inc: { down_vote_count: 1 } };
+    const update =vote === 'up'? { $inc: { up_vote_count: 1 } }: { $inc: { down_vote_count: 1 } }; // will need to ensure user can't vote multiple times
 
     const post = await Post.findOneAndUpdate({ post_id }, update, { new: true }).exec();
     if (!post) return res.status(404).json({ error: 'Post not found' });
@@ -103,14 +99,13 @@ router.post('/:post_id/click', async (req, res) => {
     }
 
     const { post_id } = req.params;
-    const post = await Post.findOneAndUpdate(
-      { post_id },
-      { $inc: { clicks_count: 1 } },
-      { new: true }
-    ).exec();
+    // increment clicks_count by 1 for the post if a user clicks on it 
+    const post = await Post.findOneAndUpdate({ post_id }, { $inc: { clicks_count: 1 } },{ new: true }).exec();
+  
     if (!post) return res.status(404).json({ error: 'Post not found' });
     return res.status(200).json(post);
-  } catch (err) {
+  }
+   catch (err) {
     console.error('click error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
@@ -131,7 +126,7 @@ router.patch('/:post_id', async (req, res) => {
       return res.status(400).json({ error: 'Update operators not allowed' });
     }
 
-    const ALLOWED = ['description', 'result', 'controversial_since'];
+    const ALLOWED = ['description'];
     const safeUpdate = {};
     for (const key of ALLOWED) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
@@ -139,10 +134,12 @@ router.patch('/:post_id', async (req, res) => {
       }
     }
 
+    //set new: true to return the updated document
     const post = await Post.findOneAndUpdate({ post_id }, safeUpdate, { new: true }).exec();
     if (!post) return res.status(404).json({ error: 'Post not found' });
     return res.status(200).json(post);
-  } catch (err) {
+  }
+   catch (err) {
     console.error('update post error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
@@ -160,10 +157,15 @@ router.delete('/:post_id', async (req, res) => {
     const post = await Post.findOneAndDelete({ post_id }).exec();
     if (!post) return res.status(404).json({ error: 'Post not found' });
     return res.status(200).json({ deleted: true, post });
-  } catch (err) {
+  }
+   catch (err) {
     console.error('delete post error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 module.exports = router;
+
+
+
+// CRUD , requests what they do , how their called , what they return , list all routs , client want command to return all users comments/images

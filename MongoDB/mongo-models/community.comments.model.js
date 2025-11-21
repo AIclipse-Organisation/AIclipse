@@ -2,25 +2,25 @@ const mongoose = require("mongoose");
 
 const commentSchema = new mongoose.Schema(
   {
-    post_id: {
-      type: String,
-      required: true,
-      index: true,
-    },
 
-    comment_id: {
+    comment_id: {   // Id for the comment
       type: String,
       required: true,
       unique: true,
       index: true,
     },
 
-    user_id: {
+    parent_post_id: { // Id for the post this comment belongs to
+      type: String,
+      default: null,
+    },
+
+    user_id: {  // Id for the user who made the comment
       type: String,
       required: true,
     },
 
-    text: {
+    text: {     // The content of the comment
       type: String,
       required: true,
       minlength: 1,
@@ -31,11 +31,6 @@ const commentSchema = new mongoose.Schema(
       type: Date,
       required: true,
       default: Date.now,
-    },
-
-    parent_comment_id: {
-      type: String,
-      default: null,
     },
 
     up_vote_count: {

@@ -7,36 +7,15 @@ const imageSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
-    user_id: {
-      type: String,
-      required: true,
-    },
+
+    //dont need user_id here since we can get it from posts
+    
     s3_key: {
       type: String,
       required: true,
       minlength: 1,
     },
-    is_ai: {
-      type: Boolean,
-      default: false,
-    },
-    is_public: {
-      type: Boolean,
-      default: false,
-    },
-    likelihood: {
-      type: Number,
-      min: 1,
-      max: 99,
-    },
-    uploaded_at: {
-      type: Date,
-      default: Date.now,
-    },
-    is_reported: {
-      type: Boolean,
-      default: false,
-    },
+    
   },
   { collection: "media.images" }
 );

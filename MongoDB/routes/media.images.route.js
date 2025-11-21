@@ -4,17 +4,10 @@ const { v4: uuidv4 } = require('uuid');
 
 const Image = require('../mongo-models/media.images.model');
 
-// POST /images - Store new image and data in database
+// POST /images - Store new image metadata in database
 router.post('/', async (req, res) => {
   try {
-    // user_id MUST come from Gateway-authenticated context
-    const authUser = req.user;
-    if (!authUser || !authUser.user_id) {
-      return res.status(401).json({ error: 'Unauthorized: missing user context' });
-    }
-
-    const { s3_key, is_ai, likelihood, is_public } = req.body || {};
-    const user_id = authUser.user_id;
+    const { s3_key } = req.body || {};
 
     if (!s3_key) {
       return res.status(400).json({ error: 'Missing required field: s3_key' });
@@ -22,11 +15,7 @@ router.post('/', async (req, res) => {
 
     const record = new Image({
       image_id: uuidv4(),
-      user_id,
       s3_key,
-      is_ai: !!is_ai,
-      likelihood: likelihood ?? null,
-      is_public: !!is_public,
     });
 
     await record.save();
@@ -38,20 +27,13 @@ router.post('/', async (req, res) => {
 });
 
 // GET /images - List image records
-// For now: if ?user_id is provided → that user's images (admin/Gateway use);
-// otherwise → only public images.
 router.get('/', async (req, res) => {
   try {
-    const { user_id } = req.query || {};
-    const q = {};
+    const items = await Image.find({})
+      .sort({ _id: -1 })   // newest first based on insertion order
+      .limit(200)
+      .exec();
 
-    if (user_id) {
-      q.user_id = user_id;
-    } else {
-      q.is_public = true;
-    }
-
-    const items = await Image.find(q).sort({ uploaded_at: -1 }).limit(200).exec();
     return res.status(200).json({ items });
   } catch (err) {
     console.error('list images error', err);
@@ -59,7 +41,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /images/:image_id - Fetch image and detection result
+// GET /images/:image_id - Fetch single image metadata
 router.get('/:image_id', async (req, res) => {
   try {
     const { image_id } = req.params;
@@ -72,14 +54,9 @@ router.get('/:image_id', async (req, res) => {
   }
 });
 
-// PATCH /images/:image_id - Update image flags
+// PATCH /images/:image_id - Update image fields (currently only s3_key)
 router.patch('/:image_id', async (req, res) => {
   try {
-    const authUser = req.user;
-    if (!authUser || !authUser.user_id) {
-      return res.status(401).json({ error: 'Unauthorized: missing user context' });
-    }
-
     const { image_id } = req.params;
     const raw = req.body || {};
 
@@ -87,7 +64,7 @@ router.patch('/:image_id', async (req, res) => {
       return res.status(400).json({ error: 'Update operators not allowed' });
     }
 
-    const ALLOWED = ['is_ai', 'likelihood', 'is_public', 'is_reported'];
+    const ALLOWED = ['s3_key'];
     const safeUpdate = {};
     for (const key of ALLOWED) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
@@ -95,9 +72,12 @@ router.patch('/:image_id', async (req, res) => {
       }
     }
 
-    const entry = await Image.findOneAndUpdate({ image_id }, safeUpdate, {
-      new: true,
-    }).exec();
+    const entry = await Image.findOneAndUpdate(
+      { image_id },
+      safeUpdate,
+      { new: true }
+    ).exec();
+
     if (!entry) return res.status(404).json({ error: 'Image not found' });
     return res.status(200).json(entry);
   } catch (err) {
@@ -109,11 +89,6 @@ router.patch('/:image_id', async (req, res) => {
 // DELETE /images/:image_id - Remove image record
 router.delete('/:image_id', async (req, res) => {
   try {
-    const authUser = req.user;
-    if (!authUser || !authUser.user_id) {
-      return res.status(401).json({ error: 'Unauthorized: missing user context' });
-    }
-
     const { image_id } = req.params;
     const entry = await Image.findOneAndDelete({ image_id }).exec();
     if (!entry) return res.status(404).json({ error: 'Image not found' });

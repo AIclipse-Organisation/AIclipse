@@ -14,55 +14,62 @@ async function runSeeder() {
 
     console.log("Connected to MongoDB");
 
-    // Clear existing
+    // Clear existing data in these collections
     await User.deleteMany({});
     await Image.deleteMany({});
     await Post.deleteMany({});
     await Comment.deleteMany({});
 
+    // --------------------
     // USER
+    // --------------------
     const user = await User.create({
       user_id: "1001",
       is_admin: false,
       user_name: "alice",
       email: "alice@example.com",
-      password: "TestingPassword", // for dev only; real app should hash
+      password: "TestingPassword", 
       age: 27,
       created_at: new Date(),
     });
 
     console.log("User inserted:", user.user_id);
 
-    // IMAGE
+    // --------------------
+    // IMAGE 
+    // --------------------
     const image = await Image.create({
       image_id: "50001",
-      user_id: "1001",
       s3_key: "uploads/2025/10/31/alice-50001.jpg",
-      is_ai: true,
-      likelihood: 82,
     });
 
     console.log("Image inserted:", image.image_id);
 
+    // --------------------
     // POST
+    // --------------------
     const post = await Post.create({
       post_id: "9001",
-      user_id: "1001",
-      image_id: "50001",
+      user_id: user.user_id,
+      image_id: image.image_id,
       description: "My first AI-generated image!",
       result: 82,
-      likedBy: ["1002", "1003"],
+      is_public: true,
       clicks_count: 34,
       up_vote_count: 20,
       down_vote_count: 2,
+      controversial_since: null,
+      is_reported: false,
     });
 
     console.log("Post inserted:", post.post_id);
 
+    // --------------------
     // COMMENT
+    // --------------------
     const comment = await Comment.create({
       comment_id: "2001",
-      post_id: "9001",
+      parent_post_id: post.post_id,
       user_id: "1002",
       text: "This is awesome!",
     });

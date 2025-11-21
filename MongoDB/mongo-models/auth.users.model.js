@@ -44,26 +44,15 @@ const userSchema = new mongoose.Schema(
       type: Number,
       min: 0,
       default: 0,
-    },// part of calucating user accuracy 
+    },
     total_correct: {
       type: Number,
       min: 0,
       default: 0,
-    },// part of calucating user accuracy 
-    strikes: {
-      type: Number,
-      min: 0,
-      default: 0,
-    },// number of reports that were true
-    is_blacklisted: {
-      type: Boolean,
-      default: false,
-    },// if so we restrict their perms? 
-    plan: {
-      type: Number,
-      min: 0,
-      default: 0,
     },
+
+    //leave strikes, is_blacklisted and plan for future use
+
   },
   { collection: "auth.users" }
 );

@@ -30,7 +30,7 @@ router.post('/', async (req, res) => {
 
     const comment = new Comment({
       comment_id: uuidv4(),
-      post_id,
+      parent_post_id: post_id, // map to schema field
       user_id,
       text,
     });
@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
   try {
     const { post_id, user_id } = req.query || {};
     const q = {};
-    if (post_id) q.post_id = post_id;
+    if (post_id) q.parent_post_id = post_id; // map to schema field
     if (user_id) q.user_id = user_id;
 
     const items = await Comment.find(q)
@@ -98,7 +98,6 @@ router.patch('/:comment_id', async (req, res) => {
       }
     }
 
-    // load comment to check ownership
     const existing = await Comment.findOne({ comment_id }).exec();
     if (!existing) return res.status(404).json({ error: 'Comment not found' });
 

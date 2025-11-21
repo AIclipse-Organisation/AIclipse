@@ -6,12 +6,12 @@ const postSchema = new mongoose.Schema(
       type: String,
       index: true,
       unique: true,
-    }, // unique id for each post
+    }, 
 
     user_id: {
       type: String,
       required: true,
-    }, // ID of the user who created the post
+    }, 
 
     image_id: {
       type: String,
@@ -32,13 +32,10 @@ const postSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Who liked the post (user_ids)
-    likedBy: [
-      {
-        type: String,
-      },
-    ],
-
+    is_public: {
+      type: Boolean,
+      default: false,
+    }, // Whether the post is on the community feed or just stored in history
 
     clicks_count: {
       type: Number,
@@ -68,6 +65,12 @@ const postSchema = new mongoose.Schema(
       required: true,
       default: Date.now,
     },
+
+    is_reported: {
+      type: Boolean,
+      default: false,
+    },
+
   },
   { collection: "community.posts" }
 );
