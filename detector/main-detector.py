@@ -2,12 +2,14 @@ import os, logging
 import time
 import json
 import threading
+from uuid import uuid4
+from fastapi.responses import JSONResponse
 import requests
 import redis
 import hashlib
 import random
 from redis.exceptions import ResponseError, ConnectionError, TimeoutError
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 
 # Detector service: consumes 'jobs.submitted' from Redis Streams, emits progress/completed,
 # and finalizes jobs via Jobs /internal/jobs/{id}/complete. Minimal P1 simulation.
@@ -136,26 +138,40 @@ def start():
             time.sleep(1)
     threading.Thread(target=process_jobs, daemon=True).start()
 
-from detector_modules.service.detector_service import predict_from_url
+from detector_modules.service.detector_service import predict_from_bytes
 
-TEST_URL = "https://thispersondoesnotexist.com"
+@app.post("/checks")
+async def detector_checks(request: Request):
+    # Read raw image bytes
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="Empty body, expected image bytes")
 
-@app.get("/test-detector")
-def test_detector():
-    """
-    Manual test endpoint to verify the detector module works in Skaffold.
-    Pulls a dummy MinIO image and runs inference.
-    """
+    # Read Request-Id (for logging / tracing)
+    request_id = request.headers.get("x-request-id") or str(uuid4())
+    user_id = request.headers.get("x-user-id", "unknown")
+
+    bytes_in = len(body)
+
     try:
-        verdict, confidence, label = predict_from_url(TEST_URL)
-        return {
-            "status": "ok",
-            "verdict": verdict,
-            "label": label,
-            "confidence": confidence
-        }
+            verdict, confidence, label = predict_from_bytes(body)
+            result = {
+                "verdict": verdict,
+                "label": label,
+                "confidence": confidence
+            }
+            print(
+                f"[Detector] Results = [verdict = {result['verdict']} [confidence = {result['confidence']}]"
+            )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        raise HTTPException(status_code=500, detail=f"Detector failure: {str(e)}")
+
+
+    print(
+        f"[Detector] request_id={request_id} user_id={user_id} "
+    )
+
+    return JSONResponse(result)
 
 class _HealthzFilter(logging.Filter):
     # Hide /healthz from access logs
