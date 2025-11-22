@@ -11,6 +11,9 @@ import random
 from redis.exceptions import ResponseError, ConnectionError, TimeoutError
 from fastapi import FastAPI, HTTPException, Request
 
+from routers.v1_0_0.checks import router as checks_v1_0_0_router
+from routers.v1_0_1.checks import router as checks_v1_0_1_router
+
 # Detector service: consumes 'jobs.submitted' from Redis Streams, emits progress/completed,
 # and finalizes jobs via Jobs /internal/jobs/{id}/complete. Minimal P1 simulation.
 
@@ -137,42 +140,6 @@ def start():
         except Exception:
             time.sleep(1)
     threading.Thread(target=process_jobs, daemon=True).start()
-
-from detector_modules.service.detector_service import predict_from_bytes
-
-@app.post("/checks")
-async def detector_checks(request: Request):
-    # Read raw image bytes
-    body = await request.body()
-    if not body:
-        raise HTTPException(status_code=400, detail="Empty body, expected image bytes")
-
-    # Read Request-Id (for logging / tracing)
-    request_id = request.headers.get("x-request-id") or str(uuid4())
-    user_id = request.headers.get("x-user-id", "unknown")
-
-    bytes_in = len(body)
-
-    try:
-            verdict, confidence, label = predict_from_bytes(body)
-            result = {
-                "verdict": verdict,
-                "label": label,
-                "confidence": confidence
-            }
-            print(
-                f"[Detector] Results = [verdict = {result['verdict']} [confidence = {result['confidence']}]"
-            )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Detector failure: {str(e)}")
-
-
-    print(
-        f"[Detector] request_id={request_id} user_id={user_id} "
-    )
-
-    return JSONResponse(result)
-
 class _HealthzFilter(logging.Filter):
     # Hide /healthz from access logs
     def filter(self, record):
@@ -186,3 +153,6 @@ logging.getLogger("uvicorn.access").addFilter(_HealthzFilter())
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
+app.include_router(checks_v1_0_0_router, prefix="/v1.0.0", tags=["v1.0.0"])
+app.include_router(checks_v1_0_1_router, prefix="/v1.0.1", tags=["v1.0.1"])

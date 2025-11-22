@@ -2,8 +2,6 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY detector_modules/ detector_modules/
-COPY main-detector.py .
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir \
@@ -13,5 +11,10 @@ RUN pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cpu
 
 RUN pip install --no-cache-dir -r requirements.txt
+
+COPY detector_modules/ detector_modules/
+COPY routers/ routers/ 
+COPY routers/swagger/ routers/swagger/
+COPY main-detector.py .
 
 CMD ["uvicorn", "main-detector:app", "--host", "0.0.0.0", "--port", "3000"]
