@@ -124,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
         postContraversial = contraversialZone(post);
         console.log(
           "contraversial zone closed: postContraversial: ",
-          postContraversial
+          postContraversial, "for post: ", post
         );
         commentsHTML = "";
         postComments = post.comments_id || [];
@@ -192,12 +192,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const timeFactor = Math.pow(ageInHours + constantOffset, gravity);
 
         let score = engagement / timeFactor;
+        let scoreWithoutPostDecay = engagement;
         console.log("score: ", score * 1000)
 
         if (ageInHours < 24) score *= 1.2;
         console.log("score: after ageInHours: ", score* 1000)
 
-        if (postContraversial) score *= 1.5;
+
+        console.log("score: before postContraversial: ", score* 1000)
+
+        if (postContraversial) score *= 2.5;
 
         console.log("score: after postContraversial: ", score* 1000)
 
@@ -296,6 +300,8 @@ document.addEventListener("DOMContentLoaded", () => {
             ${commentsHTML}
       
              Final Score: ${postFinalScore}<br><br>
+             Final Score Without decay: ${scoreWithoutPostDecay}<br><br>
+
 
           </div>
         `;
@@ -358,6 +364,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
           <div class="post-description">Uploaded: ${timeAgo(
             post.created_at
+          )}</div>
+          
+          <div class="post-description">Contraversial since: ${timeAgo(
+            post.controversial_since
           )}</div>
         </div><br>
       `;
