@@ -1,41 +1,37 @@
-const express = require('express');
-const router = express.Router();
+// controllers/community.comments.controller.js
 const { v4: uuidv4 } = require('uuid');
-
 const Comment = require('../mongo-models/community.comments.model');
-const { create } = require('../mongo-models/community.posts.model');
 
-// helper: must be logged in
-function requireUser(req) {
+// helper: get auth user or null
+function getAuthUser(req) {
   const u = req.user;
-  if (!u || !u.user_id) {
-    return null;
-  }
+  if (!u || !u.user_id) return null;
   return u;
 }
 
 // POST /comments
-//Scenario: Logged-in user adding a new comment to a post.
-//Auth: Must have req.user.user_id set (JWT).
-//Input (body): { post_id: "...", text: "..." }
-//Output (201): created comment object.
-router.post('/', async (req, res) => {
+async function createComment(req, res) {
   try {
-    const authUser = requireUser(req);
+    const authUser = getAuthUser(req);
     if (!authUser) {
-      return res.status(401).json({ error: 'Unauthorized: missing user context' });
+      return res
+        .status(401)
+        .json({ error: 'Unauthorized: missing user context' });
     }
 
-    const { post_id, text } = req.body || {};
+    const { post_id, text, parent_comment_id = null } = req.body || {};
     const user_id = authUser.user_id;
 
     if (!post_id || !text) {
-      return res.status(400).json({ error: 'Missing required fields (post_id, text)' });
+      return res
+        .status(400)
+        .json({ error: 'Missing required fields (post_id, text)' });
     }
 
     const comment = new Comment({
       comment_id: uuidv4(),
-      parent_post_id: post_id, // map to schema field
+      post_id, // FIXED to match schema field
+      parent_comment_id,
       user_id,
       text,
     });
@@ -46,35 +42,30 @@ router.post('/', async (req, res) => {
     console.error('create comment error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
-// GET /comments - List comments (filter by ?post_id or ?user_id)
-// Scenario: listing comments related to that post, optionally filtered user.
-// Input (query): ?post_id=POST_UUID → comments for that post    ,   ?user_id=USER_UUID → comments written by that user
-// Output (200): { "comment_id": "...", "post_id": "...", "user_id": "...", "text": "...", ... },
-router.get('/', async (req, res) => {
+// GET /comments
+async function listComments(req, res) {
   try {
     const { post_id, user_id } = req.query || {};
     const q = {};
-    if (post_id) q.parent_post_id = post_id; // map to schema field
+    if (post_id) q.post_id = post_id;
     if (user_id) q.user_id = user_id;
 
     const items = await Comment.find(q)
       .sort({ created_at: -1 })
       .limit(500)
       .exec();
+
     return res.status(200).json({ items });
   } catch (err) {
     console.error('list comments error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
-// GET /comments/:comment_id 
-// Scenario: Fetch details of a single comment
-// Input (params): /comments/COMMENT_UUID
-// Output (200): { "comment_id": "...", "post_id": "...", "user_id": "...", "text": "...", ... }
-router.get('/:comment_id', async (req, res) => {
+// GET /comments/:comment_id
+async function getComment(req, res) {
   try {
     const { comment_id } = req.params;
     const entry = await Comment.findOne({ comment_id }).exec();
@@ -84,25 +75,22 @@ router.get('/:comment_id', async (req, res) => {
     console.error('get comment error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
-// PATCH /comments/:comment_id - Update comment text (author or admin only)
-// Scenario: Comment author (or admin) edits the comment text.
-// Auth: req.user must be set; user must be either: the comment’s user_id, or an admin (is_admin === true).
-//Input (params): comment_id , body { text: "new text" }
-//Output (200): updated comment object.
-
-router.patch('/:comment_id', async (req, res) => {
+// PATCH /comments/:comment_id
+async function updateComment(req, res) {
   try {
-    const authUser = requireUser(req);
+    const authUser = getAuthUser(req);
     if (!authUser) {
-      return res.status(401).json({ error: 'Unauthorized: missing user context' });
+      return res
+        .status(401)
+        .json({ error: 'Unauthorized: missing user context' });
     }
 
     const { comment_id } = req.params;
     const raw = req.body || {};
 
-    if (Object.keys(raw).some(k => k.startsWith('$'))) {
+    if (Object.keys(raw).some((k) => k.startsWith('$'))) {
       return res.status(400).json({ error: 'Update operators not allowed' });
     }
 
@@ -132,18 +120,16 @@ router.patch('/:comment_id', async (req, res) => {
     console.error('update comment error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
-// DELETE /comments/:comment_id - Remove a comment (author or admin only)
-// Scenario: Comment author or admin deletes a comment.
-// Auth: Same as PATCH.
-// Input (params): comment_id
-// Output (200):  "comment": { "comment_id": "COMMENT_UUID", "post_id": "...", ... }
-router.delete('/:comment_id', async (req, res) => {
+// DELETE /comments/:comment_id
+async function deleteComment(req, res) {
   try {
-    const authUser = requireUser(req);
+    const authUser = getAuthUser(req);
     if (!authUser) {
-      return res.status(401).json({ error: 'Unauthorized: missing user context' });
+      return res
+        .status(401)
+        .json({ error: 'Unauthorized: missing user context' });
     }
 
     const { comment_id } = req.params;
@@ -160,6 +146,12 @@ router.delete('/:comment_id', async (req, res) => {
     console.error('delete comment error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
-module.exports = router;
+module.exports = {
+  createComment,
+  listComments,
+  getComment,
+  updateComment,
+  deleteComment,
+};

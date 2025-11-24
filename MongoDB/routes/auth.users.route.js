@@ -11,6 +11,10 @@ const JWT_SECRET = process.env.JWT_SECRET ;
 
 // im expecting a JWT verification middleware that decodes the token and adds the user info to req.user
 // Middleware to require authenticated user so that only logged-in users can access certain routes
+//Scenario: Used on routes where the user must be logged in.
+//Needs: req.user already set by a JWT middleware.
+//Effect: If req.user.user_id is missing → 401 Unauthorized. Otherwise calls next().
+
 function requireUser(req, res, next) {
   const u = req.user;
   if (!u || !u.user_id) {
@@ -20,6 +24,10 @@ function requireUser(req, res, next) {
 }
 
 // Middleware to require admin user for admin-only routes
+//Scenario: Used on admin-only routes.
+//Needs: req.user.is_admin === true.
+//Effect: If not admin → 403 Admin privileges required. Otherwise calls next().
+
 function requireAdmin(req, res, next) {
   const u = req.user;
   if (!u || !u.is_admin) {
@@ -32,6 +40,11 @@ function requireAdmin(req, res, next) {
 /* ------------------------------ PUBLIC ROUTES ------------------------------ */
 
 // POST /auth/signup
+//Scenario: New person signing up for an account.
+//Input (body): { "user_name": "Alice", "email": "alice@example.com", "password": "plainTextPw" }
+//Output (201): json format of created user 
+
+
 router.post('/signup', async (req, res) => {
  
   // ensures that all required fields are provided and creates a new user account
@@ -74,6 +87,10 @@ router.post('/signup', async (req, res) => {
 });
 
 // POST /auth/login
+//Scenario: Existing user logging in to get a JWT.
+//Input (body):{ "email": "alice@example.com", "password": "plainTextPw" }
+//Output (201): json format of created user 
+
 router.post('/login', async (req, res) => {
   try {
 
@@ -116,6 +133,11 @@ router.post('/login', async (req, res) => {
 /* ------------------------------ UPDATING AND DELETING YOUR INFO ------------------------------ */
 
 // PATCH /auth/me - user updates their own profile (name, email, password, age)
+//Scenario: Logged-in user wants to update their profile info.
+//Auth: requireUser – must have valid JWT.
+//Input (body): { "user_name": "New Name", "email": "new@email.com", "password": "newPw" }
+//Output (200): json format of updated user
+
 router.patch('/me', requireUser, async (req, res) => {
   try {
     // attached { user_id, email, is_admin, ... } to req.user which was set by auth middleware and verified JWT
@@ -184,6 +206,9 @@ router.patch('/me', requireUser, async (req, res) => {
 
 
 // DELETE /auth/me - user deletes their own account
+// Scenario: User wants to delete their own account.
+// Input: No body; uses req.user.user_id.
+// Response (200): { deleted: true, user_id: "...", message: "Your account has been permanently deleted" }
 router.delete('/me', requireUser, async (req, res) => {
   try {
     // req.user was set from the JWT in gateway middleware / auth middleware
@@ -211,6 +236,11 @@ router.delete('/me', requireUser, async (req, res) => {
 
 
 // GET /auth/me - user fetches their own profile
+//Scenario: User fetching their own profile page.
+//Auth: requireUser.
+//Input: None.
+//Output (200): Full user doc without password : {"user_id": "uuid-v4","user_name": "Alice","email": "alice@example.com","is_admin": false,"created_at": "...","age": 23,"plan": 0,"total_guesses": 0,"total_correct": 0}
+
 router.get('/me', requireUser, async (req, res) => {
   try {
     // req.user comes from JWT middleware 
@@ -241,6 +271,11 @@ router.get('/me', requireUser, async (req, res) => {
 // GET /auth/admin/users
 // Alows admin to list and search for users with optional filtering by user_name 
 // might have to make it public for so we can let the community search for users
+// Scenario: Admin searching or browsing users, optionally by name.
+// Auth: requireAdmin.
+// Input (query): Optional ?user_name=ali for partial match.
+// Output (200): { items: [ user1, user2, ... ] } list of users matching criteria and fields like user_id, user_name, email, is_admin, created_at
+
 
 router.get('/admin/users', requireAdmin, async (req, res) => {
   try {
@@ -269,6 +304,10 @@ router.get('/admin/users', requireAdmin, async (req, res) => {
 
 // GET /auth/admin/user/:user_id
 // Allows admin to get detailed info about a specific user by user_id
+// Scenario: Admin wants to view a specific user’s details.
+// Auth: requireAdmin.
+// Input (params): /auth/admin/user/USER_UUID
+// Output (200): Same as GET/auth/me, but for admin user.
 
 router.get('/admin/user/:user_id', requireAdmin, async (req, res) => {
   try {
@@ -289,7 +328,10 @@ router.get('/admin/user/:user_id', requireAdmin, async (req, res) => {
 
 // PATCH /auth/admin/user/:user_id
 // Allows admin to update any user's info name, email, password, is_admin, age
-
+//Scenario: Admin editing someone’s account (name, email, password, age, is_admin).
+//Auth: requireAdmin.
+//Input (params): user_id , update fields in body { "user_name": "...", "email": "...", "password": "...", "age": ..., "is_admin": ... }
+//Output (200): json format of updated user
 router.patch('/admin/user/:user_id', requireAdmin, async (req, res) => {
   try {
     const { user_id } = req.params;
@@ -330,6 +372,10 @@ router.patch('/admin/user/:user_id', requireAdmin, async (req, res) => {
 });
 
 // DELETE /auth/admin/user/:user_id
+// Scenario: Admin deleting a user account.
+// Auth: requireAdmin.
+// Input (params): user_id.
+// Output (200): { deleted: true, user: { user_id, user_name, email } }
 router.delete('/admin/user/:user_id', requireAdmin, async (req, res) => {
   try {
     const { user_id } = req.params;
@@ -339,7 +385,7 @@ router.delete('/admin/user/:user_id', requireAdmin, async (req, res) => {
 
     return res.status(200).json({
       deleted: true,
-      user: { user_id: deleted.user_id, email: deleted.email },
+      user: { user_id: deleted.user_id,Username: deleted.user_name, email: deleted.email },
     });
   } catch (err) {
     console.error('admin delete user error', err);

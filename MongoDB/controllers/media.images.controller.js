@@ -1,14 +1,9 @@
-const express = require('express');
-const router = express.Router();
+// controllers/media.images.controller.js
 const { v4: uuidv4 } = require('uuid');
-
 const Image = require('../mongo-models/media.images.model');
 
-// POST /images - Store new image metadata in database
-// Scenario: Client uploads an image 
-// Input (body): { "s3_key": "path/in/s3/bucket/filename.jpg" }
-// Output (201): created image object.
-router.post('/', async (req, res) => {
+// POST /images
+async function createImage(req, res) {
   try {
     const { s3_key } = req.body || {};
 
@@ -16,6 +11,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing required field: s3_key' });
     }
 
+    // NOTE: your schema currently requires user_id, is_ai, score, likelihood.
+    // This controller keeps the same behavior as your existing route, so you
+    // may want to extend this later to include those fields.
     const record = new Image({
       image_id: uuidv4(),
       s3_key,
@@ -27,16 +25,13 @@ router.post('/', async (req, res) => {
     console.error('create image error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
-// GET /images - List image records
-// Scenario: Client fetching list of images
-// Input: none
-// Output (200): { "items": [ { "image_id": "...", "s3_key": "...", ... } ] }
-router.get('/', async (req, res) => {
+// GET /images
+async function listImages(req, res) {
   try {
     const items = await Image.find({})
-      .sort({ _id: -1 })   // newest first based on insertion order
+      .sort({ _id: -1 })
       .limit(200)
       .exec();
 
@@ -45,13 +40,10 @@ router.get('/', async (req, res) => {
     console.error('list images error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
-// GET /images/:image_id - Fetch single image 
-// Scenario: Client fetching details of a single image record
-// Input (params): /images/IMAGE_UUID
-// Output (200): { "image_id": "...", "s3_key": "...", ... }
-router.get('/:image_id', async (req, res) => {
+// GET /images/:image_id
+async function getImage(req, res) {
   try {
     const { image_id } = req.params;
     const entry = await Image.findOne({ image_id }).exec();
@@ -61,13 +53,42 @@ router.get('/:image_id', async (req, res) => {
     console.error('get image error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
-// DELETE /images/:image_id - Remove image record
-// Scenario: Client deletes an image record
-// Input (params): /images/IMAGE_UUID
-// Output (200): { deleted: true, image: { "image_id": "...", "s3_key": "...", ... } }
-router.delete('/:image_id', async (req, res) => {
+// PATCH /images/:image_id
+async function updateImage(req, res) {
+  try {
+    const { image_id } = req.params;
+    const raw = req.body || {};
+
+    if (Object.keys(raw).some((k) => k.startsWith('$'))) {
+      return res.status(400).json({ error: 'Update operators not allowed' });
+    }
+
+    const ALLOWED = ['s3_key'];
+    const safeUpdate = {};
+    for (const key of ALLOWED) {
+      if (Object.prototype.hasOwnProperty.call(raw, key)) {
+        safeUpdate[key] = raw[key];
+      }
+    }
+
+    const entry = await Image.findOneAndUpdate(
+      { image_id },
+      safeUpdate,
+      { new: true }
+    ).exec();
+
+    if (!entry) return res.status(404).json({ error: 'Image not found' });
+    return res.status(200).json(entry);
+  } catch (err) {
+    console.error('update image error', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// DELETE /images/:image_id
+async function deleteImage(req, res) {
   try {
     const { image_id } = req.params;
     const entry = await Image.findOneAndDelete({ image_id }).exec();
@@ -77,6 +98,12 @@ router.delete('/:image_id', async (req, res) => {
     console.error('delete image error', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
 
-module.exports = router;
+module.exports = {
+  createImage,
+  listImages,
+  getImage,
+  updateImage,
+  deleteImage,
+};
