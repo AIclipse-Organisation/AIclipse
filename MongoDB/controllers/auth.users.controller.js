@@ -6,7 +6,13 @@ const User = require('../mongo-models/auth.users.model');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Middleware-style helpers (used directly in routes if you want)
+/* ------------------------------ MIDDLEWARE HELPERS ------------------------------ */
+
+// im expecting a JWT verification middleware that decodes the token and adds the user info to req.user
+// Middleware to require authenticated user so that only logged-in users can access certain routes
+// Scenario: Used on routes where the user must be logged in.
+// Needs: req.user already set by a JWT middleware.
+// Effect: If req.user.user_id is missing → 401 Unauthorized. Otherwise calls next().
 function requireUser(req, res, next) {
   const u = req.user;
   if (!u || !u.user_id) {
@@ -15,6 +21,10 @@ function requireUser(req, res, next) {
   next();
 }
 
+// Middleware to require admin user for admin-only routes
+// Scenario: Used on admin-only routes.
+// Needs: req.user.is_admin === true.
+// Effect: If not admin → 403 Admin privileges required. Otherwise calls next().
 function requireAdmin(req, res, next) {
   const u = req.user;
   if (!u || !u.is_admin) {
@@ -23,8 +33,12 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-/* ------------------------------ PUBLIC ------------------------------ */
+/* ------------------------------ PUBLIC ROUTES ------------------------------ */
 
+// POST /auth/signup
+// Scenario: New person signing up for an account.
+// Input (body): { "user_name": "Alice", "email": "alice@example.com", "password": "plainTextPw" }
+// Output (201): JSON format of created user (without password)
 async function signup(req, res) {
   try {
     const { user_name, email, password } = req.body || {};
@@ -32,6 +46,7 @@ async function signup(req, res) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Check for existing email
     const existing = await User.findOne({
       email: email.trim().toLowerCase(),
     }).exec();
@@ -39,8 +54,10 @@ async function signup(req, res) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
+    // Hash password
     const hashed = await bcrypt.hash(password, 10);
 
+    // If no existing user, create new user
     const user = new User({
       user_id: uuidv4(),
       user_name: user_name.trim(),
@@ -63,14 +80,20 @@ async function signup(req, res) {
   }
 }
 
+// POST /auth/login
+// Scenario: Existing user logging in to get a JWT.
+// Input (body): { "email": "alice@example.com", "password": "plainTextPw" }
+// Output (200): { token, user: { user_id, user_name, email, is_admin } }
 async function login(req, res) {
   try {
     const { email, password } = req.body || {};
 
+    // check if email and password are provided
     if (!email || !password) {
       return res.status(400).json({ error: 'Missing credentials' });
     }
 
+    // see if user exists
     const user = await User.findOne({
       email: email.trim().toLowerCase(),
     }).exec();
@@ -78,17 +101,20 @@ async function login(req, res) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // compare password
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // generate jwt token
     const token = jwt.sign(
       { user_id: user.user_id, email: user.email, is_admin: user.is_admin },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
 
+    // return token and user info
     return res.status(200).json({
       token,
       user: {
@@ -104,45 +130,69 @@ async function login(req, res) {
   }
 }
 
-/* ------------------------------ SELF ROUTES ------------------------------ */
+/* ------------------------------ UPDATING AND DELETING YOUR INFO ------------------------------ */
 
+// PATCH /auth/me - user updates their own profile (name, email, password, age)
+// Scenario: Logged-in user wants to update their profile info.
+// Auth: requireUser – must have valid JWT.
+// Input (body): { "user_name": "New Name", "email": "new@email.com", "password": "newPw" }
+// Output (200): JSON format of updated user (no password)
 async function updateMe(req, res) {
   try {
+    // attached { user_id, email, is_admin, ... } to req.user which was set by auth middleware and verified JWT
     const { user_id } = req.user;
 
+    // If body is empty, use an empty object so the rest of the code doesn't crash
     const raw = req.body || {};
 
+    // SECURITY: If any key starts with "$", that means the client is trying to send
+    // a MongoDB update operator (like $set, $inc, $push, etc)
+    // We don't allow that because it can be abused to override fields we don't intend
     if (Object.keys(raw).some((k) => k.startsWith('$'))) {
       return res.status(400).json({ error: 'Update operators not allowed' });
     }
 
+    // Only these fields are allowed to be edited by the user themself
+    // Anything else in req.body will be ignored.
     const ALLOWED = ['user_name', 'email', 'password'];
     const safeUpdate = {};
 
+    // Copy only allowed fields from raw into safeUpdate
+    // Example: if raw = { user_name: "bob", plan: 3 }, we keep user_name and drop plan because plan is not in ALLOWED
     for (const key of ALLOWED) {
       if (raw[key] !== undefined) {
         safeUpdate[key] = raw[key];
       }
     }
 
+    // If the user is changing their password, we NEVER store it as plain text
+    // We hash it with bcrypt before saving to Mongo
     if (safeUpdate.password) {
       safeUpdate.password = await bcrypt.hash(safeUpdate.password, 10);
     }
 
+    // If email is being updated, normalize it by triming spaces and making it lowercase
     if (safeUpdate.email) {
       safeUpdate.email = safeUpdate.email.trim().toLowerCase();
     }
 
+    // Apply the update in Mongo:
+    // Find the user by user_id
+    // Apply only safeUpdate fields
+    // { new: true } tells Mongoose to return the updated document
+    // Then we remove sensitive/internal fields from the response
     const updated = await User.findOneAndUpdate({ user_id }, safeUpdate, {
       new: true,
     })
       .select('-password -__v -_id')
       .exec();
 
+    // If there is no user with this user_id, something is wrong (stale token or deleted user)
     if (!updated) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Send the updated user document back to the client
     return res.status(200).json(updated);
   } catch (err) {
     console.error('update me error', err);
@@ -150,11 +200,19 @@ async function updateMe(req, res) {
   }
 }
 
+// DELETE /auth/me - user deletes their own account
+// Scenario: User wants to delete their own account.
+// Input: No body; uses req.user.user_id.
+// Response (200): { deleted: true, user_id: "...", message: "Your account has been permanently deleted" }
 async function deleteMe(req, res) {
   try {
+    // req.user was set from the JWT in gateway middleware / auth middleware
     const { user_id } = req.user;
 
+    // Try to delete the user's own account
     const deleted = await User.findOneAndDelete({ user_id }).exec();
+
+    // If record somehow no longer exists
     if (!deleted) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -170,12 +228,30 @@ async function deleteMe(req, res) {
   }
 }
 
+// GET /auth/me - user fetches their own profile
+// Scenario: User fetching their own profile page.
+// Auth: requireUser.
+// Input: None.
+// Output (200): Full user doc without password:
+//  {
+//    "user_id": "uuid-v4",
+//    "user_name": "Alice",
+//    "email": "alice@example.com",
+//    "is_admin": false,
+//    "created_at": "...",
+//    "age": 23,
+//    "plan": 0,
+//    "total_guesses": 0,
+//    "total_correct": 0
+//  }
 async function getMe(req, res) {
   try {
+    // req.user comes from JWT middleware
     const { user_id } = req.user;
 
+    // Look up the user by their user_id
     const user = await User.findOne({ user_id })
-      .select('-password -__v -_id')
+      .select('-password -__v -_id') // never return password / internals
       .exec();
 
     if (!user) {
@@ -189,16 +265,23 @@ async function getMe(req, res) {
   }
 }
 
-/* ------------------------------ ADMIN ------------------------------ */
+/* ------------------------------ ADMIN ROUTES ------------------------------ */
 
+// GET /auth/admin/users
+// Allows admin to list and search for users with optional filtering by user_name
+// Scenario: Admin searching or browsing users, optionally by name.
+// Auth: requireAdmin.
+// Input (query): Optional ?user_name=ali for partial match.
+// Output (200): { items: [ user1, user2, ... ] } list of users matching criteria and fields like user_id, user_name, email, is_admin, created_at
 async function adminListUsers(req, res) {
   try {
+    // Get optional query parameters for filtering
     const { user_name } = req.query || {};
 
     const q = {};
-    if (user_name) {
-      q.user_name = { $regex: user_name, $options: 'i' };
-    }
+
+    // user_name supports partial matching using regex , i for case insensitive
+    if (user_name) q.user_name = { $regex: user_name, $options: 'i' };
 
     const items = await User.find(q)
       .sort({ created_at: -1 })
@@ -213,6 +296,12 @@ async function adminListUsers(req, res) {
   }
 }
 
+// GET /auth/admin/user/:user_id
+// Allows admin to get detailed info about a specific user by user_id
+// Scenario: Admin wants to view a specific user’s details.
+// Auth: requireAdmin.
+// Input (params): /auth/admin/user/USER_UUID
+// Output (200): Same as GET /auth/me, but for any user (admin-only)
 async function adminGetUser(req, res) {
   try {
     const { user_id } = req.params;
@@ -230,6 +319,13 @@ async function adminGetUser(req, res) {
   }
 }
 
+// PATCH /auth/admin/user/:user_id
+// Allows admin to update any user's info name, email, password, is_admin, age
+// Scenario: Admin editing someone’s account (name, email, password, age, is_admin).
+// Auth: requireAdmin.
+// Input (params): user_id
+// Input (body): { "user_name": "...", "email": "...", "password": "...", "age": ..., "is_admin": ... }
+// Output (200): JSON format of updated user
 async function adminUpdateUser(req, res) {
   try {
     const { user_id } = req.params;
@@ -271,6 +367,11 @@ async function adminUpdateUser(req, res) {
   }
 }
 
+// DELETE /auth/admin/user/:user_id
+// Scenario: Admin deleting a user account.
+// Auth: requireAdmin.
+// Input (params): user_id.
+// Output (200): { deleted: true, user: { user_id, email } }
 async function adminDeleteUser(req, res) {
   try {
     const { user_id } = req.params;

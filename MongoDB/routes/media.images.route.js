@@ -1,82 +1,15 @@
+// MongoDB/routes/media.images.route.js
 const express = require('express');
 const router = express.Router();
-const { v4: uuidv4 } = require('uuid');
 
-const Image = require('../mongo-models/media.images.model');
+const imagesCtrl = require('../controllers/media.images.controller');
 
-// POST /images - Store new image metadata in database
-// Scenario: Client uploads an image 
-// Input (body): { "s3_key": "path/in/s3/bucket/filename.jpg" }
-// Output (201): created image object.
-router.post('/', async (req, res) => {
-  try {
-    const { s3_key } = req.body || {};
+// PUBLIC IMAGE ROUTES
+router.post('/', imagesCtrl.createImage);
+router.get('/', imagesCtrl.listImages);
+router.get('/:image_id', imagesCtrl.getImage);
 
-    if (!s3_key) {
-      return res.status(400).json({ error: 'Missing required field: s3_key' });
-    }
 
-    const record = new Image({
-      image_id: uuidv4(),
-      s3_key,
-    });
-
-    await record.save();
-    return res.status(201).json(record);
-  } catch (err) {
-    console.error('create image error', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /images - List image records
-// Scenario: Client fetching list of images
-// Input: none
-// Output (200): { "items": [ { "image_id": "...", "s3_key": "...", ... } ] }
-router.get('/', async (req, res) => {
-  try {
-    const items = await Image.find({})
-      .sort({ _id: -1 })   // newest first based on insertion order
-      .limit(200)
-      .exec();
-
-    return res.status(200).json({ items });
-  } catch (err) {
-    console.error('list images error', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /images/:image_id - Fetch single image 
-// Scenario: Client fetching details of a single image record
-// Input (params): /images/IMAGE_UUID
-// Output (200): { "image_id": "...", "s3_key": "...", ... }
-router.get('/:image_id', async (req, res) => {
-  try {
-    const { image_id } = req.params;
-    const entry = await Image.findOne({ image_id }).exec();
-    if (!entry) return res.status(404).json({ error: 'Image not found' });
-    return res.status(200).json(entry);
-  } catch (err) {
-    console.error('get image error', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// DELETE /images/:image_id - Remove image record
-// Scenario: Client deletes an image record
-// Input (params): /images/IMAGE_UUID
-// Output (200): { deleted: true, image: { "image_id": "...", "s3_key": "...", ... } }
-router.delete('/:image_id', async (req, res) => {
-  try {
-    const { image_id } = req.params;
-    const entry = await Image.findOneAndDelete({ image_id }).exec();
-    if (!entry) return res.status(404).json({ error: 'Image not found' });
-    return res.status(200).json({ deleted: true, image: entry });
-  } catch (err) {
-    console.error('delete image error', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
+router.delete('/:image_id', imagesCtrl.deleteImage);
 
 module.exports = router;
