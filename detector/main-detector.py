@@ -2,12 +2,17 @@ import os, logging
 import time
 import json
 import threading
+from uuid import uuid4
+from fastapi.responses import JSONResponse
 import requests
 import redis
 import hashlib
 import random
 from redis.exceptions import ResponseError, ConnectionError, TimeoutError
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+
+from routers.v1_0_0.checks import router as checks_v1_0_0_router
+from routers.v1_0_1.checks import router as checks_v1_0_1_router
 
 # Detector service: consumes 'jobs.submitted' from Redis Streams, emits progress/completed,
 # and finalizes jobs via Jobs /internal/jobs/{id}/complete. Minimal P1 simulation.
@@ -135,28 +140,6 @@ def start():
         except Exception:
             time.sleep(1)
     threading.Thread(target=process_jobs, daemon=True).start()
-
-from detector_modules.service.detector_service import predict_from_url
-
-TEST_URL = "https://thispersondoesnotexist.com"
-
-@app.get("/test-detector")
-def test_detector():
-    """
-    Manual test endpoint to verify the detector module works in Skaffold.
-    Pulls a dummy MinIO image and runs inference.
-    """
-    try:
-        verdict, confidence, label = predict_from_url(TEST_URL)
-        return {
-            "status": "ok",
-            "verdict": verdict,
-            "label": label,
-            "confidence": confidence
-        }
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
 class _HealthzFilter(logging.Filter):
     # Hide /healthz from access logs
     def filter(self, record):
@@ -170,3 +153,6 @@ logging.getLogger("uvicorn.access").addFilter(_HealthzFilter())
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
+app.include_router(checks_v1_0_0_router, prefix="/v1.0.0", tags=["v1.0.0"])
+app.include_router(checks_v1_0_1_router, prefix="/v1.0.1", tags=["v1.0.1"])
