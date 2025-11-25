@@ -103,8 +103,8 @@
       "up_vote_count": 1405,
       "down_vote_count": 1400,
       "opinion": 1,
-      "created_at": 1761753591,
-      "controversial_since": 1763056548
+      "created_at": 1761996914,
+      "controversial_since": 1763724914
     },
     {
       "post_id": 2002,
@@ -117,7 +117,7 @@
       "up_vote_count": 52,
       "down_vote_count": 6,
       "opinion": 1,
-      "created_at": 1762012791,  
+      "created_at": 1759318514,  
       "controversial_since": null
     },
     {
@@ -129,10 +129,10 @@
       "comments_id": [3004, 3005],
       "clicks_count": 562,
       "up_vote_count": 67,
-      "down_vote_count": 5,
+      "down_vote_count": 65,
       "opinion": 1,
       "created_at": 1761418577,
-      "controversial_since": null
+      "controversial_since": 1763724914
     },
     {
       "post_id": 2004,

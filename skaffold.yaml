@@ -40,6 +40,9 @@ build:
         manual:
           - src: "**/*.py"
             dest: .
+    - image: aiclipse/model-cycle
+      context: model-cycle
+      docker: { dockerfile: Dockerfile }
     - image: aiclipse/plans
       context: plans
       docker: { dockerfile: Dockerfile }
@@ -103,8 +106,3 @@ portForward:
     namespace: default
     port: 9000
     localPort: 9000
-  - resourceType: service
-    resourceName: detector-srv
-    namespace: default
-    port: 3000
-    localPort: 3000
