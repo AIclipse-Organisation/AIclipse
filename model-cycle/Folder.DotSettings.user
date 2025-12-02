@@ -1,0 +1,15 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ATestInvoker_002Ecs_002Fl_003A_002E_002E_003F_002E_002E_003F_002E_002E_003FAppData_003FRoaming_003FJetBrains_003FRider2025_002E2_003Fresharper_002Dhost_003FSourcesCache_003Fc3ec25c53b94f51fa21da479c513e551efee2b5ae49a79934686d2bb714d46_003FTestInvoker_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=637a8202_002D89c2_002D45b2_002D8e74_002Dfaa5e011b13d/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="HighCertainty_AboveThreshold_IsReadyForTraining #3" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;TestAncestor&gt;&#xD;
+    &lt;TestId&gt;xUnit::11ECFD39-D994-1242-B871-A28B2AA04A73::net8.0::Tests.ImageConfidence.ConfidenceServiceTests.HighCertainty_AboveThreshold_IsReadyForTraining&lt;/TestId&gt;&#xD;
+  &lt;/TestAncestor&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=c6e5c091_002D79e9_002D401b_002D8ed4_002D688457672ccd/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="HighCertainty_AboveThreshold_IsReadyForTraining #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;Project Location="C:\Users\seanm\Desktop\AIclipse\model-cycle\Tests" Presentation="&amp;lt;Tests&amp;gt;" /&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=d31bce19_002Dee2f_002D4709_002Da9ba_002De094ca86ac08/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="HighCertainty_AboveThreshold_IsReadyForTraining" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;TestAncestor&gt;&#xD;
+    &lt;TestId&gt;xUnit::11ECFD39-D994-1242-B871-A28B2AA04A73::net8.0::Tests.ImageConfidence.ConfidenceServiceTests.HighCertainty_AboveThreshold_IsReadyForTraining&lt;/TestId&gt;&#xD;
+  &lt;/TestAncestor&gt;&#xD;
+&lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
