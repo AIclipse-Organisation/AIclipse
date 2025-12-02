@@ -42,7 +42,7 @@ users_coll = None
 
 
 def load_or_generate_rsa(key_str: str):
-    """Load PEM-encoded RSA private key from env or generate a demo key."""
+    """Load PEM-encoded RSA private key from env"""
     if key_str and "BEGIN" in key_str:
         try:
             return serialization.load_pem_private_key(key_str.encode(), password=None)
@@ -80,11 +80,6 @@ JWKS = {
         }
     ]
 }
-
-
-# ---------------------------------------------------------------------------
-# Pydantic models
-# ---------------------------------------------------------------------------
 
 
 class UserPublic(BaseModel):
@@ -136,9 +131,7 @@ class TokenUser(BaseModel):
     plan: int = 0
 
 
-# ---------------------------------------------------------------------------
 # Startup / shutdown
-# ---------------------------------------------------------------------------
 
 
 @app.on_event("startup")
@@ -161,9 +154,7 @@ async def shutdown_event():
         mongo_client = None
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 
 def hash_password(password: str) -> str:
@@ -269,9 +260,7 @@ async def get_current_admin(user: TokenUser = Depends(get_current_user)) -> Toke
     return user
 
 
-# ---------------------------------------------------------------------------
 # Routes
-# ---------------------------------------------------------------------------
 
 
 @app.post("/signup", response_model=UserPublic, status_code=status.HTTP_201_CREATED)

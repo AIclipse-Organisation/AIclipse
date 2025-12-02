@@ -39,7 +39,7 @@ MEDIA_URI = os.getenv("MEDIA_URI")
 DETECTOR_URI = os.getenv("DETECTOR_URI")
 HOSTNAME = os.getenv("HOSTNAME")
 
-# Internal secret for detection_token (HS256, gateway-only)
+# Internal secret for detection_token
 DETECTION_TOKEN_SECRET = os.getenv("DETECTION_TOKEN_SECRET")
 
 # JWKS cache for Auth RS256 public keys
@@ -63,9 +63,7 @@ def healthz():
     return {"status": "ok"}
 
 
-# ---------------------------------------------------------------------------
 # Models and helpers
-# ---------------------------------------------------------------------------
 
 
 class UserContext(BaseModel):
@@ -290,9 +288,7 @@ def _validate_detection_token(
     return payload
 
 
-# ---------------------------------------------------------------------------
 # Startup
-# ---------------------------------------------------------------------------
 
 
 @app.on_event("startup")
@@ -304,9 +300,7 @@ async def startup_event():
         logging.warning(f"JWKS preload failed: {exc.detail}")
 
 
-# ---------------------------------------------------------------------------
 # Auth routes (proxy to Auth Service)
-# ---------------------------------------------------------------------------
 
 
 @app.post("/auth/signup")
@@ -436,9 +430,7 @@ async def gateway_admin_delete_user(
     )
 
 
-# ---------------------------------------------------------------------------
 # Detection: /checks -> Detector /v1.0.1/checks
-# ---------------------------------------------------------------------------
 
 
 @app.post("/checks")
@@ -524,10 +516,8 @@ async def gateway_checks(
     return JSONResponse(status_code=status.HTTP_200_OK, content=response_body)
 
 
-# ---------------------------------------------------------------------------
 # Image saving / history / community (Media)
 # detection_token is validated only here and never forwarded.
-# ---------------------------------------------------------------------------
 
 
 @app.post("/upload/image")
