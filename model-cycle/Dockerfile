@@ -1,11 +1,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-COPY ModelCycle.csproj .
-RUN dotnet restore
+COPY ModelCycle/ModelCycle.csproj ModelCycle/
 
-COPY . .
-RUN dotnet publish -c Release -o /app/publish
+RUN dotnet restore ModelCycle/ModelCycle.csproj
+
+COPY ModelCycle/ ModelCycle/
+
+RUN dotnet publish ModelCycle/ModelCycle.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app

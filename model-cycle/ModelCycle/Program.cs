@@ -3,8 +3,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelCycle.Services.ImageConfidence;
+
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton<IBetaDistribution, BetaDistribution>();
+builder.Services.AddSingleton<IConfidenceService, ConfidenceService>();
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
