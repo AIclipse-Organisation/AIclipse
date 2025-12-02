@@ -73,6 +73,11 @@ profiles:
       - kubeContext: docker-desktop
 portForward:
   - resourceType: service
+    resourceName: gateway-srv
+    namespace: default
+    port: 8080
+    localPort: 8080
+  - resourceType: service
     resourceName: mongo-srv
     namespace: default
     port: 27017

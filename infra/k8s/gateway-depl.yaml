@@ -12,12 +12,10 @@ spec:
         - name: gateway
           image: aiclipse/gateway
           env:
-            - name: REDIS_URI
-              valueFrom: { secretKeyRef: { name: redis-sec, key: REDIS_URI } }
-            - name: STREAM
-              value: "jobs"
-            - name: GROUP
-              value: "gateway"
+            - name: JWT_KEY
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: JWT_KEY } }
+            - name: DETECTION_TOKEN_SECRET
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: DETECTION_TOKEN_SECRET } }
             - name: AUTH_URI
               value: "http://auth-srv:3000"
             - name: MEDIA_URI
@@ -28,6 +26,8 @@ spec:
               value: "http://plans-srv:3000"
             - name: BILLING_URI
               value: "http://billing-srv:3000"
+            - name: DETECTOR_URI
+              value: "http://detector-srv:3000"
           ports: [{ name: http, containerPort: 8080 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 8080, scheme: HTTP }

@@ -40,7 +40,7 @@ DETECTOR_URI = os.getenv("DETECTOR_URI")
 HOSTNAME = os.getenv("HOSTNAME")
 
 # Internal secret for detection_token (HS256, gateway-only)
-DETECTION_TOKEN_SECRET = os.getenv("DETECTION_TOKEN_SECRET", "dev-detection-secret")
+DETECTION_TOKEN_SECRET = os.getenv("DETECTION_TOKEN_SECRET")
 
 # JWKS cache for Auth RS256 public keys
 JWKS_CACHE: Dict[str, Any] = {}
