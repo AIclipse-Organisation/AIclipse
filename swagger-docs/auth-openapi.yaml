@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Auth Service
-  version: "0.0.2"
+  version: "0.0.1"
 servers:
   - url: http://auth-srv:3000
 
