@@ -2,7 +2,7 @@
 
 public class ImageVote
 {
-    public Guid ImageId { get; set; }
+    public Guid PostId { get; set; }
     public int UserAiVotes { get; set; }
     public int UserNotAiVotes { get; set; }
     
