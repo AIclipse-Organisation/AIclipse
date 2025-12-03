@@ -2,7 +2,7 @@
 
 namespace ModelCycle.Services.ImageConfidence;
 
-public class BetaDistribution: IBetaDistribution
+public class BetaDistribution : IBetaDistribution
 {
     public double Cdf(double x, double alpha, double beta)
     {
