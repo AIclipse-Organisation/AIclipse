@@ -26,13 +26,13 @@ build:
         manual:
           - src: "**/*.py"
             dest: .
-    - image: aiclipse/jobs
-      context: jobs
-      docker: { dockerfile: Dockerfile }
-      sync:
-        manual:
-          - src: "**/*.py"
-            dest: .
+    # - image: aiclipse/jobs
+    #   context: jobs
+    #   docker: { dockerfile: Dockerfile }
+    #   sync:
+    #     manual:
+    #       - src: "**/*.py"
+    #         dest: .
     - image: aiclipse/detector
       context: detector
       docker: { dockerfile: Dockerfile }
@@ -66,13 +66,13 @@ build:
             dest: .
           - src: "**/*.html"
             dest: .
-    - image: aiclipse/observer
-      context: observer
-      docker: { dockerfile: Dockerfile }
-      sync:
-        manual:
-          - src: "**/*.py"
-            dest: .
+    # - image: aiclipse/observer
+    #   context: observer
+    #   docker: { dockerfile: Dockerfile }
+    #   sync:
+    #     manual:
+    #       - src: "**/*.py"
+    #         dest: .
 manifests:
   kustomize:
     paths:
@@ -87,15 +87,15 @@ profiles:
       - kubeContext: docker-desktop
 portForward:
   - resourceType: service
+    resourceName: gateway-srv
+    namespace: default
+    port: 8080
+    localPort: 8080
+  - resourceType: service
     resourceName: mongo-srv
     namespace: default
     port: 27017
     localPort: 27017
-  - resourceType: service
-    resourceName: redis-srv
-    namespace: default
-    port: 6379
-    localPort: 6379
   - resourceType: service
     resourceName: s3-srv
     namespace: default

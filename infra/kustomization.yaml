@@ -8,11 +8,11 @@ resources:
   - k8s/auth-depl.yaml
   - k8s/gateway-depl.yaml
   - k8s/media-depl.yaml
-  - k8s/jobs-depl.yaml
+  #- k8s/jobs-depl.yaml
   - k8s/detector-depl.yaml
   - k8s/model-cycle-depl.yaml
   - k8s/plans-depl.yaml
   - k8s/billing-depl.yaml
-  - k8s/observer-depl.yaml
+  #- k8s/observer-depl.yaml
   - k8s/client-depl.yaml
   - k8s-dev/ingress-srv.yaml

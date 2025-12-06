@@ -3,7 +3,58 @@ info:
   title: Gateway Service
   version: "0.0.1"
 servers:
+  - url: http://localhost:8080
+    description: Gateway local
   - url: http://gateway-srv:8080
+    description: Gateway in-cluster
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SavedImage:
+      type: object
+      description: Saved image in user's history or community.
+      required:
+        - image_id
+        - verdict
+        - label
+        - confidence
+        - is_public
+        - uploaded_at
+        - url
+      properties:
+        image_id:
+          type: string
+        verdict:
+          type: string
+          description: High-level verdict from detector (e.g. "ai", "human").
+        label:
+          type: string
+          description: Human-readable label for the verdict.
+        confidence:
+          type: number
+          format: float
+          description: Confidence in range [0, 1].
+        is_public:
+          type: boolean
+        uploaded_at:
+          type: string
+          format: date-time
+        url:
+          type: string
+          format: uri
+          description: URL to access the image bytes (direct or signed).
+        user_id:
+          type: string
+          description: Owner user ID (not always needed on the client).
+        is_reported:
+          type: boolean
+          description: Whether the image has been reported by users.
 
 paths:
   /auth/signup:
@@ -108,13 +159,320 @@ paths:
         "401":
           description: Invalid credentials
 
+  /auth/me:
+    get:
+      summary: Get current user profile
+      description: Proxy to Auth Service /me using the JWT provided to the Gateway.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [user_id, user_name, email, is_admin, plan, created_at]
+                properties:
+                  user_id:
+                    type: string
+                  user_name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  is_admin:
+                    type: boolean
+                  plan:
+                    type: integer
+                    format: int32
+                  created_at:
+                    type: string
+                    format: date-time
+                  age:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    nullable: true
+                  total_guesses:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    nullable: true
+                  total_correct:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                    nullable: true
+        "401":
+          description: Unauthorized
+    patch:
+      summary: Update current user profile
+      description: Proxy to Auth Service /me (PATCH).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [user_id, user_name, email, is_admin, plan, created_at]
+                properties:
+                  user_id:
+                    type: string
+                  user_name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  is_admin:
+                    type: boolean
+                  plan:
+                    type: integer
+                    format: int32
+                  created_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Invalid payload
+        "401":
+          description: Unauthorized
+    delete:
+      summary: Delete current user account
+      description: Proxy to Auth Service /me (DELETE).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, user_id, message]
+                properties:
+                  deleted:
+                    type: boolean
+                  user_id:
+                    type: string
+                  message:
+                    type: string
+        "401":
+          description: Unauthorized
+
+  /auth/admin/users:
+    get:
+      summary: List users (admin)
+      description: Proxy to Auth Service /admin/users. Requires admin user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: user_name
+          schema:
+            type: string
+          required: false
+          description: Optional case-insensitive partial match on user_name.
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        [user_id, user_name, email, is_admin, plan, created_at]
+                      properties:
+                        user_id:
+                          type: string
+                        user_name:
+                          type: string
+                        email:
+                          type: string
+                          format: email
+                        is_admin:
+                          type: boolean
+                        plan:
+                          type: integer
+                          format: int32
+                        created_at:
+                          type: string
+                          format: date-time
+        "401":
+          description: Unauthorized
+
+  /auth/admin/user/{user_id}:
+    get:
+      summary: Get user by ID (admin)
+      description: Proxy to Auth Service /admin/user/{user_id}.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [user_id, user_name, email, is_admin, plan, created_at]
+                properties:
+                  user_id:
+                    type: string
+                  user_name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  is_admin:
+                    type: boolean
+                  plan:
+                    type: integer
+                    format: int32
+                  created_at:
+                    type: string
+                    format: date-time
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+    patch:
+      summary: Update user (admin)
+      description: Proxy to Auth Service /admin/user/{user_id} (PATCH).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                age:
+                  type: integer
+                  format: int32
+                  minimum: 0
+                is_admin:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [user_id, user_name, email, is_admin, plan, created_at]
+                properties:
+                  user_id:
+                    type: string
+                  user_name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  is_admin:
+                    type: boolean
+                  plan:
+                    type: integer
+                    format: int32
+                  created_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Invalid payload
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+    delete:
+      summary: Delete user (admin)
+      description: Proxy to Auth Service /admin/user/{user_id} (DELETE).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, user]
+                properties:
+                  deleted:
+                    type: boolean
+                  user:
+                    type: object
+                    properties:
+                      user_id:
+                        type: string
+                      email:
+                        type: string
+                        format: email
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+
   /checks:
     post:
       summary: Analyze an image (no saving)
       description: >
         Upload an image and get AI/Deepfake detection result.
-        No image or result is persisted.
-        A signed detection_token is returned to bind this result to the exact image bytes.
+        No image or result is persisted at this step.
+        Gateway forwards the image bytes to Detector v1.0.1 and returns
+        the detection result along with a signed detection_token that binds
+        the result to the exact image bytes and user.
       security:
         - bearerAuth: []
       requestBody:
@@ -131,23 +489,29 @@ paths:
                   description: Image file (JPEG/PNG) to analyze.
       responses:
         "200":
-          description: Detection result (not persisted)
+          description: Detection result (not persisted) and detection_token
           content:
             application/json:
               schema:
                 type: object
-                required: [is_ai, score, detection_token]
+                required: [verdict, label, confidence, detection_token]
                 properties:
-                  is_ai:
-                    type: boolean
-                  score:
+                  verdict:
+                    type: string
+                    description: High-level verdict (e.g. "ai", "human").
+                  label:
+                    type: string
+                    description: Human-readable label for the verdict.
+                  confidence:
                     type: number
                     format: float
-                    description: Confidence score in range [0, 1].
+                    description: Confidence in range [0, 1].
                   detection_token:
                     type: string
                     description: >
-                      Signed token that binds this detection result to the exact image bytes and user.
+                      Signed token issued by Gateway that binds the detection
+                      result to the exact image bytes and user. It must be
+                      passed back to /upload/image and is only validated by Gateway.
         "400":
           description: Missing or invalid file
         "401":
@@ -165,9 +529,10 @@ paths:
     post:
       summary: Save image (history / community)
       description: >
-        Save an image and its detection result to the user's history.
-        The detection result is taken from a signed detection_token previously returned
-        by the /checks endpoint. The image is stored in Media.
+        Save an image and its detection result to the user's history and optionally community.
+        The detection result is validated using detection_token issued by /checks.
+        Gateway verifies detection_token and image bytes and then forwards only
+        trusted fields to Media. detection_token is never forwarded to internal services.
       security:
         - bearerAuth: []
       requestBody:
@@ -185,8 +550,9 @@ paths:
                 detection_token:
                   type: string
                   description: >
-                    Signed detection token obtained from /checks for this exact image.
-                    Must match the uploaded image bytes and the current user.
+                    Signed detection token obtained from /checks for this exact image
+                    and current user. Gateway validates the token and binds it to the
+                    uploaded bytes before saving.
                 is_public:
                   type: boolean
                   description: >
@@ -194,24 +560,24 @@ paths:
                     If false or omitted, the image is private (history only).
       responses:
         "201":
-          description: Image saved with validated detection result
+          description: Image saved with detection result
           content:
             application/json:
               schema:
                 type: object
-                required: [is_ai, score, image]
+                required: [verdict, label, confidence, image]
                 properties:
-                  is_ai:
-                    type: boolean
-                    description: Detection result extracted from the validated token.
-                  score:
+                  verdict:
+                    type: string
+                  label:
+                    type: string
+                  confidence:
                     type: number
                     format: float
-                    description: Detection score extracted from the validated token.
                   image:
                     $ref: "#/components/schemas/SavedImage"
         "400":
-          description: Missing or invalid file, or invalid detection_token
+          description: Missing or invalid file or detection_token
         "401":
           description: Unauthorized (invalid or missing JWT)
         "413":
@@ -236,6 +602,7 @@ paths:
           name: is_public
           schema:
             type: boolean
+          required: false
           description: >
             Optional filter. If true, return only public images of the user.
             If false, return only private images.
@@ -260,7 +627,7 @@ paths:
       summary: Get single image metadata
       description: >
         Return metadata for a single saved image.
-        Only the owner can access the image by ID.
+        Only the owner can access the image by ID, unless it is public.
       security:
         - bearerAuth: []
       parameters:
@@ -280,45 +647,22 @@ paths:
         "401":
           description: Unauthorized (invalid or missing JWT)
         "404":
-          description: Image not found or does not belong to the user
+          description: Image not found or not accessible
 
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
-  schemas:
-    SavedImage:
-      type: object
-      description: Saved image in user's history or community.
-      required:
-        - image_id
-        - is_ai
-        - likelihood
-        - is_public
-        - uploaded_at
-        - url
-      properties:
-        image_id:
-          type: string
-        is_ai:
-          type: boolean
-        score:
-          type: number
-          format: float
-          description: Raw model score in range [0, 1] at the time of saving.
-        likelihood:
-          type: number
-          format: float
-          description: Normalized likelihood value derived from the model score (e.g. percentage).
-        is_public:
-          type: boolean
-        uploaded_at:
-          type: string
-          format: date-time
-        url:
-          type: string
-          format: uri
-          description: URL to access the image bytes (direct or signed).
+  /community/images:
+    get:
+      summary: Get public community images
+      description: >
+        Return a list of public images visible in the community feed.
+      responses:
+        "200":
+          description: List of public images
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SavedImage"

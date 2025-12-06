@@ -2,3 +2,6 @@ fastapi
 uvicorn[standard]
 PyJWT 
 cryptography
+motor
+bcrypt
+email-validator

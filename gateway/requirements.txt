@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
+httpx
 PyJWT
 cryptography
-requests
-redis
+python-multipart

@@ -5,13 +5,58 @@ info:
 servers:
   - url: http://media-srv:3000
 
+components:
+  schemas:
+    ImageRecord:
+      type: object
+      description: Image document stored in the images collection.
+      required:
+        - image_id
+        - user_id
+        - s3_key
+        - verdict
+        - label
+        - confidence
+        - is_public
+        - uploaded_at
+        - is_reported
+      properties:
+        image_id:
+          type: string
+        user_id:
+          type: string
+        s3_key:
+          type: string
+          description: Key of the object stored in MinIO (S3-compatible).
+        verdict:
+          type: string
+          description: High-level verdict from detector (e.g. "ai", "human").
+        label:
+          type: string
+          description: Human-readable label for the verdict.
+        confidence:
+          type: number
+          format: float
+          description: Confidence in range [0, 1].
+        is_public:
+          type: boolean
+        uploaded_at:
+          type: string
+          format: date-time
+        is_reported:
+          type: boolean
+        url:
+          type: string
+          format: uri
+          description: Resolved URL built from s3_key (for convenience).
+
 paths:
   /upload/image:
     post:
       summary: Store image and metadata
       description: >
         Store an image in MinIO and create a metadata record in the images collection.
-        Intended to be called by Gateway after detection result has been validated.
+        Intended to be called by Gateway after detection result has been obtained.
       parameters:
         - in: header
           name: X-Request-Id
@@ -28,8 +73,9 @@ paths:
               required:
                 - file
                 - user_id
-                - is_ai
-                - score
+                - verdict
+                - label
+                - confidence
                 - is_public
               properties:
                 file:
@@ -39,13 +85,16 @@ paths:
                 user_id:
                   type: string
                   description: Owner user ID (from Gateway after JWT validation).
-                is_ai:
-                  type: boolean
-                  description: Detection result from Detector service (validated by Gateway).
-                score:
+                verdict:
+                  type: string
+                  description: Detection verdict from Detector service.
+                label:
+                  type: string
+                  description: Detection label from Detector service.
+                confidence:
                   type: number
                   format: float
-                  description: Raw model score in range [0, 1] from Detector service.
+                  description: Raw model confidence in range [0, 1].
                 is_public:
                   type: boolean
                   description: Whether the image should be public (community) or private (history).
@@ -72,14 +121,17 @@ paths:
           name: user_id
           schema:
             type: string
+          required: false
           description: Owner user ID. When provided, filters images by this user.
         - in: query
           name: is_public
           schema:
             type: boolean
+          required: false
           description: >
-            If true, return only public images.
-            If false, return only private images for the given user_id.
+            If true and user_id is omitted, return only public images (community).
+            If true with user_id, return only public images for that user.
+            If false with user_id, return only private images for that user.
             If omitted with user_id, return all images for that user.
       responses:
         "200":
@@ -124,42 +176,3 @@ paths:
                 $ref: "#/components/schemas/ImageRecord"
         "404":
           description: Image not found or not accessible for this user
-
-components:
-  schemas:
-    ImageRecord:
-      type: object
-      description: Image document stored in the images collection.
-      required:
-        - image_id
-        - user_id
-        - s3_key
-        - is_ai
-        - is_public
-        - likelihood
-        - uploaded_at
-        - is_reported
-      properties:
-        image_id:
-          type: string
-        user_id:
-          type: string
-        s3_key:
-          type: string
-          description: Key of the object stored in MinIO (S3-compatible).
-        is_ai:
-          type: boolean
-        is_public:
-          type: boolean
-        likelihood:
-          type: number
-          format: float
-        uploaded_at:
-          type: string
-          format: date-time
-        is_reported:
-          type: boolean
-        url:
-          type: string
-          format: uri
-          description: Resolved URL built from s3_key (for convenience).
