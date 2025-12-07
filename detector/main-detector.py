@@ -140,6 +140,7 @@ def start():
         except Exception:
             time.sleep(1)
     threading.Thread(target=process_jobs, daemon=True).start()
+    
 class _HealthzFilter(logging.Filter):
     # Hide /healthz from access logs
     def filter(self, record):
