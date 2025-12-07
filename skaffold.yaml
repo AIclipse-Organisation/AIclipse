@@ -40,9 +40,9 @@ build:
         manual:
           - src: "**/*.py"
             dest: .
-    - image: aiclipse/model-cycle
-      context: model-cycle
-      docker: { dockerfile: Dockerfile }
+    # - image: aiclipse/model-cycle
+    #   context: model-cycle
+    #   docker: { dockerfile: Dockerfile }
     - image: aiclipse/plans
       context: plans
       docker: { dockerfile: Dockerfile }
