@@ -211,3 +211,86 @@ pre {
 .no-margin {
   margin: 0;
 }
+
+
+
+.detection-card {
+  display: block;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  margin-top: 8px;
+}
+
+.detection-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.detection-thumb {
+  width: 110px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+}
+
+.detection-main {
+  flex: 1;
+  text-align: left;
+}
+
+.verdict-text {
+  font-weight: 700;
+  font-size: 14px;
+  margin: 2px 0 8px;
+}
+
+/* label color variants (keeps same semantic colors you used) */
+.label-strong-ai { color: #ff3b3b; }
+.label-medium-ai { color: #ff9900; }
+.label-neutral { color: #f1c40f; }
+.label-medium-real { color: #32cd32; }
+.label-strong-real { color: #00b050; }
+
+/* two-part progress bar */
+.detection-card .progress-bar {
+  display: flex;
+  width: 100%;
+  height: 18px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f1f5f9;
+  margin-bottom: 8px;
+  border: 1px solid #e6eef6;
+}
+
+.detection-card .fill {
+  height: 100%;
+  transition: width 400ms ease;
+}
+
+.real-fill { background: #32cd32; }   /* green */
+.ai-fill   { background: #ff3b3b; }   /* red */
+
+/* meta + actions */
+.detection-meta { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.detection-actions { display:flex; gap:8px; }
+
+button.danger {
+  background: #fff0f0; color: #9b1c1c; border: 1px solid #f3c6c6;
+}
+
+button.secondary {
+  background: #f3f4f6; color: #111827; border: 1px solid #e5e7eb;
+}
+
+/* small responsive tweak */
+@media (max-width:420px) {
+  .detection-row { flex-direction: column; align-items: center; }
+  .detection-thumb { width: 100%; height: 160px; }
+  .detection-main { width: 100%; }
+}

@@ -30,6 +30,11 @@ def healthz():
 def index():
     return send_from_directory("templates", "index.html")
 
+@app.get("/imgProcessing")
+def img_processing():
+    return send_from_directory("templates", "imgProcessing.html")
+
+
 
 def _get_token_from_cookie() -> str | None:
     return request.cookies.get("access_token")
@@ -306,7 +311,7 @@ def checks():
     }
 
     try:
-        resp = requests.post(url, headers=headers, files=files, timeout=30)
+        resp = requests.post(url, headers=headers, files=files, timeout=60)
     except requests.RequestException:
         logging.exception("Gateway /checks request failed")
         return jsonify({"detail": "Gateway unreachable"}), 502
@@ -366,7 +371,7 @@ def upload_image():
     }
 
     try:
-        resp = requests.post(url, headers=headers, data=data, files=files, timeout=30)
+        resp = requests.post(url, headers=headers, data=data, files=files, timeout=60)
     except requests.RequestException:
         logging.exception("Gateway /upload/image request failed")
         return jsonify({"detail": "Gateway unreachable"}), 502
