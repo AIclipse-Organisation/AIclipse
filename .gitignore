@@ -211,5 +211,32 @@ node_modules/
 
 package-lock.json
 
+# Build artefacts
 bin/
 obj/
+[Bb]uild/
+[Ll]og/
+x64/
+x86/
+*.exe
+*.dll
+*.pdb
+
+# User-specific files
+*.user
+*.suo
+*.userprefs
+*.csproj.user
+*.vcxproj.user
+
+# IDE-specific
+.vs/
+.idea/
+*.tmp
+*.cache
+*.swp
+
+# NuGet
+packages/
+*.nupkg
+project.lock.json
