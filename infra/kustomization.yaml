@@ -16,3 +16,4 @@ resources:
   #- k8s/observer-depl.yaml
   - k8s/client-depl.yaml
   - k8s-dev/ingress-srv.yaml
+  - k8s/model-cycle-pvc.yaml

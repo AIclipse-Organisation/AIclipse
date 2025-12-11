@@ -12,22 +12,26 @@ spec:
       labels:
         app: model-cycle
     spec:
-    #To wait for minio, model cycle will have a dependency and requires minio to be started before we spin it up
+      volumes: 
+        - name: model-data
+          persistentVolumeClaim:
+            claimName: model-cycle-pvc
+
+    #To wait for s3, model cycle will have a dependency and requires minio to be started before we spin it up
       initContainers:
           - name: wait-for-minio
             image: busybox
-            command: ['sh', '-c', 'until nc -z minio 9000; do echo waiting for minio; sleep 2; done;']
+            command: ['sh', '-c', 'until nc -z s3-srv 9000; do echo waiting for minio; sleep 2; done;']
       containers:
         - name: model-cycle
           image: aiclipse/model-cycle
           ports:
             - name: http
               containerPort: 3000
+          volumeMounts: 
+            - name: model-data
+              mountPath: /app/data
           env:
-            - name: MONGO_URI
-              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
-            - name: MONGO_DB
-              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
             - name: S3_ENDPOINT 
               valueFrom: { secretKeyRef: { name: s3-sec, key: S3_ENDPOINT } } 
             - name: S3_PUBLIC_ENDPOINT

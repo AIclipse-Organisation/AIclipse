@@ -1,4 +1,5 @@
-﻿using ModelCycle.Domain;
+﻿using System;
+using ModelCycle.Domain;
 
 namespace ModelCycle.Services.ImageConfidence;
 

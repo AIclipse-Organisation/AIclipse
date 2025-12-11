@@ -1,16 +1,43 @@
 using System;
+using System.IO;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelCycle.Services;
 using ModelCycle.Services.ImageConfidence;
+using ModelCycle.Data;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.WebHost.UseUrls("http://0.0.0.0:3000");
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 524288000; 
+});
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 524288000; 
+});
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy => 
+        policy.AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+});
+
 builder.Services.AddSingleton<IBetaDistribution, BetaDistribution>();
 builder.Services.AddSingleton<IConfidenceService, ConfidenceService>();
 builder.Services.AddSingleton<BlobStorageService>();
+
+var dbPath = Path.Combine("/app/data", "modelcycle.db");
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite($"Data Source={dbPath}"));
 
 builder.Services.AddControllers();
 
@@ -25,16 +52,23 @@ builder.Logging.AddFilter("System.Net.Http", LogLevel.Warning);
 
 var app = builder.Build();
 
+
 using (var scope = app.Services.CreateScope())
 {
-    var blobService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
-    try 
+    var services = scope.ServiceProvider;
+    try
     {
+        var blobService = services.GetRequiredService<BlobStorageService>();
         await blobService.InitializeAsync();
+        
+        var context = services.GetRequiredService<AppDbContext>();
+        Directory.CreateDirectory("/app/data"); 
+        context.Database.Migrate();
+        Console.WriteLine("[SQLite] Database migrated successfully.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[Error] MinIO Init failed: {ex.Message}");
+        Console.WriteLine($"[Error] Blob Initialization failed: {ex.Message}");
     }
 }
 
