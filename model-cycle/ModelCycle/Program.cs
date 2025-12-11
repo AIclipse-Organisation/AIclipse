@@ -3,12 +3,14 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelCycle.Services;
 using ModelCycle.Services.ImageConfidence;
 
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<IBetaDistribution, BetaDistribution>();
 builder.Services.AddSingleton<IConfidenceService, ConfidenceService>();
+builder.Services.AddSingleton<BlobStorageService>();
 
 builder.Services.AddControllers();
 
@@ -22,6 +24,19 @@ builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 builder.Logging.AddFilter("System.Net.Http", LogLevel.Warning);
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var blobService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
+    try 
+    {
+        await blobService.InitializeAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Error] MinIO Init failed: {ex.Message}");
+    }
+}
 
 app.UseSwagger();
 app.UseSwaggerUI();
