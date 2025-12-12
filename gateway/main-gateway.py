@@ -460,7 +460,7 @@ async def gateway_checks(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(url, content=data, headers=headers)
     except httpx.RequestError as exc:
         raise HTTPException(
