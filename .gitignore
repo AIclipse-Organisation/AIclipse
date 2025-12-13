@@ -239,4 +239,3 @@ x86/
 # NuGet
 packages/
 *.nupkg
-project.lock.json
