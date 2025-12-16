@@ -18,6 +18,13 @@ spec:
                 name: gateway-srv
                 port:
                   number: 8080
+          - path: /community
+            pathType: Prefix
+            backend:
+              service:
+                name: community-srv
+                port:
+                  number: 3000
           - path: /
             pathType: Prefix
             backend:
