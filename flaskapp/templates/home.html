@@ -1,14 +1,9 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Home</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-    {% include "navbar.html" %}
+{% block title %}Home{% endblock %}
 
+{% block content %}
     <h2>Successfully Logged In!</h2>
     <p>Welcome to your homepage 🎉</p>
-
-</body>
-</html>
+    
+{% endblock %}
