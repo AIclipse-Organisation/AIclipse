@@ -92,6 +92,9 @@ class UserPublic(BaseModel):
     age: Optional[int] = None
     total_guesses: Optional[int] = 0
     total_correct: Optional[int] = 0
+    acc_guessing_ai: Optional[int] = 0
+    acc_guessing_real: Optional[int] = 0
+    
 
 
 class SignupRequest(BaseModel):
@@ -179,6 +182,8 @@ def build_user_public(doc: dict) -> UserPublic:
         age=doc.get("age"),
         total_guesses=doc.get("total_guesses", 0),
         total_correct=doc.get("total_correct", 0),
+        acc_guessing_ai=doc.get("acc_guessing_ai", 0),
+        acc_guessing_real=doc.get("acc_guessing_real", 0),
     )
 
 
@@ -288,6 +293,8 @@ async def signup(payload: SignupRequest):
         "age": None,
         "total_guesses": 0,
         "total_correct": 0,
+        "acc_guessing_ai": 0,
+        "acc_guessing_real": 0,
     }
 
     await users_coll.insert_one(user_doc)
