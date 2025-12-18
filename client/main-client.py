@@ -28,11 +28,27 @@ def healthz():
 
 @app.get("/")
 def index():
-    return send_from_directory("templates", "index.html")
+    return send_from_directory("templates", "login.html")
 
-@app.get("/imgProcessing")
+@app.get("/upload")
 def img_processing():
-    return send_from_directory("templates", "imgProcessing.html")
+    return send_from_directory("templates", "upload.html")
+
+@app.get("/scans")
+def scans():
+    return send_from_directory("templates", "scans.html")
+
+@app.get("/home")
+def upload():
+    return send_from_directory("templates", "home.html")
+
+@app.get("/notification")
+def notification():
+    return send_from_directory("templates", "notification.html")
+
+@app.get("/plan")
+def plan():
+    return send_from_directory("templates", "plan.html")
 
 
 
