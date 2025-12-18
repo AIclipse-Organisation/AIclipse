@@ -17,13 +17,11 @@ app = FastAPI()
 
 # ---- env ----
 MONGO_URI = os.getenv("MONGO_URI")
-MONGO_DB = os.getenv("MONGO_DB", "aiclipse")
-
+MONGO_DB =  "aiclipse"
 S3_ENDPOINT = os.getenv("S3_ENDPOINT")
 S3_PUBLIC_ENDPOINT = os.getenv("S3_PUBLIC_ENDPOINT")
-S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY")
-S3_SECRET_KEY = os.getenv("S3_SECRET_KEY")
-S3_BUCKET = os.getenv("S3_BUCKET", "images")
+
+S3_BUCKET = "images"
 
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -41,8 +39,6 @@ except Exception:
 s3 = boto3.client(
     "s3",
     endpoint_url=S3_ENDPOINT,
-    aws_access_key_id=S3_ACCESS_KEY,
-    aws_secret_access_key=S3_SECRET_KEY,
     region_name=os.getenv("AWS_REGION", "us-east-1"),
 )
 
