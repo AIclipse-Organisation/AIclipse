@@ -1,3 +1,4 @@
+// Navbar and
 async function loadPartials() {
   const nodes = document.querySelectorAll("[data-include]");
   for (const el of nodes) {

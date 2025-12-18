@@ -21,16 +21,6 @@ function setDebug(data) {
   pre.textContent = JSON.stringify(data, null, 2);
 }
 
-function setCurrentUserChip(user) {
-  const chip = document.getElementById("current-user-chip");
-  if (!chip) return;
-  if (!user) {
-    chip.textContent = "Not signed in";
-    chip.classList.remove("success");
-    return;
-  }
-  chip.textContent = `${user.user_name || user.email || "User"} · plan ${user.plan ?? "?"}`;
-}
 
 async function jsonFetch(method, url, body) {
   const opts = { method, headers: { Accept: "application/json" } };
@@ -180,18 +170,4 @@ window.addEventListener("DOMContentLoaded", () => {
     if (detectCard) detectCard.latestResponse = resp;
   }
 
-  // Initial auth/me to populate header user chip (silent if fails)
-  (async () => {
-    try {
-      const { res, data } = await jsonFetch("GET", "/auth/me", null);
-      if (res.ok) {
-        setCurrentUserChip(data);
-        setStatus(document.getElementById("detect-status"), "info", "Session restored from cookie.");
-      } else {
-        setCurrentUserChip(null);
-      }
-    } catch {
-      // ignore
-    }
-  })();
 });
