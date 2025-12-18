@@ -36,9 +36,11 @@ function setCurrentUserChip(user) {
     return;
   }
 
-  chip.textContent = `${user.user_name || user.email || "User"} · plan ${
-    user.plan ?? "?"
-  }`;
+  // chip.textContent = `${user.user_name || user.email || "User"} · plan ${
+  //   user.plan ?? "?"
+  // }`;
+
+  chip.textContent = `${user.user_name}`;
 }
 
 // Basic fetch wrapper for JSON endpoints
