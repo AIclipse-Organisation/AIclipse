@@ -30,9 +30,9 @@ def healthz():
 def index():
     return send_from_directory("templates", "login.html")
 
-@app.get("/upload")
+@app.get("/imgProcessing")
 def img_processing():
-    return send_from_directory("templates", "upload.html")
+    return send_from_directory("templates", "imgProcessing.html")
 
 @app.get("/scans")
 def scans():
