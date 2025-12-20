@@ -234,11 +234,11 @@ jobs:
           kubectl -n "$NS" apply -f infra/k8s/auth-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/gateway-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/media-depl.yaml
-          kubectl -n "$NS" apply -f infra/k8s/jobs-depl.yaml
+          # kubectl -n "$NS" apply -f infra/k8s/jobs-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/detector-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/plans-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/billing-depl.yaml
-          kubectl -n "$NS" apply -f infra/k8s/observer-depl.yaml
+          # kubectl -n "$NS" apply -f infra/k8s/observer-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/client-depl.yaml
 
       - name: Ensure admin UIs (RedisInsight, Mongo Express)

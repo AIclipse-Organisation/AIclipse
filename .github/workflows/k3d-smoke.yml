@@ -28,6 +28,7 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       IMAGE_TAG: ci-${{ github.sha }}                       # unique tag per run
       CLUSTER: ci-${{ inputs.svc_name }}
