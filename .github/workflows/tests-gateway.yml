@@ -15,7 +15,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  unit:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            gateway/requirements.txt
+            gateway/requirements-dev.txt
+
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: |
+          set -euo pipefail
+          python -m pytest tests -q
+
   gateway:
+    name: k3d-smoke
+    needs: unit
     uses: ./.github/workflows/k3d-smoke.yml
     with:
       svc_name: gateway
@@ -30,3 +62,4 @@ jobs:
       health_path: /healthz
       secrets_yaml: infra/k8s-dev/dev-secrets.yaml
       readiness_selector: app=gateway
+      
