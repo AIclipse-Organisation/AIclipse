@@ -9,3 +9,4 @@ httpx
 numpy
 pydantic
 pytest
+torch
