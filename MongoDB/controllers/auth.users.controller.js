@@ -73,6 +73,12 @@ async function signup(req, res) {
       email: user.email,
       is_admin: false,
       created_at: user.created_at,
+      age: user.age,
+      plan: user.plan,
+      total_guesses: user.total_guesses,
+      total_correct: user.total_correct,
+      acc_guessing_ai: user.acc_guessing_ai,
+      acc_guessing_real: user.acc_guessing_real,
     });
   } catch (err) {
     console.error('signup error', err);
@@ -122,6 +128,13 @@ async function login(req, res) {
         user_name: user.user_name,
         email: user.email,
         is_admin: user.is_admin,
+        created_at: user.created_at,
+        age: user.age,
+        plan: user.plan,
+        total_guesses: user.total_guesses,
+        total_correct: user.total_correct,
+        acc_guessing_ai: user.acc_guessing_ai,
+        acc_guessing_real: user.acc_guessing_real,
       },
     });
   } catch (err) {
