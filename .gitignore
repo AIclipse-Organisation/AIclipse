@@ -209,8 +209,6 @@ __marimo__/
 # Node
 node_modules/
 
-package-lock.json
-
 # Build artefacts
 bin/
 obj/
@@ -239,3 +237,5 @@ x86/
 # NuGet
 packages/
 *.nupkg
+
+*.sln
