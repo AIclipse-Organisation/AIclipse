@@ -57,6 +57,16 @@ def ensure_bucket():
 def _startup():
     ensure_bucket()
 
+class _HealthzFilter(logging.Filter):
+    def filter(self, record):
+        try:
+            return "/healthz" not in record.getMessage()
+        except Exception:
+            return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_HealthzFilter())
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
