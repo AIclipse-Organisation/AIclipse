@@ -35,6 +35,12 @@ builder.Services.AddSingleton<IBetaDistribution, BetaDistribution>();
 builder.Services.AddSingleton<IConfidenceService, ConfidenceService>();
 builder.Services.AddSingleton<BlobStorageService>();
 
+string mediaServiceUrl = builder.Configuration["MediaServiceUrl"] ?? "http://media-srv:3000";
+builder.Services.AddHttpClient<IMediaService, MediaService>(client =>
+{
+    client.BaseAddress = new Uri(mediaServiceUrl);
+});
+
 var dbPath = Path.Combine("/app/data", "modelcycle.db");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));

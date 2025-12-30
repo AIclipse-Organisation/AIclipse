@@ -32,6 +32,8 @@ spec:
             - name: model-data
               mountPath: /app/data
           env:
+            - name: MediaServiceUrl
+              value: "http://media-srv:3000"
             - name: S3_ENDPOINT 
               valueFrom: { secretKeyRef: { name: s3-sec, key: S3_ENDPOINT } } 
             - name: S3_PUBLIC_ENDPOINT
