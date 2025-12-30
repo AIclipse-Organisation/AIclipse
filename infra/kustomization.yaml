@@ -15,5 +15,6 @@ resources:
   - k8s/billing-depl.yaml
   #- k8s/observer-depl.yaml
   - k8s/client-depl.yaml
+  - k8s/community-depl.yaml
   - k8s-dev/ingress-srv.yaml
   - k8s/model-cycle-pvc.yaml

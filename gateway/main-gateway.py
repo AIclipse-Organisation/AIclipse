@@ -1,38 +1,31 @@
+import asyncio
+import hashlib
+import json
 import logging
 import os
-import uuid
-import hashlib
 import time
-import json
-from typing import Optional, Dict, Any
+import uuid
+from contextlib import asynccontextmanager
+from typing import Any, Dict, Optional
 
 import httpx
 import jwt
 from fastapi import (
+    Depends,
     FastAPI,
-    HTTPException,
-    UploadFile,
     File,
     Form,
     Header,
-    Query,
+    HTTPException,
     Path,
-    Depends,
+    Query,
+    UploadFile,
     status,
 )
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
-from fastapi.middleware.cors import CORSMiddleware 
 from pydantic import BaseModel
 
-app = FastAPI()
-app.add_middleware(
-    
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 AUTH_URI = os.getenv("AUTH_URI")
 MEDIA_URI = os.getenv("MEDIA_URI")
@@ -44,6 +37,16 @@ DETECTION_TOKEN_SECRET = os.getenv("DETECTION_TOKEN_SECRET")
 
 # JWKS cache for Auth RS256 public keys
 JWKS_CACHE: Dict[str, Any] = {}
+JWKS_LOCK = asyncio.Lock()
+
+
+def _require_setting(name: str, value: Optional[str]) -> str:
+    if value:
+        return value
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"Missing required setting: {name}",
+    )
 
 class _HealthzFilter(logging.Filter):
     # Hide health endpoints from access logs
@@ -55,6 +58,25 @@ class _HealthzFilter(logging.Filter):
 
 
 logging.getLogger("uvicorn.access").addFilter(_HealthzFilter())
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Best-effort JWKS preload; if it fails, we retry lazily on first request.
+    try:
+        await _refresh_jwks()
+    except HTTPException as exc:
+        logging.warning("JWKS preload failed: %s", exc.detail)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/healthz")
@@ -82,10 +104,11 @@ async def _proxy_json(
     json_body: Optional[dict] = None,
     headers: Optional[dict] = None,
     params: Optional[dict] = None,
+    timeout_s: float = 10.0,
 ) -> Response:
     url = base_url.rstrip("/") + path
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
             resp = await client.request(
                 method=method,
                 url=url,
@@ -128,37 +151,55 @@ def _parse_bearer_token(authorization: Optional[str]) -> str:
     return parts[1]
 
 
-async def _refresh_jwks():
-    global JWKS_CACHE
-    url = AUTH_URI.rstrip("/") + "/.well-known/jwks.json"
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-    except httpx.RequestError as exc:
-        logging.error(f"Failed to refresh JWKS: {exc}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unable to fetch JWKS from auth service",
-        )
+async def _refresh_jwks(*, force: bool = False, kid: str | None = None) -> None:
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
 
-    data = resp.json()
-    keys: Dict[str, Any] = {}
-    for jwk in data.get("keys", []):
-        kid = jwk.get("kid")
-        if not kid:
-            continue
-        public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
-        keys[kid] = public_key
+    async with JWKS_LOCK:
+        if not force and kid is not None and kid in JWKS_CACHE:
+            return
 
-    if not keys:
-        logging.error("Received empty JWKS")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Auth JWKS has no keys",
-        )
+        url = auth_uri.rstrip("/") + "/.well-known/jwks.json"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            logging.error("Failed to refresh JWKS: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Unable to fetch JWKS from auth service",
+            )
 
-    JWKS_CACHE = keys
+        try:
+            data = resp.json()
+        except ValueError:
+            logging.error("JWKS response is not valid JSON")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Auth JWKS is invalid JSON",
+            )
+
+        keys: Dict[str, Any] = {}
+        for jwk_obj in data.get("keys", []):
+            jwk_kid = jwk_obj.get("kid")
+            if not jwk_kid:
+                continue
+            try:
+                public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk_obj))
+            except Exception as exc:
+                logging.error("Failed to parse JWK for kid=%s: %s", jwk_kid, exc)
+                continue
+            keys[jwk_kid] = public_key
+
+        if not keys:
+            logging.error("Received empty JWKS")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Auth JWKS has no keys",
+            )
+
+        JWKS_CACHE.clear()
+        JWKS_CACHE.update(keys)
 
 
 async def _decode_jwt_rs256(token: str) -> Dict[str, Any]:
@@ -178,7 +219,7 @@ async def _decode_jwt_rs256(token: str) -> Dict[str, Any]:
         )
 
     if kid not in JWKS_CACHE:
-        await _refresh_jwks()
+        await _refresh_jwks(kid=kid)
 
     key = JWKS_CACHE.get(kid)
     if not key:
@@ -187,20 +228,44 @@ async def _decode_jwt_rs256(token: str) -> Dict[str, Any]:
             detail="Unknown signing key",
         )
 
+    def _decode_with_key(pub_key: Any) -> Dict[str, Any]:
+        return jwt.decode(token, key=pub_key, algorithms=["RS256"])
+
     try:
-        payload = jwt.decode(token, key=key, algorithms=["RS256"])
+        return _decode_with_key(key)
+
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expired",
         )
+
+    except jwt.InvalidSignatureError:
+        await _refresh_jwks(force=True, kid=kid)
+        key2 = JWKS_CACHE.get(kid)
+        if not key2:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unknown signing key",
+            )
+        try:
+            return _decode_with_key(key2)
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired",
+            )
+        except jwt.InvalidTokenError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+            )
+
     except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
         )
-
-    return payload
 
 
 async def get_current_user(
@@ -217,12 +282,21 @@ async def get_current_user(
         )
 
     return UserContext(
-        user_id=user_id,
+        user_id=str(user_id),
         email=payload.get("email"),
         is_admin=bool(payload.get("is_admin", False)),
         plan=payload.get("plan"),
         token=token,
     )
+
+
+async def get_current_admin(user: UserContext = Depends(get_current_user)) -> UserContext:
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return user
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -238,6 +312,8 @@ def _create_detection_token(
     label: str,
     confidence: float,
 ) -> str:
+    secret = _require_setting("DETECTION_TOKEN_SECRET", DETECTION_TOKEN_SECRET)
+
     sha256_hex = _sha256_bytes(image_bytes)
     now = int(time.time())
     payload = {
@@ -249,8 +325,7 @@ def _create_detection_token(
         "iat": now,
         "exp": now + 600,
     }
-    token = jwt.encode(payload, DETECTION_TOKEN_SECRET, algorithm="HS256")
-    return token
+    return jwt.encode(payload, secret, algorithm="HS256")
 
 
 def _validate_detection_token(
@@ -258,8 +333,10 @@ def _validate_detection_token(
     user: UserContext,
     image_bytes: bytes,
 ) -> Dict[str, Any]:
+    secret = _require_setting("DETECTION_TOKEN_SECRET", DETECTION_TOKEN_SECRET)
+
     try:
-        payload = jwt.decode(token, DETECTION_TOKEN_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(token, secret, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -288,36 +365,28 @@ def _validate_detection_token(
     return payload
 
 
-# Startup
-
-
-@app.on_event("startup")
-async def startup_event():
-    # Best-effort JWKS preload; if it fails, we retry lazily on first request.
-    try:
-        await _refresh_jwks()
-    except HTTPException as exc:
-        logging.warning(f"JWKS preload failed: {exc.detail}")
-
 
 # Auth routes (proxy to Auth Service)
 
 
 @app.post("/auth/signup")
 async def gateway_auth_signup(payload: dict):
-    return await _proxy_json("POST", AUTH_URI, "/signup", json_body=payload)
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
+    return await _proxy_json("POST", auth_uri, "/signup", json_body=payload)
 
 
 @app.post("/auth/login")
 async def gateway_auth_login(payload: dict):
-    return await _proxy_json("POST", AUTH_URI, "/login", json_body=payload)
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
+    return await _proxy_json("POST", auth_uri, "/login", json_body=payload)
 
 
 @app.get("/auth/me")
 async def gateway_auth_me_get(user: UserContext = Depends(get_current_user)):
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
     return await _proxy_json(
         "GET",
-        AUTH_URI,
+        auth_uri,
         "/me",
         headers={"Authorization": f"Bearer {user.token}"},
     )
@@ -328,9 +397,10 @@ async def gateway_auth_me_patch(
     payload: dict,
     user: UserContext = Depends(get_current_user),
 ):
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
     return await _proxy_json(
         "PATCH",
-        AUTH_URI,
+        auth_uri,
         "/me",
         json_body=payload,
         headers={"Authorization": f"Bearer {user.token}"},
@@ -339,9 +409,10 @@ async def gateway_auth_me_patch(
 
 @app.delete("/auth/me")
 async def gateway_auth_me_delete(user: UserContext = Depends(get_current_user)):
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
     return await _proxy_json(
         "DELETE",
-        AUTH_URI,
+        auth_uri,
         "/me",
         headers={"Authorization": f"Bearer {user.token}"},
     )
@@ -350,13 +421,9 @@ async def gateway_auth_me_delete(user: UserContext = Depends(get_current_user)):
 @app.get("/auth/admin/users")
 async def gateway_admin_list_users(
     user_name: Optional[str] = Query(None),
-    user: UserContext = Depends(get_current_user),
+    admin: UserContext = Depends(get_current_admin),
 ):
-    if not user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
-        )
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
 
     params = {}
     if user_name:
@@ -364,9 +431,9 @@ async def gateway_admin_list_users(
 
     return await _proxy_json(
         "GET",
-        AUTH_URI,
+        auth_uri,
         "/admin/users",
-        headers={"Authorization": f"Bearer {user.token}"},
+        headers={"Authorization": f"Bearer {admin.token}"},
         params=params,
     )
 
@@ -374,19 +441,14 @@ async def gateway_admin_list_users(
 @app.get("/auth/admin/user/{user_id}")
 async def gateway_admin_get_user(
     user_id: str = Path(...),
-    user: UserContext = Depends(get_current_user),
+    admin: UserContext = Depends(get_current_admin),
 ):
-    if not user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
-        )
-
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
     return await _proxy_json(
         "GET",
-        AUTH_URI,
+        auth_uri,
         f"/admin/user/{user_id}",
-        headers={"Authorization": f"Bearer {user.token}"},
+        headers={"Authorization": f"Bearer {admin.token}"},
     )
 
 
@@ -394,39 +456,29 @@ async def gateway_admin_get_user(
 async def gateway_admin_update_user(
     user_id: str,
     payload: dict,
-    user: UserContext = Depends(get_current_user),
+    admin: UserContext = Depends(get_current_admin),
 ):
-    if not user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
-        )
-
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
     return await _proxy_json(
         "PATCH",
-        AUTH_URI,
+        auth_uri,
         f"/admin/user/{user_id}",
         json_body=payload,
-        headers={"Authorization": f"Bearer {user.token}"},
+        headers={"Authorization": f"Bearer {admin.token}"},
     )
 
 
 @app.delete("/auth/admin/user/{user_id}")
 async def gateway_admin_delete_user(
     user_id: str,
-    user: UserContext = Depends(get_current_user),
+    admin: UserContext = Depends(get_current_admin),
 ):
-    if not user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
-        )
-
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
     return await _proxy_json(
         "DELETE",
-        AUTH_URI,
+        auth_uri,
         f"/admin/user/{user_id}",
-        headers={"Authorization": f"Bearer {user.token}"},
+        headers={"Authorization": f"Bearer {admin.token}"},
     )
 
 
@@ -438,6 +490,8 @@ async def gateway_checks(
     file: UploadFile = File(...),
     user: UserContext = Depends(get_current_user),
 ):
+    detector_uri = _require_setting("DETECTOR_URI", DETECTOR_URI)
+
     if file.content_type not in ("image/jpeg", "image/png", "application/octet-stream"):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -452,7 +506,7 @@ async def gateway_checks(
         )
 
     x_request_id = str(uuid.uuid4())
-    url = DETECTOR_URI.rstrip("/") + "/v1.0.1/checks"
+    url = detector_uri.rstrip("/") + "/v1.0.1/checks"
     headers = {
         "X-Request-Id": x_request_id,
         "X-User-Id": user.user_id,
@@ -460,7 +514,7 @@ async def gateway_checks(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(url, content=data, headers=headers)
     except httpx.RequestError as exc:
         raise HTTPException(
@@ -501,8 +555,8 @@ async def gateway_checks(
     detection_token = _create_detection_token(
         user=user,
         image_bytes=data,
-        verdict=verdict,
-        label=label,
+        verdict=str(verdict),
+        label=str(label),
         confidence=float(confidence),
     )
 
