@@ -3,7 +3,7 @@ kind: Kustomization
 resources:
   - k8s-dev/dev-secrets.yaml
   - k8s/mongo-depl.yaml
-  - k8s/redis-depl.yaml
+  #- k8s/redis-depl.yaml
   - k8s/s3-depl.yaml
   - k8s/auth-depl.yaml
   - k8s/gateway-depl.yaml
