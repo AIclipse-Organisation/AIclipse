@@ -82,4 +82,37 @@ public class BlobStorageService
             throw;
         }
     }
+    
+    public async Task DownloadFileAsync(string s3Key, string destinationPath, string? bucketName = null)
+    {
+        string targetBucket = bucketName ?? _bucketName;
+
+        try 
+        {
+            var directory = Path.GetDirectoryName(destinationPath);
+            if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+
+            var args = new GetObjectArgs()
+                .WithBucket(targetBucket)
+                .WithObject(s3Key)
+                .WithCallbackStream((stream) =>
+                {
+                    using (var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write))
+                    {
+                        stream.CopyTo(fileStream);
+                    }
+                });
+
+            await _minioClient.GetObjectAsync(args);
+            
+            _logger.LogInformation("[MinIO] Successfully downloaded '{Key}' from bucket '{Bucket}'", s3Key, targetBucket);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "[MinIO] Failed to download '{Key}' from bucket '{Bucket}'", s3Key, targetBucket);
+            
+            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+            throw;
+        }
+    }
 }

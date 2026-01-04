@@ -33,6 +33,7 @@ public class ImageConfidenceController : ControllerBase
 
             return Ok(new 
             {
+                Label = result.TrainingLabel,
                 IsReady = result.IsReadyForTraining,
                 CurrentProbability = result.Probability,
                 Action = result.IsReadyForTraining ? "Added to Training Set" : "Waiting for more votes"

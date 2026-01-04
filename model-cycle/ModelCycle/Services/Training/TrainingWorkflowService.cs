@@ -46,7 +46,7 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         
         image.CurrentProbability = result.Probability;
         
-        await SyncFileSystemStateAsync(image, result, previousState, downloadUrl);
+        await SyncFileSystemStateAsync(image, result, previousState);
         
         await _db.SaveChangesAsync();
         
@@ -94,8 +94,7 @@ public class TrainingWorkflowService : ITrainingWorkflowService
     private async Task SyncFileSystemStateAsync(
         TrainingImage image, 
         ConfidenceResult result, 
-        PreviousImageState previousState, 
-        string? downloadUrl)
+        PreviousImageState previousState) 
     {
         bool isNowReady = result.IsReadyForTraining;
         bool wasReady = previousState.Status == TrainingStatus.Ready;
@@ -105,22 +104,15 @@ public class TrainingWorkflowService : ITrainingWorkflowService
             image.Status = TrainingStatus.Ready;
             image.Label = result.TrainingLabel;
             
-            string? url = downloadUrl;
-            if (string.IsNullOrEmpty(url))
-            {
-                var meta = await _mediaService.GetImageMetadataAsync(image.MediaImageId);
-                url = meta?.Url;
-            }
-
-            if (!string.IsNullOrEmpty(url))
+            if (!string.IsNullOrEmpty(image.S3Key))
             {
                 try
                 {
-                    await _datasetService.SaveImageAsync(image.MediaImageId, url);
+                    await _datasetService.SaveImageAsync(image.MediaImageId, image.S3Key);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to download image {MediaId} to training set", image.MediaImageId);
+                    _logger.LogError(ex, "Failed to download image {MediaId}", image.MediaImageId);
                     image.Status = TrainingStatus.Pending;
                     throw; 
                 }
@@ -130,7 +122,6 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         {
             if (wasReady)
             {
-                _logger.LogInformation("Demoting image {MediaId} (Confidence dropped)", image.MediaImageId);
                 await _datasetService.DeleteImageAsync(image.MediaImageId);
                 image.Status = TrainingStatus.Pending;
             }

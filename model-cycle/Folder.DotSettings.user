@@ -5,11 +5,9 @@
     &lt;TestId&gt;xUnit::11ECFD39-D994-1242-B871-A28B2AA04A73::net8.0::Tests.ImageConfidence.ConfidenceServiceTests.HighCertainty_AboveThreshold_IsReadyForTraining&lt;/TestId&gt;&#xD;
   &lt;/TestAncestor&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=c6e5c091_002D79e9_002D401b_002D8ed4_002D688457672ccd/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="HighCertainty_AboveThreshold_IsReadyForTraining #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=c6e5c091_002D79e9_002D401b_002D8ed4_002D688457672ccd/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="HighCertainty_AboveThreshold_IsReadyForTraining #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;Project Location="C:\Users\seanm\Desktop\AIclipse\model-cycle\Tests" Presentation="&amp;lt;Tests&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=d31bce19_002Dee2f_002D4709_002Da9ba_002De094ca86ac08/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="HighCertainty_AboveThreshold_IsReadyForTraining" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
-  &lt;TestAncestor&gt;&#xD;
-    &lt;TestId&gt;xUnit::11ECFD39-D994-1242-B871-A28B2AA04A73::net8.0::Tests.ImageConfidence.ConfidenceServiceTests.HighCertainty_AboveThreshold_IsReadyForTraining&lt;/TestId&gt;&#xD;
-  &lt;/TestAncestor&gt;&#xD;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=d31bce19_002Dee2f_002D4709_002Da9ba_002De094ca86ac08/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="HighCertainty_AboveThreshold_IsReadyForTraining" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;Project Location="C:\Users\seanm\Desktop\AIclipse\model-cycle\Tests" Presentation="&amp;lt;Tests&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>

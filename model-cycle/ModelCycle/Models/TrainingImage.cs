@@ -27,7 +27,7 @@ public class TrainingImage
 }
 
 public enum TrainingStatus
-{
+{ 
     Pending,       
     Ready,      
     UsedInTraining, 

@@ -42,7 +42,7 @@ builder.Services.AddHttpClient<IMediaService, MediaService>(client =>
     client.BaseAddress = new Uri(mediaServiceUrl);
 });
 
-builder.Services.AddHttpClient<IDatasetService, DatasetService>();
+builder.Services.AddScoped<IDatasetService, DatasetService>();
 
 builder.Services.AddScoped<ITrainingWorkflowService, TrainingWorkflowService>();
 
@@ -68,7 +68,7 @@ using (var scope = app.Services.CreateScope())
         await blobService.InitializeAsync();
         
         var context = services.GetRequiredService<AppDbContext>();
-        context.Database.Migrate();
+        context.Database.EnsureCreated();
         Console.WriteLine("[SQLite] Database migrated successfully.");
     }
     catch (Exception ex)
