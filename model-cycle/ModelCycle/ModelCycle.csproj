@@ -8,8 +8,6 @@
 
   <ItemGroup>
     <Folder Include="Python\" />
-    <Folder Include="Services\Data\" />
-    <Folder Include="Services\Training\" />
   </ItemGroup>
 
   <ItemGroup>

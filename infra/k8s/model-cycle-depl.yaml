@@ -32,6 +32,8 @@ spec:
             - name: model-data
               mountPath: /app/data
           env:
+            - name: TRAINING_DATA_PATH
+              value: "/app/data"
             - name: MediaServiceUrl
               value: "http://media-srv:3000"
             - name: S3_ENDPOINT 

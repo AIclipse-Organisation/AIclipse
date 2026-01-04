@@ -1,9 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ModelCycle.Data;
 using ModelCycle.Domain;
-using ModelCycle.Models;
-using ModelCycle.Services.ImageConfidence;
+using ModelCycle.Services.Training;
 
 namespace ModelCycle.Controllers;
 
@@ -11,65 +8,40 @@ namespace ModelCycle.Controllers;
 [Route("api/[controller]")]
 public class ImageConfidenceController : ControllerBase
 {
-    private readonly IConfidenceService _confidenceService;
-    private readonly AppDbContext _db;
-
-    public ImageConfidenceController(IConfidenceService confidenceService, AppDbContext db)
+    private readonly ITrainingWorkflowService _workflow;
+    private readonly ILogger<ImageConfidenceController> _logger; 
+    
+    public ImageConfidenceController(
+        ITrainingWorkflowService workflow, 
+        ILogger<ImageConfidenceController> logger)
     {
-        _confidenceService = confidenceService;
-        _db = db;
+        _workflow = workflow;
+        _logger = logger;
     }
 
     [HttpPost("evaluate")]
     public async Task<IActionResult> Evaluate([FromBody] EvaluateImageRequest request)
     {
-        var image = await _db.TrainingImages.FirstOrDefaultAsync(i => i.PostId == request.PostId);
-
-        if (image == null)
+        _logger.LogInformation("Received vote for Post {PostId} | ID: {MediaId}", request.PostId, request.MediaImageId);
+        try 
         {
-            image = new TrainingImage
+            var result = await _workflow.ProcessVoteAsync(request);
+            if (result.IsReadyForTraining)
             {
-                Id = Guid.NewGuid(),
-                PostId = request.PostId,
-                MediaImageId = request.MediaImageId, 
-                S3Key = request.S3Key,
-                Label = request.Label, 
-                UploadedAt = DateTime.UtcNow,
-                Status = TrainingStatus.Pending
-            };
-            _db.TrainingImages.Add(image);
-        }
-        
-        // is possible this module will obtain the vote data by requests later. 
-        image.UserAiVotes = request.UserAiVotes;
-        image.UserRealVotes = request.UserNotAiVotes;
-        image.ModelConfidenceScore = request.ModelConfidence; 
-        
-        var voteData = new VoteData
-        {
-            PostId = request.PostId,
-            UserAiVotes = request.UserAiVotes,
-            UserNotAiVotes = request.UserNotAiVotes,
-            ModelConfidence = request.ModelConfidence 
-        };
-        
-        var result = _confidenceService.Evaluate(voteData);
-        
-        image.CurrentProbability = result.Probability;
+                _logger.LogInformation(">>> Image {MediaId} adding to training set.", request.MediaImageId);
+            }
 
-        if (result.IsReadyForTraining)
-        {
-            image.Status = TrainingStatus.Ready;
-            image.Label = result.TrainingLabel; 
+            return Ok(new 
+            {
+                IsReady = result.IsReadyForTraining,
+                CurrentProbability = result.Probability,
+                Action = result.IsReadyForTraining ? "Added to Training Set" : "Waiting for more votes"
+            });
         }
-        
-        await _db.SaveChangesAsync();
-
-        return Ok(new 
+        catch (Exception ex)
         {
-            IsReady = result.IsReadyForTraining,
-            CurrentProbability = result.Probability,
-            Action = result.IsReadyForTraining ? "Promoted to Training Set" : "Waiting for more votes"
-        });
+            _logger.LogError(ex, "Failed to process vote for {MediaId}", request.MediaImageId);
+            return BadRequest(ex.Message);
+        }
     }
 }
