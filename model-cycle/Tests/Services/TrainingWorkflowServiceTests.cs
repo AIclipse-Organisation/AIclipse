@@ -6,11 +6,11 @@ using ModelCycle.Data;
 using ModelCycle.Domain;
 using ModelCycle.DTOs;
 using ModelCycle.Models;
+using ModelCycle.Services;
 using ModelCycle.Services.Data;
 using ModelCycle.Services.External;
 using ModelCycle.Services.ImageConfidence;
 using ModelCycle.Services.Training;
-using ModelCycle.Services;
 using Moq;
 using Xunit;
 
@@ -27,7 +27,7 @@ public class TrainingWorkflowServiceTests
 
     public TrainingWorkflowServiceTests()
     {
-        // 1. moq in memory database instead of actual sqlite
+        // 1. Mock in-memory database
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()) 
             .Options;
@@ -61,6 +61,7 @@ public class TrainingWorkflowServiceTests
                 ImageId = "img_new", 
                 Url = "http://fake/url.jpg",
                 S3Key = "images/img_new.jpg", 
+                UserId = "user_123" // Required by EF entity
             });
 
         // Mock Confidence to return ready
@@ -75,8 +76,7 @@ public class TrainingWorkflowServiceTests
         Assert.NotNull(imageInDb);
         Assert.Equal(TrainingStatus.Ready, imageInDb.Status);
         
-        // Verify we tried to save the image
-        _mockDataset.Verify(d => d.SaveImageAsync("img_new", "http://fake/url.jpg"), Times.Once);
+        _mockDataset.Verify(d => d.SaveImageAsync("img_new", "images/img_new.jpg"), Times.Once);
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class TrainingWorkflowServiceTests
 
         var request = new EvaluateImageRequest { MediaImageId = "img_existing" };
 
-        // Mock Confidence to return NOT READY 
+        // Mock Confidence to return NOT READY
         _mockConfidence.Setup(c => c.Evaluate(It.IsAny<VoteData>()))
             .Returns(new ConfidenceResult { IsReadyForTraining = false, TrainingLabel = "ai" });
 
@@ -107,11 +107,13 @@ public class TrainingWorkflowServiceTests
         // Assert
         var updatedImage = await _db.TrainingImages.FirstAsync();
         Assert.Equal(TrainingStatus.Pending, updatedImage.Status);
+        
+        // Verify delete is called
         _mockDataset.Verify(d => d.DeleteImageAsync("img_existing"), Times.Once);
     }
 
     [Fact]
-    public async Task ProcessVoteAsync_ExistingReadyImage_RemainsReady_DoesNotReDownload()
+    public async Task ProcessVoteAsync_ExistingReadyImage_RemainsReady_DownloadsWithStoredKey()
     {
         // Arrange
         var existing = new TrainingImage 
@@ -129,14 +131,13 @@ public class TrainingWorkflowServiceTests
         _mockConfidence.Setup(c => c.Evaluate(It.IsAny<VoteData>()))
             .Returns(new ConfidenceResult { IsReadyForTraining = true, TrainingLabel = "ai" });
         
-        _mockMedia.Setup(m => m.GetImageMetadataAsync("img_stable"))
-            .ReturnsAsync(new MediaImageResponse { ImageId = "img_stable", Url = "http://fake/url.jpg" });
-
         // Act
         await _service.ProcessVoteAsync(new EvaluateImageRequest { MediaImageId = "img_stable" });
 
         // Assert
         Assert.Equal(TrainingStatus.Ready, existing.Status);
-        _mockDataset.Verify(d => d.SaveImageAsync("img_stable", "http://fake/url.jpg"), Times.Once);
+        
+        // [UPDATED] Since logic is idempotent, it calls SaveImageAsync using the DB's stored S3Key
+        _mockDataset.Verify(d => d.SaveImageAsync("img_stable", "test_images/img_stable.jpg"), Times.Once);
     }
 }
