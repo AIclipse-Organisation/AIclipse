@@ -15,6 +15,8 @@ from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.functional_serializers import PlainSerializer
 
+from fastapi import Request
+
 # ---- env ----
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB = os.getenv("MONGO_DB")
@@ -244,3 +246,9 @@ def get_image(image_id: str, user_id: str | None = None):
         return attach_url(doc)
 
     raise HTTPException(status_code=404, detail="Not found")
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    return response
