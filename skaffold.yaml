@@ -75,7 +75,7 @@ build:
     #         dest: .
     - image: aiclipse/community
       context: community
-      docker: { dockerfile: Dockerfile }
+      docker: { dockerfile: Dockerfile.dev }
       sync:
         manual:
           - src: "**/*.{js,jsx,ts,tsx,json,css,scss,html}"

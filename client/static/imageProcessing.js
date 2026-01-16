@@ -68,50 +68,50 @@ window.addEventListener("DOMContentLoaded", () => {
   const aiFill = document.querySelector(".ai-fill");
 
   // PUBLIC IMAGES UI
-  const publicImagesEl = document.getElementById("public-images");
+  // const publicImagesEl = document.getElementById("public-images");
 
   // state
   window.lastFile = null;
   let lastDetectionToken = null;
 
   // fetching the images (public feed)
-  async function loadPublicImages() {
-    if (!publicImagesEl) return;
+  // async function loadPublicImages() {
+  //   if (!publicImagesEl) return;
 
-    try {
-      const res = await fetch("/images?is_public=true");
-      let data = null;
-      try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
+  //   try {
+  //     const res = await fetch("/images?is_public=true");
+  //     let data = null;
+  //     try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
 
-      if (!res.ok || !data.items) {
-        publicImagesEl.textContent = "Failed to load public images.";
-        return;
-      }
+  //     if (!res.ok || !data.items) {
+  //       publicImagesEl.textContent = "Failed to load public images.";
+  //       return;
+  //     }
 
-      if (data.items.length === 0) {
-        publicImagesEl.textContent = "No public images yet.";
-        return;
-      }
+  //     if (data.items.length === 0) {
+  //       publicImagesEl.textContent = "No public images yet.";
+  //       return;
+  //     }
 
-      publicImagesEl.innerHTML = "";
+  //     publicImagesEl.innerHTML = "";
 
-      for (const img of data.items) {
-        const imageUrl = img.url;
+  //     for (const img of data.items) {
+  //       const imageUrl = img.url;
 
-        if (!imageUrl) continue;
+  //       if (!imageUrl) continue;
 
-        const el = document.createElement("img");
-        el.src = imageUrl;
-        el.alt = img.label || "Public image";
-        el.title = `${img.label || "Image"} (${((img.confidence ?? 0) * 100).toFixed(1)}%)`;
+  //       const el = document.createElement("img");
+  //       el.src = imageUrl;
+  //       el.alt = img.label || "Public image";
+  //       el.title = `${img.label || "Image"} (${((img.confidence ?? 0) * 100).toFixed(1)}%)`;
 
-        publicImagesEl.appendChild(el);
-      }
-    } catch (err) {
-      console.error(err);
-      publicImagesEl.textContent = "Error loading public images.";
-    }
-  }
+  //       publicImagesEl.appendChild(el);
+  //     }
+  //   } catch (err) {
+  //     console.error(err);
+  //     publicImagesEl.textContent = "Error loading public images.";
+  //   }
+  // }
 
   // file chosen -> enable check button
   if (fileInput) {
@@ -252,7 +252,7 @@ window.addEventListener("DOMContentLoaded", () => {
           if (saveResult) saveResult.textContent = "";
 
           
-          loadPublicImages();
+          // loadPublicImages();
         } else {
           setStatus(saveStatus, "error", data.detail || `Save failed (${res.status})`);
         }
@@ -318,7 +318,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   // load public images on page load
-  loadPublicImages();
+  // loadPublicImages();
 
   // Initial auth/me to populate header user chip (silent if fails)
   (async () => {
@@ -335,3 +335,9 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   })();
 });
+
+
+
+function goToCommunity() {
+  window.location.href = "/community";
+}
