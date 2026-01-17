@@ -50,6 +50,10 @@ def notification():
 def plan():
     return send_from_directory("templates", "plan.html")
 
+@app.get("/profile")
+def profile():
+    return send_from_directory("templates", "profile.html")
+
 
 
 def _get_token_from_cookie() -> str | None:
