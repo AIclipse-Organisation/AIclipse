@@ -83,6 +83,17 @@
             Publish to community (public)
           </label>
 
+          <div id="public-desc-wrap" hidden style="margin-top: 10px;">
+            <label for="post-description">Description</label>
+            <textarea
+              id="post-description"
+              rows="3"
+              placeholder="Write a short description for the community post..."
+              style="width: 100%; resize: vertical;"
+            ></textarea>
+            <small id="post-description-hint" class="muted"></small>
+          </div>
+
           <div class="row">
             <button id="btn-save" disabled>Save image</button>
             <span id="save-state" class="muted">Run detection first to enable saving.</span>

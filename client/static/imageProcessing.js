@@ -35,6 +35,8 @@ async function jsonFetch(method, url, body) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
+  opts.credentials = "include";
+
   const res = await fetch(url, opts);
   let data = null;
   try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
@@ -42,7 +44,6 @@ async function jsonFetch(method, url, body) {
   return { res, data };
 }
 
-// --- DOM wiring for imgProcessing.html ---
 window.addEventListener("DOMContentLoaded", () => {
   const fileInput = document.getElementById("file-input");
   const btnCheck = document.getElementById("btn-check");
@@ -60,6 +61,11 @@ window.addEventListener("DOMContentLoaded", () => {
   const saveStatus = document.getElementById("save-status");
   const saveResult = document.getElementById("save-result");
 
+  // Description UI
+  const publicDescWrap = document.getElementById("public-desc-wrap");
+  const postDescriptionInput = document.getElementById("post-description");
+  const postDescriptionHint = document.getElementById("post-description-hint");
+
   // elements inside detect card
   const detectCard = document.getElementById("detect-card");
   const verdictEl = document.getElementById("detect-verdict");
@@ -74,44 +80,18 @@ window.addEventListener("DOMContentLoaded", () => {
   window.lastFile = null;
   let lastDetectionToken = null;
 
-  // fetching the images (public feed)
-  // async function loadPublicImages() {
-  //   if (!publicImagesEl) return;
+  
 
-  //   try {
-  //     const res = await fetch("/images?is_public=true");
-  //     let data = null;
-  //     try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
+  // store current user id 
+  window.currentUserId = null;
 
-  //     if (!res.ok || !data.items) {
-  //       publicImagesEl.textContent = "Failed to load public images.";
-  //       return;
-  //     }
-
-  //     if (data.items.length === 0) {
-  //       publicImagesEl.textContent = "No public images yet.";
-  //       return;
-  //     }
-
-  //     publicImagesEl.innerHTML = "";
-
-  //     for (const img of data.items) {
-  //       const imageUrl = img.url;
-
-  //       if (!imageUrl) continue;
-
-  //       const el = document.createElement("img");
-  //       el.src = imageUrl;
-  //       el.alt = img.label || "Public image";
-  //       el.title = `${img.label || "Image"} (${((img.confidence ?? 0) * 100).toFixed(1)}%)`;
-
-  //       publicImagesEl.appendChild(el);
-  //     }
-  //   } catch (err) {
-  //     console.error(err);
-  //     publicImagesEl.textContent = "Error loading public images.";
-  //   }
-  // }
+  function syncPublishUI() {
+    const isPublic = !!(savePublic && savePublic.checked);
+    if (publicDescWrap) publicDescWrap.hidden = !isPublic;
+    if (postDescriptionHint) postDescriptionHint.textContent = isPublic ? "Required when publishing." : "";
+  }
+  if (savePublic) savePublic.addEventListener("change", syncPublishUI);
+  syncPublishUI();
 
   // file chosen -> enable check button
   if (fileInput) {
@@ -178,7 +158,7 @@ window.addEventListener("DOMContentLoaded", () => {
       formData.append("file", window.lastFile);
 
       try {
-        const res = await fetch("/checks", { method: "POST", body: formData });
+        const res = await fetch("/checks", { method: "POST", body: formData, credentials: "include" });
         let data = null;
         try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
         setDebug({ url: "/checks", status: res.status, body: data });
@@ -231,31 +211,109 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      const isPublic = !!(savePublic && savePublic.checked);
+      const description = (postDescriptionInput && postDescriptionInput.value ? postDescriptionInput.value : "").trim();
+
+      if (isPublic && !description) {
+        setStatus(saveStatus, "error", "Description is required when publishing.");
+        return;
+      }
+
       btnSave.disabled = true;
       setStatus(saveStatus, "info", "Saving image...");
 
       const formData = new FormData();
       formData.append("file", window.lastFile);
       formData.append("detection_token", lastDetectionToken);
-
-      const isPublic = !!(savePublic && savePublic.checked);
       formData.append("is_public", isPublic ? "true" : "false");
 
       try {
-        const res = await fetch("/upload/image", { method: "POST", body: formData });
+        const res = await fetch("/upload/image", { method: "POST", body: formData, credentials: "include" });
         let data = null;
         try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
         setDebug({ url: "/upload/image", status: res.status, body: data });
 
-        if (res.ok) {
-          setStatus(saveStatus, "success", "Saved.");
-          if (saveResult) saveResult.textContent = "";
-
-          
-          // loadPublicImages();
-        } else {
+        if (!res.ok) {
           setStatus(saveStatus, "error", data.detail || `Save failed (${res.status})`);
+          return;
         }
+
+        if (!window.currentUserId) {
+          setStatus(saveStatus, "error", "You must be signed in to publish.");
+          return;
+        }
+
+        setStatus(saveStatus, "success", "Saved image.");
+
+       
+          if (isPublic) {
+            setStatus(saveStatus, "info", "Creating community post...");
+
+            const uploadPayload = (data && typeof data === "object" && data.body && typeof data.body === "object")
+              ? data.body
+              : data;
+
+            
+            const resolvedImageId =
+              (uploadPayload && uploadPayload.image_id) ||
+              (uploadPayload && uploadPayload.image && uploadPayload.image.image_id) ||
+              (data && data.image && data.image.image_id) || null;
+
+            if (!resolvedImageId) {
+              console.error("Upload response missing image_id. Raw response:", data);
+              setStatus(saveStatus, "error", "Saved image, but could not read image_id from server response.");
+              return;
+            }
+
+            const resolvedVerdict =
+              (uploadPayload && uploadPayload.verdict) ||
+              (uploadPayload && uploadPayload.result && uploadPayload.result.verdict) ||
+              (data && data.verdict) ||
+              null;
+
+            const resolvedLabel =
+              (uploadPayload && uploadPayload.label) ||
+              (uploadPayload && uploadPayload.result && uploadPayload.result.label) ||
+              (data && data.label) ||
+              null;
+
+            const resolvedConfidence =
+              (uploadPayload && uploadPayload.confidence) ||
+              (uploadPayload && uploadPayload.result && uploadPayload.result.confidence) ||
+              (data && data.confidence) ||
+              null;
+
+            const postBody = {
+              user_id: window.currentUserId,
+              image_id: resolvedImageId,
+              description,
+              result: {
+                verdict: resolvedVerdict,
+                label: resolvedLabel,
+                confidence: resolvedConfidence,
+              },
+            };
+
+
+          const postRes = await fetch("/community/posts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(postBody),
+          });
+
+          let postJson = null;
+          try { postJson = await postRes.json(); } catch { postJson = { detail: "Non-JSON response" }; }
+          setDebug({ url: "/community/posts", status: postRes.status, body: postJson });
+
+          if (postRes.ok) {
+            setStatus(saveStatus, "success", "Saved image + published post.");
+          } else {
+            setStatus(saveStatus, "error", postJson.error || postJson.detail || `Post failed (${postRes.status})`);
+          }
+        }
+
+        if (saveResult) saveResult.textContent = "";
       } catch (err) {
         console.error(err);
         setStatus(saveStatus, "error", "Network error during save.");
@@ -326,9 +384,11 @@ window.addEventListener("DOMContentLoaded", () => {
       const { res, data } = await jsonFetch("GET", "/auth/me", null);
       if (res.ok) {
         setCurrentUserChip(data);
+        window.currentUserId = data.user_id || null;
         setStatus(document.getElementById("detect-status"), "info", "Session restored from cookie.");
       } else {
         setCurrentUserChip(null);
+        window.currentUserId = null;
       }
     } catch {
       // ignore
