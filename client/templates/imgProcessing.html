@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>AICLIPSE</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
   </head>
   <body>
     <header>
@@ -13,8 +13,11 @@
 
     </header>
 
-    <main>
-      <div class="grid">
+  <body class="app">
+    <div class="app-container">
+      <div data-include="/static/partials/topbar.html"></div>
+      <main class="screen">
+        <div class="grid">
         <section class="card">
          <button onclick="goToCommunity()">Community</button>
 
@@ -121,10 +124,14 @@
         </div>
       </section> -->
 
-    </main>
+      </main>
 
-    
+      <div data-include="/static/partials/navbar.html"></div>
+    </div>
 
-    <script src="../static/imageProcessing.js"></script>
+    <script src="/static/js/include.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="../static/js/imageProcessing.js"></script>
+    <script src="/static/js/main.js"></script>
   </body>
 </html>

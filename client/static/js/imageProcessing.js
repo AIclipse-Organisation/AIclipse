@@ -18,16 +18,6 @@ function setDebug(data) {
   pre.textContent = JSON.stringify(data, null, 2);
 }
 
-function setCurrentUserChip(user) {
-  const chip = document.getElementById("current-user-chip");
-  if (!chip) return;
-  if (!user) {
-    chip.textContent = "Not signed in";
-    chip.classList.remove("success");
-    return;
-  }
-  chip.textContent = `${user.user_name || user.email || "User"} · plan ${user.plan ?? "?"}`;
-}
 
 async function jsonFetch(method, url, body) {
   const opts = { method, headers: { Accept: "application/json" } };
