@@ -2,25 +2,66 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>AICLIPSE</title>
+    <title>AICLIPSE2</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <header>
       <h1>AICLIPSE</h1>
       <div id="current-user-chip" class="badge muted">Not signed in</div>
-
     </header>
 
-  <body class="app">
-    <div class="app-container">
-      <div data-include="/static/partials/topbar.html"></div>
-      <main class="screen">
-        <div class="grid">
+    <main>
+      <div class="grid">
+        <!-- Signup / Login -->
         <section class="card">
-         <button onclick="goToCommunity()">Community</button>
+          <h2>Create an Account</h2> 
+          <div>
+            <label for="signup-username">Username</label>
+            <input id="signup-username" type="text" autocomplete="username" />
 
+            <label for="signup-email">Email</label>
+            <input id="signup-email" type="email" autocomplete="email" />
+
+            <label for="signup-password">Password</label>
+            <input
+              id="signup-password"
+              type="password"
+              autocomplete="new-password"
+            />
+
+            <button id="btn-signup">Sign up</button>
+          </div>
+
+          <hr class="divider" />
+          <h2>Already have an account?</h2>
+
+          <hr class="divider" />
+
+          <h2>Log in</h2>
+
+          <div>
+            <label for="login-email">Email</label>
+            <input id="login-email" type="email" autocomplete="email" />
+
+            <label for="login-password">Password</label>
+            <input
+              id="login-password"
+              type="password"
+              autocomplete="current-password"
+            />
+
+            <button id="btn-login">Log in</button>
+            <button id="btn-logout" class="secondary">Log out</button>
+            <button id="btn-me" class="secondary">Refresh profile</button>
+          </div>
+
+          <div id="account-status" class="status-bar"></div>
+        </section>
+
+        <!-- Detection -->
+        <section class="card" style="display: none">
           <h2>Detect</h2>
 
           <label for="file-input">Image file (JPEG/PNG)</label>
@@ -44,20 +85,6 @@
             hidden
           >
             <div class="detection-row">
-              
-              <img
-                id="preview-image"
-                alt="Selected image preview"
-                style="
-                  width: 120px;
-                  height: 120px;
-                  object-fit: cover;
-                  border-radius: 12px;
-                  flex: 0 0 auto;
-                "
-                hidden
-              />
-
               <div class="detection-main">
                 <p id="detect-verdict" class="verdict-text label-neutral">—</p>
 
@@ -75,29 +102,6 @@
                     >Confidence: —</small
                   >
                 </div>
-
-                
-          <hr class="divider" />
-
-          <h3 class="subheading">Save</h3>
-
-          <label class="row" style="gap: 10px; align-items: center;">
-            <input id="save-public" type="checkbox" />
-            Publish to community (public)
-          </label>
-
-          <div class="row">
-            <button id="btn-save" disabled>Save image</button>
-            <span id="save-state" class="muted">Run detection first to enable saving.</span>
-          </div>
-
-          <div id="save-status" class="status-bar"></div>
-          <div id="save-result" class="muted"></div>
-
-
-
-
-
               </div>
             </div>
           </div>
@@ -114,24 +118,8 @@
         <p class="muted">Debug view. Last JSON response from the server:</p>
         <pre id="debug-output">{}</pre>
       </section>
+    </main>
 
-
-
-      <!-- <section class="card">
-        <h2>Community</h2>
-        <div id="public-images" class="image-grid muted">
-          Loading public images…
-        </div>
-      </section> -->
-
-      </main>
-
-      <div data-include="/static/partials/navbar.html"></div>
-    </div>
-
-    <script src="/static/js/include.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script src="../static/js/imageProcessing.js"></script>
-    <script src="/static/js/main.js"></script>
+    <script src="/static/app.js"></script>
   </body>
 </html>

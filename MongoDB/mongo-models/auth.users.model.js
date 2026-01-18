@@ -51,6 +51,16 @@ const userSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    acc_guessing_ai:{
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    acc_guessing_real:{
+      type: Number,
+      min: 0,
+      default: 0,
+    },
 
     // current subscription plan; 0 = free. Real billing logic will come later.
     plan: {

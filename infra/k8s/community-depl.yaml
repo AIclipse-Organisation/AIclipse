@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: community-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: community } }
+  template:
+    metadata: { labels: { app: community } }
+    spec:
+      containers:
+        - name: community
+          image: aiclipse/community
+          env:
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+            - name: MONGO_DB
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+            - name: GATEWAY_URI
+              value: http://gateway-srv:8080
+
+          ports: [{ name: http, containerPort: 3000 }]
+
+          readinessProbe:
+            httpGet: { path: /community/healthz, port: 3000, scheme: HTTP }
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet: { path: /community/healthz, port: 3000, scheme: HTTP }
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            timeoutSeconds: 1
+            failureThreshold: 3
+
+          startupProbe:
+            httpGet: { path: /community/healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 1
+            failureThreshold: 60
+
+          resources:
+            requests: { cpu: "200m", memory: "256Mi" }
+            limits: { cpu: "1000m", memory: "1Gi" }
+            
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: community-srv
+spec:
+  type: ClusterIP
+  selector: { app: community }
+  ports: [{ name: http, port: 3000, targetPort: 3000 }]

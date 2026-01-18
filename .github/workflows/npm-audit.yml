@@ -1,0 +1,28 @@
+name: npm audit
+
+on:
+  pull_request:
+    branches: [ "dev", "main" ]
+    paths:
+      - "community/**"
+  push:
+    branches: [ "dev", "main" ]
+  schedule:
+    - cron: "29 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: community
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npm audit --audit-level=high --omit=dev

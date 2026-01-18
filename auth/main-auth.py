@@ -5,8 +5,9 @@ import jwt
 import bcrypt
 import re
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Depends, Header, Path, Query, status
 from fastapi.responses import JSONResponse
@@ -29,8 +30,6 @@ Responsibilities:
 - Provide basic user and admin APIs (signup, login, me, admin/users)
 """
 
-app = FastAPI()
-
 JWT_KEY = os.getenv("JWT_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB = os.getenv("MONGO_DB")
@@ -39,6 +38,10 @@ KEY_ID = "phase1-key"
 
 mongo_client: AsyncIOMotorClient | None = None
 users_coll = None
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def load_or_generate_rsa(key_str: str):
@@ -92,6 +95,9 @@ class UserPublic(BaseModel):
     age: Optional[int] = None
     total_guesses: Optional[int] = 0
     total_correct: Optional[int] = 0
+    acc_guessing_ai: Optional[int] = 0
+    acc_guessing_real: Optional[int] = 0
+    
 
 
 class SignupRequest(BaseModel):
@@ -131,28 +137,34 @@ class TokenUser(BaseModel):
     plan: int = 0
 
 
-# Startup / shutdown
-
-
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global mongo_client, users_coll
-    mongo_client = AsyncIOMotorClient(MONGO_URI)
-    db = mongo_client[MONGO_DB]
-    users_coll = db["auth.users"]
 
-    # Ensure useful indexes
-    await users_coll.create_index("email", unique=True)
-    await users_coll.create_index("user_id", unique=True)
+    created_here = False
+    if users_coll is None:
+        mongo_client = AsyncIOMotorClient(MONGO_URI)
+        db = mongo_client[MONGO_DB]
+        users_coll = db["auth.users"]
+
+        await users_coll.create_index("email", unique=True)
+        await users_coll.create_index("user_id", unique=True)
+
+        created_here = True
+
+    try:
+        yield
+    finally:
+        if created_here and mongo_client is not None:
+            close = getattr(mongo_client, "close", None)
+            if callable(close):
+                close()
+        if created_here:
+            mongo_client = None
+            users_coll = None
 
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    global mongo_client
-    if mongo_client:
-        mongo_client.close()
-        mongo_client = None
-
+app = FastAPI(lifespan=lifespan)
 
 # Helpers
 
@@ -175,15 +187,17 @@ def build_user_public(doc: dict) -> UserPublic:
         email=doc["email"],
         is_admin=bool(doc.get("is_admin", False)),
         plan=int(doc.get("plan", 0)),
-        created_at=doc.get("created_at", datetime.utcnow()),
+        created_at=doc.get("created_at", _now_utc()),
         age=doc.get("age"),
         total_guesses=doc.get("total_guesses", 0),
         total_correct=doc.get("total_correct", 0),
+        acc_guessing_ai=doc.get("acc_guessing_ai", 0),
+        acc_guessing_real=doc.get("acc_guessing_real", 0),
     )
 
 
 def issue_jwt(user_doc: dict) -> str:
-    now = datetime.utcnow()
+    now = _now_utc()
     payload = {
         "sub": user_doc["user_id"],
         "email": user_doc["email"],
@@ -276,7 +290,7 @@ async def signup(payload: SignupRequest):
             detail="Email already registered",
         )
 
-    now = datetime.utcnow()
+    now = _now_utc()
     user_doc = {
         "user_id": f"u_{uuid4()}",
         "user_name": payload.user_name.strip(),
@@ -288,6 +302,8 @@ async def signup(payload: SignupRequest):
         "age": None,
         "total_guesses": 0,
         "total_correct": 0,
+        "acc_guessing_ai": 0,
+        "acc_guessing_real": 0,
     }
 
     await users_coll.insert_one(user_doc)
@@ -336,7 +352,7 @@ async def update_me(
 ):
     assert users_coll is not None
 
-    raw = body.dict(exclude_unset=True)
+    raw = body.model_dump(exclude_unset=True)
 
     if any(str(k).startswith("$") for k in raw.keys()):
         raise HTTPException(
@@ -436,7 +452,7 @@ async def admin_update_user(
 ):
     assert users_coll is not None
 
-    raw = body.dict(exclude_unset=True)
+    raw = body.model_dump(exclude_unset=True)
     if any(str(k).startswith("$") for k in raw.keys()):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

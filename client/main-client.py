@@ -469,28 +469,28 @@ def get_image(image_id: str):
     return jsonify(data), resp.status_code
 
 
-@app.get("/community/images")
-def get_community_images():
-    """
-    Список публічних зображень (community feed).
-    JWT не потрібен.
-    Проксі на Gateway /community/images.
-    """
-    url = f"{GATEWAY_URI}/community/images"
-    headers = {"Accept": "application/json"}
+# @app.get("/community/images")
+# def get_community_images():
+#     """
+#     Список публічних зображень (community feed).
+#     JWT не потрібен.
+#     Проксі на Gateway /community/images.
+#     """
+#     url = f"{GATEWAY_URI}/community/images"
+#     headers = {"Accept": "application/json"}
 
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-    except requests.RequestException:
-        logging.exception("Gateway /community/images request failed")
-        return jsonify({"detail": "Gateway unreachable"}), 502
+#     try:
+#         resp = requests.get(url, headers=headers, timeout=10)
+#     except requests.RequestException:
+#         logging.exception("Gateway /community/images request failed")
+#         return jsonify({"detail": "Gateway unreachable"}), 502
 
-    try:
-        data = resp.json()
-    except ValueError:
-        return jsonify({"detail": "Invalid JSON from gateway on /community/images"}), 502
+#     try:
+#         data = resp.json()
+#     except ValueError:
+#         return jsonify({"detail": "Invalid JSON from gateway on /community/images"}), 502
 
-    return jsonify(data), resp.status_code
+#     return jsonify(data), resp.status_code
 
 
 class Quiet(WSGIRequestHandler):
