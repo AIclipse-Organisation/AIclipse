@@ -9,3 +9,7 @@ async function loadPartials() {
 }
 
 document.addEventListener("DOMContentLoaded", loadPartials);
+
+function goToCommunity() {
+  window.location.href = "/community";
+}
