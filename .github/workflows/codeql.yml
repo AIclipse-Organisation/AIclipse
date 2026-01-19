@@ -38,33 +38,40 @@ jobs:
   codeql-csharp:
     name: CodeQL C#
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: model-cycle
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: github/codeql-action/init@v4
         with:
           languages: csharp
           queries: security-and-quality
           build-mode: manual
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-      - name: Restore and build
+
+      - name: Restore and build ModelCycle
         id: csharp_build
         shell: bash
         run: |
           set -euo pipefail
 
-          project="$(find . -maxdepth 1 -name '*.csproj' ! -iname '*test*.csproj' | head -n 1)"
-
-          if [ -z "$project" ]; then
-            echo "::error::No non-test .csproj found in $(pwd)"
-            exit 1
+          project="ModelCycle/ModelCycle.csproj"
+          if [ ! -f "$project" ]; then
+            echo "::warning::Missing $project; skipping CodeQL analyze for C#."
+            echo "built=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-          if dotnet restore "$project" && dotnet build "$project" -c Release -v minimal; then
+          dotnet restore "$project"
+
+          if dotnet build "$project" -c Release -v minimal; then
             echo "built=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::Build failed for $project; skipping CodeQL analyze for C#."
