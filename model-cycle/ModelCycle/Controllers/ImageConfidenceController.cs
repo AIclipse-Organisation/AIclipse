@@ -22,13 +22,12 @@ public class ImageConfidenceController : ControllerBase
     [HttpPost("evaluate")]
     public async Task<IActionResult> Evaluate([FromBody] EvaluateImageRequest request)
     {
-        _logger.LogInformation("Received vote for Post {PostId} | ID: {MediaId}", request.PostId, request.MediaImageId);
         try 
         {
             var result = await _workflow.ProcessVoteAsync(request);
             if (result.IsReadyForTraining)
             {
-                _logger.LogInformation(">>> Image {MediaId} adding to training set.", request.MediaImageId);
+                _logger.LogInformation(">>> Image adding to training set.");
             }
 
             return Ok(new 
@@ -41,7 +40,7 @@ public class ImageConfidenceController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to process vote for {MediaId}", request.MediaImageId);
+            _logger.LogError(ex, "Failed to process vote");
             return BadRequest(ex.Message);
         }
     }

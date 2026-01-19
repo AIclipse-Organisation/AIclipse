@@ -63,8 +63,8 @@ public class TrainingWorkflowService : ITrainingWorkflowService
             var mediaMetadata = await _mediaService.GetImageMetadataAsync(request.MediaImageId);
             if (mediaMetadata == null)
             {
-                _logger.LogError("Media ID {MediaId} not found in Media Service", request.MediaImageId);
-                throw new Exception($"Image {request.MediaImageId} not found in Media Module");
+                _logger.LogError("Media ID not found in Media Service");
+                throw new Exception($"Image not found in Media Module");
             }
 
             image = new TrainingImage

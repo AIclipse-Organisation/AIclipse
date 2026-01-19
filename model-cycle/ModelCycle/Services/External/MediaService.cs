@@ -23,7 +23,7 @@ public class MediaService : IMediaService
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                _logger.LogWarning("MediaService returned 404 for Image ID: {MediaId}", mediaImageId);
+                _logger.LogWarning("MediaService returned 404 for Image");
                 return null; 
             }
             response.EnsureSuccessStatusCode();
@@ -33,7 +33,7 @@ public class MediaService : IMediaService
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Network error calling MediaService for ID: {MediaId}", mediaImageId);
+            _logger.LogError(ex, "Network error calling MediaService.");
             throw; 
         }
         catch (JsonException ex)

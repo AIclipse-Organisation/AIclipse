@@ -72,13 +72,13 @@ public class BlobStorageService
 
             await _minioClient.PutObjectAsync(putArgs);
             
-            _logger.LogInformation("[MinIO] Successfully uploaded '{Object}' to bucket '{Bucket}'", objectName, _bucketName);
+            _logger.LogInformation("[MinIO] Successfully uploaded to bucket '{Bucket}'", _bucketName);
             
             return objectName; 
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "[MinIO] Failed to upload '{Object}' to bucket '{Bucket}'", objectName, _bucketName);
+            _logger.LogError(e, "[MinIO] Failed to upload  to bucket '{Bucket}'", _bucketName);
             throw;
         }
     }
