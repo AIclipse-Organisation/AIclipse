@@ -48,7 +48,7 @@ def compute_metrics(preds, labels):
         fake_to_real = int(cm[0][1]) # Fake image called Real
         real_to_fake = int(cm[1][0]) # Real image called Fake
     except:
-        fake_to_real = 0
+    except Exception:
         real_to_fake = 0
 
     return {
