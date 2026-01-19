@@ -2,7 +2,6 @@ import os
 import sys
 import json
 import argparse
-import random
 import numpy as np
 import torch
 import torch.nn as nn
@@ -44,13 +43,15 @@ def compute_metrics(preds, labels):
     rec = recall_score(labels, preds, zero_division=0)
     f1 = f1_score(labels, preds, zero_division=0)
     
+    fake_to_real = 0
+    real_to_fake = 0
     try:
         cm = confusion_matrix(labels, preds, labels=[0, 1]) 
         fake_to_real = int(cm[0][1]) # Fake image called Real
         real_to_fake = int(cm[1][0]) # Real image called Fake
-    except:
-        fake_to_real = 0
-        real_to_fake = 0
+    except Exception:
+        # If confusion_matrix fails, keep default misclassification counts at 0
+        pass
 
     return {
         "accuracy": float(acc),
