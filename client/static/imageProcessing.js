@@ -26,7 +26,7 @@ function setCurrentUserChip(user) {
     chip.classList.remove("success");
     return;
   }
-  chip.textContent = `${user.user_name || user.email || "User"} · plan ${user.plan ?? "?"}`;
+  chip.textContent = `${user.user_name || user.email || "User"} Â· plan ${user.plan ?? "?"}`;
 }
 
 async function jsonFetch(method, url, body) {
@@ -400,4 +400,3 @@ window.addEventListener("DOMContentLoaded", () => {
 
 function goToCommunity() {
   window.location.href = "/community";
-}
