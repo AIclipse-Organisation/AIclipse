@@ -1,3 +1,4 @@
+import base64
 import hashlib
 
 import httpx
@@ -5,6 +6,15 @@ import jwt
 import pytest
 
 from tests.conftest import make_auth_token
+
+
+# Small, valid 1x1 PNGs so the gateway's image sniffing passes.
+PNG_1X1_BLACK = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC"
+)
+PNG_1X1_WHITE = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC"
+)
 
 
 @pytest.mark.asyncio
@@ -17,7 +27,7 @@ async def test_checks_ok_returns_detection_token(client, patch_upstreams, auth_k
         plan=0,
     )
 
-    image_bytes = b"\x89PNG\r\n\x1a\nfakepngdata"
+    image_bytes = PNG_1X1_BLACK
 
     def detector_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers.get("x-user-id") == "u_det"
@@ -62,7 +72,7 @@ async def test_checks_rejects_bad_content_type(client, auth_keypair, register_au
         files={"file": ("x.txt", b"hello", "text/plain")},
     )
     assert r.status_code == 415
-    assert r.json()["detail"] == "Unsupported media type"
+    assert r.json()["detail"] == "Unsupported or invalid image"
 
 
 @pytest.mark.asyncio
@@ -77,7 +87,7 @@ async def test_upload_image_validates_detection_token_and_returns_fallback(
         plan=0,
     )
 
-    image_bytes = b"\x89PNG\r\n\x1a\nfakepngdata2"
+    image_bytes = PNG_1X1_BLACK
 
     def detector_handler(_req: httpx.Request) -> httpx.Response:
         return httpx.Response(status_code=200, json={"verdict": "ok", "label": "clean", "confidence": 0.42})
@@ -117,8 +127,8 @@ async def test_upload_image_rejects_modified_bytes(client, patch_upstreams, auth
         plan=0,
     )
 
-    original_bytes = b"\x89PNG\r\n\x1a\norig"
-    modified_bytes = b"\x89PNG\r\n\x1a\nMODIFIED"
+    original_bytes = PNG_1X1_BLACK
+    modified_bytes = PNG_1X1_WHITE
 
     def detector_handler(_req: httpx.Request) -> httpx.Response:
         return httpx.Response(status_code=200, json={"verdict": "ok", "label": "clean", "confidence": 0.1})
@@ -130,6 +140,7 @@ async def test_upload_image_rejects_modified_bytes(client, patch_upstreams, auth
         headers={"Authorization": f"Bearer {token}"},
         files={"file": ("x.png", original_bytes, "image/png")},
     )
+    assert r1.status_code == 200
     detection_token = r1.json()["detection_token"]
 
     r2 = await client.post(

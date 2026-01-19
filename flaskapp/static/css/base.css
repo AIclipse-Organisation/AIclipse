@@ -1,0 +1,110 @@
+/* GENERAL PRERESET */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* TOP BAR */
+.topbar {
+    height: 56px;
+    background: #ffffff;
+    border-bottom: 1px solid #ddd;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+}
+
+/* Hamburger button */
+.menu-button {
+    border: none;
+    background: transparent;
+    font-size: 24px;      
+    line-height: 1;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.topbar-logo img{
+    width:150px;
+}
+
+.topbar-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    width: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.topbar-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* MOBILE-FRIENDLY BODY */
+body.app {
+    font-family: Arial, sans-serif;
+    background: #f8f8f8;
+}
+
+.app-container {
+    position: relative;
+    min-height: 100vh;
+    background: #f8f8f8;
+
+    margin: 0 auto;
+
+    max-width: 480px;
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+}
+
+
+/* NAVBAR (BOTTOM MOBILE TAB STYLE) */
+.navbar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+
+    background: #ffffff;
+    border-top: 1px solid #ddd;
+
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+
+    z-index: 1000;
+}
+
+.navbar a {
+    text-decoration: none;
+    color: #444;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.navbar a:hover {
+    color: #111;
+}
+
+/* PAGE CONTENT CONTAINER */
+.screen {
+    padding: 20px;
+}
+
+/* RESPONSIVE BEHAVIOUR */
+@media (min-width: 768px) {
+    body.app {
+        max-width: 480px;
+        margin: auto;
+        border-left: 1px solid #ddd;
+        border-right: 1px solid #ddd;
+    }
+}

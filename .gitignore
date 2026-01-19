@@ -239,4 +239,5 @@ packages/
 *.nupkg
 
 *.sln
+*.user
 model-cycle/Folder.DotSettings.user
