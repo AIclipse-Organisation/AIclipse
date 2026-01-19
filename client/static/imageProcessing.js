@@ -400,3 +400,4 @@ window.addEventListener("DOMContentLoaded", () => {
 
 function goToCommunity() {
   window.location.href = "/community";
+}
