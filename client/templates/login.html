@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AICLIPSE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/login.css" />
+  </head>
+
+  <body class="app">
+    <div class="app-container">
+      <main class="screen">
+        <div class="grid">
+          <!-- Signup / Login -->
+          <section class="card">
+            <h2>Create an Account</h2>
+            <div>
+              <label for="signup-username">Username</label>
+              <input id="signup-username" type="text" autocomplete="username" />
+
+              <label for="signup-email">Email</label>
+              <input id="signup-email" type="email" autocomplete="email" />
+
+              <label for="signup-password">Password</label>
+              <input
+                id="signup-password"
+                type="password"
+                autocomplete="new-password"
+              />
+
+              <button id="btn-signup">Sign up</button>
+            </div>
+
+            <hr class="divider" />
+            <h2>Already have an account?</h2>
+            <hr class="divider" />
+
+            <h2>Log in</h2>
+
+            <div>
+              <label for="login-email">Email</label>
+              <input id="login-email" type="email" autocomplete="email" />
+
+              <label for="login-password">Password</label>
+              <input
+                id="login-password"
+                type="password"
+                autocomplete="current-password"
+              />
+
+              <button id="btn-login">Log in</button>
+            </div>
+
+            <div id="account-status" class="status-bar"></div>
+          </section>
+
+          <!-- Keep?? -->
+          <!-- Detection -->
+          <section class="card" style="display: none">
+            <h2>Detect</h2>
+
+            <label for="file-input">Image file (JPEG/PNG)</label>
+            <input id="file-input" type="file" accept="image/*" />
+
+            <div class="row">
+              <button id="btn-check" disabled>Analyze image</button>
+              <span id="check-state" class="muted"
+                >Select a file to enable detection.</span
+              >
+            </div>
+
+            <div id="detect-status" class="status-bar"></div>
+
+            <h3 class="subheading">Results</h3>
+
+            <div id="detect-card" class="detection-card" aria-live="polite" hidden>
+              <div class="detection-row">
+                <div class="detection-main">
+                  <p id="detect-verdict" class="verdict-text label-neutral">—</p>
+
+                  <div class="progress-bar" aria-hidden="true" title="Real vs AI probability">
+                    <div class="fill real-fill" style="width: 0%"></div>
+                    <div class="fill ai-fill" style="width: 0%"></div>
+                  </div>
+
+                  <div class="detection-meta">
+                    <small id="detect-confidence" class="muted">Confidence: —</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+    </div>
+    <script src="/static/js/include.js"></script>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

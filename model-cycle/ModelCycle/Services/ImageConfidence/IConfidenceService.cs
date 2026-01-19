@@ -4,5 +4,5 @@ namespace ModelCycle.Services.ImageConfidence;
 
 public interface IConfidenceService
 {
-    ConfidenceResult Evaluate(ImageVote vote);
+    ConfidenceResult Evaluate(VoteData voteData);
 }

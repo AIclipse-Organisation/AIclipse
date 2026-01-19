@@ -4,3 +4,4 @@ httpx
 PyJWT
 cryptography
 python-multipart
+pillow

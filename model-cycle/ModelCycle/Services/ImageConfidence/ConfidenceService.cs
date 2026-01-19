@@ -1,4 +1,5 @@
-﻿using ModelCycle.Domain;
+﻿using System;
+using ModelCycle.Domain;
 
 namespace ModelCycle.Services.ImageConfidence;
 
@@ -11,9 +12,9 @@ public class ConfidenceService: IConfidenceService
         _beta = beta;
     }
     
-    public ConfidenceResult Evaluate(ImageVote vote)
+    public ConfidenceResult Evaluate(VoteData voteData)
     {
-        // User averages found in research - (will later be dynamic per user)
+        // User averages found in research - Added in
         double userAccuracyAi  = 0.8; 
         double userAccuracyReal = 0.8; 
         
@@ -21,16 +22,16 @@ public class ConfidenceService: IConfidenceService
         double modelAccuracyAi = 0.8;
         double modelAccuracyReal = 0.8;
         
-        double userAi = userAccuracyAi * vote.UserAiVotes;
-        double userAiNot = (1 - userAccuracyReal)  * vote.UserNotAiVotes;
-        double userReal = userAccuracyReal * vote.UserNotAiVotes;
-        double userRealNot = (1 - userAccuracyAi)  * vote.UserAiVotes;
+        double userAi = userAccuracyAi * voteData.UserAiVotes;
+        double userAiNot = (1 - userAccuracyReal)  * voteData.UserNotAiVotes;
+        double userReal = userAccuracyReal * voteData.UserNotAiVotes;
+        double userRealNot = (1 - userAccuracyAi)  * voteData.UserAiVotes;
 
-        double modelAi = vote.ModelConfidence * modelAccuracyAi;
-        double modelAiNot = (1 - vote.ModelConfidence) * (1 - modelAccuracyReal);
+        double modelAi = voteData.ModelConfidence * modelAccuracyAi;
+        double modelAiNot = (1 - voteData.ModelConfidence) * (1 - modelAccuracyReal);
 
-        double modelReal = (1 - vote.ModelConfidence) * modelAccuracyReal;
-        double modelRealNot = vote.ModelConfidence * (1 - modelAccuracyAi);
+        double modelReal = (1 - voteData.ModelConfidence) * modelAccuracyReal;
+        double modelRealNot = voteData.ModelConfidence * (1 - modelAccuracyAi);
         
         double alpha = 1 + userAi + userAiNot + modelAi + modelAiNot;
         double beta = 1 + userReal + userRealNot + modelReal + modelRealNot;

@@ -1,6 +1,6 @@
 ﻿namespace ModelCycle.Domain;
 
-public class ImageVote
+public class VoteData
 {
     public Guid PostId { get; set; }
     public int UserAiVotes { get; set; }

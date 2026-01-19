@@ -29,6 +29,7 @@ function setCurrentUserChip(user) {
   chip.textContent = `${user.user_name || user.email || "User"} Â· plan ${user.plan ?? "?"}`;
 }
 
+
 async function jsonFetch(method, url, body) {
   const opts = { method, headers: { Accept: "application/json" } };
   if (body != null) {

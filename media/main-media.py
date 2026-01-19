@@ -3,8 +3,10 @@ import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Optional, Annotated
+from contextlib import asynccontextmanager
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from pymongo import MongoClient
@@ -13,18 +15,23 @@ from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.functional_serializers import PlainSerializer
 
-app = FastAPI()
+from fastapi import Request
 
 # ---- env ----
 MONGO_URI = os.getenv("MONGO_URI")
-MONGO_DB =  "aiclipse"
+MONGO_DB = os.getenv("MONGO_DB")
+
 S3_ENDPOINT = os.getenv("S3_ENDPOINT")
 S3_PUBLIC_ENDPOINT = os.getenv("S3_PUBLIC_ENDPOINT")
 
 S3_BUCKET = "images"
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png"}
 MAX_FILE_SIZE = 5 * 1024 * 1024
+
+# Presign TTLs (seconds)
+PRESIGN_PRIVATE_EXPIRES_S = 300
+PRESIGN_PUBLIC_EXPIRES_S = 3600
 
 # ---- mongo ----
 images = None
@@ -36,26 +43,48 @@ except Exception:
     images = None
 
 # ---- s3 / minio ----
-s3 = boto3.client(
+_s3_cfg = Config(signature_version="s3v4", s3={"addressing_style": "path"})
+
+# Internal client for upload and bucket operations
+s3_internal = boto3.client(
     "s3",
     endpoint_url=S3_ENDPOINT,
-    region_name=os.getenv("AWS_REGION", "us-east-1"),
+    region_name="us-east-1",
+    config=_s3_cfg,
 )
+
+# Public client for presigned URLs
+s3_public = boto3.client(
+    "s3",
+    endpoint_url=S3_PUBLIC_ENDPOINT,
+    region_name="us-east-1",
+    config=_s3_cfg,
+)
+
 
 def ensure_bucket():
     try:
-        s3.head_bucket(Bucket=S3_BUCKET)
+        s3_internal.head_bucket(Bucket=S3_BUCKET)
         return
     except Exception:
         pass
     try:
-        s3.create_bucket(Bucket=S3_BUCKET)
+        s3_internal.create_bucket(Bucket=S3_BUCKET)
     except Exception as e:
         logging.warning("bucket ensure failed: %s", e)
 
-@app.on_event("startup")
-def _startup():
-    ensure_bucket()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        ensure_bucket()
+    except Exception as exc:
+        logging.warning("bucket ensure on startup failed: %s", exc)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
 
 class _HealthzFilter(logging.Filter):
     def filter(self, record):
@@ -67,23 +96,36 @@ class _HealthzFilter(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(_HealthzFilter())
 
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
 
+
 # --------------------------------------------------
-# URL helper
+# URL helper (presigned)
 # --------------------------------------------------
-def public_url_for_key(key: str) -> str:
-    base = (S3_PUBLIC_ENDPOINT or "").rstrip("/")
-    return f"{base}/{S3_BUCKET}/{key}"
+def presigned_get_url_for_key(key: str, *, is_public: bool) -> Optional[str]:
+    expires = PRESIGN_PUBLIC_EXPIRES_S if is_public else PRESIGN_PRIVATE_EXPIRES_S
+    try:
+        return s3_public.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={"Bucket": S3_BUCKET, "Key": key},
+            ExpiresIn=expires,
+            HttpMethod="GET",
+        )
+    except Exception:
+        logging.exception("presign failed for key=%s", key)
+        return None
+
 
 def attach_url(doc: dict) -> dict:
     d = dict(doc)
     key = d.get("s3_key")
     if key:
-        d["url"] = public_url_for_key(key)
+        d["url"] = presigned_get_url_for_key(key, is_public=bool(d.get("is_public")))
     return d
+
 
 # --------------------------------------------------
 # BEST PRACTICE: ObjectId-safe response model
@@ -92,6 +134,7 @@ PyObjectId = Annotated[
     ObjectId,
     PlainSerializer(lambda v: str(v), return_type=str),
 ]
+
 
 class ImageOut(BaseModel):
     id: Optional[PyObjectId] = Field(default=None, alias="_id")
@@ -112,6 +155,7 @@ class ImageOut(BaseModel):
         populate_by_name=True,
     )
 
+
 # --------------------------------------------------
 
 @app.post("/upload/image", status_code=201, response_model=ImageOut)
@@ -131,16 +175,12 @@ async def upload_image(
         raise HTTPException(status_code=413, detail="Payload Too Large")
 
     image_id = f"img_{uuid4().hex}"
-    ext = (
-        ".jpg" if file.content_type == "image/jpeg"
-        else ".png" if file.content_type == "image/png"
-        else ".webp"
-    )
-
+    ct = (file.content_type or "").lower()
+    ext = ".jpg" if ct in ("image/jpeg", "image/jpg") else ".png"
     key = f"{image_id}{ext}"
 
     try:
-        s3.put_object(
+        s3_internal.put_object(
             Bucket=S3_BUCKET,
             Key=key,
             Body=data,
@@ -171,6 +211,7 @@ async def upload_image(
 
     return attach_url(doc)
 
+
 @app.get("/images")
 def list_images(user_id: str | None = None, is_public: bool | None = None):
     if images is None:
@@ -191,6 +232,7 @@ def list_images(user_id: str | None = None, is_public: bool | None = None):
     items = [attach_url(it) for it in items]
     return {"items": items}
 
+
 @app.get("/image/{image_id}")
 def get_image(image_id: str, user_id: str | None = None):
     if images is None:
@@ -204,3 +246,9 @@ def get_image(image_id: str, user_id: str | None = None):
         return attach_url(doc)
 
     raise HTTPException(status_code=404, detail="Not found")
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    return response
