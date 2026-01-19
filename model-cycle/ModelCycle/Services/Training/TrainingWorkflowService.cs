@@ -13,18 +13,21 @@ public class TrainingWorkflowService : ITrainingWorkflowService
     private readonly IMediaService _mediaService;
     private readonly IDatasetService _datasetService;
     private readonly ILogger<TrainingWorkflowService> _logger; 
+    private readonly TrainingJobQueue _jobQueue;
 
     public TrainingWorkflowService(
         AppDbContext db,
         IConfidenceService confidenceService,
         IMediaService mediaService,
         IDatasetService datasetService,
+        TrainingJobQueue jobQueue,
         ILogger<TrainingWorkflowService> logger)
     {
         _db = db;
         _confidenceService = confidenceService;
         _mediaService = mediaService;
         _datasetService = datasetService;
+        _jobQueue = jobQueue;
         _logger = logger;
     }
 
@@ -49,6 +52,13 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         await SyncFileSystemStateAsync(image, result, previousState);
         
         await _db.SaveChangesAsync();
+        
+        if (result.IsReadyForTraining)
+        {
+            // call's background worker and returns immediately.
+            await _jobQueue.QueueJobAsync();
+            _logger.LogInformation("Training signal queued.");
+        }
         
         return result;
     }
