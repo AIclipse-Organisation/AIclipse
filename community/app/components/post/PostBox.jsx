@@ -28,6 +28,11 @@ export default function PostBox({ image, currentUserId, currentUserName }) {
     setError("");
     setBusy(true);
 
+    // Store original counts before optimistic update
+    const originalUp = up;
+    const originalDown = down;
+
+    // Optimistic UI update
     if (direction === "up") setUp((v) => v + 1);
     else setDown((v) => v + 1);
 
@@ -42,17 +47,20 @@ export default function PostBox({ image, currentUserId, currentUserName }) {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        if (direction === "up") setUp((v) => Math.max(0, v - 1));
-        else setDown((v) => Math.max(0, v - 1));
+        // Restore original counts on error
+        setUp(originalUp);
+        setDown(originalDown);
         setError(data.error || data.detail || `Vote failed (${res.status})`);
         return;
       }
 
+      // Update with authoritative counts from server
       setUp(Number(data.up_vote_count ?? 0));
       setDown(Number(data.down_vote_count ?? 0));
     } catch {
-      if (direction === "up") setUp((v) => Math.max(0, v - 1));
-      else setDown((v) => Math.max(0, v - 1));
+      // Restore original counts on network error
+      setUp(originalUp);
+      setDown(originalDown);
       setError("Network error while voting.");
     } finally {
       setBusy(false);
@@ -158,7 +166,7 @@ export default function PostBox({ image, currentUserId, currentUserName }) {
 
   useEffect(() => {
     if (showComments) loadComments();
-  }, [showComments]);
+  }, [showComments, postId]);
 
   return (
     <div className="comm_postBox">

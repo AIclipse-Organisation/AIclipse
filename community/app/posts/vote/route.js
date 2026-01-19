@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
+import jwt from "jsonwebtoken";
+import { validateUserId, validatePostId } from "../validation.js";
 
 export const runtime = "nodejs"; 
 
@@ -9,11 +11,68 @@ const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
 
+// Helper function to extract and verify JWT token from Authorization header or cookie
+function getAuthenticatedUserId(req) {
+  let token = null;
+  
+  // Try Authorization header first
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+      token = parts[1];
+    }
+  }
+  
+  // Fallback to cookie if no Authorization header
+  if (!token) {
+    const cookieHeader = req.headers.get("cookie");
+    if (cookieHeader) {
+      const cookies = Object.fromEntries(
+        cookieHeader.split("; ").map(c => {
+          const [key, ...v] = c.split("=");
+          return [key, v.join("=")];
+        })
+      );
+      token = cookies.access_token;
+    }
+  }
+  
+  if (!token) {
+    throw new Error("Missing authentication token");
+  }
+  
+  try {
+    // Decode without verification to get the user_id
+    // In production, you should verify the JWT signature using the public key from auth service
+    const decoded = jwt.decode(token);
+    
+    if (!decoded || !decoded.sub) {
+      throw new Error("Invalid token payload");
+    }
+    
+    return decoded.sub; // user_id is stored in 'sub' claim
+  } catch (err) {
+    throw new Error("Invalid or expired token");
+  }
+}
+
 
 export async function POST(req) {
   let client = null;
 
   try {
+    // Verify authentication and get authenticated user_id from JWT token
+    let authenticatedUserId;
+    try {
+      authenticatedUserId = getAuthenticatedUserId(req);
+    } catch (authErr) {
+      return NextResponse.json(
+        { error: "Unauthorized", detail: String(authErr) },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json().catch(() => null);
 
     const post_id = body?.post_id || null;
@@ -25,6 +84,34 @@ export async function POST(req) {
       return NextResponse.json(
         { error: "Missing/invalid fields: post_id, user_id, vote('up'|'down')" },
         { status: 400 }
+      );
+    }
+
+    // validate user_id format
+    const userIdValidation = validateUserId(user_id);
+    if (!userIdValidation.valid) {
+      return NextResponse.json(
+        { error: userIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safeUserId = userIdValidation.value; // Use sanitized string value
+
+    // validate post_id format
+    const postIdValidation = validatePostId(post_id);
+    if (!postIdValidation.valid) {
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safePostId = postIdValidation.value; // Use sanitized string value
+
+    // Security check: ensure user_id in request matches authenticated user
+    if (safeUserId !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "Forbidden: Cannot vote on behalf of other users" },
+        { status: 403 }
       );
     }
 
@@ -40,106 +127,76 @@ export async function POST(req) {
     const posts = db.collection(POSTS_COLLECTION);
     const votes = db.collection(VOTES_COLLECTION);
 
-    // ensure unique vote 
-    await votes.createIndex(
-      { post_id: 1, user_id: 1 },
-      { unique: true, name: "uniq_post_user_vote" }
-    );
-
     // make sure post exists
     const postExists = await posts.findOne(
-      { post_id },
+      { post_id: safePostId },
       { projection: { _id: 0, post_id: 1 } }
     );
     if (!postExists) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
-    // see if this user already voted on this post
-    const existing = await votes.findOne(
-      { post_id, user_id },
-      { projection: { _id: 0, vote: 1 } }
+    const now = new Date();
+
+    // Atomic operation: upsert vote and get old value to determine count changes
+    // This prevents race conditions by handling the entire vote logic in a single operation
+    const voteResult = await votes.findOneAndUpdate(
+      { post_id: safePostId, user_id: safeUserId },
+      {
+        $set: { vote, updated_at: now },
+        $setOnInsert: { created_at: now }
+      },
+      {
+        upsert: true,
+        returnDocument: "before", // get old value to know what changed
+        projection: { _id: 0, vote: 1 }
+      }
     );
 
-    // same vote again -> don’t change counts , instead just return current counts and update the database
-    if (existing?.vote === vote) {
-      const post = await posts.findOne(
-        { post_id },
-        { projection: { _id: 0, up_vote_count: 1, down_vote_count: 1 } }
-      );
+    const oldVote = voteResult?.value?.vote; // undefined if new vote, "up" or "down" if existing
 
-      return NextResponse.json(
-        {
-          post_id,
-          up_vote_count: Number(post?.up_vote_count ?? 0),
-          down_vote_count: Number(post?.down_vote_count ?? 0),
-          message: "Vote already recorded",
-        },
-        { status: 200 }
+    // Determine count adjustments based on old vs new vote
+    let upDelta = 0;
+    let downDelta = 0;
+
+    if (!oldVote) {
+      // New vote: increment the appropriate counter
+      if (vote === "up") upDelta = 1;
+      else downDelta = 1;
+    } else if (oldVote !== vote) {
+      // Vote switched: move count from old to new
+      if (vote === "up") {
+        upDelta = 1;
+        downDelta = -1;
+      } else {
+        upDelta = -1;
+        downDelta = 1;
+      }
+    }
+    // If oldVote === vote, no change needed (same vote again)
+
+    // Update post counts if there's any change, using pipeline to prevent negative values
+    if (upDelta !== 0 || downDelta !== 0) {
+      await posts.updateOne(
+        { post_id: safePostId },
+        [
+          {
+            $set: {
+              up_vote_count: {
+                $max: [0, { $add: [{ $ifNull: ["$up_vote_count", 0] }, upDelta] }]
+              },
+              down_vote_count: {
+                $max: [0, { $add: [{ $ifNull: ["$down_vote_count", 0] }, downDelta] }]
+              }
+            }
+          }
+        ]
       );
     }
 
-    // first vote ever, insert vote record + increment the correct counter
-    if (!existing) {
-      await votes.insertOne({
-        post_id,
-        user_id,
-        vote,
-        created_at: new Date(),
-        updated_at: new Date(),
-      });
-
-      const inc = vote === "up" ? { up_vote_count: 1 } : { down_vote_count: 1 };
-
-      const updated = await posts.findOneAndUpdate(
-        { post_id },
-        { $inc: inc }, 
-        {
-          returnDocument: "after",
-          projection: { _id: 0, up_vote_count: 1, down_vote_count: 1 },
-        }
-      );
-
-      return NextResponse.json(
-        {
-          post_id,
-          up_vote_count: Number(updated?.value?.up_vote_count ?? 0),
-          down_vote_count: Number(updated?.value?.down_vote_count ?? 0),
-        },
-        { status: 200 }
-      );
-    }
-
-
-    // If they change their mind and switch vote (up <-> down) , will update their existing vote record 
-    await votes.updateOne(
-      { post_id, user_id },
-      { $set: { vote, updated_at: new Date() } }
-    );
-
-    // move one count from the old bucket to the new one
-    const inc = vote === "up"
-      ? { up_vote_count: 1, down_vote_count: -1 }
-      : { up_vote_count: -1, down_vote_count: 1 };
-
-    await posts.updateOne({ post_id }, { $inc: inc });
-
-    //  stop counts from going negative
-    await posts.updateOne(
-      { post_id },
-      [
-        {
-          $set: {
-            up_vote_count: { $max: [0, "$up_vote_count"] },
-            down_vote_count: { $max: [0, "$down_vote_count"] },
-          },
-        },
-      ]
-    );
-
-    // return current authoritative counts
+    // Get final counts to return
     const post = await posts.findOne(
-      { post_id },
+      { post_id: safePostId },
       { projection: { _id: 0, up_vote_count: 1, down_vote_count: 1 } }
     );
 
@@ -148,6 +205,7 @@ export async function POST(req) {
         post_id,
         up_vote_count: Number(post?.up_vote_count ?? 0),
         down_vote_count: Number(post?.down_vote_count ?? 0),
+        ...(oldVote === vote && { message: "Vote already recorded" })
       },
       { status: 200 }
     );

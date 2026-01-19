@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
+import { validatePostId } from "../validation.js";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,16 @@ export async function POST(req) {
       return NextResponse.json({ error: "Missing post_id" }, { status: 400 });
     }
 
+    // validate post_id format
+    const postIdValidation = validatePostId(post_id);
+    if (!postIdValidation.valid) {
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safePostId = postIdValidation.value; // Use sanitized string value
+
     if (!MONGO_URI) {
       throw new Error("MONGO_URI is not set");
     }
@@ -36,7 +47,7 @@ export async function POST(req) {
 
     // mark as reported 
     const result = await postsCol.findOneAndUpdate(
-      { post_id },
+      { post_id: safePostId },
       {
         $set: {
           is_reported: true,
@@ -55,7 +66,7 @@ export async function POST(req) {
 
     return NextResponse.json(
       {
-        post_id,
+        post_id: safePostId,
         is_reported: true,
       },
       { status: 200 }

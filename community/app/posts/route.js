@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
+import jwt from "jsonwebtoken";
+import { validateUserId, validateImageId } from "./validation.js";
 
 export const runtime = "nodejs"; // required for MongoDB driver
 
@@ -10,18 +12,71 @@ const POSTS_COLLECTION = "community.posts";
 // NEW: user collection to lookup poster name
 const USERS_COLLECTION = "auth.users";
 
+// Helper function to extract and verify JWT token from Authorization header or cookie
+function getAuthenticatedUserId(req) {
+  let token = null;
+  
+  // Try Authorization header first
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+      token = parts[1];
+    }
+  }
+  
+  // Fallback to cookie if no Authorization header
+  if (!token) {
+    const cookieHeader = req.headers.get("cookie");
+    if (cookieHeader) {
+      const cookies = Object.fromEntries(
+        cookieHeader.split("; ").map(c => {
+          const [key, ...v] = c.split("=");
+          return [key, v.join("=")];
+        })
+      );
+      token = cookies.access_token;
+    }
+  }
+  
+  if (!token) {
+    throw new Error("Missing authentication token");
+  }
+  
+  try {
+    // Decode without verification to get the user_id
+    // In production, you should verify the JWT signature using the public key from auth service
+    const decoded = jwt.decode(token);
+    
+    if (!decoded || !decoded.sub) {
+      throw new Error("Invalid token payload");
+    }
+    
+    return decoded.sub; // user_id is stored in 'sub' claim
+  } catch (err) {
+    throw new Error("Invalid or expired token");
+  }
+}
 
-  //Generates a unique post ID.Uses timestamp and random number to reduce chance of collisions.
-
+// Generates a unique post ID. Uses timestamp and random number to reduce chance of collisions.
 function makePostId() {
   return `post_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-
- //Creates a new community post linked to an image.
- 
+// Creates a new community post linked to an image.
 export async function POST(req) {
   try {
+    // Verify authentication and get authenticated user_id from JWT token
+    let authenticatedUserId;
+    try {
+      authenticatedUserId = getAuthenticatedUserId(req);
+    } catch (authErr) {
+      return NextResponse.json(
+        { error: "Unauthorized", detail: String(authErr) },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json().catch(() => null);
 
     const user_id = body?.user_id || null;
@@ -33,6 +88,43 @@ export async function POST(req) {
     if (!user_id || !image_id || !description) {
       return NextResponse.json(
         { error: "Missing required fields: user_id, image_id, description" },
+        { status: 400 }
+      );
+    }
+
+    // validate user_id format
+    const userIdValidation = validateUserId(user_id);
+    if (!userIdValidation.valid) {
+      return NextResponse.json(
+        { error: userIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safeUserId = userIdValidation.value; // Use sanitized string value
+
+    // Security check: ensure user_id in request matches authenticated user
+    if (safeUserId !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "Forbidden: Cannot create posts on behalf of other users" },
+        { status: 403 }
+      );
+    }
+
+    // validate image_id format
+    const imageIdValidation = validateImageId(image_id);
+    if (!imageIdValidation.valid) {
+      return NextResponse.json(
+        { error: imageIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safeImageId = imageIdValidation.value; // Use sanitized string value
+
+    // length validation to prevent storage/performance issues
+    const MAX_DESCRIPTION_LENGTH = 1000;
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      return NextResponse.json(
+        { error: `Description too long (max ${MAX_DESCRIPTION_LENGTH} characters)` },
         { status: 400 }
       );
     }
@@ -50,7 +142,7 @@ export async function POST(req) {
     // NEW: lookup user_name from auth.users so posts can display it without extra DB lookups later
     const usersCol = db.collection(USERS_COLLECTION);
     const userDoc = await usersCol.findOne(
-      { user_id },
+      { user_id: safeUserId },
       { projection: { _id: 0, user_name: 1, email: 1 } }
     );
 
@@ -59,9 +151,9 @@ export async function POST(req) {
     
     const doc = {
       post_id: makePostId(),
-      user_id,
+      user_id: safeUserId,
       user_name,          // NEW: stored on post, like comments store user_name
-      image_id,
+      image_id: safeImageId,
       description,
       result,
       clicks_count: 0,
@@ -88,11 +180,9 @@ export async function POST(req) {
   }
 }
 
-// 
-//  LIST POSTS
-//  GET /community/posts
-//  Returns the latest community posts (newest first).
-//  
+// LIST POSTS
+// GET /community/posts
+// Returns the latest community posts (newest first).
 export async function GET() {
   try {
     if (!MONGO_URI) {

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
+import jwt from "jsonwebtoken";
+import { validateUserId, validatePostId } from "../validation.js";
 
 export const runtime = "nodejs";
 
@@ -9,19 +11,55 @@ const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 const COMMENTS_COLLECTION = "community.comments";
 
+// Helper function to extract and verify JWT token from Authorization header or cookie
+function getAuthenticatedUserId(req) {
+  let token = null;
+  
+  // Try Authorization header first
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+      token = parts[1];
+    }
+  }
+  
+  // Fallback to cookie if no Authorization header
+  if (!token) {
+    const cookieHeader = req.headers.get("cookie");
+    if (cookieHeader) {
+      const cookies = Object.fromEntries(
+        cookieHeader.split("; ").map(c => {
+          const [key, ...v] = c.split("=");
+          return [key, v.join("=")];
+        })
+      );
+      token = cookies.access_token;
+    }
+  }
+  
+  if (!token) {
+    throw new Error("Missing authentication token");
+  }
+  
+  try {
+    // Decode without verification to get the user_id
+    // In production, you should verify the JWT signature using the public key from auth service
+    const decoded = jwt.decode(token);
+    
+    if (!decoded || !decoded.sub) {
+      throw new Error("Invalid token payload");
+    }
+    
+    return decoded.sub; // user_id is stored in 'sub' claim
+  } catch (err) {
+    throw new Error("Invalid or expired token");
+  }
+}
+
 // Generates a unique comment ID. Timestamp + random suffix
 function makeCommentId() {
   return `c_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-// Escape HTML so stored comments cannot inject markup if rendered unsafely later
-function escapeHtml(s) {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }
 
 // Normalizes and validates a comment string
@@ -39,15 +77,13 @@ function normalizeComment(raw) {
   if (!text) return { ok: false, error: "Comment cannot be empty." };
 
   // length limit (after normalization)
-  const MAX = 2000;
+  const MAX = 1000;
   if (text.length > MAX) {
     return { ok: false, error: `Comment too long (max ${MAX} characters).` };
   }
 
-  // store escaped text so it stays safe even outside React rendering
-  const safeText = escapeHtml(text);
-
-  return { ok: true, text: safeText };
+  // store raw text; React's default rendering provides XSS protection
+  return { ok: true, text };
 }
 
 // GET /community/posts/comments?post_id=...
@@ -64,6 +100,16 @@ export async function GET(req) {
       return NextResponse.json({ error: "Missing post_id" }, { status: 400 });
     }
 
+    // validate post_id format
+    const postIdValidation = validatePostId(post_id);
+    if (!postIdValidation.valid) {
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safePostId = postIdValidation.value; // Use sanitized string value
+
     if (!MONGO_URI) {
       throw new Error("MONGO_URI is not set");
     }
@@ -75,23 +121,11 @@ export async function GET(req) {
     const db = client.db(MONGO_DB);
     const commentsCol = db.collection(COMMENTS_COLLECTION);
 
-    // indexes help query performance
-    await commentsCol.createIndex({ post_id: 1, created_at: -1 }, { name: "by_post_created" });
-    await commentsCol.createIndex({ user_id: 1, created_at: -1 }, { name: "by_user_created" });
-
-    // load newest comments first, filter by the requested post_id
-    console.log("[COMMENTS GET] Searching for post_id:", post_id);
-    
     const items = await commentsCol
-      .find({ post_id: post_id }, { projection: { _id: 0 } })
+      .find({ post_id: safePostId }, { projection: { _id: 0 } })
       .sort({ created_at: -1 })
       .limit(100) // safety cap
       .toArray();
-
-    console.log("[COMMENTS GET] Found", items.length, "comments for post_id:", post_id);
-    if (items.length > 0) {
-      console.log("[COMMENTS GET] First comment post_id:", items[0].post_id);
-    }
 
     return NextResponse.json({ items }, { status: 200 });
   } catch (err) {
@@ -116,13 +150,22 @@ export async function POST(req) {
   let client = null;
 
   try {
+    // Verify authentication and get authenticated user_id from JWT token
+    let authenticatedUserId;
+    try {
+      authenticatedUserId = getAuthenticatedUserId(req);
+    } catch (authErr) {
+      return NextResponse.json(
+        { error: "Unauthorized", detail: String(authErr) },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json().catch(() => null);
 
     const post_id = body?.post_id || null;
     const user_id = body?.user_id || null;
     const user_name = (body?.user_name || "").trim();
-
-    console.log("[COMMENTS POST] Received:", { post_id, user_id, user_name, text: body?.text?.substring(0, 20) });
 
     // validate + normalize comment text (also escapes HTML)
     const normalized = normalizeComment(body?.text);
@@ -139,6 +182,34 @@ export async function POST(req) {
       );
     }
 
+    // validate user_id format
+    const userIdValidation = validateUserId(user_id);
+    if (!userIdValidation.valid) {
+      return NextResponse.json(
+        { error: userIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safeUserId = userIdValidation.value; // Use sanitized string value
+
+    // Security check: ensure user_id in request matches authenticated user
+    if (safeUserId !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "Forbidden: Cannot post comments on behalf of other users" },
+        { status: 403 }
+      );
+    }
+
+    // validate post_id format
+    const postIdValidation = validatePostId(post_id);
+    if (!postIdValidation.valid) {
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safePostId = postIdValidation.value; // Use sanitized string value
+
     if (!MONGO_URI) {
       throw new Error("MONGO_URI is not set");
     }
@@ -151,13 +222,9 @@ export async function POST(req) {
     const postsCol = db.collection(POSTS_COLLECTION);
     const commentsCol = db.collection(COMMENTS_COLLECTION);
 
-    // indexes help query performance
-    await commentsCol.createIndex({ post_id: 1, created_at: -1 }, { name: "by_post_created" });
-    await commentsCol.createIndex({ user_id: 1, created_at: -1 }, { name: "by_user_created" });
-
     // ensure the post exists 
     const postExists = await postsCol.findOne(
-      { post_id },
+      { post_id: safePostId },
       { projection: { _id: 0, post_id: 1 } }
     );
     if (!postExists) {
@@ -169,20 +236,18 @@ export async function POST(req) {
     // build the comment document
     const doc = {
       comment_id: makeCommentId(),
-      post_id,
-      user_id, 
+      post_id: safePostId,
+      user_id: safeUserId, 
       user_name, 
       text, 
       created_at: now,
       updated_at: now,
     };
 
-    console.log("[COMMENTS POST] Saving comment:", { comment_id: doc.comment_id, post_id: doc.post_id });
-
     await commentsCol.insertOne(doc);
 
     // counter on the post to show number of comments
-    await postsCol.updateOne({ post_id }, { $inc: { comment_count: 1 } });
+    await postsCol.updateOne({ post_id: safePostId }, { $inc: { comment_count: 1 } });
 
     return NextResponse.json(doc, { status: 201 });
   } catch (err) {

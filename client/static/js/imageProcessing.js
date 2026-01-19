@@ -26,7 +26,16 @@ function setCurrentUserChip(user) {
     chip.classList.remove("success");
     return;
   }
-  chip.textContent = `${user.user_name || user.email || "User"} Â· plan ${user.plan ?? "?"}`;
+  chip.textContent = `${user.user_name || user.email || "User"} · plan ${user.plan ?? "?"}`;
+  chip.classList.add("success");
+}
+
+// Helper to get cookie value 
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
 }
 
 
@@ -215,8 +224,20 @@ window.addEventListener("DOMContentLoaded", () => {
       const isPublic = !!(savePublic && savePublic.checked);
       const description = (postDescriptionInput && postDescriptionInput.value ? postDescriptionInput.value : "").trim();
 
+      // Check authentication before attempting to save if publishing
+      if (isPublic && !window.currentUserId) {
+        setStatus(saveStatus, "error", "You must be signed in to publish to community.");
+        return;
+      }
+
       if (isPublic && !description) {
         setStatus(saveStatus, "error", "Description is required when publishing.");
+        return;
+      }
+
+      // Validate description length 
+      if (description.length > 1000) {
+        setStatus(saveStatus, "error", `Description too long (${description.length}/1000 characters).`);
         return;
       }
 
@@ -239,11 +260,6 @@ window.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        if (!window.currentUserId) {
-          setStatus(saveStatus, "error", "You must be signed in to publish.");
-          return;
-        }
-
         setStatus(saveStatus, "success", "Saved image.");
 
        
@@ -253,7 +269,7 @@ window.addEventListener("DOMContentLoaded", () => {
             const uploadPayload = (data && typeof data === "object" && data.body && typeof data.body === "object")
               ? data.body
               : data;
-
+ 
             
             const resolvedImageId =
               (uploadPayload && uploadPayload.image_id) ||
@@ -298,7 +314,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
           const postRes = await fetch("/community/posts", {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            headers: { 
+              "Content-Type": "application/json", 
+              "Accept": "application/json"
+            },
             credentials: "include",
             body: JSON.stringify(postBody),
           });
@@ -391,7 +410,7 @@ window.addEventListener("DOMContentLoaded", () => {
         setCurrentUserChip(null);
         window.currentUserId = null;
       }
-    } catch {
+    } catch (err) {
       // ignore
     }
   })();
