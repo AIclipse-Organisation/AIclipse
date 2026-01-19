@@ -2,7 +2,6 @@ import os
 import sys
 import json
 import argparse
-import random
 import numpy as np
 import torch
 import torch.nn as nn
