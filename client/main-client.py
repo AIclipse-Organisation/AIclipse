@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 import requests
 from flask import (
@@ -580,15 +581,19 @@ def get_community_comments():
     if not post_id:
         return jsonify({"error": "Missing post_id parameter"}), 400
 
+    # Validate post_id to prevent SSRF via path/query manipulation
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", post_id):
+        return jsonify({"error": "Invalid post_id parameter"}), 400
+
     community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
-    url = f"{community_url}/community/posts/comments?post_id={post_id}"
+    url = f"{community_url}/community/posts/comments"
 
     headers = {
         "Accept": "application/json"
     }
 
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=headers, params={"post_id": post_id}, timeout=10)
     except requests.RequestException:
         logging.exception("Community comments request failed")
         return jsonify({"detail": "Community service unreachable"}), 502
