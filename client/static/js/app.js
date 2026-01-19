@@ -36,9 +36,11 @@ function setCurrentUserChip(user) {
     return;
   }
 
-  chip.textContent = `${user.user_name || user.email || "User"} · plan ${
-    user.plan ?? "?"
-  }`;
+  // chip.textContent = `${user.user_name || user.email || "User"} · plan ${
+  //   user.plan ?? "?"
+  // }`;
+
+  chip.textContent = `${user.user_name}`;
 }
 
 // Basic fetch wrapper for JSON endpoints
@@ -203,7 +205,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (res.ok && data.user) {
         setStatus(accountStatus, "success", "Logged in.");
         setCurrentUserChip(data.user);
-        window.location.href = "/imgProcessing";
+        window.location.href = "/home";
 
 
       } else {
@@ -655,3 +657,4 @@ window.addEventListener('beforeunload', () => {
     }
   })();
 });
+
