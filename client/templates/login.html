@@ -1,60 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>AICLIPSE</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/css/login.css" />
-  </head>
 
-  <body class="app">
-    <div class="app-container">
-      <main class="screen">
-        <div class="grid">
-          <!-- Signup / Login -->
-          <section class="card">
-            <h2>Create an Account</h2>
-            <div>
+<head>
+  <meta charset="utf-8" />
+  <title>AICLIPSE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/css/login.css" />
+</head>
+
+<body class="app">
+  <div class="app-container">
+    <main class="screen">
+
+      <div class="auth-shell">
+
+        <!-- Brand -->
+        <div class="brand-hero" aria-label="AICLIPSE branding">
+          <img class="brand-image" src="/static/images/aiclipse_logo.png" alt="AICLIPSE" />
+        </div>
+
+        <!-- Auth Card -->
+        <section class="auth-card">
+
+          <!-- Toggle -->
+          <div class="auth-toggle" role="tablist" aria-label="Auth mode">
+            <button type="button" class="auth-tab is-active" data-mode="login" role="tab" aria-selected="true">
+              Log in
+            </button>
+            <button type="button" class="auth-tab" data-mode="signup" role="tab" aria-selected="false">
+              Sign up
+            </button>
+          </div>
+
+          <!-- Panels -->
+          <div class="auth-panels" data-mode="login">
+
+            <!-- Signup -->
+            <div class="auth-panel" data-panel="signup">
+              <h2 class="legacy-heading">Create an Account</h2>
+
               <label for="signup-username">Username</label>
-              <input id="signup-username" type="text" autocomplete="username" />
+              <input id="signup-username" type="text" placeholder="Username" />
 
               <label for="signup-email">Email</label>
-              <input id="signup-email" type="email" autocomplete="email" />
+              <input id="signup-email" type="email" placeholder="Email" />
 
               <label for="signup-password">Password</label>
-              <input
-                id="signup-password"
-                type="password"
-                autocomplete="new-password"
-              />
+              <input id="signup-password" type="password" placeholder="Password" />
 
               <button id="btn-signup">Sign up</button>
             </div>
 
-            <hr class="divider" />
-            <h2>Already have an account?</h2>
-            <hr class="divider" />
+            <!-- Login -->
+            <div class="auth-panel" data-panel="login">
+              <h2 class="legacy-heading">Log in</h2>
 
-            <h2>Log in</h2>
-
-            <div>
               <label for="login-email">Email</label>
-              <input id="login-email" type="email" autocomplete="email" />
+              <input id="login-email" type="email" placeholder="Email" />
 
               <label for="login-password">Password</label>
-              <input
-                id="login-password"
-                type="password"
-                autocomplete="current-password"
-              />
+              <input id="login-password" type="password" placeholder="Password" />
 
               <button id="btn-login">Log in</button>
             </div>
 
-            <div id="account-status" class="status-bar"></div>
-          </section>
+            <div id="account-status"></div>
+          </div>
+        </section>
 
-          <!-- Keep?? -->
+        <!-- Keep?? -->
           <!-- Detection -->
           <section class="card" style="display: none">
             <h2>Detect</h2>
@@ -90,9 +104,12 @@
               </div>
             </div>
           </section>
-        </div>
-    </div>
-    <script src="/static/js/include.js"></script>
-    <script src="/static/js/app.js"></script>
-  </body>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/include.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+
 </html>
