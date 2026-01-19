@@ -10,7 +10,7 @@ public class TrainingJobQueue
 
     public TrainingJobQueue()
     {
-        //only hold 1 pending training at a time 
+        //only hold 1 pending training at a time
         var options = new BoundedChannelOptions(1)
         {
             FullMode = BoundedChannelFullMode.DropWrite

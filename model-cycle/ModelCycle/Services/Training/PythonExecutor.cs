@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace ModelCycle.Services.Training;
 
-public class PythonExecutor
+public class PythonExecutor : IPythonExecutor
 {
     private readonly ILogger<PythonExecutor> _logger;
     private const string PYTHON_SCRIPT_NAME = "python_scripts/training.py";

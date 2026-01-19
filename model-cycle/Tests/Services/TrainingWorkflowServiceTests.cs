@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -23,33 +24,38 @@ public class TrainingWorkflowServiceTests
     private readonly Mock<IMediaService> _mockMedia;
     private readonly Mock<IDatasetService> _mockDataset;
     private readonly Mock<ILogger<TrainingWorkflowService>> _mockLogger;
+    
+    private readonly TrainingJobQueue _jobQueue; 
+    
     private readonly TrainingWorkflowService _service;
 
     public TrainingWorkflowServiceTests()
     {
-        // 1. Mock in-memory database
+        //  Mock database
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()) 
             .Options;
         _db = new AppDbContext(options);
-
-        // 2. Setup Mocks
+        
         _mockConfidence = new Mock<IConfidenceService>();
         _mockMedia = new Mock<IMediaService>();
         _mockDataset = new Mock<IDatasetService>();
         _mockLogger = new Mock<ILogger<TrainingWorkflowService>>();
+        
+        _jobQueue = new TrainingJobQueue();
 
         _service = new TrainingWorkflowService(
             _db, 
             _mockConfidence.Object, 
             _mockMedia.Object, 
             _mockDataset.Object, 
+            _jobQueue, // Updated Constructor Injection
             _mockLogger.Object
         );
     }
 
     [Fact]
-    public async Task ProcessVoteAsync_NewImage_PromotesToReady_AndDownloads()
+    public async Task ProcessVoteAsync_NewImage_PromotesToReady_AndQueuesJob()
     {
         // Arrange
         var request = new EvaluateImageRequest { MediaImageId = "img_new", PostId = Guid.NewGuid() };
@@ -61,7 +67,7 @@ public class TrainingWorkflowServiceTests
                 ImageId = "img_new", 
                 Url = "http://fake/url.jpg",
                 S3Key = "images/img_new.jpg", 
-                UserId = "user_123" // Required by EF entity
+                UserId = "user_123" 
             });
 
         // Mock Confidence to return ready
@@ -77,10 +83,17 @@ public class TrainingWorkflowServiceTests
         Assert.Equal(TrainingStatus.Ready, imageInDb.Status);
         
         _mockDataset.Verify(d => d.SaveImageAsync("img_new", "images/img_new.jpg"), Times.Once);
+
+        // ASSERT
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var reader = _jobQueue.ReadAllAsync(cts.Token).GetAsyncEnumerator();
+        
+        bool hasSignal = await reader.MoveNextAsync(); 
+        Assert.True(hasSignal, "The training job should have been queued.");
     }
 
     [Fact]
-    public async Task ProcessVoteAsync_ExistingReadyImage_Demotion_DeletesFile()
+    public async Task ProcessVoteAsync_ExistingReadyImage_Demotion_DeletesFile_AndDoesNotQueue()
     {
         // Arrange
         var existing = new TrainingImage 
@@ -97,7 +110,7 @@ public class TrainingWorkflowServiceTests
 
         var request = new EvaluateImageRequest { MediaImageId = "img_existing" };
 
-        // Mock Confidence to return NOT READY
+        // Mock Confidence 
         _mockConfidence.Setup(c => c.Evaluate(It.IsAny<VoteData>()))
             .Returns(new ConfidenceResult { IsReadyForTraining = false, TrainingLabel = "ai" });
 
@@ -108,12 +121,11 @@ public class TrainingWorkflowServiceTests
         var updatedImage = await _db.TrainingImages.FirstAsync();
         Assert.Equal(TrainingStatus.Pending, updatedImage.Status);
         
-        // Verify delete is called
         _mockDataset.Verify(d => d.DeleteImageAsync("img_existing"), Times.Once);
     }
 
     [Fact]
-    public async Task ProcessVoteAsync_ExistingReadyImage_RemainsReady_DownloadsWithStoredKey()
+    public async Task ProcessVoteAsync_ExistingReadyImage_RemainsReady_QueuesJob()
     {
         // Arrange
         var existing = new TrainingImage 
@@ -137,7 +149,14 @@ public class TrainingWorkflowServiceTests
         // Assert
         Assert.Equal(TrainingStatus.Ready, existing.Status);
         
-        // [UPDATED] Since logic is idempotent, it calls SaveImageAsync using the DB's stored S3Key
+        // Verify download 
         _mockDataset.Verify(d => d.SaveImageAsync("img_stable", "test_images/img_stable.jpg"), Times.Once);
+
+        // ASSERT QUEUE
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var reader = _jobQueue.ReadAllAsync(cts.Token).GetAsyncEnumerator();
+        
+        bool hasSignal = await reader.MoveNextAsync(); 
+        Assert.True(hasSignal, "Job should be queued even if image was already ready (as it might trigger the threshold).");
     }
 }

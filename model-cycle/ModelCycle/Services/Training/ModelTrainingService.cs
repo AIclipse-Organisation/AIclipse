@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using ModelCycle.Data;
-using ModelCycle.DTOs; // Where PythonTrainingResult lives
+using ModelCycle.DTOs;
 using ModelCycle.DTOs.ModelTraining;
 using ModelCycle.Models;
 
@@ -10,20 +10,19 @@ namespace ModelCycle.Services.Training;
 public class ModelTrainingService : IModelTrainingService
 {
     private readonly AppDbContext _context;
-    private readonly TrainingJobManager _jobManager;
-    private readonly PythonExecutor _pythonExecutor;
-    private readonly BlobStorageService _blobStorage;
+    private readonly ITrainingJobManager _jobManager; 
+    private readonly IPythonExecutor _pythonExecutor; 
+    private readonly IBlobStorageService _blobStorage;
     private readonly ILogger<ModelTrainingService> _logger;
 
-    // will probably store these constants in a secrets storage later
     private const int BATCH_SIZE_THRESHOLD = 100;
     private const double REPLAY_BUFFER_RATIO = 0.20;
 
     public ModelTrainingService(
         AppDbContext context,
-        TrainingJobManager jobManager,
-        PythonExecutor pythonExecutor,
-        BlobStorageService blobStorage,
+        ITrainingJobManager jobManager, 
+        IPythonExecutor pythonExecutor, 
+        IBlobStorageService blobStorage,
         ILogger<ModelTrainingService> logger)
     {
         _context = context;
@@ -32,7 +31,7 @@ public class ModelTrainingService : IModelTrainingService
         _blobStorage = blobStorage;
         _logger = logger;
     }
-
+    
     public async Task<Guid?> RunTrainingCycleAsync()
     {
         var (newImages, replayImages) = await GetTrainingData();
@@ -90,13 +89,12 @@ public class ModelTrainingService : IModelTrainingService
 
         var newImages = readyReal.Concat(readyFake).ToList();
 
-        // Get Replay Buffer
         int replayTotal = (int)(BATCH_SIZE_THRESHOLD * REPLAY_BUFFER_RATIO);
         int replayHalf = replayTotal / 2;
 
         var realReplay = await _context.TrainingImages
             .Where(i => i.Status == TrainingStatus.UsedInTraining && i.Label == "Real")
-            .OrderBy(x => Guid.NewGuid()) // Random
+            .OrderBy(x => Guid.NewGuid()) 
             .Take(replayHalf)
             .ToListAsync();
 
@@ -191,7 +189,6 @@ public class ModelTrainingService : IModelTrainingService
                 });
             }
             
-            // Link replay images (but don't change status)
             foreach (var img in replayImages)
             {
                 weights.ImageLinks.Add(new ModelImageLink 

@@ -11,7 +11,7 @@ using Moq;
 using Moq.Protected;
 using Xunit;
 
-namespace ModelCycle.Tests.Services;
+namespace Tests.Services;
 
 public class MediaServiceTests
 {

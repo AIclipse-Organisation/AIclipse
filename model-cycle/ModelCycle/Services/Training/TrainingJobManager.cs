@@ -8,7 +8,7 @@ using ModelCycle.Data;
 using ModelCycle.Models;
 using ModelCycle.Services; 
 
-public class TrainingJobManager
+public class TrainingJobManager : ITrainingJobManager
 {
     private readonly IWebHostEnvironment _env;
     private readonly IDatasetService _datasetService;

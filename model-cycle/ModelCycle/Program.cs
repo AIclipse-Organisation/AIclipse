@@ -49,7 +49,9 @@
     builder.Services.AddSingleton<TrainingJobQueue>();
 
     builder.Services.AddHostedService<QueuedTrainingWorker>();
-    
+    builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
+    builder.Services.AddScoped<ITrainingJobManager, TrainingJobManager>(); 
+    builder.Services.AddScoped<IPythonExecutor, PythonExecutor>();
     builder.Services.AddScoped<IModelTrainingService, ModelTrainingService>();
 
     builder.Services.AddControllers();

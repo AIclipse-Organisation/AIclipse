@@ -4,7 +4,7 @@ using Minio.Exceptions;
 
 namespace ModelCycle.Services;
 
-public class BlobStorageService
+public class BlobStorageService : IBlobStorageService
 {
     private readonly IMinioClient _minioClient;
     private readonly string _bucketName;
