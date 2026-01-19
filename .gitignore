@@ -239,3 +239,4 @@ packages/
 *.nupkg
 
 *.sln
+*.user
