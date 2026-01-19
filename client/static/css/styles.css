@@ -412,6 +412,20 @@ body.app .navbar a:hover {
   color: #CFB87C;
 }
 
+body.app .navbar a.active {
+  color: #CFB87C;
+}
+
+body.app .navbar a.active::after {
+  content: "";
+  display: block;
+  width: 20px;
+  height: 2px;
+  margin: 6px auto 0;
+  background: currentColor;
+  border-radius: 999px;
+}
+
 /* Screen content area
    Add bottom padding so content doesn't hide behind navbar */
 body.app .screen {
