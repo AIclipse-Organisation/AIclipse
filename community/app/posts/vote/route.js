@@ -155,56 +155,33 @@ export async function POST(req) {
 
     const oldVote = voteResult?.value?.vote; // undefined if new vote, "up" or "down" if existing
 
-    // Determine count adjustments based on old vs new vote
-    let upDelta = 0;
-    let downDelta = 0;
-
-    if (!oldVote) {
-      // New vote: increment the appropriate counter
-      if (vote === "up") upDelta = 1;
-      else downDelta = 1;
-    } else if (oldVote !== vote) {
-      // Vote switched: move count from old to new
-      if (vote === "up") {
-        upDelta = 1;
-        downDelta = -1;
-      } else {
-        upDelta = -1;
-        downDelta = 1;
-      }
-    }
-    // If oldVote === vote, no change needed (same vote again)
-
-    // Update post counts if there's any change, using pipeline to prevent negative values
-    if (upDelta !== 0 || downDelta !== 0) {
-      await posts.updateOne(
-        { post_id: safePostId },
-        [
-          {
-            $set: {
-              up_vote_count: {
-                $max: [0, { $add: [{ $ifNull: ["$up_vote_count", 0] }, upDelta] }]
-              },
-              down_vote_count: {
-                $max: [0, { $add: [{ $ifNull: ["$down_vote_count", 0] }, downDelta] }]
-              }
-            }
+    // Don't update post counts - they should be calculated from votes collection
+    // The GET endpoint will aggregate the real counts from community.votes
+    
+    // Calculate actual vote counts from the votes collection (source of truth)
+    const actualCounts = await votes.aggregate([
+      { $match: { post_id: safePostId } },
+      {
+        $group: {
+          _id: null,
+          up_vote_count: {
+            $sum: { $cond: [{ $eq: ["$vote", "up"] }, 1, 0] }
+          },
+          down_vote_count: {
+            $sum: { $cond: [{ $eq: ["$vote", "down"] }, 1, 0] }
           }
-        ]
-      );
-    }
+        }
+      }
+    ]).toArray();
 
-    // Get final counts to return
-    const post = await posts.findOne(
-      { post_id: safePostId },
-      { projection: { _id: 0, up_vote_count: 1, down_vote_count: 1 } }
-    );
+    const upCount = actualCounts[0]?.up_vote_count ?? 0;
+    const downCount = actualCounts[0]?.down_vote_count ?? 0;
 
     return NextResponse.json(
       {
         post_id,
-        up_vote_count: Number(post?.up_vote_count ?? 0),
-        down_vote_count: Number(post?.down_vote_count ?? 0),
+        up_vote_count: Number(upCount),
+        down_vote_count: Number(downCount),
         ...(oldVote === vote && { message: "Vote already recorded" })
       },
       { status: 200 }

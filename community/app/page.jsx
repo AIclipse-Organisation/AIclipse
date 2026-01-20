@@ -14,6 +14,17 @@ export default function Page() {
   const [error, setError] = useState(null);   // displayable error message
   const [loading, setLoading] = useState(true); // initial loading state
 
+  // Callback to update vote counts when a post is voted on
+  const handleVoteUpdate = (postId, upVoteCount, downVoteCount) => {
+    setItems((prevItems) =>
+      prevItems.map((item) =>
+        item.post_id === postId
+          ? { ...item, up_vote_count: upVoteCount, down_vote_count: downVoteCount }
+          : item
+      )
+    );
+  };
+
   useEffect(() => {
     let alive = true;
     const abortController = new AbortController();
@@ -112,6 +123,7 @@ export default function Page() {
               image={img}
               currentUserId={currentUserId}
               currentUserName={currentUserName}
+              onVoteUpdate={handleVoteUpdate}
             />
           ))}
         </div>

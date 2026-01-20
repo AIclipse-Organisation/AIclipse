@@ -182,7 +182,7 @@ export async function POST(req) {
 
 // LIST POSTS
 // GET /community/posts
-// Returns the latest community posts (newest first).
+// Returns the latest community posts (newest first) with actual vote counts from the database.
 export async function GET() {
   try {
     if (!MONGO_URI) {
@@ -196,11 +196,51 @@ export async function GET() {
     const db = client.db(MONGO_DB);
     const col = db.collection(POSTS_COLLECTION);
 
-    const items = await col
+    // Get posts sorted by newest first
+    const posts = await col
       .find({}, { projection: { _id: 0 } }) // hide Mongo internal _id
       .sort({ created_at: -1 })              // newest first
       .limit(100)                            // safety cap to avoid huge responses
       .toArray();
+
+    // Fetch actual vote counts from the votes collection
+    const VOTES_COLLECTION = "community.votes";
+    const votesCol = db.collection(VOTES_COLLECTION);
+    
+    // Get all post IDs to query votes
+    const postIds = posts.map(p => p.post_id);
+    
+    // Aggregate vote counts for all posts
+    const voteCountsAgg = await votesCol.aggregate([
+      { $match: { post_id: { $in: postIds } } },
+      {
+        $group: {
+          _id: "$post_id",
+          up_vote_count: {
+            $sum: { $cond: [{ $eq: ["$vote", "up"] }, 1, 0] }
+          },
+          down_vote_count: {
+            $sum: { $cond: [{ $eq: ["$vote", "down"] }, 1, 0] }
+          }
+        }
+      }
+    ]).toArray();
+    
+    // Create a map of post_id to vote counts
+    const voteCountsMap = {};
+    for (const vc of voteCountsAgg) {
+      voteCountsMap[vc._id] = {
+        up_vote_count: vc.up_vote_count,
+        down_vote_count: vc.down_vote_count
+      };
+    }
+    
+    // Merge actual vote counts into posts
+    const items = posts.map(post => ({
+      ...post,
+      up_vote_count: voteCountsMap[post.post_id]?.up_vote_count || 0,
+      down_vote_count: voteCountsMap[post.post_id]?.down_vote_count || 0
+    }));
 
     await client.close();
 

@@ -84,6 +84,11 @@
   transform: translateY(-1px);
 }
 
+.comm_votesCell button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Comments */
 
 .comm_CommentsCell button {

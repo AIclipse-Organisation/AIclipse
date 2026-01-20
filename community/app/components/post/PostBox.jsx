@@ -1,7 +1,7 @@
 import "../../styles/postBox.css";
 import { useEffect, useState } from "react";
 
-export default function PostBox({ image, currentUserId, currentUserName }) {
+export default function PostBox({ image, currentUserId, currentUserName, onVoteUpdate }) {
   const [up, setUp] = useState(Number(image?.up_vote_count ?? 0));
   const [down, setDown] = useState(Number(image?.down_vote_count ?? 0));
   const [error, setError] = useState("");
@@ -20,21 +20,22 @@ export default function PostBox({ image, currentUserId, currentUserName }) {
     setIsReported(Boolean(image?.is_reported));
   }, [image?.is_reported]);
 
+  // Sync vote counts when image prop changes
+  useEffect(() => {
+    setUp(Number(image?.up_vote_count ?? 0));
+    setDown(Number(image?.down_vote_count ?? 0));
+  }, [image?.up_vote_count, image?.down_vote_count]);
+
   async function vote(direction) {
     if (!postId) return setError("Missing post_id from feed.");
     if (!currentUserId) return setError("You must be signed in to vote.");
     if (direction !== "up" && direction !== "down") return;
+    
+    // Prevent multiple simultaneous votes
+    if (busy) return;
 
     setError("");
     setBusy(true);
-
-    // Store original counts before optimistic update
-    const originalUp = up;
-    const originalDown = down;
-
-    // Optimistic UI update
-    if (direction === "up") setUp((v) => v + 1);
-    else setDown((v) => v + 1);
 
     try {
       const res = await fetch(`/community/posts/vote`, {
@@ -47,20 +48,21 @@ export default function PostBox({ image, currentUserId, currentUserName }) {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        // Restore original counts on error
-        setUp(originalUp);
-        setDown(originalDown);
         setError(data.error || data.detail || `Vote failed (${res.status})`);
         return;
       }
 
-      // Update with authoritative counts from server
-      setUp(Number(data.up_vote_count ?? 0));
-      setDown(Number(data.down_vote_count ?? 0));
-    } catch {
-      // Restore original counts on network error
-      setUp(originalUp);
-      setDown(originalDown);
+      // Update with authoritative counts from server (this is the source of truth)
+      const newUp = Number(data.up_vote_count ?? 0);
+      const newDown = Number(data.down_vote_count ?? 0);
+      setUp(newUp);
+      setDown(newDown);
+      
+      // Notify parent component of the vote count change
+      if (onVoteUpdate) {
+        onVoteUpdate(postId, newUp, newDown);
+      }
+    } catch (err) {
       setError("Network error while voting.");
     } finally {
       setBusy(false);
@@ -190,11 +192,21 @@ export default function PostBox({ image, currentUserId, currentUserName }) {
 
       <div className="comm_bottomRow">
         <div className="comm_votesCell">
-          <button type="button" onClick={() => vote("up")} disabled={busy || !postId}>
+          <button 
+            type="button" 
+            onClick={() => vote("up")} 
+            disabled={busy || !postId}
+            title="Upvote"
+          >
             ⬆️
           </button>
           <span>{up}</span>
-          <button type="button" onClick={() => vote("down")} disabled={busy || !postId}>
+          <button 
+            type="button" 
+            onClick={() => vote("down")} 
+            disabled={busy || !postId}
+            title="Downvote"
+          >
             ⬇️
           </button>
           <span>{down}</span>
