@@ -103,7 +103,12 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ post_id: postId }),
-    }).catch(() => {});
+    }).catch((err) => {
+      // Click tracking is non-critical; errors are ignored in production
+      if (process.env.NODE_ENV === "development") {
+        console.error("Failed to record post click:", err);
+      }
+    });
   }
 
   function reportPost() {

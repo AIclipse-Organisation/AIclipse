@@ -67,18 +67,15 @@ export default function Page() {
         const images = imgs.items || [];
         const postItems = posts.items || [];
 
-        // Build lookup table so we can join quickly
-        const postByImageId = new Map(postItems.map((p) => [p.image_id, p]));
+        // Build lookup table: image_id -> image data (for getting S3 URLs)
+        const imageById = new Map(images.map((img) => [img.image_id, img]));
 
-        // Only keep images that have a matching community post
-        const merged = images
-          .map((img) => {
-            const post = postByImageId.get(img.image_id);
-            if (!post) return null;
-
-            return { ...img, ...post }; // Combine image fields + post fields
-          })
-          .filter(Boolean);
+        // Start with posts (which are already filtered to public images)
+        // and enrich with image data if available
+        const merged = postItems.map((post) => {
+          const img = imageById.get(post.image_id) || {};
+          return { ...img, ...post }; // Post fields override image fields
+        });
 
         if (alive) setItems(merged);
       } catch (e) {
@@ -90,19 +87,11 @@ export default function Page() {
       }
     }
 
-    load().catch((err) => {
-      // Catch any unhandled errors from the load function
-      // Don't set error state for aborted requests
-      if (err.name === "AbortError") return;
-      if (alive) {
-        setError(err?.message || "Unexpected error loading community feed");
-        setLoading(false);
-      }
-    });
+    load();
 
     return () => {
-      alive = false;
       abortController.abort(); // Cancel all pending fetch requests
+      alive = false;
     };
   }, []);
 

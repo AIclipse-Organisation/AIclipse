@@ -45,7 +45,6 @@ function getAuthenticatedUserId(req) {
   
   try {
     // Decode without verification to get the user_id
-    // In production, you should verify the JWT signature using the public key from auth service
     const decoded = jwt.decode(token);
     
     if (!decoded || !decoded.sub) {
@@ -65,6 +64,8 @@ function makePostId() {
 
 // Creates a new community post linked to an image.
 export async function POST(req) {
+  let client = null;
+  
   try {
     // Verify authentication and get authenticated user_id from JWT token
     let authenticatedUserId;
@@ -133,7 +134,7 @@ export async function POST(req) {
       throw new Error("MONGO_URI is not set");
     }
 
-    const client = new MongoClient(MONGO_URI);
+    client = new MongoClient(MONGO_URI);
     await client.connect();
 
     const db = client.db(MONGO_DB);
@@ -146,7 +147,7 @@ export async function POST(req) {
       { projection: { _id: 0, user_name: 1, email: 1 } }
     );
 
-    const user_name = (userDoc?.user_name || userDoc?.email || "Unknown").toString();
+    const user_name = String(userDoc?.user_name || userDoc?.email || "Unknown");
 
     
     const doc = {
@@ -168,8 +169,26 @@ export async function POST(req) {
 
     await col.insertOne(doc);
 
-    // close connection immediately after the data has been sent
-    await client.close();
+    // Mark the image as public so it appears in the community feed
+    // This ensures all community posts are visible to everyone
+    try {
+      const GATEWAY_URI = process.env.GATEWAY_URI || "http://localhost:8000";
+      const imageUpdateUrl = `${GATEWAY_URI}/media/image/${safeImageId}`;
+      
+      await fetch(imageUpdateUrl, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: safeUserId,
+          is_public: true
+        })
+      });
+    } catch (imageUpdateErr) {
+      // Log but don't fail the post creation if image update fails
+      console.error("Failed to mark image as public:", imageUpdateErr);
+    }
 
     return NextResponse.json(doc, { status: 201 });
   } catch (err) {
@@ -177,30 +196,55 @@ export async function POST(req) {
       { error: "Failed to create post", detail: String(err) },
       { status: 500 }
     );
+  } finally {
+    // Always close connection, even if an error occurred
+    if (client) {
+      try {
+        await client.close();
+      } catch (closeErr) {
+        // Log but don't throw - we're already handling the main error
+        console.error("Error closing MongoDB connection:", closeErr);
+      }
+    }
   }
 }
 
 // LIST POSTS
 // GET /community/posts
 // Returns the latest community posts (newest first) with actual vote counts from the database.
+// Only returns posts for images that are public (is_public = true).
 export async function GET() {
+  let client = null;
+  
   try {
     if (!MONGO_URI) {
       throw new Error("MONGO_URI is not set");
     }
 
     // open Mongo connection
-    const client = new MongoClient(MONGO_URI);
+    client = new MongoClient(MONGO_URI);
     await client.connect();
 
     const db = client.db(MONGO_DB);
     const col = db.collection(POSTS_COLLECTION);
+    const IMAGES_COLLECTION = "images";
+    const imagesCol = db.collection(IMAGES_COLLECTION);
 
-    // Get posts sorted by newest first
+    // First, get all public image IDs
+    const publicImages = await imagesCol
+      .find({ is_public: true }, { projection: { image_id: 1 } })
+      .toArray();
+    
+    const publicImageIds = publicImages.map(img => img.image_id);
+
+    // Get posts sorted by newest first, but only for public images
     const posts = await col
-      .find({}, { projection: { _id: 0 } }) // hide Mongo internal _id
-      .sort({ created_at: -1 })              // newest first
-      .limit(100)                            // safety cap to avoid huge responses
+      .find(
+        { image_id: { $in: publicImageIds } }, // Only posts with public images
+        { projection: { _id: 0 } }  // hide Mongo internal _id
+      )
+      .sort({ created_at: -1 })     // newest first
+      .limit(100)                   // safety cap to avoid huge responses
       .toArray();
 
     // Fetch actual vote counts from the votes collection
@@ -242,13 +286,21 @@ export async function GET() {
       down_vote_count: voteCountsMap[post.post_id]?.down_vote_count || 0
     }));
 
-    await client.close();
-
     return NextResponse.json({ items }, { status: 200 });
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to list posts", detail: String(err) },
       { status: 500 }
     );
+  } finally {
+    // Always close connection, even if an error occurred
+    if (client) {
+      try {
+        await client.close();
+      } catch (closeErr) {
+        // Log but don't throw - we're already handling the main error
+        console.error("Error closing MongoDB connection:", closeErr);
+      }
+    }
   }
 }

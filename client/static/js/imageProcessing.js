@@ -31,12 +31,12 @@ function setCurrentUserChip(user) {
 }
 
 // Helper to get cookie value 
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
-}
+// function getCookie(name) {
+//   const value = `; ${document.cookie}`;
+//   const parts = value.split(`; ${name}=`);
+//   if (parts.length === 2) return parts.pop().split(';').shift();
+//   return null;
+// }
 
 
 async function jsonFetch(method, url, body) {

@@ -494,8 +494,8 @@ def create_community_post():
 
     try:
         resp = requests.post(url, json=post_data, headers=headers, timeout=10)
-    except requests.RequestException:
-        logging.exception("Community /posts request failed")
+    except requests.RequestException as e:
+        logging.error("Community /posts request failed: %s", e)
         return jsonify({"detail": "Community service unreachable"}), 502
 
     try:
