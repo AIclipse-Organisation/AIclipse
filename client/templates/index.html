@@ -1,125 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>AICLIPSE2</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/styles.css" />
-  </head>
-  <body>
-    <header>
-      <h1>AICLIPSE</h1>
-      <div id="current-user-chip" class="badge muted">Not signed in</div>
-    </header>
 
-    <main>
-      <div class="grid">
-        <!-- Signup / Login -->
-        <section class="card">
-          <h2>Create an Account</h2> 
-          <div>
-            <label for="signup-username">Username</label>
-            <input id="signup-username" type="text" autocomplete="username" />
+<head>
+  <meta charset="utf-8" />
+  <title>AICLIPSE2</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
 
-            <label for="signup-email">Email</label>
-            <input id="signup-email" type="email" autocomplete="email" />
+<body>
+  <header>
+    <h1>AICLIPSE</h1>
+    <div id="current-user-chip" class="badge muted">Not signed in</div>
+  </header>
 
-            <label for="signup-password">Password</label>
-            <input
-              id="signup-password"
-              type="password"
-              autocomplete="new-password"
-            />
+  <main>
+    <div class="grid">
+      <!-- Signup / Login -->
+      <section class="card">
+        <h2>Create an Account</h2>
+        <div>
+          <label for="signup-username">Username</label>
+          <input id="signup-username" type="text" autocomplete="username" />
 
-            <button id="btn-signup">Sign up</button>
-          </div>
+          <label for="signup-email">Email</label>
+          <input id="signup-email" type="email" autocomplete="email" />
 
-          <hr class="divider" />
-          <h2>Already have an account?</h2>
+          <label for="signup-password">Password</label>
+          <input id="signup-password" type="password" autocomplete="new-password" />
 
-          <hr class="divider" />
+          <button id="btn-signup">Sign up</button>
+        </div>
 
-          <h2>Log in</h2>
+        <hr class="divider" />
+        <h2>Already have an account?</h2>
 
-          <div>
-            <label for="login-email">Email</label>
-            <input id="login-email" type="email" autocomplete="email" />
+        <hr class="divider" />
 
-            <label for="login-password">Password</label>
-            <input
-              id="login-password"
-              type="password"
-              autocomplete="current-password"
-            />
+        <h2>Log in</h2>
 
-            <button id="btn-login">Log in</button>
-            <button id="btn-logout" class="secondary">Log out</button>
-            <button id="btn-me" class="secondary">Refresh profile</button>
-          </div>
+        <div>
+          <label for="login-email">Email</label>
+          <input id="login-email" type="email" autocomplete="email" />
 
-          <div id="account-status" class="status-bar"></div>
-        </section>
+          <label for="login-password">Password</label>
+          <input id="login-password" type="password" autocomplete="current-password" />
 
-        <!-- Detection -->
-        <section class="card" style="display: none">
-          <h2>Detect</h2>
+          <button id="btn-login">Log in</button>
+          <button id="btn-logout" class="secondary">Log out</button>
+          <button id="btn-me" class="secondary">Refresh profile</button>
+        </div>
 
-          <label for="file-input">Image file (JPEG/PNG)</label>
-          <input id="file-input" type="file" accept="image/*" />
+        <div id="account-status" class="status-bar"></div>
+      </section>
 
-          <div class="row">
-            <button id="btn-check" disabled>Analyze image</button>
-            <span id="check-state" class="muted"
-              >Select a file to enable detection.</span
-            >
-          </div>
+      <!-- Detection -->
+      <section class="card" style="display: none">
+        <h2>Detect</h2>
 
-          <div id="detect-status" class="status-bar"></div>
+        <label for="file-input">Image file (JPEG/PNG)</label>
+        <input id="file-input" type="file" accept="image/*" />
 
-          <h3 class="subheading">Results</h3>
+        <div class="row">
+          <button id="btn-check" disabled>Analyze image</button>
+          <span id="check-state" class="muted">Select a file to enable detection.</span>
+        </div>
 
-          <div
-            id="detect-card"
-            class="detection-card"
-            aria-live="polite"
-            hidden
-          >
-            <div class="detection-row">
-              <div class="detection-main">
-                <p id="detect-verdict" class="verdict-text label-neutral">—</p>
+        <div id="detect-status" class="status-bar"></div>
 
-                <div
-                  class="progress-bar"
-                  aria-hidden="true"
-                  title="Real vs AI probability"
-                >
-                  <div class="fill real-fill" style="width: 0%"></div>
-                  <div class="fill ai-fill" style="width: 0%"></div>
-                </div>
+        <h3 class="subheading">Results</h3>
 
-                <div class="detection-meta">
-                  <small id="detect-confidence" class="muted"
-                    >Confidence: —</small
-                  >
-                </div>
+        <div id="detect-card" class="detection-card" aria-live="polite" hidden>
+          <div class="detection-row">
+            <div class="detection-main">
+              <p id="detect-verdict" class="verdict-text label-neutral">—</p>
+
+              <div class="progress-bar" aria-hidden="true" title="Real vs AI probability">
+                <div class="fill real-fill" style="width: 0%"></div>
+                <div class="fill ai-fill" style="width: 0%"></div>
+              </div>
+
+              <div class="detection-meta">
+                <small id="detect-confidence" class="muted">Confidence: —</small>
               </div>
             </div>
           </div>
-        </section>
-      </div>
-
-      <section class="card">
-        <h2>Raw responses</h2>
-
-        <pre id="detect-result" style="display: none">No detection yet.</pre>
-
-        <pre id="detect-result">No detection yet.</pre>
-
-        <p class="muted">Debug view. Last JSON response from the server:</p>
-        <pre id="debug-output">{}</pre>
+        </div>
       </section>
-    </main>
+    </div>
 
-    <script src="/static/app.js"></script>
-  </body>
+    <section class="card">
+      <h2>Raw responses</h2>
+
+      <pre id="detect-result" style="display: none">No detection yet.</pre>
+
+      <pre id="detect-result">No detection yet.</pre>
+
+      <p class="muted">Debug view. Last JSON response from the server:</p>
+      <pre id="debug-output">{}</pre>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+
 </html>

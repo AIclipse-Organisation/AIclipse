@@ -69,41 +69,39 @@
         </section>
 
         <!-- Keep?? -->
-          <!-- Detection -->
-          <section class="card" style="display: none">
-            <h2>Detect</h2>
+        <!-- Detection -->
+        <section class="card" style="display: none">
+          <h2>Detect</h2>
 
-            <label for="file-input">Image file (JPEG/PNG)</label>
-            <input id="file-input" type="file" accept="image/*" />
+          <label for="file-input">Image file (JPEG/PNG)</label>
+          <input id="file-input" type="file" accept="image/*" />
 
-            <div class="row">
-              <button id="btn-check" disabled>Analyze image</button>
-              <span id="check-state" class="muted"
-                >Select a file to enable detection.</span
-              >
-            </div>
+          <div class="row">
+            <button id="btn-check" disabled>Analyze image</button>
+            <span id="check-state" class="muted">Select a file to enable detection.</span>
+          </div>
 
-            <div id="detect-status" class="status-bar"></div>
+          <div id="detect-status" class="status-bar"></div>
 
-            <h3 class="subheading">Results</h3>
+          <h3 class="subheading">Results</h3>
 
-            <div id="detect-card" class="detection-card" aria-live="polite" hidden>
-              <div class="detection-row">
-                <div class="detection-main">
-                  <p id="detect-verdict" class="verdict-text label-neutral">—</p>
+          <div id="detect-card" class="detection-card" aria-live="polite" hidden>
+            <div class="detection-row">
+              <div class="detection-main">
+                <p id="detect-verdict" class="verdict-text label-neutral">—</p>
 
-                  <div class="progress-bar" aria-hidden="true" title="Real vs AI probability">
-                    <div class="fill real-fill" style="width: 0%"></div>
-                    <div class="fill ai-fill" style="width: 0%"></div>
-                  </div>
+                <div class="progress-bar" aria-hidden="true" title="Real vs AI probability">
+                  <div class="fill real-fill" style="width: 0%"></div>
+                  <div class="fill ai-fill" style="width: 0%"></div>
+                </div>
 
-                  <div class="detection-meta">
-                    <small id="detect-confidence" class="muted">Confidence: —</small>
-                  </div>
+                <div class="detection-meta">
+                  <small id="detect-confidence" class="muted">Confidence: —</small>
                 </div>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
       </div>
     </main>
   </div>
