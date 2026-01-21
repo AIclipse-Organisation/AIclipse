@@ -10,20 +10,18 @@ namespace ModelCycle.Services.Training;
 public class ModelTrainingService : IModelTrainingService
 {
     private readonly AppDbContext _context;
-    private readonly ITrainingJobManager _jobManager; 
-    private readonly IPythonExecutor _pythonExecutor; 
+    private readonly ITrainingJobManager _jobManager;
+    private readonly IPythonExecutor _pythonExecutor;
     private readonly IBlobStorageService _blobStorage;
     private readonly ILogger<ModelTrainingService> _logger;
 
-    private const int BATCH_SIZE_THRESHOLD = 100;
-    private const double REPLAY_BUFFER_RATIO = 0.20;
     private const int BATCH_SIZE_THRESHOLD = 4; // these numbers will likely be grabbed from secrets, to allow for easy adjustments when testing later
     private const double REPLAY_BUFFER_RATIO = 0.20;// these numbers will likely be grabbed from secrets, to allow for easy adjustments when testing later
 
     public ModelTrainingService(
         AppDbContext context,
-        ITrainingJobManager jobManager, 
-        IPythonExecutor pythonExecutor, 
+        ITrainingJobManager jobManager,
+        IPythonExecutor pythonExecutor,
         IBlobStorageService blobStorage,
         ILogger<ModelTrainingService> logger)
     {
@@ -33,34 +31,34 @@ public class ModelTrainingService : IModelTrainingService
         _blobStorage = blobStorage;
         _logger = logger;
     }
-    
+
     public async Task<Guid?> RunTrainingCycleAsync()
     {
         var (newImages, replayImages) = await GetTrainingData();
-        
-        if (newImages.Count < BATCH_SIZE_THRESHOLD) 
+
+        if (newImages.Count < BATCH_SIZE_THRESHOLD)
         {
             _logger.LogWarning("Insufficient balanced data found. Aborting.");
             return null;
         }
-        
+
         using var jobScope = _jobManager.CreateJobScope();
-        
+
         try
         {
             _logger.LogInformation("Initializing training Job {Id}...", jobScope.JobId);
-            
+
             await _jobManager.StageImagesAsync(jobScope, newImages, replayImages);
             string baseModelPath = await _jobManager.PrepareBaseModelAsync(jobScope);
-            
+
             _logger.LogInformation("Starting Python training...");
             var success = await _pythonExecutor.RunTrainingAsync(jobScope, baseModelPath);
-            
+
             if (!success) return null;
-            
+
             _logger.LogInformation("Uploading trained model...");
             string s3ModelPath = await UploadModelToMinioAsync(jobScope);
-            
+
             return await ProcessTrainingResults(jobScope, newImages, replayImages, s3ModelPath);
         }
         catch (Exception ex)
@@ -83,9 +81,9 @@ public class ModelTrainingService : IModelTrainingService
             .Where(i => i.Status == TrainingStatus.Ready && i.Label == "Fake")
             .Take(targetPerClass)
             .ToListAsync();
-        
+
         _logger.LogInformation(
-            "Training Data Check: Real: {RealCount}/{Target}, Fake: {FakeCount}/{Target}. (Threshold: {Total})", 
+            "Training Data Check: Real: {RealCount}/{Target}, Fake: {FakeCount}/{Target}. (Threshold: {Total})",
             readyReal.Count, targetPerClass, readyFake.Count, targetPerClass, BATCH_SIZE_THRESHOLD
         );
 
@@ -101,7 +99,7 @@ public class ModelTrainingService : IModelTrainingService
 
         var realReplay = await _context.TrainingImages
             .Where(i => i.Status == TrainingStatus.UsedInTraining && i.Label == "Real")
-            .OrderBy(x => Guid.NewGuid()) 
+            .OrderBy(x => Guid.NewGuid())
             .Take(replayHalf)
             .ToListAsync();
 
@@ -118,30 +116,30 @@ public class ModelTrainingService : IModelTrainingService
 
     private async Task<string> UploadModelToMinioAsync(TrainingJobManager.JobScope scope)
     {
-        if (!File.Exists(scope.OutputModelPath)) 
+        if (!File.Exists(scope.OutputModelPath))
             throw new FileNotFoundException("Python did not produce a model.safetensors file");
 
         using var stream = new FileStream(scope.OutputModelPath, FileMode.Open, FileAccess.Read);
-        
+
         return await _blobStorage.UploadFileAsync(
-            stream, 
-            $"models/{scope.JobId}", 
-            "model.safetensors", 
+            stream,
+            $"models/{scope.JobId}",
+            "model.safetensors",
             "application/octet-stream"
         );
     }
 
     private async Task<Guid> ProcessTrainingResults(
-        TrainingJobManager.JobScope scope, 
-        List<TrainingImage> newImages, 
-        List<TrainingImage> replayImages, 
+        TrainingJobManager.JobScope scope,
+        List<TrainingImage> newImages,
+        List<TrainingImage> replayImages,
         string s3ModelPath)
     {
-        if (!File.Exists(scope.MetricsPath)) 
+        if (!File.Exists(scope.MetricsPath))
             throw new FileNotFoundException("Metrics file not found");
 
         var json = await File.ReadAllTextAsync(scope.MetricsPath);
-        var results = JsonSerializer.Deserialize<PythonTrainingResult>(json) 
+        var results = JsonSerializer.Deserialize<PythonTrainingResult>(json)
                       ?? throw new InvalidOperationException("Failed to deserialize metrics json.");
 
         var weights = new ModelWeights
@@ -150,7 +148,7 @@ public class ModelTrainingService : IModelTrainingService
             Version = $"v_{DateTime.UtcNow:yyyyMMdd}_{scope.JobId.ToString().Substring(0, 4)}",
             CreatedAt = DateTime.UtcNow,
             MinioObjectPath = s3ModelPath,
-            
+
             NewImagesCount = newImages.Count,
             ReplayBufferCount = replayImages.Count,
 
@@ -166,7 +164,7 @@ public class ModelTrainingService : IModelTrainingService
             GoldenFakeToRealMisclassifications = results.GoldenTest.MisclassFakeToReal,
             GoldenRealToFakeMisclassifications = results.GoldenTest.MisclassRealToFake
         };
-        
+
         var currentModel = await _context.ModelWeights
             .Where(m => m.IsDeployed)
             .OrderByDescending(m => m.CreatedAt)
@@ -186,23 +184,23 @@ public class ModelTrainingService : IModelTrainingService
         {
             weights.IsDeployed = true;
             if (currentModel != null) currentModel.IsDeployed = false;
-            
+
             foreach (var img in newImages)
             {
                 img.Status = TrainingStatus.UsedInTraining;
-                weights.ImageLinks.Add(new ModelImageLink 
-                { 
-                    TrainingImageId = img.Id, 
-                    UsageType = ImageUsageType.NewTraining 
+                weights.ImageLinks.Add(new ModelImageLink
+                {
+                    TrainingImageId = img.Id,
+                    UsageType = ImageUsageType.NewTraining
                 });
             }
-            
+
             foreach (var img in replayImages)
             {
-                weights.ImageLinks.Add(new ModelImageLink 
-                { 
-                    TrainingImageId = img.Id, 
-                    UsageType = ImageUsageType.Replay 
+                weights.ImageLinks.Add(new ModelImageLink
+                {
+                    TrainingImageId = img.Id,
+                    UsageType = ImageUsageType.Replay
                 });
             }
         }
