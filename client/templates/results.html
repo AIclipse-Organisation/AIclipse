@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>AICLIPSE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/upload.css" />
+</head>
+
+<body class="app">
+    <div class="app-container">
+        <div data-include="/static/partials/topbar.html"></div>
+
+        <main class="screen">
+            <div class="grid">
+                <section class="page-header" aria-label="Page title">
+                    <h1 class="page-title">Results</h1>
+                    <div class="page-underline" role="presentation"></div>
+                </section>
+
+                <section class="card">
+                    <h3 class="subheading">Results</h3>
+
+                    <div id="detect-card" class="detection-card" aria-live="polite">
+                        <div class="detection-row">
+                            <img id="preview-image" alt="Selected image preview" style="
+                width: 120px;
+                height: 120px;
+                object-fit: cover;
+                border-radius: 12px;
+                flex: 0 0 auto;
+              " />
+
+                            <div class="detection-main">
+                                <p id="detect-verdict" class="verdict-text label-neutral">—</p>
+
+                                <div class="progress-bar" aria-hidden="true" title="Real vs AI probability">
+                                    <div class="fill real-fill" style="width: 0%"></div>
+                                    <div class="fill ai-fill" style="width: 0%"></div>
+                                </div>
+
+                                <div class="detection-meta">
+                                    <small id="detect-confidence" class="muted">Confidence: —</small>
+                                </div>
+
+                                <hr class="divider" />
+
+                                <h3 class="subheading">Save</h3>
+
+                                <label class="row" style="gap: 10px; align-items: center;">
+                                    <input id="save-public" type="checkbox" />
+                                    Publish to community (public)
+                                </label>
+
+                                <div id="public-desc-wrap" hidden style="margin-top: 10px;">
+                                    <label for="post-description">Description</label>
+                                    <textarea id="post-description" rows="3"
+                                        placeholder="Write a short description for the community post..."
+                                        style="width: 100%; resize: vertical;"></textarea>
+                                    <small id="post-description-hint" class="muted"></small>
+                                </div>
+
+                                <div class="row">
+                                    <button id="btn-save" disabled>Save image</button>
+                                    <span id="save-state" class="muted">Run detection first to enable saving.</span>
+                                </div>
+
+                                <div id="save-status" class="status-bar"></div>
+                                <div id="save-result" class="muted"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row" style="margin-top: 12px;">
+                        <button class="secondary" id="btn-back">Back</button>
+                    </div>
+                </section>
+            </div>
+
+            <section class="card">
+                <h2>Raw responses</h2>
+                <p class="muted">Debug view. Last JSON response from the server:</p>
+                <pre id="debug-output">{}</pre>
+            </section>
+        </main>
+
+        <div data-include="/static/partials/navbar.html"></div>
+    </div>
+
+    <script src="/static/js/include.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/imageProcessing.js"></script>
+    <script src="/static/js/results.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+
+</html>

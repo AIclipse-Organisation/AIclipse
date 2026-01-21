@@ -23,97 +23,22 @@
 
           <section class="card">
 
-            <label for="file-input">Image file (JPEG/PNG)</label>
-            <input id="file-input" type="file" accept="image/*" />
+            <input id="file-input" type="file" accept="image/*" hidden />
 
-            <div class="row">
-              <button id="btn-check" disabled>Analyze image</button>
-              <span id="check-state" class="muted">Select a file to enable detection.</span>
-            </div>
+            <label for="file-input" class="file-upload">
+              Upload image to scan
+            </label>
+
+            <span id="check-state" class="muted">Select an image to analyze.</span>
+
+            <button id="btn-check" disabled>Analyze Results</button>
 
             <div id="detect-status" class="status-bar"></div>
 
-            <h3 class="subheading">Results</h3>
-
-            <div id="detect-card" class="detection-card" aria-live="polite" hidden>
-              <div class="detection-row">
-
-                <img id="preview-image" alt="Selected image preview" style="
-                  width: 120px;
-                  height: 120px;
-                  object-fit: cover;
-                  border-radius: 12px;
-                  flex: 0 0 auto;
-                " hidden />
-
-                <div class="detection-main">
-                  <p id="detect-verdict" class="verdict-text label-neutral">—</p>
-
-                  <div class="progress-bar" aria-hidden="true" title="Real vs AI probability">
-                    <div class="fill real-fill" style="width: 0%"></div>
-                    <div class="fill ai-fill" style="width: 0%"></div>
-                  </div>
-
-                  <div class="detection-meta">
-                    <small id="detect-confidence" class="muted">Confidence: —</small>
-                  </div>
-
-
-                  <hr class="divider" />
-
-                  <h3 class="subheading">Save</h3>
-
-                  <label class="row" style="gap: 10px; align-items: center;">
-                    <input id="save-public" type="checkbox" />
-                    Publish to community (public)
-                  </label>
-
-                  <div id="public-desc-wrap" hidden style="margin-top: 10px;">
-                    <label for="post-description">Description</label>
-                    <textarea id="post-description" rows="3"
-                      placeholder="Write a short description for the community post..."
-                      style="width: 100%; resize: vertical;"></textarea>
-                    <small id="post-description-hint" class="muted"></small>
-                  </div>
-
-                  <div class="row">
-                    <button id="btn-save" disabled>Save image</button>
-                    <span id="save-state" class="muted">Run detection first to enable saving.</span>
-                  </div>
-
-                  <div id="save-status" class="status-bar"></div>
-                  <div id="save-result" class="muted"></div>
-
-
-
-
-
-                </div>
-              </div>
-            </div>
           </section>
+
+
         </div>
-
-        <section class="card">
-          <h2>Raw responses</h2>
-
-          <pre id="detect-result" style="display: none">No detection yet.</pre>
-
-          <pre id="detect-result">No detection yet.</pre>
-
-          <p class="muted">Debug view. Last JSON response from the server:</p>
-          <pre id="debug-output">{}</pre>
-        </section>
-
-
-
-        <!-- <section class="card">
-        <h2>Community</h2>
-        <div id="public-images" class="image-grid muted">
-          Loading public images…
-        </div>
-      </section> -->
-
       </main>
 
       <div data-include="/static/partials/navbar.html"></div>

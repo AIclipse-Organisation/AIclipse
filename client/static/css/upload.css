@@ -10,6 +10,37 @@
   font-size: 16px;
 }
 
+.file-upload {
+  width: 100%;
+  padding: 13px;
+  margin-top: 6px;
+  border-radius: 10px;
+  border: 1px solid #C9BA83;
+  background: #C9BA83;
+  color: #000000;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+
+.file-upload:active {
+  transform: scale(0.98);
+}
+
+#btn-check{
+    width: 100%;
+  padding: 13px;
+  margin-top: 6px;
+  border-radius: 10px;
+  border: 1px solid #C9BA83;
+  background: #C9BA83;
+  color: #000000;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 label {
   display: block;
   font-size: 13px;
