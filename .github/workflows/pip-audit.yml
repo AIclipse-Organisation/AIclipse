@@ -33,10 +33,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: pip-audit
+      - name: pip-audit (requirements.txt)
         uses: pypa/gh-action-pip-audit@v1.1.0
         with:
-          inputs: |
-            ${{ matrix.service }}/requirements.txt
-            ${{ matrix.service }}/requirements-dev.txt
+          inputs: ${{ matrix.service }}/requirements.txt
+          vulnerability-service: osv
+
+      - name: pip-audit (requirements-dev.txt)
+        if: ${{ hashFiles(format('{0}/requirements-dev.txt', matrix.service)) != '' }}
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: ${{ matrix.service }}/requirements-dev.txt
           vulnerability-service: osv

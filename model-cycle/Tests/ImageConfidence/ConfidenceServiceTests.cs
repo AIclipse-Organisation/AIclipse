@@ -42,7 +42,7 @@ namespace Tests.ImageConfidence;
         [Fact]
         public void AlphaBeta_CorrectlyComputed_WithWeightedVotes()
         {
-            var vote = new ImageVote
+            var vote = new VoteData
             {
                 UserAiVotes = 2,
                 UserNotAiVotes = 3,
@@ -59,7 +59,7 @@ namespace Tests.ImageConfidence;
         [Fact]
         public void StrongRealVotes_ProduceRealLabel()
         {
-            var vote = new ImageVote
+            var vote = new VoteData
             {
                 UserAiVotes = 0,
                 UserNotAiVotes = 10,
@@ -74,7 +74,7 @@ namespace Tests.ImageConfidence;
         [Fact]
         public void StrongAiVotes_ProduceAiLabel()
         {
-            var vote = new ImageVote
+            var vote = new VoteData
             {
                 UserAiVotes = 10,
                 UserNotAiVotes = 0,
@@ -89,7 +89,7 @@ namespace Tests.ImageConfidence;
         [Fact]
         public void PosteriorMean_BetweenZeroAndOne()
         {
-            var vote = new ImageVote
+            var vote = new VoteData
             {
                 UserAiVotes = 3,
                 UserNotAiVotes = 3,
@@ -104,7 +104,7 @@ namespace Tests.ImageConfidence;
         [Fact]
         public void Probability_Computed_ForBothLabels()
         {
-            var vote = new ImageVote
+            var vote = new VoteData
             {
                 UserAiVotes = 4,
                 UserNotAiVotes = 4,
@@ -120,7 +120,7 @@ namespace Tests.ImageConfidence;
         [Fact]
         public void HighCertainty_AboveThreshold_IsReadyForTraining()
         {
-            var vote = new ImageVote
+            var vote = new VoteData
             {
                 UserAiVotes = 10,
                 UserNotAiVotes = 1,
@@ -135,7 +135,7 @@ namespace Tests.ImageConfidence;
         [Fact]
         public void LowCertainty_BelowThreshold_NotReadyForTraining()
         {
-            var vote = new ImageVote
+            var vote = new VoteData
             {
                 UserAiVotes = 1,
                 UserNotAiVotes = 1,

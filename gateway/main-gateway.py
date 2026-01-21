@@ -1,12 +1,13 @@
 import asyncio
 import hashlib
+import io
 import json
 import logging
 import os
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import httpx
 import jwt
@@ -25,6 +26,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
+from PIL import Image, UnidentifiedImageError
 
 
 AUTH_URI = os.getenv("AUTH_URI")
@@ -34,6 +36,18 @@ HOSTNAME = os.getenv("HOSTNAME")
 
 # Internal secret for detection_token
 DETECTION_TOKEN_SECRET = os.getenv("DETECTION_TOKEN_SECRET")
+
+# Image safety limits
+MAX_FILE_SIZE = 5 * 1024 * 1024
+MAX_WIDTH = 12000
+MAX_HEIGHT = 12000
+MAX_PIXELS = 40000000  # 40 MP
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS  # decompression-bomb protection
+
+SUPPORTED_IMAGE_FORMATS: Dict[str, Tuple[str, str]] = {
+    "JPEG": ("image/jpeg", ".jpg"),
+    "PNG": ("image/png", ".png"),
+}
 
 # JWKS cache for Auth RS256 public keys
 JWKS_CACHE: Dict[str, Any] = {}
@@ -48,6 +62,7 @@ def _require_setting(name: str, value: Optional[str]) -> str:
         detail=f"Missing required setting: {name}",
     )
 
+
 class _HealthzFilter(logging.Filter):
     # Hide health endpoints from access logs
     def filter(self, record):
@@ -58,6 +73,7 @@ class _HealthzFilter(logging.Filter):
 
 
 logging.getLogger("uvicorn.access").addFilter(_HealthzFilter())
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -365,6 +381,40 @@ def _validate_detection_token(
     return payload
 
 
+def _sniff_and_validate_image(data: bytes) -> Tuple[str, str]:
+    """
+    Validate bytes are a real JPEG/PNG image and return (normalized_content_type, normalized_ext).
+
+    - Does NOT modify bytes.
+    - Protects against non-image uploads and basic decompression-bomb cases.
+    """
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    if len(data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="Payload Too Large")
+
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            im.verify()
+
+        with Image.open(io.BytesIO(data)) as im:
+            fmt = (im.format or "").upper()
+            w, h = im.size
+            if w <= 0 or h <= 0 or w > MAX_WIDTH or h > MAX_HEIGHT:
+                raise HTTPException(status_code=415, detail="Invalid image dimensions")
+            im.load()
+
+    except HTTPException:
+        raise
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise HTTPException(status_code=415, detail="Unsupported or invalid image")
+
+    if fmt not in SUPPORTED_IMAGE_FORMATS:
+        raise HTTPException(status_code=415, detail="Unsupported image format")
+
+    return SUPPORTED_IMAGE_FORMATS[fmt]
+
 
 # Auth routes (proxy to Auth Service)
 
@@ -492,18 +542,8 @@ async def gateway_checks(
 ):
     detector_uri = _require_setting("DETECTOR_URI", DETECTOR_URI)
 
-    if file.content_type not in ("image/jpeg", "image/png", "application/octet-stream"):
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unsupported media type",
-        )
-
     data = await file.read()
-    if not data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Empty file",
-        )
+    normalized_ct, _ext = _sniff_and_validate_image(data)
 
     x_request_id = str(uuid.uuid4())
     url = detector_uri.rstrip("/") + "/v1.0.1/checks"
@@ -582,11 +622,7 @@ async def gateway_upload_image(
     user: UserContext = Depends(get_current_user),
 ):
     data = await file.read()
-    if not data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Empty file",
-        )
+    normalized_ct, ext = _sniff_and_validate_image(data)
 
     payload = _validate_detection_token(
         token=detection_token,
@@ -608,8 +644,10 @@ async def gateway_upload_image(
         url = MEDIA_URI.rstrip("/") + "/upload/image"
         headers = {"X-Request-Id": str(uuid.uuid4())}
 
+        safe_name = file.filename or f"upload{ext}"
+
         files = {
-            "file": (file.filename, data, file.content_type),
+            "file": (safe_name, data, normalized_ct),
             "user_id": (None, user.user_id),
             "verdict": (None, str(verdict)),
             "label": (None, str(label)),
