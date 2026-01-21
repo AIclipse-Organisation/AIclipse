@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using ModelCycle.Data;
 using ModelCycle.DTOs;
 using ModelCycle.DTOs.ModelTraining;
@@ -19,8 +20,9 @@ public class ModelTrainingServiceTests
     private readonly AppDbContext _db;
     private readonly Mock<ITrainingJobManager> _mockJobManager;
     private readonly Mock<IPythonExecutor> _mockPythonExecutor;
-    private readonly Mock<IBlobStorageService> _mockBlobStorage; // Interface Mock
+    private readonly Mock<IBlobStorageService> _mockBlobStorage;
     private readonly Mock<ILogger<ModelTrainingService>> _mockLogger;
+    
     private readonly ModelTrainingService _service;
 
     public ModelTrainingServiceTests()
@@ -29,17 +31,15 @@ public class ModelTrainingServiceTests
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         _db = new AppDbContext(options);
-
-        // Simple Interface Mocks
+        
         _mockJobManager = new Mock<ITrainingJobManager>();
         _mockPythonExecutor = new Mock<IPythonExecutor>();
-        _mockBlobStorage = new Mock<IBlobStorageService>(); // No config needed!
+        _mockBlobStorage = new Mock<IBlobStorageService>();
         _mockLogger = new Mock<ILogger<ModelTrainingService>>();
-
-        // Setup Upload Success Default
+        
         _mockBlobStorage
-            .Setup(b => b.UploadFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync((Stream s, string path, string f, string c) => path); // Return the path as success
+            .Setup(x => x.UploadFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync("s3/path/to/model");
 
         _service = new ModelTrainingService(
             _db, 
@@ -55,38 +55,54 @@ public class ModelTrainingServiceTests
     {
         _db.TrainingImages.Add(new TrainingImage 
         { 
-            Id = Guid.NewGuid(), Status = TrainingStatus.Ready, Label = "Real", MediaImageId="x", S3Key="x" 
+            Id = Guid.NewGuid(),
+            Status = TrainingStatus.Ready, 
+            Label = "Real", 
+            MediaImageId = "test_unique_1", // Unique ID
+            S3Key = "test-bucket" 
         });
         await _db.SaveChangesAsync();
 
         var result = await _service.RunTrainingCycleAsync();
 
         Assert.Null(result);
-        _mockJobManager.Verify(x => x.CreateJobScope(), Times.Never);
+        
+        _mockPythonExecutor.Verify(x => x.RunTrainingAsync(It.IsAny<TrainingJobManager.JobScope>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
     public async Task RunTrainingCycleAsync_SufficientData_DeploysModel_WhenMetricsImprove()
     {
-        // Arrange 
         for (int i = 0; i < 50; i++) 
         {
-            _db.TrainingImages.Add(new TrainingImage { Id = Guid.NewGuid(), Status = TrainingStatus.Ready, Label = "Real", MediaImageId=$"r{i}", S3Key="k" });
-            _db.TrainingImages.Add(new TrainingImage { Id = Guid.NewGuid(), Status = TrainingStatus.Ready, Label = "Fake", MediaImageId=$"f{i}", S3Key="k" });
+            _db.TrainingImages.Add(new TrainingImage { 
+                Status = TrainingStatus.Ready, 
+                Label = "Real", 
+                MediaImageId = $"real_{i}", // Unique
+                S3Key = "test-bucket" 
+            });
+        }
+        for (int i = 0; i < 50; i++) 
+        {
+            _db.TrainingImages.Add(new TrainingImage { 
+                Status = TrainingStatus.Ready, 
+                Label = "Fake", 
+                MediaImageId = $"fake_{i}", // Unique
+                S3Key = "test-bucket" 
+            });
         }
         await _db.SaveChangesAsync();
-        
+
         var jobId = Guid.NewGuid();
         var tempPath = Path.Combine(Path.GetTempPath(), "test_job_" + jobId);
         Directory.CreateDirectory(Path.Combine(tempPath, "output"));
-        
+
         var mockScope = new TrainingJobManager.JobScope(jobId, tempPath, "golden", Mock.Of<ILogger>());
         
         _mockJobManager.Setup(x => x.CreateJobScope()).Returns(mockScope);
-        _mockJobManager.Setup(x => x.PrepareBaseModelAsync(mockScope)).ReturnsAsync("base_path");
-        _mockPythonExecutor.Setup(x => x.RunTrainingAsync(mockScope, "base_path")).ReturnsAsync(true);
-
-
+        _mockJobManager.Setup(x => x.PrepareBaseModelAsync(mockScope)).ReturnsAsync("base_model_path");
+        _mockPythonExecutor.Setup(x => x.RunTrainingAsync(mockScope, "base_model_path")).ReturnsAsync(true);
+        
         var metrics = new PythonTrainingResult
         {
             Validation = new Metrics { Accuracy = 0.95 },
@@ -95,13 +111,53 @@ public class ModelTrainingServiceTests
         await File.WriteAllTextAsync(mockScope.MetricsPath, JsonSerializer.Serialize(metrics));
         await File.WriteAllTextAsync(mockScope.OutputModelPath, "fake_model_content");
 
-        // Act
         var resultId = await _service.RunTrainingCycleAsync();
 
-        // Assert
         Assert.NotNull(resultId);
-        var model = await _db.ModelWeights.FindAsync(resultId);
-        Assert.True(model.IsDeployed);
+        var modelInDb = await _db.ModelWeights.FindAsync(resultId);
+        Assert.NotNull(modelInDb);
+        Assert.True(modelInDb.IsDeployed);
+
+        mockScope.Dispose();
+    }
+
+    [Fact]
+    public async Task RunTrainingCycleAsync_RejectsModel_WhenGoldenAccuracyDrops()
+    {
+        _db.ModelWeights.Add(new ModelWeights { IsDeployed = true, GoldenTestAccuracy = 0.95 });
+        
+        for (int i = 0; i < 50; i++) 
+        {
+             _db.TrainingImages.Add(new TrainingImage { Status = TrainingStatus.Ready, Label = "Real", MediaImageId = $"real_r_{i}", S3Key = "test" });
+        }
+        for (int i = 0; i < 50; i++) 
+        {
+             _db.TrainingImages.Add(new TrainingImage { Status = TrainingStatus.Ready, Label = "Fake", MediaImageId = $"fake_r_{i}", S3Key = "test" });
+        }
+        await _db.SaveChangesAsync();
+
+        var jobId = Guid.NewGuid();
+        var tempPath = Path.Combine(Path.GetTempPath(), "test_job_" + jobId);
+        Directory.CreateDirectory(Path.Combine(tempPath, "output"));
+        var mockScope = new TrainingJobManager.JobScope(jobId, tempPath, "golden", Mock.Of<ILogger>());
+
+        _mockJobManager.Setup(x => x.CreateJobScope()).Returns(mockScope);
+        _mockJobManager.Setup(x => x.PrepareBaseModelAsync(mockScope)).ReturnsAsync("base_path");
+        _mockPythonExecutor.Setup(x => x.RunTrainingAsync(mockScope, "base_path")).ReturnsAsync(true);
+
+        var metrics = new PythonTrainingResult
+        {
+            Validation = new Metrics { Accuracy = 0.90 },
+            GoldenTest = new Metrics { Accuracy = 0.80 } 
+        };
+        await File.WriteAllTextAsync(mockScope.MetricsPath, JsonSerializer.Serialize(metrics));
+        await File.WriteAllTextAsync(mockScope.OutputModelPath, "fake_model_content");
+
+        var resultId = await _service.RunTrainingCycleAsync();
+
+        var modelInDb = await _db.ModelWeights.FindAsync(resultId);
+        Assert.False(modelInDb.IsDeployed);
+        Assert.NotNull(modelInDb.RejectionReason);
 
         mockScope.Dispose();
     }

@@ -23,7 +23,7 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 # get training script python packages
 COPY --from=build /src/ModelCycle/requirements.txt .
 
-RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY --from=build /app/publish .
 

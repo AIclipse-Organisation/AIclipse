@@ -1,157 +1,153 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration; 
 using Microsoft.Extensions.Logging;
 using ModelCycle.Data;
-using ModelCycle.DTOs;
-using ModelCycle.DTOs.ModelTraining;
 using ModelCycle.Models;
-using ModelCycle.Services;
-using ModelCycle.Services.Data;
+using ModelCycle.Services; 
 using ModelCycle.Services.Training;
 using Moq;
 using Xunit;
 
-namespace Tests.Services;
+namespace ModelCycle.Tests.Services;
 
-
-public class ModelTrainingServiceTests
+public class TrainingJobManagerTests : IDisposable
 {
     private readonly AppDbContext _db;
-    private readonly Mock<TrainingJobManager> _mockJobManager;
-    private readonly Mock<PythonExecutor> _mockPythonExecutor;
-    private readonly Mock<BlobStorageService> _mockBlobStorage;
-    private readonly Mock<ILogger<ModelTrainingService>> _mockLogger;
-    private readonly ModelTrainingService _service;
+    private readonly Mock<IWebHostEnvironment> _mockEnv;
+    private readonly Mock<IDatasetService> _mockDatasetService;
+    private readonly Mock<IBlobStorageService> _mockBlobStorage; 
+    private readonly Mock<ILogger<TrainingJobManager>> _mockLogger;
+    private readonly TrainingJobManager _manager;
+    private readonly string _testRootPath;
 
-    public ModelTrainingServiceTests()
+    public TrainingJobManagerTests()
     {
-        // 1. InMemory Database
+        _testRootPath = Path.Combine(Path.GetTempPath(), "ModelCycleTests_" + Guid.NewGuid());
+        Directory.CreateDirectory(_testRootPath);
+        
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         _db = new AppDbContext(options);
-
-        // 2. Setup Configuration Mock (Required for BlobStorageService constructor)
-        var mockConfig = new Mock<IConfiguration>();
-        mockConfig.Setup(c => c["MINIO_BUCKET_NAME"]).Returns("test-bucket");
-        mockConfig.Setup(c => c["S3_ENDPOINT"]).Returns("localhost");
-        mockConfig.Setup(c => c["AWS_ACCESS_KEY_ID"]).Returns("test");
-        mockConfig.Setup(c => c["AWS_SECRET_ACCESS_KEY"]).Returns("test");
-
-        // 3. Initialize BlobStorage Mock FIRST
-        // We must pass constructor arguments because it's a class, not an interface.
-        _mockBlobStorage = new Mock<BlobStorageService>(
-            mockConfig.Object, 
-            Mock.Of<ILogger<BlobStorageService>>()
-        );
-
-        // 4. Initialize JobManager Mock using the Blob Mock
-        // Note: TrainingJobManager methods must be 'virtual' for this to work
-        _mockJobManager = new Mock<TrainingJobManager>(
-            Mock.Of<IWebHostEnvironment>(), 
-            Mock.Of<IDatasetService>(), 
-            _mockBlobStorage.Object, // <--- Use the Object, not Mock.Of<T>()
-            _db, 
-            Mock.Of<ILogger<TrainingJobManager>>());
-
-        _mockPythonExecutor = new Mock<PythonExecutor>(Mock.Of<ILogger<PythonExecutor>>());
-        _mockLogger = new Mock<ILogger<ModelTrainingService>>();
-
-        _service = new ModelTrainingService(
-            _db, 
-            _mockJobManager.Object, 
-            _mockPythonExecutor.Object, 
-            _mockBlobStorage.Object, 
+        
+        _mockEnv = new Mock<IWebHostEnvironment>();
+        _mockEnv.Setup(e => e.ContentRootPath).Returns(_testRootPath);
+        
+        _mockDatasetService = new Mock<IDatasetService>();
+        _mockBlobStorage = new Mock<IBlobStorageService>();
+        _mockLogger = new Mock<ILogger<TrainingJobManager>>();
+        
+        _manager = new TrainingJobManager(
+            _mockEnv.Object,
+            _mockDatasetService.Object,
+            _mockBlobStorage.Object,
+            _db,
             _mockLogger.Object
         );
     }
 
-    [Fact]
-    public async Task RunTrainingCycleAsync_InsufficientData_ReturnsNull()
+    public void Dispose()
     {
-        _db.TrainingImages.Add(new TrainingImage { Status = TrainingStatus.Ready, Label = "Real" });
-        await _db.SaveChangesAsync();
-
-        var result = await _service.RunTrainingCycleAsync();
-
-        Assert.Null(result);
-        _mockPythonExecutor.Verify(x => x.RunTrainingAsync(It.IsAny<TrainingJobManager.JobScope>(), It.IsAny<string>()), Times.Never);
+        if (Directory.Exists(_testRootPath))
+            Directory.Delete(_testRootPath, true);
+        
+        _db.Dispose();
     }
 
     [Fact]
-    public async Task RunTrainingCycleAsync_SufficientData_DeploysModel_WhenMetricsImprove()
+    public void CreateJobScope_Throws_WhenGoldenSetMissing()
     {
-        for (int i = 0; i < 50; i++) _db.TrainingImages.Add(new TrainingImage { Status = TrainingStatus.Ready, Label = "Real" });
-        for (int i = 0; i < 50; i++) _db.TrainingImages.Add(new TrainingImage { Status = TrainingStatus.Ready, Label = "Fake" });
-        await _db.SaveChangesAsync();
-
-        var jobId = Guid.NewGuid();
-        var tempPath = Path.Combine(Path.GetTempPath(), "test_job_" + jobId);
-        Directory.CreateDirectory(Path.Combine(tempPath, "output"));
-
-        var mockScope = new TrainingJobManager.JobScope(jobId, tempPath, "golden", Mock.Of<ILogger>());
-        
-        // Mocking 'virtual' methods
-        _mockJobManager.Setup(x => x.CreateJobScope()).Returns(mockScope);
-        _mockJobManager.Setup(x => x.PrepareBaseModelAsync(mockScope)).ReturnsAsync("base_model_path");
-        _mockPythonExecutor.Setup(x => x.RunTrainingAsync(mockScope, "base_model_path")).ReturnsAsync(true);
-        
-        var metrics = new PythonTrainingResult
-        {
-            Validation = new Metrics { Accuracy = 0.95 },
-            GoldenTest = new Metrics { Accuracy = 0.99 }
-        };
-        await File.WriteAllTextAsync(mockScope.MetricsPath, JsonSerializer.Serialize(metrics));
-        await File.WriteAllTextAsync(mockScope.OutputModelPath, "fake_model_content");
-
-        var resultId = await _service.RunTrainingCycleAsync();
-
-        Assert.NotNull(resultId);
-        var modelInDb = await _db.ModelWeights.FindAsync(resultId);
-        Assert.NotNull(modelInDb);
-        Assert.True(modelInDb.IsDeployed);
-
-        mockScope.Dispose();
+        Assert.Throws<DirectoryNotFoundException>(() => _manager.CreateJobScope());
     }
 
     [Fact]
-    public async Task RunTrainingCycleAsync_RejectsModel_WhenGoldenAccuracyDrops()
+    public void CreateJobScope_CreatesDirectories_WhenGoldenSetExists()
     {
-        _db.ModelWeights.Add(new ModelWeights { IsDeployed = true, GoldenTestAccuracy = 0.95 });
+        // Arrange
+        var goldenPath = Path.Combine(_testRootPath, "golden_set");
+        Directory.CreateDirectory(goldenPath);
+
+        // Act
+        using var scope = _manager.CreateJobScope();
+
+        // Assert
+        Assert.True(Directory.Exists(scope.DataDir), "Data directory not created");
+        Assert.True(Directory.Exists(scope.OutputDir), "Output directory not created");
+        Assert.True(Directory.Exists(scope.BaseModelDir), "Base Model directory not created");
+        Assert.Equal(goldenPath, scope.GoldenDir);
+    }
+
+    [Fact]
+    public async Task StageImagesAsync_CopiesFiles_Correctly()
+    {
+        // Arrange
+        var goldenPath = Path.Combine(_testRootPath, "golden_set");
+        Directory.CreateDirectory(goldenPath);
         
-        for (int i = 0; i < 50; i++) _db.TrainingImages.Add(new TrainingImage { Status = TrainingStatus.Ready, Label = "Real" });
-        for (int i = 0; i < 50; i++) _db.TrainingImages.Add(new TrainingImage { Status = TrainingStatus.Ready, Label = "Fake" });
-        await _db.SaveChangesAsync();
+        var sourceImagePath = Path.Combine(_testRootPath, "source_image.jpg");
+        await File.WriteAllTextAsync(sourceImagePath, "dummy image content");
 
-        var jobId = Guid.NewGuid();
-        var tempPath = Path.Combine(Path.GetTempPath(), "test_job_" + jobId);
-        Directory.CreateDirectory(Path.Combine(tempPath, "output"));
-        var mockScope = new TrainingJobManager.JobScope(jobId, tempPath, "golden", Mock.Of<ILogger>());
-
-        _mockJobManager.Setup(x => x.CreateJobScope()).Returns(mockScope);
-        _mockJobManager.Setup(x => x.PrepareBaseModelAsync(mockScope)).ReturnsAsync("base_path");
-        _mockPythonExecutor.Setup(x => x.RunTrainingAsync(mockScope, "base_path")).ReturnsAsync(true);
-
-        var metrics = new PythonTrainingResult
+        var image = new TrainingImage
         {
-            Validation = new Metrics { Accuracy = 0.90 },
-            GoldenTest = new Metrics { Accuracy = 0.80 } 
+            Id = Guid.NewGuid(),
+            MediaImageId = "img_1",
+            S3Key = "img_1.jpg",
+            Label = "Real",
+            Status = TrainingStatus.Ready
         };
-        await File.WriteAllTextAsync(mockScope.MetricsPath, JsonSerializer.Serialize(metrics));
-        await File.WriteAllTextAsync(mockScope.OutputModelPath, "fake_model_content");
 
-        var resultId = await _service.RunTrainingCycleAsync();
+        _mockDatasetService
+            .Setup(ds => ds.GetLocalFilePath("img_1"))
+            .Returns(sourceImagePath);
 
-        var modelInDb = await _db.ModelWeights.FindAsync(resultId);
-        Assert.False(modelInDb.IsDeployed);
-        Assert.NotNull(modelInDb.RejectionReason);
+        using var scope = _manager.CreateJobScope();
 
-        mockScope.Dispose();
+        // Act
+        await _manager.StageImagesAsync(scope, new List<TrainingImage> { image }, new List<TrainingImage>());
+
+        // Assert
+        var expectedDestPath = Path.Combine(scope.DataDir, "REAL", $"{image.Id}.jpg");
+        Assert.True(File.Exists(expectedDestPath), "Image was not copied to the job directory");
+    }
+
+    [Fact]
+    public async Task PrepareBaseModelAsync_DownloadsModel_AndCopiesConfig()
+    {
+        // Arrange
+        var goldenPath = Path.Combine(_testRootPath, "golden_set");
+        Directory.CreateDirectory(goldenPath);
+        using var scope = _manager.CreateJobScope();
+        
+        var seedDir = Path.Combine(_testRootPath, "seed_model");
+        Directory.CreateDirectory(seedDir);
+        await File.WriteAllTextAsync(Path.Combine(seedDir, "config.json"), "{}");
+        await File.WriteAllTextAsync(Path.Combine(seedDir, "preprocessor_config.json"), "{}");
+        
+        _db.ModelWeights.Add(new ModelWeights
+        {
+            Version = "v1",
+            IsDeployed = true,
+            MinioObjectPath = "models/v1/model.safetensors",
+            CreatedAt = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+        
+        _mockBlobStorage
+            .Setup(b => b.DownloadFileAsync("models/v1/model.safetensors", It.IsAny<string>(), null))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var resultPath = await _manager.PrepareBaseModelAsync(scope);
+
+        // Assert
+        Assert.Equal(scope.BaseModelDir, resultPath);
+        
+        Assert.True(File.Exists(Path.Combine(scope.BaseModelDir, "config.json")));
+        
+        _mockBlobStorage.Verify(b => b.DownloadFileAsync("models/v1/model.safetensors", It.IsAny<string>(), null), Times.Once);
     }
 }

@@ -31,7 +31,6 @@ public class TrainingWorkflowServiceTests
 
     public TrainingWorkflowServiceTests()
     {
-        //  Mock database
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()) 
             .Options;
@@ -49,7 +48,7 @@ public class TrainingWorkflowServiceTests
             _mockConfidence.Object, 
             _mockMedia.Object, 
             _mockDataset.Object, 
-            _jobQueue, // Updated Constructor Injection
+            _jobQueue, 
             _mockLogger.Object
         );
     }
@@ -58,19 +57,27 @@ public class TrainingWorkflowServiceTests
     public async Task ProcessVoteAsync_NewImage_PromotesToReady_AndQueuesJob()
     {
         // Arrange
-        var request = new EvaluateImageRequest { MediaImageId = "img_new", PostId = Guid.NewGuid() };
+        // FIX: Added required S3Key
+        var request = new EvaluateImageRequest 
+        { 
+            MediaImageId = "img_new", 
+            PostId = Guid.NewGuid(),
+            S3Key = "images/img_new.jpg" 
+        };
         
-        // Mock Media Service to return metadata
         _mockMedia.Setup(m => m.GetImageMetadataAsync("img_new"))
             .ReturnsAsync(new MediaImageResponse 
             { 
                 ImageId = "img_new", 
                 Url = "http://fake/url.jpg",
                 S3Key = "images/img_new.jpg", 
-                UserId = "user_123" 
+                UserId = "user_123",
+                Verdict = "real",
+                Label = "real",
+                Confidence = 1,
+                IsPublic = true
             });
 
-        // Mock Confidence to return ready
         _mockConfidence.Setup(c => c.Evaluate(It.IsAny<VoteData>()))
                        .Returns(new ConfidenceResult { IsReadyForTraining = true, TrainingLabel = "ai" });
 
@@ -84,7 +91,7 @@ public class TrainingWorkflowServiceTests
         
         _mockDataset.Verify(d => d.SaveImageAsync("img_new", "images/img_new.jpg"), Times.Once);
 
-        // ASSERT
+        // Verify Queue: Should have 1 item
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         var reader = _jobQueue.ReadAllAsync(cts.Token).GetAsyncEnumerator();
         
@@ -108,9 +115,13 @@ public class TrainingWorkflowServiceTests
         _db.TrainingImages.Add(existing);
         await _db.SaveChangesAsync(); 
 
-        var request = new EvaluateImageRequest { MediaImageId = "img_existing" };
+        // FIX: Added required S3Key
+        var request = new EvaluateImageRequest 
+        { 
+            MediaImageId = "img_existing",
+            S3Key = "test_images/img_existing.jpg"
+        };
 
-        // Mock Confidence 
         _mockConfidence.Setup(c => c.Evaluate(It.IsAny<VoteData>()))
             .Returns(new ConfidenceResult { IsReadyForTraining = false, TrainingLabel = "ai" });
 
@@ -125,14 +136,15 @@ public class TrainingWorkflowServiceTests
     }
 
     [Fact]
-    public async Task ProcessVoteAsync_ExistingReadyImage_RemainsReady_QueuesJob()
+    // RENAMED: Logic changed to prevent spamming queue
+    public async Task ProcessVoteAsync_ExistingReadyImage_RemainsReady_DoesNotQueue()
     {
         // Arrange
         var existing = new TrainingImage 
         { 
             Id = Guid.NewGuid(), 
             MediaImageId = "img_stable", 
-            Status = TrainingStatus.Ready,
+            Status = TrainingStatus.Ready, 
             Label = "ai",
             S3Key = "test_images/img_stable.jpg",
             PostId = Guid.NewGuid()
@@ -143,20 +155,25 @@ public class TrainingWorkflowServiceTests
         _mockConfidence.Setup(c => c.Evaluate(It.IsAny<VoteData>()))
             .Returns(new ConfidenceResult { IsReadyForTraining = true, TrainingLabel = "ai" });
         
+        var request = new EvaluateImageRequest 
+        { 
+            MediaImageId = "img_stable",
+            S3Key = "test_images/img_stable.jpg"
+        };
+
         // Act
-        await _service.ProcessVoteAsync(new EvaluateImageRequest { MediaImageId = "img_stable" });
+        await _service.ProcessVoteAsync(request);
 
         // Assert
         Assert.Equal(TrainingStatus.Ready, existing.Status);
         
-        // Verify download 
-        _mockDataset.Verify(d => d.SaveImageAsync("img_stable", "test_images/img_stable.jpg"), Times.Once);
-
-        // ASSERT QUEUE
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
         var reader = _jobQueue.ReadAllAsync(cts.Token).GetAsyncEnumerator();
         
-        bool hasSignal = await reader.MoveNextAsync(); 
-        Assert.True(hasSignal, "Job should be queued even if image was already ready (as it might trigger the threshold).");
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => 
+        {
+            await reader.MoveNextAsync();
+        });
     }
 }

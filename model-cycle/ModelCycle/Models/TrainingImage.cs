@@ -11,15 +11,15 @@ public class TrainingImage
     
     public Guid PostId { get; set; } 
 
-    public string MediaImageId { get; set; } 
-    public string S3Key { get; set; }
+    public required string MediaImageId { get; set; } 
+    public required string S3Key { get; set; }
     
     public int UserAiVotes { get; set; }
     public int UserRealVotes { get; set; }
     public double ModelConfidenceScore { get; set; }
 
     public double CurrentProbability { get; set; }
-    public string Label { get; set; }
+    public required string Label { get; set; }
     
     public TrainingStatus Status { get; set; } = TrainingStatus.Pending; 
     

@@ -5,10 +5,10 @@ namespace ModelCycle.DTOs.ModelTraining;
 public class PythonTrainingResult
 {
     [JsonPropertyName("validation")]
-    public Metrics Validation { get; set; }
+    public required Metrics Validation { get; set; }
 
     [JsonPropertyName("golden_test")]
-    public Metrics GoldenTest { get; set; }
+    public required Metrics GoldenTest { get; set; }
 
     [JsonPropertyName("epochs_trained")]
     public int EpochsTrained { get; set; }

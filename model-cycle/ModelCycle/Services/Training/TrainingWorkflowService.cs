@@ -53,11 +53,10 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         
         await _db.SaveChangesAsync();
         
-        if (result.IsReadyForTraining)
+        if (result.IsReadyForTraining && previousState.Status != TrainingStatus.Ready)
         {
-            // call's background worker and returns immediately.
             await _jobQueue.QueueJobAsync();
-            _logger.LogInformation("Training signal queued.");
+            _logger.LogInformation("Image promoted to Ready. Training signal queued.");
         }
         
         return result;

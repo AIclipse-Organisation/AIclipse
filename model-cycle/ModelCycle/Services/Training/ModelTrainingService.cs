@@ -17,6 +17,8 @@ public class ModelTrainingService : IModelTrainingService
 
     private const int BATCH_SIZE_THRESHOLD = 100;
     private const double REPLAY_BUFFER_RATIO = 0.20;
+    private const int BATCH_SIZE_THRESHOLD = 4; // these numbers will likely be grabbed from secrets, to allow for easy adjustments when testing later
+    private const double REPLAY_BUFFER_RATIO = 0.20;// these numbers will likely be grabbed from secrets, to allow for easy adjustments when testing later
 
     public ModelTrainingService(
         AppDbContext context,
@@ -81,6 +83,11 @@ public class ModelTrainingService : IModelTrainingService
             .Where(i => i.Status == TrainingStatus.Ready && i.Label == "Fake")
             .Take(targetPerClass)
             .ToListAsync();
+        
+        _logger.LogInformation(
+            "Training Data Check: Real: {RealCount}/{Target}, Fake: {FakeCount}/{Target}. (Threshold: {Total})", 
+            readyReal.Count, targetPerClass, readyFake.Count, targetPerClass, BATCH_SIZE_THRESHOLD
+        );
 
         if (readyReal.Count < targetPerClass || readyFake.Count < targetPerClass)
         {
@@ -134,7 +141,8 @@ public class ModelTrainingService : IModelTrainingService
             throw new FileNotFoundException("Metrics file not found");
 
         var json = await File.ReadAllTextAsync(scope.MetricsPath);
-        var results = JsonSerializer.Deserialize<PythonTrainingResult>(json);
+        var results = JsonSerializer.Deserialize<PythonTrainingResult>(json) 
+                      ?? throw new InvalidOperationException("Failed to deserialize metrics json.");
 
         var weights = new ModelWeights
         {

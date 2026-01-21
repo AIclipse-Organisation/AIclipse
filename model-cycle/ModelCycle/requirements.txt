@@ -1,5 +1,11 @@
-torch --index-url https://download.pytorch.org/whl/cpu
-torchvision --index-url https://download.pytorch.org/whl/cpu
+
+--index-url https://download.pytorch.org/whl/cpu
+
+
+--extra-index-url https://pypi.org/simple
+
+torch
+torchvision
 transformers
 scikit-learn
 numpy

@@ -90,7 +90,8 @@ public class BlobStorageService : IBlobStorageService
         try 
         {
             var directory = Path.GetDirectoryName(destinationPath);
-            if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+
+            if (!Directory.Exists(directory) && !string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
             var args = new GetObjectArgs()
                 .WithBucket(targetBucket)

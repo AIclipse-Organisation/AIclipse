@@ -12,14 +12,14 @@ public class TrainingJobManager : ITrainingJobManager
 {
     private readonly IWebHostEnvironment _env;
     private readonly IDatasetService _datasetService;
-    private readonly BlobStorageService _blobStorage;
+    private readonly IBlobStorageService _blobStorage;
     private readonly AppDbContext _context;
     private readonly ILogger<TrainingJobManager> _logger;
 
     public TrainingJobManager(
         IWebHostEnvironment env,
         IDatasetService datasetService,
-        BlobStorageService blobStorage,
+        IBlobStorageService blobStorage,
         AppDbContext context,
         ILogger<TrainingJobManager> logger)
     {
