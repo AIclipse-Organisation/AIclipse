@@ -1,5 +1,5 @@
 .card {
-  background: transparent;
+  background: white;
   box-shadow: none;
   border-radius: 0;
   padding: 0;
@@ -192,11 +192,6 @@ pre {
   color: #4b5563;
 }
 
-.divider {
-  margin: 14px 0;
-  border: none;
-  border-top: 1px solid #e5e7eb;
-}
 
 .subheading {
   font-size: 13px;
@@ -214,18 +209,22 @@ pre {
 
 
 .detection-card {
-  display: block;
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  margin-top: 8px;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
 }
 
 .detection-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  display: block;
+}
+
+#preview-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  border-radius: 10px;
 }
 
 .detection-thumb {
@@ -276,7 +275,7 @@ pre {
 .ai-fill   { background: #ff3b3b; }   /* red */
 
 /* meta + actions */
-.detection-meta { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.detection-meta { display:flex; align-items:center; justify-content:center; gap:12px; }
 .detection-actions { display:flex; gap:8px; }
 
 button.danger {
@@ -285,4 +284,174 @@ button.danger {
 
 button.secondary {
   background: #f3f4f6; color: #111827; border: 1px solid #e5e7eb;
+}
+
+.verdict-text {
+  font-size: 18px;          
+  font-weight: 700;
+  text-align: center;
+  margin: 12px 0 10px;
+}
+
+/* CENTER CONFIDENCE TEXT */
+#detect-confidence {
+  justify-content: center;
+  text-align: center;
+  margin-top: 6px;
+}
+
+/* BIGGER, CENTERED PROGRESS BAR */
+.detection-card .progress-bar {
+  height: 26px;             
+  border-radius: 999px;     
+  max-width: 520px;         
+  margin: 10px auto;       
+}
+
+/* smoother fill look */
+.detection-card .fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+
+/* ACTION CARD */
+.action-card {
+  margin: 18px auto 0;
+  max-width: 380px;
+  padding: 16px 14px;
+
+  background: transparent;
+  border: none;
+  border-radius: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Title like screenshot */
+.action-title {
+  margin: 6px 0 2px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+/* Align icon + text consistently */
+.action-item {
+  width: 100%;
+  max-width: 340px;
+  margin: 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* icon box width keeps perfect alignment */
+.action-icon {
+  width: 22px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex: 0 0 22px;
+}
+
+/* Text should align nicely */
+.action-text {
+  display: inline-block;
+  text-align: left;
+}
+
+/* --- Color matching your screenshot --- */
+/* Gold for publish + save */
+.action-publish,
+.action-save {
+  color: #c9ba83;
+  font-weight: 700;
+}
+
+/* Make checkbox follow gold */
+.action-publish input {
+  accent-color: #c9ba83;
+}
+
+/* Save button: transparent like list item */
+.action-save #btn-save {
+  background: transparent;
+  border: none;
+  color: #c9ba83;
+  font-weight: 700;
+  padding: 0;
+}
+
+/* Delete: red */
+.action-delete {
+  color: #ff3b3b;
+  font-weight: 700;
+}
+
+.action-delete #btn-delete {
+  background: transparent;
+  border: none;
+  color: #ff3b3b;
+  font-weight: 700;
+  padding: 0;
+}
+
+/* keep disabled save still readable */
+.action-save #btn-save:disabled {
+  opacity: 0.55;
+}
+
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+/* Modal card */
+.modal {
+  width: 90%;
+  max-width: 360px;
+  background: #111;
+  border-radius: 14px;
+  padding: 18px 16px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+/* Title */
+.modal-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* Text */
+.modal-text {
+  font-size: 14px;
+  color: #ccc;
+  margin-bottom: 18px;
+}
+
+/* Actions */
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-actions button {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
 }

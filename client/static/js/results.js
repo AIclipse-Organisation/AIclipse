@@ -116,3 +116,43 @@ window.addEventListener("DOMContentLoaded", () => {
   const btnBack = document.getElementById("btn-back");
   if (btnBack) btnBack.addEventListener("click", () => history.back());
 });
+
+
+  // Delete modal
+  const deleteBtn = document.getElementById("btn-delete");
+  const modal = document.getElementById("delete-modal");
+  const cancelBtn = document.getElementById("cancel-delete");
+  const confirmBtn = document.getElementById("confirm-delete");
+
+  if (modal) modal.hidden = true; // force closed on load
+
+  if (deleteBtn && modal && cancelBtn && confirmBtn) {
+    deleteBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      modal.hidden = false;
+    });
+
+    cancelBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      modal.hidden = true;
+    });
+
+    confirmBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      modal.hidden = true;
+
+      try {
+        // Clear UI (safe fallback)
+        const preview = document.getElementById("preview-image");
+        if (preview) preview.src = "";
+
+        const verdict = document.getElementById("detect-verdict");
+        if (verdict) verdict.textContent = "—";
+
+        window.history.back();
+      } catch (err) {
+        console.error("Delete failed", err);
+      }
+    });
+  }
