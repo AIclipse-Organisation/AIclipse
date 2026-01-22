@@ -5,6 +5,9 @@ import jwt
 import bcrypt
 import re
 import json
+import secrets
+import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -28,20 +31,30 @@ Responsibilities:
 - Issue RS256 JWTs
 - Expose JWKS for Gateway verification
 - Provide basic user and admin APIs (signup, login, me, admin/users)
+- Manage API keys for developer access (stored hashed), and exchange them for short-lived JWT
 """
 
 JWT_KEY = os.getenv("JWT_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB = os.getenv("MONGO_DB")
+API_KEY_PEPPER = os.getenv("API_KEY_PEPPER")
+INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN")
 
 KEY_ID = "phase1-key"
 
 mongo_client: AsyncIOMotorClient | None = None
 users_coll = None
+api_keys_coll = None
 
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _require_setting(name: str, value: Optional[str]) -> str:
+    if value:
+        return value
+    raise HTTPException(status_code=500, detail=f"Missing required setting: {name}")
 
 
 def load_or_generate_rsa(key_str: str):
@@ -97,7 +110,6 @@ class UserPublic(BaseModel):
     total_correct: Optional[int] = 0
     acc_guessing_ai: Optional[int] = 0
     acc_guessing_real: Optional[int] = 0
-    
 
 
 class SignupRequest(BaseModel):
@@ -137,18 +149,51 @@ class TokenUser(BaseModel):
     plan: int = 0
 
 
+# ---- API key models ----
+
+class ApiKeyPublic(BaseModel):
+    key_id: str
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+    last4: str
+
+
+class ApiKeyListResponse(BaseModel):
+    items: List[ApiKeyPublic]
+
+
+class ApiKeyCreateResponse(BaseModel):
+    api_key: str
+    key: ApiKeyPublic
+
+
+class ApiKeyExchangeRequest(BaseModel):
+    api_key: str
+
+
+class ApiKeyExchangeResponse(BaseModel):
+    token: str
+    exp: int
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global mongo_client, users_coll
+    global mongo_client, users_coll, api_keys_coll
 
     created_here = False
     if users_coll is None:
         mongo_client = AsyncIOMotorClient(MONGO_URI)
         db = mongo_client[MONGO_DB]
         users_coll = db["auth.users"]
+        api_keys_coll = db["auth.api_keys"]
 
         await users_coll.create_index("email", unique=True)
         await users_coll.create_index("user_id", unique=True)
+
+        await api_keys_coll.create_index("key_id", unique=True)
+        await api_keys_coll.create_index("user_id")
+        await api_keys_coll.create_index("revoked_at")
 
         created_here = True
 
@@ -162,6 +207,7 @@ async def lifespan(app: FastAPI):
         if created_here:
             mongo_client = None
             users_coll = None
+            api_keys_coll = None
 
 
 app = FastAPI(lifespan=lifespan)
@@ -214,6 +260,33 @@ def issue_jwt(user_doc: dict) -> str:
         headers={"kid": KEY_ID},
     )
     return token
+
+
+def issue_jwt_from_api_key(user_doc: dict, *, api_key_id: str) -> tuple[str, int]:
+    """
+    Short-lived JWT for API access. Keeps same main fields (sub/email/user_name/is_admin/plan).
+    Adds token_type + api_key_id (harmless for existing consumers).
+    """
+    now = _now_utc()
+    exp_dt = now + timedelta(minutes=5)
+    payload = {
+        "sub": user_doc["user_id"],
+        "email": user_doc["email"],
+        "user_name": user_doc.get("user_name"),
+        "is_admin": bool(user_doc.get("is_admin", False)),
+        "plan": int(user_doc.get("plan", 0)),
+        "token_type": "api_key",
+        "api_key_id": api_key_id,
+        "iat": now,
+        "exp": exp_dt,
+    }
+    token = jwt.encode(
+        payload,
+        private_key,
+        algorithm="RS256",
+        headers={"kid": KEY_ID},
+    )
+    return token, int(exp_dt.timestamp())
 
 
 def _parse_bearer_token(authorization: Optional[str]) -> str:
@@ -272,6 +345,31 @@ async def get_current_admin(user: TokenUser = Depends(get_current_user)) -> Toke
             detail="Admin privileges required",
         )
     return user
+
+
+def _hmac_sha256_hex(value: str, *, pepper: str) -> str:
+    mac = hmac.new(pepper.encode("utf-8"), value.encode("utf-8"), hashlib.sha256)
+    return mac.hexdigest()
+
+
+def _generate_api_key() -> tuple[str, str, str]:
+    """
+    Returns (key_id, secret, full_key)
+    full_key format: {key_id}.{secret}
+    """
+    key_id = f"ak_{uuid4()}"
+    secret = "sk_" + secrets.token_urlsafe(32)
+    full_key = f"{key_id}.{secret}"
+    return key_id, secret, full_key
+
+
+def _parse_full_api_key(full_key: str) -> tuple[str, str]:
+    if not full_key or "." not in full_key:
+        raise HTTPException(status_code=401, detail="Invalid API key format")
+    key_id, secret = full_key.split(".", 1)
+    if not key_id.startswith("ak_") or not secret.startswith("sk_"):
+        raise HTTPException(status_code=401, detail="Invalid API key format")
+    return key_id, secret
 
 
 # Routes
@@ -516,6 +614,129 @@ async def admin_delete_user(
             "email": result["email"],
         },
     }
+
+
+# ---- API key management ----
+
+@app.get("/me/api-keys", response_model=ApiKeyListResponse)
+async def list_my_api_keys(user: TokenUser = Depends(get_current_user)):
+    assert api_keys_coll is not None
+
+    cursor = api_keys_coll.find({"user_id": user.user_id}).sort("created_at", -1).limit(200)
+    items: List[ApiKeyPublic] = []
+    async for doc in cursor:
+        items.append(
+            ApiKeyPublic(
+                key_id=doc["key_id"],
+                created_at=doc.get("created_at", _now_utc()),
+                last_used_at=doc.get("last_used_at"),
+                revoked_at=doc.get("revoked_at"),
+                last4=doc.get("last4", "????"),
+            )
+        )
+    return {"items": items}
+
+
+@app.post("/me/api-keys", response_model=ApiKeyCreateResponse, status_code=status.HTTP_201_CREATED)
+async def create_my_api_key(user: TokenUser = Depends(get_current_user)):
+    assert api_keys_coll is not None
+    assert users_coll is not None
+
+    pepper = _require_setting("API_KEY_PEPPER", API_KEY_PEPPER)
+
+    user_doc = await users_coll.find_one({"user_id": user.user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    key_id, secret, full_key = _generate_api_key()
+    secret_hash = _hmac_sha256_hex(secret, pepper=pepper)
+    now = _now_utc()
+
+    doc = {
+        "key_id": key_id,
+        "user_id": user.user_id,
+        "secret_hash": secret_hash,
+        "created_at": now,
+        "last_used_at": None,
+        "revoked_at": None,
+        "last4": secret[-4:],
+    }
+
+    await api_keys_coll.insert_one(doc)
+
+    pub = ApiKeyPublic(
+        key_id=key_id,
+        created_at=now,
+        last_used_at=None,
+        revoked_at=None,
+        last4=doc["last4"],
+    )
+
+    return ApiKeyCreateResponse(api_key=full_key, key=pub)
+
+
+@app.post("/me/api-keys/{key_id}/revoke")
+async def revoke_my_api_key(
+    key_id: str,
+    user: TokenUser = Depends(get_current_user),
+):
+    assert api_keys_coll is not None
+
+    now = _now_utc()
+    result = await api_keys_coll.find_one_and_update(
+        {"key_id": key_id, "user_id": user.user_id, "revoked_at": None},
+        {"$set": {"revoked_at": now}},
+        return_document=True,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="API key not found or already revoked")
+
+    return {"revoked": True, "key_id": key_id}
+
+
+# ---- Internal exchange endpoint (Gateway only) ----
+
+@app.post("/internal/api-keys/exchange", response_model=ApiKeyExchangeResponse)
+async def exchange_api_key(
+    body: ApiKeyExchangeRequest,
+    x_internal_token: Optional[str] = Header(None, alias="X-Internal-Token"),
+):
+    assert api_keys_coll is not None
+    assert users_coll is not None
+
+    expected = _require_setting("INTERNAL_AUTH_TOKEN", INTERNAL_AUTH_TOKEN)
+    if not x_internal_token or not hmac.compare_digest(x_internal_token, expected):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    pepper = _require_setting("API_KEY_PEPPER", API_KEY_PEPPER)
+
+    full_key = body.api_key.strip()
+    key_id, secret = _parse_full_api_key(full_key)
+
+    key_doc = await api_keys_coll.find_one({"key_id": key_id})
+    if not key_doc:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    if key_doc.get("revoked_at") is not None:
+        raise HTTPException(status_code=401, detail="API key revoked")
+
+    want = str(key_doc.get("secret_hash") or "")
+    got = _hmac_sha256_hex(secret, pepper=pepper)
+    if not want or not hmac.compare_digest(want, got):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    # best-effort last_used_at
+    try:
+        await api_keys_coll.update_one({"key_id": key_id}, {"$set": {"last_used_at": _now_utc()}})
+    except Exception:
+        pass
+
+    user_doc = await users_coll.find_one({"user_id": key_doc["user_id"]})
+    if not user_doc:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    token, exp = issue_jwt_from_api_key(user_doc, api_key_id=key_id)
+    return ApiKeyExchangeResponse(token=token, exp=exp)
 
 
 @app.get("/.well-known/jwks.json")

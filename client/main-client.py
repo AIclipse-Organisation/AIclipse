@@ -13,9 +13,9 @@ from flask import (
 from werkzeug.serving import WSGIRequestHandler
 
 # Client service.
-# - Віддає UI (index.html)
-# - Є BFF для браузера: приймає запити з фронта, ходить до Gateway по GATEWAY_URI
-# - Зберігає JWT виключно в HttpOnly cookie, фронт його не бачить
+# - Returns UI (index.html)
+# - Is a BFF for the browser: accepts requests from the front, goes to the Gateway via GATEWAY_URI
+# - Stores JWT exclusively in HttpOnly cookie, the front does not see it
 
 app = Flask(__name__)
 
@@ -54,6 +54,10 @@ def plan():
 @app.get("/profile")
 def profile():
     return send_from_directory("templates", "profile.html")
+
+@app.get("/dev")
+def dev():
+    return send_from_directory("templates", "dev.html")
 
 
 

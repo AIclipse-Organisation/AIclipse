@@ -11,6 +11,8 @@ from typing import Any, Dict, Optional, Tuple
 
 import httpx
 import jwt
+import hmac
+
 from fastapi import (
     Depends,
     FastAPI,
@@ -22,6 +24,7 @@ from fastapi import (
     Query,
     UploadFile,
     status,
+    Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -36,6 +39,10 @@ HOSTNAME = os.getenv("HOSTNAME")
 
 # Internal secret for detection_token
 DETECTION_TOKEN_SECRET = os.getenv("DETECTION_TOKEN_SECRET")
+
+# Gateway -> Auth internal auth for api-key exchange
+INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN")
+APIKEY_CACHE_TTL_SECONDS = 60
 
 # Image safety limits
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -53,6 +60,13 @@ SUPPORTED_IMAGE_FORMATS: Dict[str, Tuple[str, str]] = {
 JWKS_CACHE: Dict[str, Any] = {}
 JWKS_LOCK = asyncio.Lock()
 
+# API key allowed paths
+API_KEY_ALLOWED_PATHS = {"/v1/checks", "/checks"}
+
+# API key exchange cache: sha256(api_key) -> (jwt, exp_unix)
+APIKEY_TOKEN_CACHE: Dict[str, Tuple[str, int]] = {}
+APIKEY_CACHE_LOCK = asyncio.Lock()
+
 
 def _require_setting(name: str, value: Optional[str]) -> str:
     if value:
@@ -67,7 +81,7 @@ class _HealthzFilter(logging.Filter):
     # Hide health endpoints from access logs
     def filter(self, record):
         try:
-            return all(p not in record.getMessage() for p in ("/healthz", "/api/healthz"))
+            return "/healthz" not in record.getMessage()
         except Exception:
             return True
 
@@ -96,7 +110,6 @@ app.add_middleware(
 
 
 @app.get("/healthz")
-@app.get("/api/healthz")
 def healthz():
     return {"status": "ok"}
 
@@ -284,6 +297,81 @@ async def _decode_jwt_rs256(token: str) -> Dict[str, Any]:
         )
 
 
+def _sha256_bytes(data: bytes) -> str:
+    h = hashlib.sha256()
+    h.update(data)
+    return h.hexdigest()
+
+
+def _sha256_str(s: str) -> str:
+    return _sha256_bytes(s.encode("utf-8"))
+
+
+def _require_internal_token() -> str:
+    return _require_setting("INTERNAL_AUTH_TOKEN", INTERNAL_AUTH_TOKEN)
+
+
+async def _exchange_api_key_for_jwt(api_key: str) -> Tuple[str, int]:
+    """
+    Exchange API key -> short-lived RS256 JWT in Auth service.
+    Returns (jwt, exp_unix).
+    Uses best-effort in-memory caching.
+    """
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
+    now = int(time.time())
+    cache_key = _sha256_str(api_key)
+
+    async with APIKEY_CACHE_LOCK:
+        cached = APIKEY_TOKEN_CACHE.get(cache_key)
+        if cached:
+            tok, exp = cached
+            if exp - 5 > now:
+                return tok, exp
+            APIKEY_TOKEN_CACHE.pop(cache_key, None)
+
+    url = auth_uri.rstrip("/") + "/internal/api-keys/exchange"
+    headers = {
+        "Accept": "application/json",
+        "X-Internal-Token": _require_internal_token(),
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json={"api_key": api_key}, headers=headers)
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Auth exchange unreachable: {exc}",
+        )
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    if resp.status_code == 403:
+        raise HTTPException(status_code=403, detail="API key exchange forbidden")
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=502, detail="Auth service error on exchange")
+
+    try:
+        data = resp.json()
+    except ValueError:
+        raise HTTPException(status_code=502, detail="Auth exchange returned invalid JSON")
+
+    token = data.get("token")
+    exp = data.get("exp")
+    if not token or not exp:
+        raise HTTPException(status_code=502, detail="Auth exchange missing token/exp")
+
+    exp_i = int(exp)
+
+    # Clamp cache TTL
+    cache_exp = min(exp_i, now + APIKEY_CACHE_TTL_SECONDS)
+
+    async with APIKEY_CACHE_LOCK:
+        APIKEY_TOKEN_CACHE[cache_key] = (token, cache_exp)
+
+    return token, exp_i
+
+
 async def get_current_user(
     authorization: Optional[str] = Header(None),
 ) -> UserContext:
@@ -306,6 +394,42 @@ async def get_current_user(
     )
 
 
+async def get_current_user_any(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-Api-Key"),
+) -> UserContext:
+    """
+    Accept either:
+      - X-Api-Key (only on whitelisted routes) -> exchange -> RS256 verify -> UserContext
+      - Authorization: Bearer <jwt> (normal browser flow)
+    """
+    if x_api_key:
+        if request.url.path not in API_KEY_ALLOWED_PATHS:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key not allowed on this route",
+            )
+
+        jwt_token, _exp = await _exchange_api_key_for_jwt(x_api_key)
+        payload = await _decode_jwt_rs256(jwt_token)
+
+        user_id = payload.get("sub") or payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Token missing subject")
+
+        return UserContext(
+            user_id=str(user_id),
+            email=payload.get("email"),
+            is_admin=bool(payload.get("is_admin", False)),
+            plan=payload.get("plan"),
+            token=jwt_token,
+        )
+
+    # fallback to Bearer
+    return await get_current_user(authorization=authorization)
+
+
 async def get_current_admin(user: UserContext = Depends(get_current_user)) -> UserContext:
     if not user.is_admin:
         raise HTTPException(
@@ -313,12 +437,6 @@ async def get_current_admin(user: UserContext = Depends(get_current_user)) -> Us
             detail="Admin privileges required",
         )
     return user
-
-
-def _sha256_bytes(data: bytes) -> str:
-    h = hashlib.sha256()
-    h.update(data)
-    return h.hexdigest()
 
 
 def _create_detection_token(
@@ -532,18 +650,50 @@ async def gateway_admin_delete_user(
     )
 
 
-# Detection: /checks -> Detector /v1.0.1/checks
+@app.get("/auth/api-keys")
+async def gateway_list_api_keys(user: UserContext = Depends(get_current_user)):
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
+    return await _proxy_json(
+        "GET",
+        auth_uri,
+        "/me/api-keys",
+        headers={"Authorization": f"Bearer {user.token}"},
+    )
 
 
-@app.post("/checks")
-async def gateway_checks(
-    file: UploadFile = File(...),
+@app.post("/auth/api-keys")
+async def gateway_create_api_key(user: UserContext = Depends(get_current_user)):
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
+    return await _proxy_json(
+        "POST",
+        auth_uri,
+        "/me/api-keys",
+        headers={"Authorization": f"Bearer {user.token}"},
+    )
+
+
+@app.post("/auth/api-keys/{key_id}/revoke")
+async def gateway_revoke_api_key(
+    key_id: str,
     user: UserContext = Depends(get_current_user),
 ):
+    auth_uri = _require_setting("AUTH_URI", AUTH_URI)
+    return await _proxy_json(
+        "POST",
+        auth_uri,
+        f"/me/api-keys/{key_id}/revoke",
+        headers={"Authorization": f"Bearer {user.token}"},
+    )
+
+
+# Detection: /v1/checks (new) + /checks (legacy) -> Detector /v1.0.1/checks
+
+
+async def _checks_impl(file: UploadFile, user: UserContext) -> JSONResponse:
     detector_uri = _require_setting("DETECTOR_URI", DETECTOR_URI)
 
     data = await file.read()
-    normalized_ct, _ext = _sniff_and_validate_image(data)
+    _normalized_ct, _ext = _sniff_and_validate_image(data)
 
     x_request_id = str(uuid.uuid4())
     url = detector_uri.rstrip("/") + "/v1.0.1/checks"
@@ -608,6 +758,23 @@ async def gateway_checks(
     }
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=response_body)
+
+
+@app.post("/v1/checks")
+async def gateway_checks_v1(
+    file: UploadFile = File(...),
+    user: UserContext = Depends(get_current_user_any),
+):
+    return await _checks_impl(file, user)
+
+
+@app.post("/checks")
+async def gateway_checks_legacy(
+    file: UploadFile = File(...),
+    user: UserContext = Depends(get_current_user_any),
+):
+    # Temporary legacy alias.
+    return await _checks_impl(file, user)
 
 
 # Image saving / history / community (Media)

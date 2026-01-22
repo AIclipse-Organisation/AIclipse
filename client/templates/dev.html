@@ -1,0 +1,117 @@
+<!-- templates/dev.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>For Devs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Try your current path -->
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <!-- Fallback if styles.css is actually in /static root -->
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+
+  <body class="app">
+    <div class="app-container">
+      <div data-include="/static/partials/topbar.html"></div>
+
+      <main class="screen">
+        <section class="card">
+          <h2>Developer API</h2>
+          <p class="muted">
+            Manage your API keys and test calls to the public API.
+            Do not use API keys in browser-based apps in production.
+          </p>
+          <div id="dev-status" class="status-bar"></div>
+        </section>
+
+        <div class="grid">
+          <section class="card">
+            <h3>API Keys</h3>
+
+            <label for="api-key-input">API key for examples and test</label>
+            <input
+              id="api-key-input"
+              type="password"
+              placeholder="Paste your API key here"
+              autocomplete="off"
+              spellcheck="false"
+            />
+
+            <div class="row" style="margin-top: 10px">
+              <button id="btn-generate-key">Generate new key</button>
+              <button id="btn-refresh-keys" class="secondary">Refresh list</button>
+            </div>
+
+            <div id="new-key-wrap" hidden style="margin-top: 16px">
+              <h4 class="subheading">New key (shown once)</h4>
+              <div class="row">
+                <input id="new-api-key" type="text" readonly />
+                <button id="btn-copy-key" class="secondary">Copy</button>
+              </div>
+              <small id="new-key-meta" class="muted"></small>
+            </div>
+
+            <h4 class="subheading" style="margin-top: 18px">Existing keys</h4>
+            <div id="keys-empty" class="muted">No keys loaded yet.</div>
+
+            <table id="keys-table" class="table" hidden>
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Created</th>
+                  <th>Last used</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="keys-tbody"></tbody>
+            </table>
+          </section>
+
+          <section class="card">
+            <h3>How to call the API</h3>
+
+            <p class="muted">
+              Send the key in the <code>X-Api-Key</code> header.
+            </p>
+
+            <label for="usage-curl">curl example</label>
+            <pre id="usage-curl">Loading…</pre>
+
+            <div class="row">
+              <button id="btn-copy-curl" class="secondary">Copy curl</button>
+            </div>
+
+            <hr class="divider" />
+
+            <h4 class="subheading">Quick test</h4>
+
+            <label for="test-file">Image file (JPEG/PNG)</label>
+            <input id="test-file" type="file" accept="image/*" />
+
+            <div class="row">
+              <button id="btn-test-call" disabled>Send to /api/v1/checks</button>
+              <span id="test-state" class="muted">Select a file and provide an API key.</span>
+            </div>
+
+            <div id="test-status" class="status-bar"></div>
+            <pre id="test-result">No test yet.</pre>
+          </section>
+        </div>
+
+        <section class="card">
+          <h3>Debug</h3>
+          <p class="muted">Last response</p>
+          <pre id="debug-output">{}</pre>
+        </section>
+      </main>
+
+      <div data-include="../static/partials/navbar.html"></div>
+    </div>
+
+    <script src="../static/js/include.js"></script>
+    <script src="../static/js/dev.js"></script>
+  </body>
+</html>
