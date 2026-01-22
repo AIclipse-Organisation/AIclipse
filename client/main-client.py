@@ -31,34 +31,40 @@ def healthz():
 def index():
     return send_from_directory("templates", "login.html")
 
+
 @app.get("/imgProcessing")
 def img_processing():
     return send_from_directory("templates", "imgProcessing.html")
+
 
 @app.get("/scans")
 def scans():
     return send_from_directory("templates", "scans.html")
 
+
 @app.get("/home")
 def upload():
     return send_from_directory("templates", "home.html")
+
 
 @app.get("/notification")
 def notification():
     return send_from_directory("templates", "notification.html")
 
+
 @app.get("/plan")
 def plan():
     return send_from_directory("templates", "plan.html")
+
 
 @app.get("/profile")
 def profile():
     return send_from_directory("templates", "profile.html")
 
+
 @app.get("/dev")
 def dev():
     return send_from_directory("templates", "dev.html")
-
 
 
 def _get_token_from_cookie() -> str | None:
@@ -66,10 +72,6 @@ def _get_token_from_cookie() -> str | None:
 
 
 def _is_request_secure() -> bool:
-    """
-    Визначаємо, чи запит прийшов по HTTPS.
-    За ingress/proxy дивимось на X-Forwarded-Proto, інакше на request.scheme.
-    """
     proto = request.headers.get("X-Forwarded-Proto", request.scheme)
     return proto.lower() == "https"
 
@@ -81,9 +83,6 @@ def _call_gateway_json(
     json_data: dict | None = None,
     require_auth: bool = False,
 ):
-    """
-    Проксі для JSON-запитів на Gateway.
-    """
     headers = {"Accept": "application/json"}
 
     if require_auth:
@@ -116,7 +115,6 @@ def _call_gateway_json(
             return jsonify({"detail": "Invalid JSON from gateway"}), 502
         return jsonify(data), status_code
 
-    # fallback на не-JSON (на випадок майбутніх змін)
     return resp.content, status_code, {"Content-Type": content_type}
 
 
@@ -125,10 +123,6 @@ def _call_gateway_json(
 
 @app.post("/auth/signup")
 def auth_signup():
-    """
-    Реєстрація користувача.
-    Проксі на Gateway /auth/signup (без JWT).
-    """
     payload = request.get_json(force=True, silent=True) or {}
     return _call_gateway_json(
         "POST",
@@ -140,13 +134,6 @@ def auth_signup():
 
 @app.post("/auth/login")
 def auth_login():
-    """
-    Логін користувача.
-    1) Надсилаємо email/password на Gateway /auth/login
-    2) Отримуємо { token, user }
-    3) Кладемо token в HttpOnly cookie (без префікса "Bearer ")
-    4) На фронт повертаємо тільки user, без токена
-    """
     payload = request.get_json(force=True, silent=True) or {}
 
     url = f"{GATEWAY_URI}/auth/login"
@@ -157,7 +144,6 @@ def auth_login():
         return jsonify({"detail": "Gateway unreachable"}), 502
 
     if resp.status_code != 200:
-        # Проксі помилку логіну як є (401/400 тощо)
         try:
             data = resp.json()
         except ValueError:
@@ -175,19 +161,17 @@ def auth_login():
     if not token or not user:
         return jsonify({"detail": "Gateway login response missing token or user"}), 502
 
-    # НОРМАЛІЗАЦІЯ: забираємо можливий префікс "Bearer "
     if isinstance(token, str) and token.lower().startswith("bearer "):
         token = token.split(" ", 1)[1].strip()
 
     response = make_response(jsonify({"user": user}), 200)
-
     response.set_cookie(
         "access_token",
         token,
         httponly=True,
         secure=_is_request_secure(),
         samesite="Lax",
-        max_age=60 * 60 * 24 * 7,  # 7 днів
+        max_age=60 * 60 * 24 * 7,
     )
 
     return response
@@ -195,10 +179,6 @@ def auth_login():
 
 @app.post("/logout")
 def logout():
-    """
-    Логаут: просто чистимо cookie з JWT.
-    Токен stateless, Gateway нічого не знає про сесії.
-    """
     response = make_response(jsonify({"detail": "Logged out"}), 200)
     response.set_cookie(
         "access_token",
@@ -213,10 +193,6 @@ def logout():
 
 @app.get("/auth/me")
 def auth_me_get():
-    """
-    Отримати поточного користувача.
-    Якщо Gateway повертає 401, чистимо cookie.
-    """
     token = _get_token_from_cookie()
     if not token:
         return jsonify({"detail": "Not authenticated"}), 401
@@ -234,7 +210,6 @@ def auth_me_get():
         return jsonify({"detail": "Gateway unreachable"}), 502
 
     if resp.status_code == 401:
-        # Токен невалідний / прострочений – чистимо cookie
         response = make_response(jsonify({"detail": "Unauthorized"}), 401)
         response.set_cookie(
             "access_token",
@@ -256,9 +231,6 @@ def auth_me_get():
 
 @app.patch("/auth/me")
 def auth_me_patch():
-    """
-    Оновлення профілю поточного користувача.
-    """
     payload = request.get_json(force=True, silent=True) or {}
     return _call_gateway_json(
         "PATCH",
@@ -270,10 +242,6 @@ def auth_me_patch():
 
 @app.delete("/auth/me")
 def auth_me_delete():
-    """
-    Видалення акаунту поточного користувача.
-    Якщо успішно – чистимо cookie.
-    """
     token = _get_token_from_cookie()
     if not token:
         return jsonify({"detail": "Not authenticated"}), 401
@@ -312,10 +280,6 @@ def auth_me_delete():
 
 @app.post("/checks")
 def checks():
-    """
-    Аналіз зображення (без збереження).
-    Проксі на Gateway /checks з JWT з cookie.
-    """
     token = _get_token_from_cookie()
     if not token:
         return jsonify({"detail": "Not authenticated"}), 401
@@ -351,14 +315,6 @@ def checks():
 
 @app.post("/upload/image")
 def upload_image():
-    """
-    Збереження зображення + результату аналізу.
-    Проксі на Gateway /upload/image.
-    Приймає:
-      - file (binary)
-      - detection_token (string)
-      - is_public (optional boolean)
-    """
     token = _get_token_from_cookie()
     if not token:
         return jsonify({"detail": "Not authenticated"}), 401
@@ -373,7 +329,6 @@ def upload_image():
     is_public_raw = request.form.get("is_public")
     is_public = None
     if is_public_raw is not None:
-        # приймаємо "true"/"false", "1"/"0"
         is_public = str(is_public_raw).lower() in ("true", "1", "yes", "on")
 
     file = request.files["file"]
@@ -411,10 +366,6 @@ def upload_image():
 
 @app.get("/images")
 def get_my_images():
-    """
-    Отримати зображення поточного користувача.
-    Проксі на Gateway /images з JWT.
-    """
     token = _get_token_from_cookie()
     if not token:
         return jsonify({"detail": "Not authenticated"}), 401
@@ -446,10 +397,6 @@ def get_my_images():
 
 @app.get("/image/<string:image_id>")
 def get_image(image_id: str):
-    """
-    Отримати метадані одного зображення (для власника або, якщо public).
-    Проксі на Gateway /image/{image_id}.
-    """
     token = _get_token_from_cookie()
     if not token:
         return jsonify({"detail": "Not authenticated"}), 401
@@ -712,28 +659,19 @@ def community_report():
     return jsonify(data), resp.status_code
 
 
-# @app.get("/community/images")
-# def get_community_images():
-#     """
-#     Список публічних зображень (community feed).
-#     JWT не потрібен.
-#     Проксі на Gateway /community/images.
-#     """
-#     url = f"{GATEWAY_URI}/community/images"
-#     headers = {"Accept": "application/json"}
+@app.get("/auth/api-keys")
+def auth_api_keys_list():
+    return _call_gateway_json("GET", "/auth/api-keys", require_auth=True)
 
-#     try:
-#         resp = requests.get(url, headers=headers, timeout=10)
-#     except requests.RequestException:
-#         logging.exception("Gateway /community/images request failed")
-#         return jsonify({"detail": "Gateway unreachable"}), 502
 
-#     try:
-#         data = resp.json()
-#     except ValueError:
-#         return jsonify({"detail": "Invalid JSON from gateway on /community/images"}), 502
+@app.post("/auth/api-keys")
+def auth_api_keys_rotate():
+    return _call_gateway_json("POST", "/auth/api-keys", require_auth=True)
 
-#     return jsonify(data), resp.status_code
+
+@app.post("/auth/api-keys/<string:key_id>/revoke")
+def auth_api_keys_revoke(key_id: str):
+    return _call_gateway_json("POST", f"/auth/api-keys/{key_id}/revoke", require_auth=True)
 
 
 class Quiet(WSGIRequestHandler):

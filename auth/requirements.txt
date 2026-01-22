@@ -5,3 +5,4 @@ cryptography
 motor
 bcrypt
 email-validator
+pymongo

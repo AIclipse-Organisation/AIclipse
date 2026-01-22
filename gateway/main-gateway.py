@@ -11,7 +11,6 @@ from typing import Any, Dict, Optional, Tuple
 
 import httpx
 import jwt
-import hmac
 
 from fastapi import (
     Depends,
@@ -42,7 +41,6 @@ DETECTION_TOKEN_SECRET = os.getenv("DETECTION_TOKEN_SECRET")
 
 # Gateway -> Auth internal auth for api-key exchange
 INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN")
-APIKEY_CACHE_TTL_SECONDS = 60
 
 # Image safety limits
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -62,10 +60,6 @@ JWKS_LOCK = asyncio.Lock()
 
 # API key allowed paths
 API_KEY_ALLOWED_PATHS = {"/v1/checks", "/checks"}
-
-# API key exchange cache: sha256(api_key) -> (jwt, exp_unix)
-APIKEY_TOKEN_CACHE: Dict[str, Tuple[str, int]] = {}
-APIKEY_CACHE_LOCK = asyncio.Lock()
 
 
 def _require_setting(name: str, value: Optional[str]) -> str:
@@ -303,10 +297,6 @@ def _sha256_bytes(data: bytes) -> str:
     return h.hexdigest()
 
 
-def _sha256_str(s: str) -> str:
-    return _sha256_bytes(s.encode("utf-8"))
-
-
 def _require_internal_token() -> str:
     return _require_setting("INTERNAL_AUTH_TOKEN", INTERNAL_AUTH_TOKEN)
 
@@ -318,17 +308,6 @@ async def _exchange_api_key_for_jwt(api_key: str) -> Tuple[str, int]:
     Uses best-effort in-memory caching.
     """
     auth_uri = _require_setting("AUTH_URI", AUTH_URI)
-    now = int(time.time())
-    cache_key = _sha256_str(api_key)
-
-    async with APIKEY_CACHE_LOCK:
-        cached = APIKEY_TOKEN_CACHE.get(cache_key)
-        if cached:
-            tok, exp = cached
-            if exp - 5 > now:
-                return tok, exp
-            APIKEY_TOKEN_CACHE.pop(cache_key, None)
-
     url = auth_uri.rstrip("/") + "/internal/api-keys/exchange"
     headers = {
         "Accept": "application/json",
@@ -361,15 +340,7 @@ async def _exchange_api_key_for_jwt(api_key: str) -> Tuple[str, int]:
     if not token or not exp:
         raise HTTPException(status_code=502, detail="Auth exchange missing token/exp")
 
-    exp_i = int(exp)
-
-    # Clamp cache TTL
-    cache_exp = min(exp_i, now + APIKEY_CACHE_TTL_SECONDS)
-
-    async with APIKEY_CACHE_LOCK:
-        APIKEY_TOKEN_CACHE[cache_key] = (token, cache_exp)
-
-    return token, exp_i
+    return token, int(exp)
 
 
 async def get_current_user(

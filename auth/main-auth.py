@@ -11,17 +11,18 @@ import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Depends, Header, Path, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
-from uuid import uuid4
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 
 """
 Auth Service
@@ -181,33 +182,24 @@ class ApiKeyExchangeResponse(BaseModel):
 async def lifespan(app: FastAPI):
     global mongo_client, users_coll, api_keys_coll
 
-    created_here = False
-    if users_coll is None:
-        mongo_client = AsyncIOMotorClient(MONGO_URI)
-        db = mongo_client[MONGO_DB]
-        users_coll = db["auth.users"]
-        api_keys_coll = db["auth.api_keys"]
+    mongo_client = AsyncIOMotorClient(MONGO_URI)
+    db = mongo_client[MONGO_DB]
+    users_coll = db["auth.users"]
+    api_keys_coll = db["auth.api_keys"]
 
-        await users_coll.create_index("email", unique=True)
-        await users_coll.create_index("user_id", unique=True)
+    await users_coll.create_index([("email", 1)], name="uniq_email", unique=True)
+    await users_coll.create_index([("user_id", 1)], name="uniq_user_id", unique=True)
 
-        await api_keys_coll.create_index("key_id", unique=True)
-        await api_keys_coll.create_index("user_id")
-        await api_keys_coll.create_index("revoked_at")
-
-        created_here = True
+    await api_keys_coll.create_index([("key_id", 1)], name="uniq_key_id", unique=True)
+    await api_keys_coll.create_index([("user_id", 1)], name="uniq_user_id_one_key", unique=True)
 
     try:
         yield
     finally:
-        if created_here and mongo_client is not None:
-            close = getattr(mongo_client, "close", None)
-            if callable(close):
-                close()
-        if created_here:
-            mongo_client = None
-            users_coll = None
-            api_keys_coll = None
+        mongo_client.close()
+        mongo_client = None
+        users_coll = None
+        api_keys_coll = None
 
 
 app = FastAPI(lifespan=lifespan)
@@ -648,9 +640,10 @@ async def create_my_api_key(user: TokenUser = Depends(get_current_user)):
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
+    now = _now_utc()
+
     key_id, secret, full_key = _generate_api_key()
     secret_hash = _hmac_sha256_hex(secret, pepper=pepper)
-    now = _now_utc()
 
     doc = {
         "key_id": key_id,
@@ -658,11 +651,13 @@ async def create_my_api_key(user: TokenUser = Depends(get_current_user)):
         "secret_hash": secret_hash,
         "created_at": now,
         "last_used_at": None,
-        "revoked_at": None,
         "last4": secret[-4:],
     }
 
-    await api_keys_coll.insert_one(doc)
+    try:
+        await api_keys_coll.replace_one({"user_id": user.user_id}, doc, upsert=True)
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="API key rotation conflict; retry")
 
     pub = ApiKeyPublic(
         key_id=key_id,
@@ -682,14 +677,9 @@ async def revoke_my_api_key(
 ):
     assert api_keys_coll is not None
 
-    now = _now_utc()
-    result = await api_keys_coll.find_one_and_update(
-        {"key_id": key_id, "user_id": user.user_id, "revoked_at": None},
-        {"$set": {"revoked_at": now}},
-        return_document=True,
-    )
-    if not result:
-        raise HTTPException(status_code=404, detail="API key not found or already revoked")
+    res = await api_keys_coll.delete_one({"user_id": user.user_id, "key_id": key_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="API key not found")
 
     return {"revoked": True, "key_id": key_id}
 
@@ -717,15 +707,11 @@ async def exchange_api_key(
     if not key_doc:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    if key_doc.get("revoked_at") is not None:
-        raise HTTPException(status_code=401, detail="API key revoked")
-
     want = str(key_doc.get("secret_hash") or "")
     got = _hmac_sha256_hex(secret, pepper=pepper)
     if not want or not hmac.compare_digest(want, got):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    # best-effort last_used_at
     try:
         await api_keys_coll.update_one({"key_id": key_id}, {"$set": {"last_used_at": _now_utc()}})
     except Exception:

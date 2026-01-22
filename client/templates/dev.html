@@ -1,117 +1,96 @@
-<!-- templates/dev.html -->
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>For Devs</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Try your current path -->
-    <link rel="stylesheet" href="/static/css/styles.css" />
-    <!-- Fallback if styles.css is actually in /static root -->
-    <link rel="stylesheet" href="/static/styles.css" />
-  </head>
+<head>
+  <meta charset="utf-8" />
+  <title>For Devs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
 
-  <body class="app">
-    <div class="app-container">
-      <div data-include="/static/partials/topbar.html"></div>
+<body class="app">
+  <div class="app-container">
+    <div data-include="/static/partials/topbar.html"></div>
 
-      <main class="screen">
-        <section class="card">
-          <h2>Developer API</h2>
-          <p class="muted">
-            Manage your API keys and test calls to the public API.
-            Do not use API keys in browser-based apps in production.
-          </p>
-          <div id="dev-status" class="status-bar"></div>
-        </section>
+    <main class="screen">
+      <section class="card">
+        <h2>Developer API</h2>
+        <p class="muted">
+          Generate your API key here. The key is shown only once. If you lose it,
+          rotate the key. The previous key becomes invalid.
+        </p>
 
-        <div class="grid">
-          <section class="card">
-            <h3>API Keys</h3>
+        <p class="muted" style="margin-top: 8px">
+          Documentation:
+          <a id="api-docs-link" href="#" rel="noopener">coming soon</a>
+        </p>
 
-            <label for="api-key-input">API key for examples and test</label>
-            <input
-              id="api-key-input"
-              type="password"
-              placeholder="Paste your API key here"
-              autocomplete="off"
-              spellcheck="false"
-            />
+        <div id="dev-status" class="status-bar"></div>
+      </section>
 
-            <div class="row" style="margin-top: 10px">
-              <button id="btn-generate-key">Generate new key</button>
-              <button id="btn-refresh-keys" class="secondary">Refresh list</button>
-            </div>
+      <section class="card">
+        <h3>Your API key</h3>
 
-            <div id="new-key-wrap" hidden style="margin-top: 16px">
-              <h4 class="subheading">New key (shown once)</h4>
-              <div class="row">
-                <input id="new-api-key" type="text" readonly />
-                <button id="btn-copy-key" class="secondary">Copy</button>
-              </div>
-              <small id="new-key-meta" class="muted"></small>
-            </div>
-
-            <h4 class="subheading" style="margin-top: 18px">Existing keys</h4>
-            <div id="keys-empty" class="muted">No keys loaded yet.</div>
-
-            <table id="keys-table" class="table" hidden>
-              <thead>
-                <tr>
-                  <th>Key</th>
-                  <th>Created</th>
-                  <th>Last used</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="keys-tbody"></tbody>
-            </table>
-          </section>
-
-          <section class="card">
-            <h3>How to call the API</h3>
-
-            <p class="muted">
-              Send the key in the <code>X-Api-Key</code> header.
-            </p>
-
-            <label for="usage-curl">curl example</label>
-            <pre id="usage-curl">Loading…</pre>
-
-            <div class="row">
-              <button id="btn-copy-curl" class="secondary">Copy curl</button>
-            </div>
-
-            <hr class="divider" />
-
-            <h4 class="subheading">Quick test</h4>
-
-            <label for="test-file">Image file (JPEG/PNG)</label>
-            <input id="test-file" type="file" accept="image/*" />
-
-            <div class="row">
-              <button id="btn-test-call" disabled>Send to /api/v1/checks</button>
-              <span id="test-state" class="muted">Select a file and provide an API key.</span>
-            </div>
-
-            <div id="test-status" class="status-bar"></div>
-            <pre id="test-result">No test yet.</pre>
-          </section>
+        <div class="row" style="margin-top: 10px">
+          <button id="btn-rotate-key">Generate new key</button>
         </div>
 
-        <section class="card">
-          <h3>Debug</h3>
-          <p class="muted">Last response</p>
-          <pre id="debug-output">{}</pre>
-        </section>
-      </main>
+        <div id="new-key-wrap" hidden style="margin-top: 16px">
+          <label for="new-api-key">New key</label>
 
-      <div data-include="../static/partials/navbar.html"></div>
-    </div>
+          <div class="copy-field" style="position: relative; margin-top: 6px;">
+            <input id="new-api-key" type="text" readonly style="width: 100%; padding-right: 32px;" />
 
-    <script src="/static/js/include.js"></script>
-    <script src="/static/js/dev.js"></script>
-  </body>
+            <button
+              id="btn-copy-key"
+              type="button"
+              class="copy-icon"
+              aria-label="Copy API key"
+              title="Copy"
+              style="
+                position: absolute;
+                right: 0;
+                width: 32px;
+                height: 32px;
+                padding: 0;
+                margin: 0;
+                border: 0;
+                background: transparent;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                line-height: 0;
+                cursor: pointer;
+              "
+            >
+              <svg id="Copy_24" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
+                xmlns:xlink="http://www.w3.org/1999/xlink" style="display:block;">
+                <rect width="24" height="24" stroke="none" fill="#000000" opacity="0" />
+                <g transform="matrix(0.53 0 0 0.53 12 12)">
+                  <path
+                    style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoffset: 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(0,0,0); fill-rule: nonzero; opacity: 1;"
+                    transform=" translate(-24, -24)"
+                    d="M 18.5 5 C 15.480226 5 13 7.4802259 13 10.5 L 13 32.5 C 13 35.519774 15.480226 38 18.5 38 L 34.5 38 C 37.519774 38 40 35.519774 40 32.5 L 40 10.5 C 40 7.4802259 37.519774 5 34.5 5 L 18.5 5 z M 18.5 8 L 34.5 8 C 35.898226 8 37 9.1017741 37 10.5 L 37 32.5 C 37 33.898226 35.898226 35 34.5 35 L 18.5 35 C 17.101774 35 16 33.898226 16 32.5 L 16 10.5 C 16 9.1017741 17.101774 8 18.5 8 z M 11 10 L 9.78125 10.8125 C 8.66825 11.5545 8 12.803625 8 14.140625 L 8 33.5 C 8 38.747 12.253 43 17.5 43 L 30.859375 43 C 32.197375 43 33.4465 42.33175 34.1875 41.21875 L 35 40 L 17.5 40 C 13.91 40 11 37.09 11 33.5 L 11 10 z"
+                    stroke-linecap="round"
+                  />
+                </g>
+              </svg>
+            </button>
+          </div>
+
+          <small class="muted">
+            Copy and store it securely. Reloading this page will not show it again.
+          </small>
+        </div>
+
+      </section>
+    </main>
+
+    <div data-include="/static/partials/navbar.html"></div>
+  </div>
+
+  <script src="/static/js/include.js"></script>
+  <script src="/static/js/dev.js"></script>
+</body>
+
 </html>
