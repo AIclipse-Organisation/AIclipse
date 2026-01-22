@@ -115,29 +115,40 @@ window.addEventListener("DOMContentLoaded", () => {
   // Back button
   const btnBack = document.getElementById("btn-back");
   if (btnBack) btnBack.addEventListener("click", () => history.back());
-});
 
+  // =========================
+  // Delete modal logic
+  // =========================
 
-  // Delete modal
   const deleteBtn = document.getElementById("btn-delete");
   const modal = document.getElementById("delete-modal");
   const cancelBtn = document.getElementById("cancel-delete");
   const confirmBtn = document.getElementById("confirm-delete");
 
-  if (modal) modal.hidden = true; // force closed on load
+  // Ensure modal starts closed on page load.
+  // This works together with CSS:
+  //   .modal-overlay[hidden] { display: none; }
+  // Without that CSS rule, display:flex would override "hidden".
+  if (modal) modal.hidden = true;
 
   if (deleteBtn && modal && cancelBtn && confirmBtn) {
+
+    // Open modal when Delete is clicked
     deleteBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       modal.hidden = false;
     });
 
+    // Close modal without action
     cancelBtn.addEventListener("click", (e) => {
       e.preventDefault();
       modal.hidden = true;
     });
 
+    // Confirm delete
+    // Currently this only clears UI state and navigates back.
+    // No backend delete is triggered here.
     confirmBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       modal.hidden = true;
@@ -156,3 +167,4 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+});

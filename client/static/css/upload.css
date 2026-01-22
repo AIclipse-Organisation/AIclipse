@@ -418,6 +418,14 @@ button.secondary {
   z-index: 2000;
 }
 
+.modal-overlay[hidden] {
+  display: none !important;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 /* Modal card */
 .modal {
   width: 90%;
