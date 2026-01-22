@@ -27,22 +27,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from PIL import Image, UnidentifiedImageError
+import re
 
 
 AUTH_URI = os.getenv("AUTH_URI")
 MEDIA_URI = os.getenv("MEDIA_URI")
 
+_IMAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+
 
 def _is_safe_image_id(image_id: str) -> bool:
     """
-    Validate that the image_id is a simple, safe identifier.
-    Restrict to alphanumeric characters plus underscore and hyphen to
-    prevent path traversal or injection of additional URL components.
+    Validate that the image_id is a simple, URL-safe identifier.
+    This prevents path traversal or injection of additional path/query components.
+    Restricts to alphanumeric, underscore, and hyphen with max length of 128.
     """
-    if not image_id:
+    if not isinstance(image_id, str):
         return False
-    allowed_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
-    return all(ch in allowed_chars for ch in image_id)
+    return bool(_IMAGE_ID_PATTERN.fullmatch(image_id))
 
 
 DETECTOR_URI = os.getenv("DETECTOR_URI")
