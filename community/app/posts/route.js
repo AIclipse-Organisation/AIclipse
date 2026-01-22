@@ -209,6 +209,117 @@ export async function POST(req) {
   }
 }
 
+// DELETE POST
+// DELETE /community/posts?post_id=xxx
+// Allows a user to delete their own post
+export async function DELETE(req) {
+  let client = null;
+  
+  try {
+    // Verify authentication and get authenticated user_id from JWT token
+    let authenticatedUserId;
+    try {
+      authenticatedUserId = getAuthenticatedUserId(req);
+    } catch (authErr) {
+      return NextResponse.json(
+        { error: "Unauthorized", detail: String(authErr) },
+        { status: 401 }
+      );
+    }
+
+    // Get post_id from query parameters
+    const { searchParams } = new URL(req.url);
+    const post_id = searchParams.get("post_id");
+
+    if (!post_id) {
+      return NextResponse.json(
+        { error: "Missing required parameter: post_id" },
+        { status: 400 }
+      );
+    }
+
+    if (!MONGO_URI) {
+      throw new Error("MONGO_URI is not set");
+    }
+
+    client = new MongoClient(MONGO_URI);
+    await client.connect();
+
+    const db = client.db(MONGO_DB);
+    const col = db.collection(POSTS_COLLECTION);
+
+    // First, find the post to verify ownership
+    const post = await col.findOne({ post_id });
+
+    if (!post) {
+      return NextResponse.json(
+        { error: "Post not found" },
+        { status: 404 }
+      );
+    }
+
+    // Security check: ensure the authenticated user owns this post
+    if (post.user_id !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "Forbidden: You can only delete your own posts" },
+        { status: 403 }
+      );
+    }
+
+    // Delete the post
+    const deleteResult = await col.deleteOne({ post_id });
+
+    if (deleteResult.deletedCount === 0) {
+      return NextResponse.json(
+        { error: "Failed to delete post" },
+        { status: 500 }
+      );
+    }
+
+    // Delete associated comments and votes
+    const COMMENTS_COLLECTION = "community.comments";
+    const VOTES_COLLECTION = "community.votes";
+    
+    const commentsResult = await db.collection(COMMENTS_COLLECTION).deleteMany({ post_id });
+    const votesResult = await db.collection(VOTES_COLLECTION).deleteMany({ post_id });
+    
+    console.log(`Deleted ${commentsResult.deletedCount} comments and ${votesResult.deletedCount} votes for post ${post_id}`);
+
+    // Delete the associated image from the images collection
+    const image_id = post.image_id;
+    if (image_id) {
+      const IMAGES_COLLECTION = "images";
+      const imagesCol = db.collection(IMAGES_COLLECTION);
+      
+      const imageDeleteResult = await imagesCol.deleteOne({ image_id });
+      
+      if (imageDeleteResult.deletedCount > 0) {
+        console.log(`Deleted image ${image_id} from images collection`);
+      } else {
+        console.warn(`Image ${image_id} not found in images collection`);
+      }
+    }
+
+    return NextResponse.json(
+      { message: "Post deleted successfully (including comments, votes, and image)", post_id },
+      { status: 200 }
+    );
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Failed to delete post", detail: String(err) },
+      { status: 500 }
+    );
+  } finally {
+    if (client) {
+      try {
+        await client.close();
+      } catch (closeErr) {
+        console.error("Error closing MongoDB connection:", closeErr);
+      }
+    }
+  }
+}
+
 // LIST POSTS
 // GET /community/posts
 // Returns the latest community posts (newest first) with actual vote counts from the database.

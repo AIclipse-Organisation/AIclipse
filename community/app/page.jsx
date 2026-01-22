@@ -25,6 +25,11 @@ export default function Page() {
     );
   };
 
+  // Callback to remove a post from the list when it's deleted
+  const handlePostDelete = (postId) => {
+    setItems((prevItems) => prevItems.filter((item) => item.post_id !== postId));
+  };
+
   useEffect(() => {
     let alive = true;
     const abortController = new AbortController();
@@ -113,6 +118,7 @@ export default function Page() {
               currentUserId={currentUserId}
               currentUserName={currentUserName}
               onVoteUpdate={handleVoteUpdate}
+              onPostDelete={handlePostDelete}
             />
           ))}
         </div>

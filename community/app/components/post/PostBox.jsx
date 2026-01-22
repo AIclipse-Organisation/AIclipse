@@ -1,7 +1,7 @@
 import "../../styles/postBox.css";
 import { useEffect, useState } from "react";
 
-export default function PostBox({ image, currentUserId, currentUserName, onVoteUpdate }) {
+export default function PostBox({ image, currentUserId, currentUserName, onVoteUpdate, onPostDelete }) {
   const [up, setUp] = useState(Number(image?.up_vote_count ?? 0));
   const [down, setDown] = useState(Number(image?.down_vote_count ?? 0));
   const [error, setError] = useState("");
@@ -15,6 +15,9 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
   const postId = image?.post_id || null;
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
+
+  // Check if current user owns this post
+  const isOwner = currentUserId && image?.user_id === currentUserId;
 
   useEffect(() => {
     setIsReported(Boolean(image?.is_reported));
@@ -132,6 +135,43 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
       });
   }
 
+  async function deletePost() {
+    if (!postId) return;
+    if (!isOwner) return setError("You can only delete your own posts.");
+
+    // Confirm before deleting
+    if (!confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/community/posts?post_id=${encodeURIComponent(postId)}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data.error || data.detail || `Failed to delete post (${res.status})`);
+        return;
+      }
+
+      // Notify parent component to remove this post from the list
+      if (onPostDelete) {
+        onPostDelete(postId);
+      }
+    } catch (err) {
+      setError("Network error while deleting post.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submitComment() {
     if (!postId) return setCommentError("Missing post_id.");
     if (!currentUserId) return setCommentError("You must be signed in to comment.");
@@ -186,6 +226,18 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
         >
           🚩 {isReported ? "(reported)" : "(report)"}
         </button>
+        
+        {isOwner && (
+          <button
+            type="button"
+            onClick={deletePost}
+            disabled={!postId || busy}
+            title="Delete this post"
+            style={{ marginLeft: "8px", color: "#dc3545" }}
+          >
+            🗑️ Delete
+          </button>
+        )}
       </div>
 
       <img
