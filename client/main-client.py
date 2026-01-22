@@ -67,6 +67,11 @@ def dev():
     return send_from_directory("templates", "dev.html")
 
 
+@app.get("/docs")
+def docs():
+    return send_from_directory("templates", "docs.html")
+
+
 def _get_token_from_cookie() -> str | None:
     return request.cookies.get("access_token")
 
