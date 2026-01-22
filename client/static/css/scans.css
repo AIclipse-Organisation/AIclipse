@@ -188,3 +188,19 @@
   border-radius: 999px;
   background: var(--accent, #c9a64b);
 }
+
+
+.scan-details-link {
+  display: inline-block;
+  margin-top: 6px;
+
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+
+  color: var(--accent, #5f8affe0);
+}
+
+.scan-details-link:hover {
+  text-decoration: underline;
+}

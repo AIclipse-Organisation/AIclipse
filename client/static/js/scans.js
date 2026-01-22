@@ -155,6 +155,32 @@ function createScanCard(img, index) {
   meta.textContent = uploadedText;
   analysis.appendChild(meta);
 
+  // -------------------------
+  // View more details link
+  // -------------------------
+  const detailsLink = makeEl("a", "scan-details-link", "View more details");
+  detailsLink.href = "/viewscan.html";
+
+  detailsLink.addEventListener("click", (e) => {
+    e.preventDefault();
+
+    const vis = getVisibility(img); // "private" or "public"
+    const scanNumber = index + 1;
+    const title = `Scan ${scanNumber} (${vis.charAt(0).toUpperCase() + vis.slice(1)})`;
+
+    try {
+      // Store exactly what we got from /images so viewscan can render it
+      sessionStorage.setItem("selectedScan", JSON.stringify(img));
+      sessionStorage.setItem("selectedScanTitle", title);
+    } catch (_) {
+      // If storage fails for any reason, still navigate (page can fallback)
+    }
+
+    window.location.href = "/viewscan";
+  });
+
+  analysis.appendChild(detailsLink);
+
   return card;
 }
 

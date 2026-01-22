@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>View Scan</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <link rel="stylesheet" href="/static/css/viewscan.css" />
+</head>
+
+<body class="app">
+  <div class="app-container">
+    <div data-include="/static/partials/topbar.html"></div>
+
+    <main class="screen">
+      <section class="page-header" aria-label="Page title">
+        <h1 id="viewscan-title" class="page-title">View Scan</h1>
+        <div class="page-underline" role="presentation"></div>
+      </section>
+
+      <div id="viewscan-status" class="status-message"></div>
+
+      <section id="viewscan-card" class="viewscan-card" hidden>
+        <div class="viewscan-image-wrap">
+          <img id="viewscan-image" class="viewscan-image" alt="Selected scan image" />
+        </div>
+
+        <div class="viewscan-meta">
+          <h2 class="viewscan-heading">Details</h2>
+
+          <!-- Populated from JS -->
+          <dl class="meta-list" id="meta-list"></dl>
+
+          <div class="viewscan-actions">
+            <a class="secondary-link" href="/scans">Back to Scans</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div data-include="/static/partials/navbar.html"></div>
+  </div>
+
+  <script src="/static/js/include.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/main.js"></script>
+  <script src="/static/js/viewscan.js"></script>
+</body>
+</html>
