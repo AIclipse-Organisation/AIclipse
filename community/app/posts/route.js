@@ -12,6 +12,82 @@ const POSTS_COLLECTION = "community.posts";
 // NEW: user collection to lookup poster name
 const USERS_COLLECTION = "auth.users";
 
+
+// COMA
+function safeNumber(n, fallback = 0) {
+  const x = Number(n);
+  return Number.isFinite(x) ? x : fallback;
+}
+
+function safeDiv(a, b) {
+  return b > 0 ? a / b : 0;
+}
+
+// Uses your demo concept: controversial boost only if:
+// - total votes >= 50
+// - vote ratio between 40–60%
+// - controversial_since exists
+// - boost window: 48h–96h after controversial_since
+function isControversial(post, nowSec) {
+  const SECONDS_IN_HOUR = 3600;
+  const MIN_TOTAL_VOTES = 50;
+
+  const up = safeNumber(post.up_vote_count);
+  const down = safeNumber(post.down_vote_count);
+  const total = up + down;
+
+  if (total < MIN_TOTAL_VOTES) return false;
+
+  const controversialSince = safeNumber(post.controversial_since, 0);
+  if (!controversialSince) return false;
+
+  const ratio = (up / total) * 100;
+  const inZone = ratio >= 40 && ratio <= 60;
+  if (!inZone) return false;
+
+  const timeDiff = nowSec - controversialSince;
+  const boostStart = 48 * SECONDS_IN_HOUR; // 48h
+  const boostEnd = 96 * SECONDS_IN_HOUR;   // 96h
+  if (timeDiff < boostStart || timeDiff >= boostEnd) return false;
+
+  return true;
+}
+
+// Convert created_at to unix seconds safely (Date or ISO string)
+function createdAtToUnixSeconds(created_at) {
+  if (!created_at) return 0;
+  if (created_at instanceof Date) {
+    return Math.floor(created_at.getTime() / 1000);
+  }
+  const d = new Date(created_at);
+  const t = d.getTime();
+  return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
+}
+
+// COMA 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Helper function to extract and verify JWT token from Authorization header or cookie
 function getAuthenticatedUserId(req) {
   let token = null;
@@ -215,92 +291,179 @@ export async function POST(req) {
 // Only returns posts for images that are public (is_public = true).
 export async function GET() {
   let client = null;
-  
+
   try {
     if (!MONGO_URI) {
       throw new Error("MONGO_URI is not set");
     }
 
-    // open Mongo connection
     client = new MongoClient(MONGO_URI);
     await client.connect();
 
     const db = client.db(MONGO_DB);
     const col = db.collection(POSTS_COLLECTION);
+
     const IMAGES_COLLECTION = "images";
     const imagesCol = db.collection(IMAGES_COLLECTION);
 
-    // First, get all public image IDs
+    // 1) public image ids
     const publicImages = await imagesCol
       .find({ is_public: true }, { projection: { image_id: 1 } })
       .toArray();
-    
-    const publicImageIds = publicImages.map(img => img.image_id);
 
-    // Get posts sorted by newest first, but only for public images
+    const publicImageIds = publicImages.map((img) => img.image_id);
+
+    // 2) posts for public images
     const posts = await col
       .find(
-        { image_id: { $in: publicImageIds } }, // Only posts with public images
-        { projection: { _id: 0 } }  // hide Mongo internal _id
+        { image_id: { $in: publicImageIds } },
+        { projection: { _id: 0 } }
       )
-      .sort({ created_at: -1 })     // newest first
-      .limit(100)                   // safety cap to avoid huge responses
+      .sort({ created_at: -1 })
+      .limit(100)
       .toArray();
 
-    // Fetch actual vote counts from the votes collection
+    // If no posts, return early
+    if (!posts.length) {
+      return NextResponse.json({ items: [] }, { status: 200 });
+    }
+
+    // 3) vote aggregation (your existing logic)
     const VOTES_COLLECTION = "community.votes";
     const votesCol = db.collection(VOTES_COLLECTION);
-    
-    // Get all post IDs to query votes
-    const postIds = posts.map(p => p.post_id);
-    
-    // Aggregate vote counts for all posts
-    const voteCountsAgg = await votesCol.aggregate([
-      { $match: { post_id: { $in: postIds } } },
-      {
-        $group: {
-          _id: "$post_id",
-          up_vote_count: {
-            $sum: { $cond: [{ $eq: ["$vote", "up"] }, 1, 0] }
+
+    const postIds = posts.map((p) => p.post_id);
+
+    const voteCountsAgg = await votesCol
+      .aggregate([
+        { $match: { post_id: { $in: postIds } } },
+        {
+          $group: {
+            _id: "$post_id",
+            up_vote_count: {
+              $sum: { $cond: [{ $eq: ["$vote", "up"] }, 1, 0] },
+            },
+            down_vote_count: {
+              $sum: { $cond: [{ $eq: ["$vote", "down"] }, 1, 0] },
+            },
           },
-          down_vote_count: {
-            $sum: { $cond: [{ $eq: ["$vote", "down"] }, 1, 0] }
-          }
-        }
-      }
-    ]).toArray();
-    
-    // Create a map of post_id to vote counts
+        },
+      ])
+      .toArray();
+
     const voteCountsMap = {};
     for (const vc of voteCountsAgg) {
       voteCountsMap[vc._id] = {
         up_vote_count: vc.up_vote_count,
-        down_vote_count: vc.down_vote_count
+        down_vote_count: vc.down_vote_count,
       };
     }
-    
-    // Merge actual vote counts into posts
-    const items = posts.map(post => ({
+
+    // 4) merge votes into posts
+    const items = posts.map((post) => ({
       ...post,
       up_vote_count: voteCountsMap[post.post_id]?.up_vote_count || 0,
-      down_vote_count: voteCountsMap[post.post_id]?.down_vote_count || 0
+      down_vote_count: voteCountsMap[post.post_id]?.down_vote_count || 0,
     }));
 
-    return NextResponse.json({ items }, { status: 200 });
+    // 5) compute averages for normalization
+    const n = items.length || 1;
+
+    const totalClicks = items.reduce(
+      (s, p) => s + safeNumber(p.clicks_count),
+      0
+    );
+    const totalVotes = items.reduce(
+      (s, p) => s + safeNumber(p.up_vote_count) + safeNumber(p.down_vote_count),
+      0
+    );
+    const totalComments = items.reduce(
+      (s, p) => s + safeNumber(p.comment_count),
+      0
+    );
+
+    // Avoid divide by 0 by falling back to 1 (demo-style)
+    const avgClicks = totalClicks / n || 1;
+    const avgVotes = totalVotes / n || 1;
+    const avgComments = totalComments / n || 1;
+
+    // 6) scoring constants (from your demo)
+    const votesWeight = 0.6;
+    const commentsWeight = 0.3;
+    const clicksWeight = 0.1;
+
+    const constantOffset = 2;
+    const gravity = 1.2;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    // 7) compute score per post
+    const ranked = items.map((post) => {
+      const numVotes = safeNumber(post.up_vote_count) + safeNumber(post.down_vote_count);
+      const numClicks = safeNumber(post.clicks_count);
+      const numComments = safeNumber(post.comment_count);
+
+      const votesNorm = safeDiv(numVotes, avgVotes);
+      const clicksNorm = safeDiv(numClicks, avgClicks);
+      const commentsNorm = safeDiv(numComments, avgComments);
+
+      var engagement =
+        votesNorm * votesWeight +
+        clicksNorm * clicksWeight +
+        commentsNorm * commentsWeight;
+
+     
+
+      const createdAtSec = createdAtToUnixSeconds(post.created_at);
+      const ageSeconds = Math.max(nowSec - createdAtSec, 0);
+      const ageHours = ageSeconds / 3600;
+
+      const timeFactor = Math.pow(ageHours + constantOffset, gravity);
+
+      let score = engagement / timeFactor;
+
+      // demo: fresh boost
+
+      if (engagement === 0 && ageHours < 24) {
+      score = Math.max(score, 0.5); 
+    }
+
+    if (ageHours < 24) score *= 1.2;
+
+
+      // demo: controversial boost
+      if (isControversial(post, nowSec)) score *= 2.5;
+
+      return {
+        ...post,
+        score, // NEW: included for sorting + optional UI debug
+        debug: {
+          votesNorm,
+          clicksNorm,
+          commentsNorm,
+          engagement,
+          ageHours,
+        },
+      };
+    });
+
+    // 8) sort by score desc
+    ranked.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+    return NextResponse.json({ items: ranked }, { status: 200 });
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to list posts", detail: String(err) },
       { status: 500 }
     );
   } finally {
-    // Always close connection, even if an error occurred
     if (client) {
       try {
         await client.close();
       } catch (closeErr) {
-        // Log but don't throw - we're already handling the main error
         console.error("Error closing MongoDB connection:", closeErr);
       }
     }
   }
 }
+
