@@ -1,5 +1,7 @@
+    using System.Text.Json;
     using Microsoft.AspNetCore.Http.Features;
     using Microsoft.EntityFrameworkCore;
+    using ModelCycle;
     using ModelCycle.Data;
     using ModelCycle.Services.ImageConfidence;
     using ModelCycle.Services.Data;
@@ -8,6 +10,39 @@
     using ModelCycle.Services.External;
 
     var builder = WebApplication.CreateBuilder(args);
+    
+    string configUrl = Environment.GetEnvironmentVariable("CENTRAL_CONFIG_URL") 
+                       ?? throw new Exception("CENTRAL_CONFIG_URL env var is missing!");
+
+    string currentEnv = Environment.GetEnvironmentVariable("APP_ENV") ?? "dev";
+
+    Console.WriteLine($"[Config] Fetching configuration from: {configUrl}");
+
+    try 
+    {
+        using var httpClient = new HttpClient();
+        var jsonString = await httpClient.GetStringAsync(configUrl);
+
+        using var doc = JsonDocument.Parse(jsonString);
+        if (doc.RootElement.TryGetProperty(currentEnv, out var envNode) && 
+            envNode.TryGetProperty("model-cycle", out var cycleNode))
+        {
+            var config = cycleNode.Deserialize<ModelCycleConfig>();
+            if (config != null)
+            {
+                builder.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(config));
+                Console.WriteLine($"[Config] Loaded - Batch: {config.BatchSizeThreshold}, Ratio: {config.ReplayBufferRatio}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[Config] WARNING: Could not find '{currentEnv}:model-cycle' in npoint JSON.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Config] FATAL: Failed to load config from npoint.io. {ex.Message}");
+    }
 
     builder.WebHost.UseUrls("http://0.0.0.0:3000");
     builder.WebHost.ConfigureKestrel(options =>

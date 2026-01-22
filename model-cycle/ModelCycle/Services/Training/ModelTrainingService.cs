@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using ModelCycle.Data;
 using ModelCycle.DTOs;
 using ModelCycle.DTOs.ModelTraining;
@@ -14,29 +15,29 @@ public class ModelTrainingService : IModelTrainingService
     private readonly IPythonExecutor _pythonExecutor;
     private readonly IBlobStorageService _blobStorage;
     private readonly ILogger<ModelTrainingService> _logger;
-
-    private const int BATCH_SIZE_THRESHOLD = 4; // these numbers will likely be grabbed from secrets, to allow for easy adjustments when testing later
-    private const double REPLAY_BUFFER_RATIO = 0.20;// these numbers will likely be grabbed from secrets, to allow for easy adjustments when testing later
+    private readonly ModelCycleConfig _config;
 
     public ModelTrainingService(
         AppDbContext context,
         ITrainingJobManager jobManager,
         IPythonExecutor pythonExecutor,
         IBlobStorageService blobStorage,
-        ILogger<ModelTrainingService> logger)
+        ILogger<ModelTrainingService> logger,
+        IOptions<ModelCycleConfig> config)
     {
         _context = context;
         _jobManager = jobManager;
         _pythonExecutor = pythonExecutor;
         _blobStorage = blobStorage;
         _logger = logger;
+        _config = config.Value;
     }
 
     public async Task<Guid?> RunTrainingCycleAsync()
     {
         var (newImages, replayImages) = await GetTrainingData();
 
-        if (newImages.Count < BATCH_SIZE_THRESHOLD)
+        if (newImages.Count < _config.BatchSizeThreshold)
         {
             _logger.LogWarning("Insufficient balanced data found. Aborting.");
             return null;
@@ -70,7 +71,7 @@ public class ModelTrainingService : IModelTrainingService
 
     private async Task<(List<TrainingImage> New, List<TrainingImage> Replay)> GetTrainingData()
     {
-        int targetPerClass = BATCH_SIZE_THRESHOLD / 2;
+        int targetPerClass = _config.BatchSizeThreshold / 2;
 
         var readyReal = await _context.TrainingImages
             .Where(i => i.Status == TrainingStatus.Ready && i.Label == "Real")
@@ -84,7 +85,7 @@ public class ModelTrainingService : IModelTrainingService
 
         _logger.LogInformation(
             "Training Data Check: Real: {RealCount}/{Target}, Fake: {FakeCount}/{Target}. (Threshold: {Total})",
-            readyReal.Count, targetPerClass, readyFake.Count, targetPerClass, BATCH_SIZE_THRESHOLD
+            readyReal.Count, targetPerClass, readyFake.Count, targetPerClass, _config.BatchSizeThreshold
         );
 
         if (readyReal.Count < targetPerClass || readyFake.Count < targetPerClass)
@@ -94,7 +95,7 @@ public class ModelTrainingService : IModelTrainingService
 
         var newImages = readyReal.Concat(readyFake).ToList();
 
-        int replayTotal = (int)(BATCH_SIZE_THRESHOLD * REPLAY_BUFFER_RATIO);
+        int replayTotal = (int)(_config.BatchSizeThreshold * _config.ReplayBufferRatio);
         int replayHalf = replayTotal / 2;
 
         var realReplay = await _context.TrainingImages

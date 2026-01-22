@@ -26,6 +26,7 @@ COPY --from=build /src/ModelCycle/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY --from=build /app/publish .
+ENV APP_ENV=dev
 
 ENV ASPNETCORE_URLS=http://+:3000
 EXPOSE 3000
