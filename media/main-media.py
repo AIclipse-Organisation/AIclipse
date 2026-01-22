@@ -17,6 +17,17 @@ from pydantic.functional_serializers import PlainSerializer
 
 from fastapi import Request
 
+
+def sanitize_for_log(value: str | None) -> str:
+    """
+    Remove newline characters from values before logging to mitigate log injection.
+    """
+    if value is None:
+        return ""
+    # Strip carriage returns and newlines; keep other characters unchanged.
+    return value.replace("\r", "").replace("\n", "")
+
+
 # ---- env ----
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB = os.getenv("MONGO_DB")
@@ -271,18 +282,25 @@ def delete_image(image_id: str, user_id: str | None = None):
     if s3_key:
         try:
             s3_internal.delete_object(Bucket=S3_BUCKET, Key=s3_key)
-            logging.info(f"Deleted image file from MinIO: {s3_key}")
+            logging.info("Deleted image file from MinIO: %s", sanitize_for_log(str(s3_key)))
         except ClientError as e:
-            logging.exception(f"Failed to delete image from MinIO: {s3_key}")
+            logging.exception("Failed to delete image from MinIO: %s", sanitize_for_log(str(s3_key)))
             raise HTTPException(status_code=500, detail="Failed to delete image from storage") from e
 
     # Delete from MongoDB
     result = images.delete_one({"image_id": image_id})
     if result.deleted_count == 0:
-        logging.warning(f"Image {image_id} not found in MongoDB during deletion")
+        logging.warning(
+            "Image %s not found in MongoDB during deletion",
+            sanitize_for_log(str(image_id)),
+        )
         raise HTTPException(status_code=404, detail="Image not found in database")
 
-    logging.info(f"Successfully deleted image {image_id} (user: {user_id})")
+    logging.info(
+        "Successfully deleted image %s (user: %s)",
+        sanitize_for_log(str(image_id)),
+        sanitize_for_log(str(user_id) if user_id else ""),
+    )
     return {"message": "Image deleted successfully", "image_id": image_id}
 
 

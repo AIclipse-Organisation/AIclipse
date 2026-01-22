@@ -31,6 +31,20 @@ from PIL import Image, UnidentifiedImageError
 
 AUTH_URI = os.getenv("AUTH_URI")
 MEDIA_URI = os.getenv("MEDIA_URI")
+
+
+def _is_safe_image_id(image_id: str) -> bool:
+    """
+    Validate that the image_id is a simple, safe identifier.
+    Restrict to alphanumeric characters plus underscore and hyphen to
+    prevent path traversal or injection of additional URL components.
+    """
+    if not image_id:
+        return False
+    allowed_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+    return all(ch in allowed_chars for ch in image_id)
+
+
 DETECTOR_URI = os.getenv("DETECTOR_URI")
 HOSTNAME = os.getenv("HOSTNAME")
 
@@ -785,6 +799,13 @@ async def gateway_delete_image(
     Delete an image. Only the owner can delete their own image.
     Gateway authenticates the user and forwards the request to media service.
     """
+    if not _is_safe_image_id(image_id):
+        # Do not forward potentially dangerous identifiers to the media service.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
     if MEDIA_URI:
         url = MEDIA_URI.rstrip("/") + f"/image/{image_id}"
         params = {"user_id": user.user_id}  # Use authenticated user_id from JWT
