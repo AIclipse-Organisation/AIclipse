@@ -398,18 +398,55 @@ export async function DELETE(req) {
     
     console.log(`Deleted ${commentsResult.deletedCount} comments and ${votesResult.deletedCount} votes for post ${post_id}`);
 
-    // Delete the associated image from the images collection
+    // Delete the associated image via gateway
     const image_id = post.image_id;
     if (image_id) {
-      const IMAGES_COLLECTION = "images";
-      const imagesCol = db.collection(IMAGES_COLLECTION);
-      
-      const imageDeleteResult = await imagesCol.deleteOne({ image_id });
-      
-      if (imageDeleteResult.deletedCount > 0) {
-        console.log(`Deleted image ${image_id} from images collection`);
-      } else {
-        console.warn(`Image ${image_id} not found in images collection`);
+      try {
+        // Extract JWT token from request to pass to gateway
+        const authHeader = req.headers.get("authorization");
+        const cookieHeader = req.headers.get("cookie");
+        
+        let token = null;
+        if (authHeader) {
+          const parts = authHeader.split(" ");
+          if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+            token = parts[1];
+          }
+        }
+        if (!token && cookieHeader) {
+          const cookies = Object.fromEntries(
+            cookieHeader.split("; ").map(c => {
+              const [key, ...v] = c.split("=");
+              return [key, v.join("=")];
+            })
+          );
+          token = cookies.access_token;
+        }
+
+        if (token) {
+          // Call gateway which will authenticate and forward to media service
+          const GATEWAY_URI = process.env.GATEWAY_URI || "http://gateway-srv:8080";
+          const gatewayUrl = `${GATEWAY_URI}/image/${image_id}`;
+          const gatewayResponse = await fetch(gatewayUrl, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (gatewayResponse.ok) {
+            console.log(`Successfully deleted image ${image_id} via gateway`);
+          } else {
+            const errorText = await gatewayResponse.text().catch(() => 'Unknown error');
+            console.warn(`Failed to delete image ${image_id} from gateway: ${gatewayResponse.status} - ${errorText}`);
+            // Continue with post deletion even if image deletion fails
+          }
+        } else {
+          console.warn('No authentication token available to delete image');
+        }
+      } catch (gatewayError) {
+        console.error(`Error calling gateway to delete image ${image_id}:`, gatewayError);
+        
       }
     }
 

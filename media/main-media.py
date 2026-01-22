@@ -247,6 +247,45 @@ def get_image(image_id: str, user_id: str | None = None):
 
     raise HTTPException(status_code=404, detail="Not found")
 
+
+@app.delete("/image/{image_id}")
+def delete_image(image_id: str, user_id: str | None = None):
+    """
+    Delete an image from both MinIO storage and MongoDB.
+    Only the owner (user_id) can delete their image.
+    """
+    if images is None:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Find the image document
+    doc = images.find_one({"image_id": image_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # Security check only owner can delete
+    if user_id is not None and doc.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You can only delete your own images")
+
+    # Delete from MinIO/S3 storage
+    s3_key = doc.get("s3_key")
+    if s3_key:
+        try:
+            s3_internal.delete_object(Bucket=S3_BUCKET, Key=s3_key)
+            logging.info(f"Deleted image file from MinIO: {s3_key}")
+        except ClientError as e:
+            logging.exception(f"Failed to delete image from MinIO: {s3_key}")
+            raise HTTPException(status_code=500, detail="Failed to delete image from storage") from e
+
+    # Delete from MongoDB
+    result = images.delete_one({"image_id": image_id})
+    if result.deleted_count == 0:
+        logging.warning(f"Image {image_id} not found in MongoDB during deletion")
+        raise HTTPException(status_code=404, detail="Image not found in database")
+
+    logging.info(f"Successfully deleted image {image_id} (user: {user_id})")
+    return {"message": "Image deleted successfully", "image_id": image_id}
+
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)

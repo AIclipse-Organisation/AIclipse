@@ -774,3 +774,48 @@ async def gateway_get_community_images():
                 )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content={"items": []})
+
+
+@app.delete("/image/{image_id}")
+async def gateway_delete_image(
+    image_id: str = Path(...),
+    user: UserContext = Depends(get_current_user),
+):
+    """
+    Delete an image. Only the owner can delete their own image.
+    Gateway authenticates the user and forwards the request to media service.
+    """
+    if MEDIA_URI:
+        url = MEDIA_URI.rstrip("/") + f"/image/{image_id}"
+        params = {"user_id": user.user_id}  # Use authenticated user_id from JWT
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.delete(url, params=params)
+        except httpx.RequestError:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Media service unavailable",
+            )
+        else:
+            if resp.status_code == 200:
+                return Response(
+                    content=resp.content,
+                    status_code=resp.status_code,
+                    media_type=resp.headers.get("content-type", "application/json"),
+                )
+            if resp.status_code == 404:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Image not found",
+                )
+            if resp.status_code == 403:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You can only delete your own images",
+                )
+
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Media service unavailable",
+    )
