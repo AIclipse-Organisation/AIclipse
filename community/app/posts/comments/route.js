@@ -263,3 +263,93 @@ export async function POST(req) {
     }
   }
 }
+// DELETE COMMENT
+// DELETE /community/posts/comments?comment_id=xxx
+// Allows a user to delete their own comment
+export async function DELETE(req) {
+  let client = null;
+  
+  try {
+    // Verify authentication and get authenticated user_id from JWT token
+    let authenticatedUserId;
+    try {
+      authenticatedUserId = getAuthenticatedUserId(req);
+    } catch (authErr) {
+      return NextResponse.json(
+        { error: "Unauthorized", detail: String(authErr) },
+        { status: 401 }
+      );
+    }
+
+    // Get comment_id from query parameters
+    const { searchParams } = new URL(req.url);
+    const comment_id = searchParams.get("comment_id");
+
+    if (!comment_id) {
+      return NextResponse.json(
+        { error: "Missing required parameter: comment_id" },
+        { status: 400 }
+      );
+    }
+
+    if (!MONGO_URI) {
+      throw new Error("MONGO_URI is not set");
+    }
+
+    client = new MongoClient(MONGO_URI);
+    await client.connect();
+
+    const db = client.db(MONGO_DB);
+    const commentsCol = db.collection(COMMENTS_COLLECTION);
+
+    // First, find the comment to verify ownership
+    const comment = await commentsCol.findOne({ comment_id });
+
+    if (!comment) {
+      return NextResponse.json(
+        { error: "Comment not found" },
+        { status: 404 }
+      );
+    }
+
+    // Security check: ensure the authenticated user owns this comment
+    if (comment.user_id !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "Forbidden: You can only delete your own comments" },
+        { status: 403 }
+      );
+    }
+
+    // Delete the comment
+    const deleteResult = await commentsCol.deleteOne({ comment_id });
+
+    if (deleteResult.deletedCount === 0) {
+      return NextResponse.json(
+        { error: "Failed to delete comment" },
+        { status: 500 }
+      );
+    }
+
+    // Decrement comment count on the post
+    const postsCol = db.collection(POSTS_COLLECTION);
+    await postsCol.updateOne({ post_id: comment.post_id }, { $inc: { comment_count: -1 } });
+
+    return NextResponse.json(
+      { message: "Comment deleted successfully", comment_id },
+      { status: 200 }
+    );
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Failed to delete comment", detail: String(err) },
+      { status: 500 }
+    );
+  } finally {
+    if (client) {
+      try {
+        await client.close();
+      } catch (closeErr) {
+        console.error("Error closing MongoDB connection:", closeErr);
+      }
+    }
+  }
+}

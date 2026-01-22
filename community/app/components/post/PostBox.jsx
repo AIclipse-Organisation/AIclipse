@@ -211,6 +211,40 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     }
   }
 
+  async function deleteComment(comment_id) {
+    if (!comment_id) return;
+
+    // Confirm before deleting
+    if (!confirm("Are you sure you want to delete this comment?")) {
+      return;
+    }
+
+    setCommentsBusy(true);
+    setCommentError("");
+
+    try {
+      const res = await fetch(`/community/posts/comments?comment_id=${encodeURIComponent(comment_id)}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setCommentError(data.error || data.detail || `Failed to delete comment (${res.status})`);
+        return;
+      }
+
+      // Remove the deleted comment from the list
+      setComments((arr) => arr.filter(c => c.comment_id !== comment_id));
+    } catch (err) {
+      setCommentError("Network error while deleting comment.");
+    } finally {
+      setCommentsBusy(false);
+    }
+  }
+
   useEffect(() => {
     if (showComments) loadComments();
   }, [showComments, postId]);
@@ -325,15 +359,29 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
           </div>
 
           <div className="comm_commentsList">
-            {comments.map((c) => (
-              <div key={c.comment_id} className="comm_comment">
-                <div className="comm_commentMeta">
-                  {c.user_name || "Unknown"} ·{" "}
-                  {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+            {comments.map((c) => {
+              const isCommentOwner = currentUserId && c.user_id === currentUserId;
+              return (
+                <div key={c.comment_id} className="comm_comment">
+                  <div className="comm_commentMeta">
+                    {c.user_name || "Unknown"} ·{" "}
+                    {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+                    {isCommentOwner && (
+                      <button
+                        type="button"
+                        onClick={() => deleteComment(c.comment_id)}
+                        disabled={commentsBusy}
+                        title="Delete this comment"
+                        style={{ marginLeft: "8px", color: "#dc3545", fontSize: "0.85em", cursor: "pointer", background: "none", border: "none", padding: "0" }}
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+                  <div className="comm_commentText">{c.text}</div>
                 </div>
-                <div className="comm_commentText">{c.text}</div>
-              </div>
-            ))}
+              );
+            })}
 
             {!commentsBusy && comments.length === 0 && (
               <div className="muted">No comments yet.</div>
