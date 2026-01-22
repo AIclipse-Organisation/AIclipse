@@ -2,8 +2,8 @@
 
 public class UploadModelRequest
 {
-    public IFormFile File { get; set; }
-    public string Version { get; set; } 
+    public required IFormFile File { get; set; }
+    public  required string Version { get; set; } 
     
     public int NewImagesCount { get; set; }
     public int ReplayBufferCount { get; set; }

@@ -28,7 +28,7 @@ public class ImageConfidenceControllerTests
     public async Task Evaluate_ReturnsOk_WhenWorkflowSucceeds()
     {
         // Arrange
-        var request = new EvaluateImageRequest();
+        var request = new EvaluateImageRequest{MediaImageId = "test"};
         var fakeResult = new ConfidenceResult { IsReadyForTraining = true, Probability = 0.95, TrainingLabel = "Fake" };
 
         _mockWorkflow.Setup(w => w.ProcessVoteAsync(request))
@@ -50,7 +50,7 @@ public class ImageConfidenceControllerTests
             .ThrowsAsync(new Exception("Media not found"));
 
         // Act
-        var result = await _controller.Evaluate(new EvaluateImageRequest());
+        var result = await _controller.Evaluate(new EvaluateImageRequest{MediaImageId = "test"});
 
         // Assert
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
