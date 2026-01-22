@@ -308,7 +308,7 @@ async def _exchange_api_key_for_jwt(api_key: str) -> Tuple[str, int]:
     Uses best-effort in-memory caching.
     """
     auth_uri = _require_setting("AUTH_URI", AUTH_URI)
-    url = auth_uri.rstrip("/") + "/internal/api-keys/exchange"
+    url = auth_uri.rstrip("/") + "/internal/api-key/exchange"
     headers = {
         "Accept": "application/json",
         "X-Internal-Token": _require_internal_token(),
@@ -621,38 +621,35 @@ async def gateway_admin_delete_user(
     )
 
 
-@app.get("/auth/api-keys")
-async def gateway_list_api_keys(user: UserContext = Depends(get_current_user)):
+@app.get("/auth/api-key")
+async def gateway_get_api_key(user: UserContext = Depends(get_current_user)):
     auth_uri = _require_setting("AUTH_URI", AUTH_URI)
     return await _proxy_json(
         "GET",
         auth_uri,
-        "/me/api-keys",
+        "/me/api-key",
         headers={"Authorization": f"Bearer {user.token}"},
     )
 
 
-@app.post("/auth/api-keys")
-async def gateway_create_api_key(user: UserContext = Depends(get_current_user)):
+@app.post("/auth/api-key")
+async def gateway_rotate_api_key(user: UserContext = Depends(get_current_user)):
     auth_uri = _require_setting("AUTH_URI", AUTH_URI)
     return await _proxy_json(
         "POST",
         auth_uri,
-        "/me/api-keys",
+        "/me/api-key",
         headers={"Authorization": f"Bearer {user.token}"},
     )
 
 
-@app.post("/auth/api-keys/{key_id}/revoke")
-async def gateway_revoke_api_key(
-    key_id: str,
-    user: UserContext = Depends(get_current_user),
-):
+@app.delete("/auth/api-key")
+async def gateway_delete_api_key(user: UserContext = Depends(get_current_user)):
     auth_uri = _require_setting("AUTH_URI", AUTH_URI)
     return await _proxy_json(
-        "POST",
+        "DELETE",
         auth_uri,
-        f"/me/api-keys/{key_id}/revoke",
+        "/me/api-key",
         headers={"Authorization": f"Bearer {user.token}"},
     )
 

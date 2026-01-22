@@ -60,9 +60,7 @@ async function copyToClipboard(text) {
       await navigator.clipboard.writeText(text);
       return true;
     }
-  } catch {
-    // fall through to legacy method
-  }
+  } catch {}
 
   // Legacy fallback, works on http in most browsers
   try {
@@ -102,9 +100,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const newApiKeyEl = document.getElementById("new-api-key");
   const btnCopyKey = document.getElementById("btn-copy-key");
 
-  const KEYS_LIST = "/auth/api-keys";
-  const KEYS_CREATE = "/auth/api-keys";
-  const KEY_REVOKE = (keyId) => `/auth/api-keys/${encodeURIComponent(keyId)}/revoke`;
+  const API_KEY_ENDPOINT = "/auth/api-key";
 
   function hideKey() {
     if (newApiKeyEl) newApiKeyEl.value = "";
@@ -129,51 +125,18 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function listKeys() {
-    const { res, data } = await jsonFetch("GET", KEYS_LIST);
-    if (!res.ok) throw new Error(data?.detail || `Failed to load keys (${res.status})`);
-    return Array.isArray(data) ? data : (data.items || []);
-  }
+  async function rotateKey() {
+    hideKey();
+    setStatus(devStatus, "info", "Generating key…");
 
-  function isActiveKey(item) {
-    // Auth returns revoked_at when revoked; treat missing/empty as active
-    return !item.revoked_at && !item.revokedAt;
-  }
-
-  function getKeyId(item) {
-    return item.key_id || item.keyId || item.id || item.kid || "";
-  }
-
-  async function revokeKey(keyId) {
-    const { res, data } = await jsonFetch("POST", KEY_REVOKE(keyId), {});
-    if (!res.ok) throw new Error(data?.detail || `Failed to revoke (${res.status})`);
-  }
-
-  async function createKey() {
-    const { res, data } = await jsonFetch("POST", KEYS_CREATE, {});
+    const { res, data } = await jsonFetch("POST", API_KEY_ENDPOINT, {});
     if (!(res.ok || res.status === 201)) {
       throw new Error(data?.detail || `Failed to create key (${res.status})`);
     }
+
     const apiKey = data.api_key || data.key || data.token || "";
     if (!apiKey) throw new Error("Create response missing api_key");
-    return apiKey;
-  }
 
-  async function rotateKey() {
-    hideKey();
-    setStatus(devStatus, "info", "Rotating key…");
-
-    // 1) Load existing keys
-    const items = await listKeys();
-    const active = items.filter(isActiveKey).map(getKeyId).filter(Boolean);
-
-    // 2) Revoke all active keys (must succeed before creating new key)
-    for (const id of active) {
-      await revokeKey(id);
-    }
-
-    // 3) Create new key (shown once)
-    const apiKey = await createKey();
     if (newApiKeyEl) newApiKeyEl.value = apiKey;
     if (newKeyWrap) newKeyWrap.hidden = false;
 

@@ -32,7 +32,7 @@ Responsibilities:
 - Issue RS256 JWTs
 - Expose JWKS for Gateway verification
 - Provide basic user and admin APIs (signup, login, me, admin/users)
-- Manage API keys for developer access (stored hashed), and exchange them for short-lived JWT
+- Manage API key for developer access (stored hashed), and exchange it for short-lived JWT
 """
 
 JWT_KEY = os.getenv("JWT_KEY")
@@ -156,12 +156,11 @@ class ApiKeyPublic(BaseModel):
     key_id: str
     created_at: datetime
     last_used_at: Optional[datetime] = None
-    revoked_at: Optional[datetime] = None
     last4: str
 
 
-class ApiKeyListResponse(BaseModel):
-    items: List[ApiKeyPublic]
+class ApiKeyGetResponse(BaseModel):
+    key: Optional[ApiKeyPublic] = None
 
 
 class ApiKeyCreateResponse(BaseModel):
@@ -204,8 +203,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Helpers
 
+# Helpers
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -610,27 +609,25 @@ async def admin_delete_user(
 
 # ---- API key management ----
 
-@app.get("/me/api-keys", response_model=ApiKeyListResponse)
-async def list_my_api_keys(user: TokenUser = Depends(get_current_user)):
+@app.get("/me/api-key", response_model=ApiKeyGetResponse)
+async def get_my_api_key(user: TokenUser = Depends(get_current_user)):
     assert api_keys_coll is not None
 
-    cursor = api_keys_coll.find({"user_id": user.user_id}).sort("created_at", -1).limit(200)
-    items: List[ApiKeyPublic] = []
-    async for doc in cursor:
-        items.append(
-            ApiKeyPublic(
-                key_id=doc["key_id"],
-                created_at=doc.get("created_at", _now_utc()),
-                last_used_at=doc.get("last_used_at"),
-                revoked_at=doc.get("revoked_at"),
-                last4=doc.get("last4", "????"),
-            )
-        )
-    return {"items": items}
+    doc = await api_keys_coll.find_one({"user_id": user.user_id})
+    if not doc:
+        return ApiKeyGetResponse(key=None)
+
+    pub = ApiKeyPublic(
+        key_id=doc["key_id"],
+        created_at=doc.get("created_at", _now_utc()),
+        last_used_at=doc.get("last_used_at"),
+        last4=doc.get("last4", "????"),
+    )
+    return ApiKeyGetResponse(key=pub)
 
 
-@app.post("/me/api-keys", response_model=ApiKeyCreateResponse, status_code=status.HTTP_201_CREATED)
-async def create_my_api_key(user: TokenUser = Depends(get_current_user)):
+@app.post("/me/api-key", response_model=ApiKeyCreateResponse, status_code=status.HTTP_201_CREATED)
+async def rotate_my_api_key(user: TokenUser = Depends(get_current_user)):
     assert api_keys_coll is not None
     assert users_coll is not None
 
@@ -663,30 +660,21 @@ async def create_my_api_key(user: TokenUser = Depends(get_current_user)):
         key_id=key_id,
         created_at=now,
         last_used_at=None,
-        revoked_at=None,
         last4=doc["last4"],
     )
 
     return ApiKeyCreateResponse(api_key=full_key, key=pub)
 
 
-@app.post("/me/api-keys/{key_id}/revoke")
-async def revoke_my_api_key(
-    key_id: str,
-    user: TokenUser = Depends(get_current_user),
-):
+@app.delete("/me/api-key")
+async def delete_my_api_key(user: TokenUser = Depends(get_current_user)):
     assert api_keys_coll is not None
 
-    res = await api_keys_coll.delete_one({"user_id": user.user_id, "key_id": key_id})
-    if res.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="API key not found")
-
-    return {"revoked": True, "key_id": key_id}
+    res = await api_keys_coll.delete_one({"user_id": user.user_id})
+    return {"revoked": bool(res.deleted_count)}
 
 
-# ---- Internal exchange endpoint (Gateway only) ----
-
-@app.post("/internal/api-keys/exchange", response_model=ApiKeyExchangeResponse)
+@app.post("/internal/api-key/exchange", response_model=ApiKeyExchangeResponse)
 async def exchange_api_key(
     body: ApiKeyExchangeRequest,
     x_internal_token: Optional[str] = Header(None, alias="X-Internal-Token"),

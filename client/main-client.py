@@ -659,19 +659,19 @@ def community_report():
     return jsonify(data), resp.status_code
 
 
-@app.get("/auth/api-keys")
-def auth_api_keys_list():
-    return _call_gateway_json("GET", "/auth/api-keys", require_auth=True)
+@app.get("/auth/api-key")
+def auth_api_key_get():
+    return _call_gateway_json("GET", "/auth/api-key", require_auth=True)
 
 
-@app.post("/auth/api-keys")
-def auth_api_keys_rotate():
-    return _call_gateway_json("POST", "/auth/api-keys", require_auth=True)
+@app.post("/auth/api-key")
+def auth_api_key_rotate():
+    return _call_gateway_json("POST", "/auth/api-key", require_auth=True)
 
 
-@app.post("/auth/api-keys/<string:key_id>/revoke")
-def auth_api_keys_revoke(key_id: str):
-    return _call_gateway_json("POST", f"/auth/api-keys/{key_id}/revoke", require_auth=True)
+@app.delete("/auth/api-key")
+def auth_api_key_delete():
+    return _call_gateway_json("DELETE", "/auth/api-key", require_auth=True)
 
 
 class Quiet(WSGIRequestHandler):
