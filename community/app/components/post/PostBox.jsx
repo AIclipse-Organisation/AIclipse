@@ -20,7 +20,6 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   const postId = image?.post_id || null;
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
 
-  // Check if current user owns this post
   const isOwner = currentUserId && image?.user_id === currentUserId;
 
   useEffect(() => {
@@ -300,6 +299,16 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     if (showComments) loadComments();
   }, [showComments, postId]);
 
+
+  function formatScore(x) {
+    const n = Number(x);
+    if (!Number.isFinite(n)) return "—";
+    // 4 decimals is usually enough to see differences
+    return n.toFixed(6);
+  }
+
+
+
   return (
     <div className="comm_postBox">
       <div className="comm_topRow">
@@ -363,6 +372,12 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
       <div className="comm_poster">
         <strong>Posted by:</strong> {image?.user_name || "Unknown"}
+      </div>
+
+      
+      {/* DEV: ranking score */}
+      <div className="comm_score">
+        <strong>Score:</strong> {formatScore(image?.score)}
       </div>
 
       {(image?.result?.verdict || image?.result?.label) && (
