@@ -209,6 +209,119 @@ export async function POST(req) {
   }
 }
 
+// PATCH POST
+// PATCH /community/posts?post_id=xxx
+// Allows a user to update their own post's description
+export async function PATCH(req) {
+  let client = null;
+  
+  try {
+    // Verify authentication and get authenticated user_id from JWT token
+    let authenticatedUserId;
+    try {
+      authenticatedUserId = getAuthenticatedUserId(req);
+    } catch (authErr) {
+      return NextResponse.json(
+        { error: "Unauthorized", detail: String(authErr) },
+        { status: 401 }
+      );
+    }
+
+    // Get post_id from query parameters
+    const { searchParams } = new URL(req.url);
+    const post_id = searchParams.get("post_id");
+
+    if (!post_id) {
+      return NextResponse.json(
+        { error: "Missing required parameter: post_id" },
+        { status: 400 }
+      );
+    }
+
+    // Get description from body
+    const body = await req.json().catch(() => null);
+    const description = (body?.description || "").trim();
+
+    if (!description) {
+      return NextResponse.json(
+        { error: "Description cannot be empty" },
+        { status: 400 }
+      );
+    }
+
+    // Length validation
+    const MAX_DESCRIPTION_LENGTH = 1000;
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      return NextResponse.json(
+        { error: `Description too long (max ${MAX_DESCRIPTION_LENGTH} characters)` },
+        { status: 400 }
+      );
+    }
+
+    if (!MONGO_URI) {
+      throw new Error("MONGO_URI is not set");
+    }
+
+    client = new MongoClient(MONGO_URI);
+    await client.connect();
+
+    const db = client.db(MONGO_DB);
+    const col = db.collection(POSTS_COLLECTION);
+
+    // First find the post to verify ownership
+    const post = await col.findOne({ post_id });
+
+    if (!post) {
+      return NextResponse.json(
+        { error: "Post not found" },
+        { status: 404 }
+      );
+    }
+
+    // Security check ensure the authenticated user owns this post
+    if (post.user_id !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "Forbidden: You can only edit your own posts" },
+        { status: 403 }
+      );
+    }
+
+    // Update the description
+    const updateResult = await col.updateOne(
+      { post_id },
+      { $set: { description, updated_at: new Date() } }
+    );
+
+    if (updateResult.modifiedCount === 0) {
+      return NextResponse.json(
+        { error: "Failed to update post" },
+        { status: 500 }
+      );
+    }
+
+    // Return the updated post
+    const updatedPost = await col.findOne({ post_id }, { projection: { _id: 0 } });
+
+    return NextResponse.json(
+      { message: "Post updated successfully", post: updatedPost },
+      { status: 200 }
+    );
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Failed to update post", detail: String(err) },
+      { status: 500 }
+    );
+  } finally {
+    if (client) {
+      try {
+        await client.close();
+      } catch (closeErr) {
+        console.error("Error closing MongoDB connection:", closeErr);
+      }
+    }
+  }
+}
+
 // DELETE POST
 // DELETE /community/posts?post_id=xxx
 // Allows a user to delete their own post

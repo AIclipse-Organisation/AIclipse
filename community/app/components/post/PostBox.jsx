@@ -13,6 +13,10 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   const [commentText, setCommentText] = useState("");
   const [commentError, setCommentError] = useState("");
 
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState(image?.description || "");
+  const [description, setDescription] = useState(image?.description || "");
+
   const postId = image?.post_id || null;
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
 
@@ -22,6 +26,12 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   useEffect(() => {
     setIsReported(Boolean(image?.is_reported));
   }, [image?.is_reported]);
+
+  // Sync description when image prop changes
+  useEffect(() => {
+    setDescription(image?.description || "");
+    setEditedDescription(image?.description || "");
+  }, [image?.description]);
 
   // Sync vote counts when image prop changes
   useEffect(() => {
@@ -245,6 +255,47 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     }
   }
 
+  async function updateDescription() {
+    if (!postId) return;
+    if (!isOwner) return setError("You can only edit your own posts.");
+
+    const trimmed = editedDescription.trim();
+    if (!trimmed) return setError("Description cannot be empty.");
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/community/posts?post_id=${encodeURIComponent(postId)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ description: trimmed }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data.error || data.detail || `Failed to update post (${res.status})`);
+        return;
+      }
+
+      // Update the description
+      setDescription(trimmed);
+      setIsEditingDescription(false);
+    } catch (err) {
+      setError("Network error while updating post.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function cancelEdit() {
+    setEditedDescription(description);
+    setIsEditingDescription(false);
+    setError("");
+  }
+
   useEffect(() => {
     if (showComments) loadComments();
   }, [showComments, postId]);
@@ -329,7 +380,50 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
         </div>
       )}
 
-      {image?.description && <div className="comm_description">{image.description}</div>}
+      {isEditingDescription ? (
+        <div className="comm_description">
+          <textarea
+            value={editedDescription}
+            onChange={(e) => setEditedDescription(e.target.value)}
+            disabled={busy}
+            maxLength={1000}
+            style={{ width: "100%", minHeight: "60px", padding: "8px", fontSize: "0.95em" }}
+          />
+          <div style={{ marginTop: "8px" }}>
+            <button
+              type="button"
+              onClick={updateDescription}
+              disabled={busy}
+              style={{ marginRight: "8px", padding: "4px 12px", cursor: "pointer" }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              disabled={busy}
+              style={{ padding: "4px 12px", cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="comm_description">
+          {description}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => setIsEditingDescription(true)}
+              disabled={busy}
+              title="Edit description"
+              style={{ marginLeft: "8px", fontSize: "0.85em", cursor: "pointer", background: "none", border: "none", padding: "0" }}
+            >
+              ✏️
+            </button>
+          )}
+        </div>
+      )}
 
       {showComments && (
         <div className="comm_commentsWrapper">
