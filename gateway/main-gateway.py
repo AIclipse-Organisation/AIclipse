@@ -742,6 +742,13 @@ async def gateway_get_image(
     image_id: str = Path(...),
     user: UserContext = Depends(get_current_user),
 ):
+    if not _is_safe_image_id(image_id):
+        # Do not forward potentially dangerous identifiers to the media service.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
     if MEDIA_URI:
         url = MEDIA_URI.rstrip("/") + f"/image/{image_id}"
         params = {"user_id": user.user_id}
