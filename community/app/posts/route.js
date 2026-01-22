@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import jwt from "jsonwebtoken";
-import { validateUserId, validateImageId } from "./validation.js";
+import { validateUserId, validateImageId, validatePostId } from "./validation.js";
 
 export const runtime = "nodejs"; // required for MongoDB driver
 
@@ -55,6 +55,58 @@ function getAuthenticatedUserId(req) {
   } catch (err) {
     throw new Error("Invalid or expired token");
   }
+}
+
+// Helper function to extract raw JWT token from request (for forwarding to other services)
+function extractToken(req) {
+  // Try Authorization header first
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+      return parts[1];
+    }
+  }
+  
+  // Fallback to cookie
+  const cookieHeader = req.headers.get("cookie");
+  if (cookieHeader) {
+    const cookies = Object.fromEntries(
+      cookieHeader.split("; ").map(c => {
+        const [key, ...v] = c.split("=");
+        return [key, v.join("=")];
+      })
+    );
+    return cookies.access_token || null;
+  }
+  
+  return null;
+}
+
+// Helper function to extract raw JWT token from request
+function extractToken(req) {
+  // Try Authorization header first
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+      return parts[1];
+    }
+  }
+  
+  // Fallback to cookie
+  const cookieHeader = req.headers.get("cookie");
+  if (cookieHeader) {
+    const cookies = Object.fromEntries(
+      cookieHeader.split("; ").map(c => {
+        const [key, ...v] = c.split("=");
+        return [key, v.join("=")];
+      })
+    );
+    return cookies.access_token || null;
+  }
+  
+  return null;
 }
 
 // Generates a unique post ID. Uses timestamp and random number to reduce chance of collisions.
@@ -238,6 +290,16 @@ export async function PATCH(req) {
       );
     }
 
+    // Validate post_id format
+    const postIdValidation = validatePostId(post_id);
+    if (!postIdValidation.valid) {
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safePostId = postIdValidation.value;
+
     // Get description from body
     const body = await req.json().catch(() => null);
     const description = (body?.description || "").trim();
@@ -269,7 +331,7 @@ export async function PATCH(req) {
     const col = db.collection(POSTS_COLLECTION);
 
     // First find the post to verify ownership
-    const post = await col.findOne({ post_id });
+    const post = await col.findOne({ post_id: safePostId });
 
     if (!post) {
       return NextResponse.json(
@@ -286,21 +348,17 @@ export async function PATCH(req) {
       );
     }
 
-    // Update the description
+    // Update the description (MongoDB may report modifiedCount=0 if values are unchanged)
     const updateResult = await col.updateOne(
-      { post_id },
+      { post_id: safePostId },
       { $set: { description, updated_at: new Date() } }
     );
 
-    if (updateResult.modifiedCount === 0) {
-      return NextResponse.json(
-        { error: "Failed to update post" },
-        { status: 500 }
-      );
-    }
+    // Note: modifiedCount can be 0 if the new description is the same as the old one
+    // This is not an error, just a no-op update
 
     // Return the updated post
-    const updatedPost = await col.findOne({ post_id }, { projection: { _id: 0 } });
+    const updatedPost = await col.findOne({ post_id: safePostId }, { projection: { _id: 0 } });
 
     return NextResponse.json(
       { message: "Post updated successfully", post: updatedPost },
@@ -351,6 +409,16 @@ export async function DELETE(req) {
       );
     }
 
+    // Validate post_id format
+    const postIdValidation = validatePostId(post_id);
+    if (!postIdValidation.valid) {
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safePostId = postIdValidation.value;
+
     if (!MONGO_URI) {
       throw new Error("MONGO_URI is not set");
     }
@@ -362,7 +430,7 @@ export async function DELETE(req) {
     const col = db.collection(POSTS_COLLECTION);
 
     // First, find the post to verify ownership
-    const post = await col.findOne({ post_id });
+    const post = await col.findOne({ post_id: safePostId });
 
     if (!post) {
       return NextResponse.json(
@@ -380,12 +448,13 @@ export async function DELETE(req) {
     }
 
     // Delete the post
-    const deleteResult = await col.deleteOne({ post_id });
+    const deleteResult = await col.deleteOne({ post_id: safePostId });
 
     if (deleteResult.deletedCount === 0) {
+      // The post was likely deleted by a concurrent request
       return NextResponse.json(
-        { error: "Failed to delete post" },
-        { status: 500 }
+        { error: "Post not found or already deleted" },
+        { status: 404 }
       );
     }
 
@@ -393,35 +462,17 @@ export async function DELETE(req) {
     const COMMENTS_COLLECTION = "community.comments";
     const VOTES_COLLECTION = "community.votes";
     
-    const commentsResult = await db.collection(COMMENTS_COLLECTION).deleteMany({ post_id });
-    const votesResult = await db.collection(VOTES_COLLECTION).deleteMany({ post_id });
+    const commentsResult = await db.collection(COMMENTS_COLLECTION).deleteMany({ post_id: safePostId });
+    const votesResult = await db.collection(VOTES_COLLECTION).deleteMany({ post_id: safePostId });
     
-    console.log(`Deleted ${commentsResult.deletedCount} comments and ${votesResult.deletedCount} votes for post ${post_id}`);
+    console.log(`Deleted ${commentsResult.deletedCount} comments and ${votesResult.deletedCount} votes for post ${safePostId}`);
 
     // Delete the associated image via gateway
     const image_id = post.image_id;
+    let imageDeleted = false;
     if (image_id) {
       try {
-        // Extract JWT token from request to pass to gateway
-        const authHeader = req.headers.get("authorization");
-        const cookieHeader = req.headers.get("cookie");
-        
-        let token = null;
-        if (authHeader) {
-          const parts = authHeader.split(" ");
-          if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
-            token = parts[1];
-          }
-        }
-        if (!token && cookieHeader) {
-          const cookies = Object.fromEntries(
-            cookieHeader.split("; ").map(c => {
-              const [key, ...v] = c.split("=");
-              return [key, v.join("=")];
-            })
-          );
-          token = cookies.access_token;
-        }
+        const token = extractToken(req);
 
         if (token) {
           // Call gateway which will authenticate and forward to media service
@@ -436,22 +487,26 @@ export async function DELETE(req) {
 
           if (gatewayResponse.ok) {
             console.log(`Successfully deleted image ${image_id} via gateway`);
+            imageDeleted = true;
           } else {
             const errorText = await gatewayResponse.text().catch(() => 'Unknown error');
             console.warn(`Failed to delete image ${image_id} from gateway: ${gatewayResponse.status} - ${errorText}`);
-            // Continue with post deletion even if image deletion fails
           }
         } else {
           console.warn('No authentication token available to delete image');
         }
       } catch (gatewayError) {
         console.error(`Error calling gateway to delete image ${image_id}:`, gatewayError);
-        
       }
     }
 
     return NextResponse.json(
-      { message: "Post deleted successfully (including comments, votes, and image)", post_id },
+      { 
+        message: imageDeleted 
+          ? "Post deleted successfully (including comments, votes, and image)" 
+          : "Post deleted successfully (comments and votes removed; image deletion was attempted)",
+        post_id: safePostId 
+      },
       { status: 200 }
     );
   } catch (err) {

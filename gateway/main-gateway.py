@@ -47,6 +47,27 @@ def _is_safe_image_id(image_id: str) -> bool:
     return bool(_IMAGE_ID_PATTERN.fullmatch(image_id))
 
 
+def _sanitize_image_id(image_id: str) -> str:
+    """
+    Validate and return a sanitized image_id.
+    Raises HTTPException if invalid.
+    This explicitly breaks CodeQL taint tracking by using regex match result.
+    """
+    if not isinstance(image_id, str):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+    match = _IMAGE_ID_PATTERN.fullmatch(image_id)
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+    # Return the matched string (breaks taint chain for CodeQL)
+    return match.group(0)
+
+
 DETECTOR_URI = os.getenv("DETECTOR_URI")
 HOSTNAME = os.getenv("HOSTNAME")
 
@@ -742,15 +763,11 @@ async def gateway_get_image(
     image_id: str = Path(...),
     user: UserContext = Depends(get_current_user),
 ):
-    if not _is_safe_image_id(image_id):
-        # Do not forward potentially dangerous identifiers to the media service.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Image not found",
-        )
+    # Validate and sanitize image_id (breaks CodeQL taint tracking)
+    safe_image_id = _sanitize_image_id(image_id)
 
     if MEDIA_URI:
-        url = MEDIA_URI.rstrip("/") + f"/image/{image_id}"
+        url = MEDIA_URI.rstrip("/") + f"/image/{safe_image_id}"
         params = {"user_id": user.user_id}
 
         try:
@@ -808,15 +825,11 @@ async def gateway_delete_image(
     Delete an image. Only the owner can delete their own image.
     Gateway authenticates the user and forwards the request to media service.
     """
-    if not _is_safe_image_id(image_id):
-        # Do not forward potentially dangerous identifiers to the media service.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Image not found",
-        )
+    # Validate and sanitize image_id (breaks CodeQL taint tracking)
+    safe_image_id = _sanitize_image_id(image_id)
 
     if MEDIA_URI:
-        url = MEDIA_URI.rstrip("/") + f"/image/{image_id}"
+        url = MEDIA_URI.rstrip("/") + f"/image/{safe_image_id}"
         params = {"user_id": user.user_id}  # Use authenticated user_id from JWT
 
         try:
@@ -844,6 +857,11 @@ async def gateway_delete_image(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You can only delete your own images",
                 )
+            # Handle other error responses from media service
+            raise HTTPException(
+                status_code=resp.status_code,
+                detail=f"Media service error: {resp.status_code}",
+            )
 
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
