@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import jwt from "jsonwebtoken";
-import { validateUserId, validatePostId } from "../validation.js";
+import { validateUserId, validatePostId, validateCommentId } from "../validation.js";
 
 export const runtime = "nodejs";
 
@@ -292,6 +292,16 @@ export async function DELETE(req) {
       );
     }
 
+    // Validate comment_id format
+    const commentIdValidation = validateCommentId(comment_id);
+    if (!commentIdValidation.valid) {
+      return NextResponse.json(
+        { error: commentIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safeCommentId = commentIdValidation.value;
+
     if (!MONGO_URI) {
       throw new Error("MONGO_URI is not set");
     }
@@ -303,7 +313,7 @@ export async function DELETE(req) {
     const commentsCol = db.collection(COMMENTS_COLLECTION);
 
     // First, find the comment to verify ownership
-    const comment = await commentsCol.findOne({ comment_id });
+    const comment = await commentsCol.findOne({ comment_id: safeCommentId });
 
     if (!comment) {
       return NextResponse.json(
@@ -321,12 +331,13 @@ export async function DELETE(req) {
     }
 
     // Delete the comment
-    const deleteResult = await commentsCol.deleteOne({ comment_id });
+    const deleteResult = await commentsCol.deleteOne({ comment_id: safeCommentId });
 
     if (deleteResult.deletedCount === 0) {
+      // The comment was likely deleted by a concurrent request
       return NextResponse.json(
-        { error: "Failed to delete comment" },
-        { status: 500 }
+        { error: "Comment not found or already deleted" },
+        { status: 404 }
       );
     }
 
@@ -335,7 +346,7 @@ export async function DELETE(req) {
     await postsCol.updateOne({ post_id: comment.post_id }, { $inc: { comment_count: -1 } });
 
     return NextResponse.json(
-      { message: "Comment deleted successfully", comment_id },
+      { message: "Comment deleted successfully", comment_id: safeCommentId },
       { status: 200 }
     );
   } catch (err) {

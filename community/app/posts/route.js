@@ -83,32 +83,6 @@ function extractToken(req) {
   return null;
 }
 
-// Helper function to extract raw JWT token from request
-function extractToken(req) {
-  // Try Authorization header first
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const parts = authHeader.split(" ");
-    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
-      return parts[1];
-    }
-  }
-  
-  // Fallback to cookie
-  const cookieHeader = req.headers.get("cookie");
-  if (cookieHeader) {
-    const cookies = Object.fromEntries(
-      cookieHeader.split("; ").map(c => {
-        const [key, ...v] = c.split("=");
-        return [key, v.join("=")];
-      })
-    );
-    return cookies.access_token || null;
-  }
-  
-  return null;
-}
-
 // Generates a unique post ID. Uses timestamp and random number to reduce chance of collisions.
 function makePostId() {
   return `post_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -340,7 +314,7 @@ export async function PATCH(req) {
       );
     }
 
-    // Security check ensure the authenticated user owns this post
+    // Security check: ensure the authenticated user owns this post
     if (post.user_id !== authenticatedUserId) {
       return NextResponse.json(
         { error: "Forbidden: You can only edit your own posts" },
@@ -349,7 +323,7 @@ export async function PATCH(req) {
     }
 
     // Update the description (MongoDB may report modifiedCount=0 if values are unchanged)
-    const updateResult = await col.updateOne(
+    await col.updateOne(
       { post_id: safePostId },
       { $set: { description, updated_at: new Date() } }
     );
