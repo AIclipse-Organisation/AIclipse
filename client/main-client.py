@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 import requests
 from flask import (
@@ -465,6 +466,244 @@ def get_image(image_id: str):
         data = resp.json()
     except ValueError:
         return jsonify({"detail": "Invalid JSON from gateway on /image"}), 502
+
+    return jsonify(data), resp.status_code
+
+
+@app.post("/community/posts")
+def create_community_post():
+
+    token = request.cookies.get("access_token")
+    if not token:
+        return jsonify({"error": "Unauthorized", "detail": "Missing auth token"}), 401
+
+    # Get the JSON body from the request
+    try:
+        post_data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
+    url = f"{community_url}/community/posts"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+
+    try:
+        resp = requests.post(url, json=post_data, headers=headers, timeout=10)
+    except requests.RequestException as e:
+        logging.error("Community /posts request failed: %s", e)
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
+@app.get("/community/posts")
+def get_community_posts():
+    """
+    Proxy for getting all community posts.
+    No auth required for reading posts.
+    """
+    community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
+    url = f"{community_url}/community/posts"
+
+    headers = {
+        "Accept": "application/json"
+    }
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community posts request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
+@app.post("/community/posts/vote")
+def community_vote():
+    """
+    Proxy for voting on community posts.
+    Extracts JWT from cookie and forwards to community service.
+    """
+    token = request.cookies.get("access_token")
+    if not token:
+        return jsonify({"error": "Unauthorized", "detail": "Missing auth token"}), 401
+
+    try:
+        vote_data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
+    url = f"{community_url}/community/posts/vote"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+
+    try:
+        resp = requests.post(url, json=vote_data, headers=headers, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community vote request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
+@app.get("/community/posts/comments")
+def get_community_comments():
+    """
+    Proxy for getting comments on community posts.
+    No auth required for reading comments.
+    """
+    post_id = request.args.get("post_id")
+    if not post_id:
+        return jsonify({"error": "Missing post_id parameter"}), 400
+
+    # Validate post_id to prevent SSRF via path/query manipulation
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", post_id):
+        return jsonify({"error": "Invalid post_id parameter"}), 400
+
+    community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
+    url = f"{community_url}/community/posts/comments"
+
+    headers = {
+        "Accept": "application/json"
+    }
+
+    try:
+        resp = requests.get(url, headers=headers, params={"post_id": post_id}, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community comments request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
+@app.post("/community/posts/comments")
+def create_community_comment():
+    """
+    Proxy for posting comments on community posts.
+    Extracts JWT from cookie and forwards to community service.
+    """
+    token = request.cookies.get("access_token")
+    if not token:
+        return jsonify({"error": "Unauthorized", "detail": "Missing auth token"}), 401
+
+    try:
+        comment_data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
+    url = f"{community_url}/community/posts/comments"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+
+    try:
+        resp = requests.post(url, json=comment_data, headers=headers, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community comment request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
+@app.post("/community/posts/click")
+def community_click():
+    """
+    Proxy for tracking post clicks.
+    """
+    try:
+        click_data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
+    url = f"{community_url}/community/posts/click"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    try:
+        resp = requests.post(url, json=click_data, headers=headers, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community click request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
+@app.post("/community/posts/report")
+def community_report():
+    """
+    Proxy for reporting posts.
+    """
+    try:
+        report_data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
+    url = f"{community_url}/community/posts/report"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    try:
+        resp = requests.post(url, json=report_data, headers=headers, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community report request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
 
     return jsonify(data), resp.status_code
 

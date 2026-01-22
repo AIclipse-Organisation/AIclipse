@@ -11,7 +11,7 @@ using Moq;
 using Moq.Protected;
 using Xunit;
 
-namespace ModelCycle.Tests.Services;
+namespace Tests.Services;
 
 public class MediaServiceTests
 {
@@ -39,7 +39,13 @@ public class MediaServiceTests
         var fakeResponse = new MediaImageResponse 
         { 
             ImageId = "img_123", 
-            Url = "http://s3/img.jpg" 
+            Url = "http://s3/img.jpg",
+            UserId = "user_test_123",
+            S3Key = "images/img_123.jpg",
+            Verdict = "pending",
+            Label = "unknown",
+            Confidence = 1,
+            IsPublic = true
         };
         var json = JsonSerializer.Serialize(fakeResponse);
 
@@ -61,6 +67,7 @@ public class MediaServiceTests
         // Assert
         Assert.NotNull(result);
         Assert.Equal("img_123", result.ImageId);
+        Assert.Equal("user_test_123", result.UserId); // Optional: verify new fields
     }
 
     [Fact]

@@ -4,10 +4,10 @@ public class EvaluateImageRequest
 {
     public Guid PostId { get; set; } 
 
-    public string MediaImageId { get; set; } 
+    public required string MediaImageId { get; set; } 
 
 
-    public string S3Key { get; set; } 
+    public string? S3Key { get; set; } 
 
     public string Label { get; set; } = "Unknown"; 
     
