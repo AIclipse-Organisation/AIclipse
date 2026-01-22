@@ -7,10 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Python\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
@@ -30,5 +26,21 @@
     <_ContentIncludedByDefault Remove="Tests\obj\project.assets.json" />
     <_ContentIncludedByDefault Remove="Tests\obj\Tests.csproj.nuget.dgspec.json" />
   </ItemGroup>
+
+<ItemGroup>
+    <None Update="seed_model\**">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+</ItemGroup>
+
+    <ItemGroup>
+        <None Update="golden_set\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+<ItemGroup>
+  <Folder Include="python_scripts\" />
+</ItemGroup>
 
 </Project>

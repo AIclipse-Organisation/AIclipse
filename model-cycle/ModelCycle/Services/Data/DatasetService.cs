@@ -14,6 +14,21 @@ public class DatasetService : IDatasetService
         
         if (!Directory.Exists(_storagePath)) Directory.CreateDirectory(_storagePath);
     }
+    
+    public string GetLocalFilePath(string mediaId)
+    {
+        var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+        
+        foreach (var ext in supportedExtensions)
+        {
+            var path = Path.Combine(_storagePath, $"{mediaId}{ext}");
+            if (File.Exists(path))
+            {
+                return path;
+            }
+        }
+        return Path.Combine(_storagePath, $"{mediaId}.jpg");
+    }
 
     public async Task SaveImageAsync(string mediaId, string s3Key)
     {

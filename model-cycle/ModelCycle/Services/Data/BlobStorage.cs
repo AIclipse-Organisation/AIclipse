@@ -4,7 +4,7 @@ using Minio.Exceptions;
 
 namespace ModelCycle.Services;
 
-public class BlobStorageService
+public class BlobStorageService : IBlobStorageService
 {
     private readonly IMinioClient _minioClient;
     private readonly string _bucketName;
@@ -90,7 +90,8 @@ public class BlobStorageService
         try 
         {
             var directory = Path.GetDirectoryName(destinationPath);
-            if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+
+            if (!Directory.Exists(directory) && !string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
             var args = new GetObjectArgs()
                 .WithBucket(targetBucket)
