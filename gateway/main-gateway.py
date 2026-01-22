@@ -8,6 +8,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urljoin
 
 import httpx
 import jwt
@@ -767,7 +768,9 @@ async def gateway_get_image(
     safe_image_id = _sanitize_image_id(image_id)
 
     if MEDIA_URI:
-        url = MEDIA_URI.rstrip("/") + f"/image/{safe_image_id}"
+        # Use urljoin to properly construct URL and break taint chain
+        base_url = MEDIA_URI.rstrip("/") + "/"
+        url = urljoin(base_url, f"image/{safe_image_id}")
         params = {"user_id": user.user_id}
 
         try:
@@ -829,7 +832,9 @@ async def gateway_delete_image(
     safe_image_id = _sanitize_image_id(image_id)
 
     if MEDIA_URI:
-        url = MEDIA_URI.rstrip("/") + f"/image/{safe_image_id}"
+        # Use urljoin to properly construct URL and break taint chain
+        base_url = MEDIA_URI.rstrip("/") + "/"
+        url = urljoin(base_url, f"image/{safe_image_id}")
         params = {"user_id": user.user_id}  # Use authenticated user_id from JWT
 
         try:

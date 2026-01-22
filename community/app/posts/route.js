@@ -521,13 +521,30 @@ export async function DELETE(req) {
     const image_id = post.image_id;
     let imageDeleted = false;
     if (image_id) {
+      // Validate image_id to prevent SSRF
+      const validation = validateImageId(image_id);
+      if (!validation.valid) {
+        console.warn(`Invalid image_id format: ${image_id}`);
+        // Continue with post deletion even if image_id is invalid
+        return NextResponse.json(
+          { 
+            message: "Post deleted successfully (comments and votes removed; image had invalid ID)",
+            post_id: safePostId 
+          },
+          { status: 200 }
+        );
+      }
+      
+      // Use the validated value from the validation result to break taint chain
+      const safeImageId = validation.value;
+      
       try {
         const token = extractToken(req);
 
         if (token) {
           // Call gateway which will authenticate and forward to media service
           const GATEWAY_URI = process.env.GATEWAY_URI || "http://gateway-srv:8080";
-          const gatewayUrl = `${GATEWAY_URI}/image/${image_id}`;
+          const gatewayUrl = `${GATEWAY_URI}/image/${safeImageId}`;
           const gatewayResponse = await fetch(gatewayUrl, {
             method: 'DELETE',
             headers: {
@@ -536,17 +553,17 @@ export async function DELETE(req) {
           });
 
           if (gatewayResponse.ok) {
-            console.log(`Successfully deleted image ${image_id} via gateway`);
+            console.log(`Successfully deleted image ${safeImageId} via gateway`);
             imageDeleted = true;
           } else {
             const errorText = await gatewayResponse.text().catch(() => 'Unknown error');
-            console.warn(`Failed to delete image ${image_id} from gateway: ${gatewayResponse.status} - ${errorText}`);
+            console.warn(`Failed to delete image ${safeImageId} from gateway: ${gatewayResponse.status} - ${errorText}`);
           }
         } else {
           console.warn('No authentication token available to delete image');
         }
       } catch (gatewayError) {
-        console.error(`Error calling gateway to delete image ${image_id}:`, gatewayError);
+        console.error(`Error calling gateway to delete image ${safeImageId}:`, gatewayError);
       }
     }
 
