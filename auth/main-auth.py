@@ -7,6 +7,7 @@ import re
 import json
 import secrets
 import hmac
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -337,19 +338,28 @@ async def get_current_admin(user: TokenUser = Depends(get_current_user)) -> Toke
     return user
 
 
+def _api_key_kdf(secret: str, *, pepper: str) -> bytes:
+    """
+    Normalize (pepper + secret) into fixed-length bytes for bcrypt input.
+    Prevents bcrypt 72-byte limit issues.
+    """
+    raw = (pepper + secret).encode("utf-8")
+    return hashlib.sha256(raw).digest()  # 32 bytes
+
+
 def _hash_api_key_secret(secret: str, *, pepper: str) -> str:
     """
     Hash API key secret using bcrypt.
     Includes pepper server-side to harden DB-at-rest compromise cases.
     """
-    data = (pepper + secret).encode("utf-8")
+    data = _api_key_kdf(secret, pepper=pepper)
     return bcrypt.hashpw(data, bcrypt.gensalt()).decode("utf-8")
 
 
 def _verify_api_key_secret(secret: str, stored_hash: str, *, pepper: str) -> bool:
     if not stored_hash:
         return False
-    data = (pepper + secret).encode("utf-8")
+    data = _api_key_kdf(secret, pepper=pepper)
     try:
         return bcrypt.checkpw(data, stored_hash.encode("utf-8"))
     except Exception:
