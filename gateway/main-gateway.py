@@ -8,8 +8,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import urljoin, urlparse
-
+from urllib.parse import urlparse
 
 import httpx
 import jwt
@@ -62,7 +61,7 @@ def _sanitize_image_id(image_id: str) -> str:
 def _build_media_image_url(image_id: str) -> str:
     if not MEDIA_URI:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Media service not configured",
         )
 
@@ -75,31 +74,19 @@ def _build_media_image_url(image_id: str) -> str:
 
     safe_image_id = _sanitize_image_id(image_id)
 
-    if "/" in safe_image_id or "\\" in safe_image_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Image not found",
-        )
+    # Build from parsed origin (scheme + netloc), not by joining strings that include user input
+    origin = f"{base.scheme}://{base.netloc}"
+    full_url = origin + "/image/" + safe_image_id
 
-    base_url = base.geturl().rstrip("/") + "/"
-    full_url = urljoin(base_url, f"/image/{safe_image_id}")
-
+    # Optional: keep a belt-and-suspenders check (won’t hurt)
     resolved = urlparse(full_url)
-
-    if resolved.scheme != base.scheme or resolved.netloc != base.netloc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Invalid URL construction",
-        )
-
-    if not resolved.path.startswith("/image/"):
+    if resolved.scheme != base.scheme or resolved.netloc != base.netloc or resolved.path != ("/image/" + safe_image_id):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Invalid URL construction",
         )
 
     return full_url
-
 
 
 
@@ -798,6 +785,12 @@ async def gateway_get_image(
     image_id: str = Path(...),
     user: UserContext = Depends(get_current_user),
 ):
+    # Return 404 if media service is not configured
+    if not MEDIA_URI:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
     # Validate and sanitize image_id (breaks CodeQL taint tracking)
     url = _build_media_image_url(image_id)
     params = {"user_id": user.user_id}
@@ -858,37 +851,45 @@ async def gateway_delete_image(
     Gateway authenticates the user and forwards the request to media service.
     """
 
-    url = _build_media_image_url(image_id)
+    # 🔑 IMPORTANT: match GET behavior
+    if not MEDIA_URI:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
 
-    params = {"user_id": user.user_id}  # Use authenticated user_id from JWT
+    url = _build_media_image_url(image_id)
+    params = {"user_id": user.user_id}
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.delete(url, params=params)
     except httpx.RequestError:
+        # Media exists but is unreachable
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Media service unavailable",
         )
-    else:
-        if resp.status_code == 200:
-            return Response(
-                content=resp.content,
-                status_code=resp.status_code,
-                media_type=resp.headers.get("content-type", "application/json"),
-            )
-        if resp.status_code == 404:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Image not found",
-            )
-        if resp.status_code == 403:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You can only delete your own images",
-            )
-        # Handle other error responses from media service
-        raise HTTPException(
+
+    if resp.status_code == 200:
+        return Response(
+            content=resp.content,
             status_code=resp.status_code,
-            detail=f"Media service error: {resp.status_code}",
+            media_type=resp.headers.get("content-type", "application/json"),
         )
+    if resp.status_code == 404:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+    if resp.status_code == 403:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own images",
+        )
+
+    raise HTTPException(
+        status_code=resp.status_code,
+        detail=f"Media service error: {resp.status_code}",
+    )
+
