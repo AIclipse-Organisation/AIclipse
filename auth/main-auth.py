@@ -6,7 +6,6 @@ import bcrypt
 import re
 import json
 import secrets
-import hashlib
 import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
@@ -43,7 +42,6 @@ INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN")
 
 KEY_ID = "phase1-key"
 
-mongo_client: AsyncIOMotorClient | None = None
 users_coll = None
 api_keys_coll = None
 
@@ -179,7 +177,7 @@ class ApiKeyExchangeResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global mongo_client, users_coll, api_keys_coll
+    global users_coll, api_keys_coll
 
     mongo_client = AsyncIOMotorClient(MONGO_URI)
     db = mongo_client[MONGO_DB]
@@ -195,10 +193,11 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        mongo_client.close()
-        mongo_client = None
-        users_coll = None
-        api_keys_coll = None
+        try:
+            mongo_client.close()
+        finally:
+            users_coll = None
+            api_keys_coll = None
 
 
 app = FastAPI(lifespan=lifespan)
@@ -338,9 +337,23 @@ async def get_current_admin(user: TokenUser = Depends(get_current_user)) -> Toke
     return user
 
 
-def _hmac_sha256_hex(value: str, *, pepper: str) -> str:
-    mac = hmac.new(pepper.encode("utf-8"), value.encode("utf-8"), hashlib.sha256)
-    return mac.hexdigest()
+def _hash_api_key_secret(secret: str, *, pepper: str) -> str:
+    """
+    Hash API key secret using bcrypt.
+    Includes pepper server-side to harden DB-at-rest compromise cases.
+    """
+    data = (pepper + secret).encode("utf-8")
+    return bcrypt.hashpw(data, bcrypt.gensalt()).decode("utf-8")
+
+
+def _verify_api_key_secret(secret: str, stored_hash: str, *, pepper: str) -> bool:
+    if not stored_hash:
+        return False
+    data = (pepper + secret).encode("utf-8")
+    try:
+        return bcrypt.checkpw(data, stored_hash.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def _generate_api_key() -> tuple[str, str, str]:
@@ -640,7 +653,7 @@ async def rotate_my_api_key(user: TokenUser = Depends(get_current_user)):
     now = _now_utc()
 
     key_id, secret, full_key = _generate_api_key()
-    secret_hash = _hmac_sha256_hex(secret, pepper=pepper)
+    secret_hash = _hash_api_key_secret(secret, pepper=pepper)
 
     doc = {
         "key_id": key_id,
@@ -695,9 +708,8 @@ async def exchange_api_key(
     if not key_doc:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    want = str(key_doc.get("secret_hash") or "")
-    got = _hmac_sha256_hex(secret, pepper=pepper)
-    if not want or not hmac.compare_digest(want, got):
+    stored = str(key_doc.get("secret_hash") or "")
+    if not _verify_api_key_secret(secret, stored, pepper=pepper):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     try:
