@@ -15,35 +15,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # unit:
-  #   name: unit-tests
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   defaults:
-  #     run:
-  #       working-directory: community
-  #   steps:
-  #     - uses: actions/checkout@v4
+  unit:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: community
+    steps:
+      - uses: actions/checkout@v4
 
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.11"
-  #         cache: "pip"
-  #         cache-dependency-path: |
-  #           community/requirements.txt
-  #           community/requirements-dev.txt
+      # - name: Setup Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: "3.11"
+      #     cache: "pip"
+      #     cache-dependency-path: |
+      #       community/requirements.txt
+      #       community/requirements-dev.txt
 
-  #     - name: Install deps
-  #       run: |
-  #         set -euo pipefail
-  #         python -m pip install -U pip
-  #         pip install -r requirements-dev.txt
+      # - name: Install deps
+      #   run: |
+      #     set -euo pipefail
+      #     python -m pip install -U pip
+      #     pip install -r requirements-dev.txt
 
-  #     - name: Run pytest
-  #       run: |
-  #         set -euo pipefail
-  #         python -m pytest tests -q
+      # - name: Run pytest
+      #   run: |
+      #     set -euo pipefail
+      #     python -m pytest tests -q
 
   community:
     name: k3d-smoke
