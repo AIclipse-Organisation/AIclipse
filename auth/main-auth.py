@@ -730,7 +730,7 @@ async def exchange_api_key(
         )
     except Exception:
         logging.warning(
-            "Non-critical: failed to update api key last_used_at (key_id=%s)",
+            "Non-critical: failed to update api key",
             key_id,
             exc_info=True,
         )
