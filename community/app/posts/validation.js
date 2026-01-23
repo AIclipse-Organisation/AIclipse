@@ -75,3 +75,26 @@ export function validateImageId(image_id) {
 
   return { valid: true, value: String(trimmed) };
 }
+
+// Validates comment_id format
+export function validateCommentId(comment_id) {
+  if (typeof comment_id !== "string") {
+    return { valid: false, error: "comment_id must be a string" };
+  }
+
+  const trimmed = comment_id.trim();
+  if (!trimmed) {
+    return { valid: false, error: "comment_id cannot be empty" };
+  }
+
+  if (trimmed.length > 100) {
+    return { valid: false, error: "comment_id too long" };
+  }
+
+  const validPattern = /^[a-zA-Z0-9_-]+$/;
+  if (!validPattern.test(trimmed)) {
+    return { valid: false, error: "comment_id contains invalid characters" };
+  }
+
+  return { valid: true, value: String(trimmed) };
+}

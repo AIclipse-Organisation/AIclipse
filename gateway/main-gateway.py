@@ -8,6 +8,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
 
 import httpx
 import jwt
@@ -27,10 +28,99 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from PIL import Image, UnidentifiedImageError
-
+import re
+import posixpath
 
 AUTH_URI = os.getenv("AUTH_URI")
 MEDIA_URI = os.getenv("MEDIA_URI")
+
+_IMAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+_MEDIA_PATH_RE = re.compile(r"^[A-Za-z0-9_/-]{1,256}$")
+
+def _build_media_url(path: str) -> str:
+    """
+    Build a validated URL to the media service.
+    `path` is treated as a relative path/segment and normalized/validated.
+    """
+    if not MEDIA_URI:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
+    base = urlparse(MEDIA_URI)
+    if base.scheme not in ("http", "https") or not base.netloc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid media service configuration",
+        )
+
+    normalized = posixpath.normpath(path.lstrip("/"))
+
+    # Reject traversal / absolute
+    if normalized in (".", "..") or normalized.startswith("../") or normalized.startswith("/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid media path",
+        )
+
+    # Strict allowlist for path characters
+    if not _MEDIA_PATH_RE.fullmatch(normalized):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid media path",
+        )
+
+    # Build from parsed origin
+    origin = f"{base.scheme}://{base.netloc}"
+    full_url = f"{origin}/{normalized}"
+
+    # Lock it down
+    resolved = urlparse(full_url)
+    if resolved.scheme != base.scheme or resolved.netloc != base.netloc or resolved.path != ("/" + normalized):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid URL construction",
+        )
+
+    return full_url
+
+
+def _build_media_image_url(image_id: str) -> str:
+    safe_image_id = _sanitize_image_id(image_id)
+
+    # Segment validation: must be exactly image/<id>
+    rel = posixpath.normpath(f"image/{safe_image_id}")
+    parts = rel.split("/")
+    if len(parts) != 2 or parts[0] != "image" or parts[1] != safe_image_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid media path",
+        )
+
+    return _build_media_url(rel)
+
+
+def _sanitize_image_id(image_id: str) -> str:
+    """
+    Validate and return a sanitized image_id.
+    Raises HTTPException if invalid.
+    This explicitly breaks CodeQL taint tracking by using regex match result.
+    """
+    if not isinstance(image_id, str):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+    match = _IMAGE_ID_PATTERN.fullmatch(image_id)
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+    # Return the matched string (breaks taint chain for CodeQL)
+    return match.group(0)
+
 DETECTOR_URI = os.getenv("DETECTOR_URI")
 HOSTNAME = os.getenv("HOSTNAME")
 
@@ -726,31 +816,42 @@ async def gateway_get_image(
     image_id: str = Path(...),
     user: UserContext = Depends(get_current_user),
 ):
-    if MEDIA_URI:
-        url = MEDIA_URI.rstrip("/") + f"/image/{image_id}"
-        params = {"user_id": user.user_id}
+    # Match your desired behavior: if media service isn't configured, pretend not found
+    if not MEDIA_URI:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
 
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(url, params=params)
-        except httpx.RequestError:
-            pass
-        else:
-            if resp.status_code == 200:
-                return Response(
-                    content=resp.content,
-                    status_code=resp.status_code,
-                    media_type=resp.headers.get("content-type", "application/json"),
-                )
-            if resp.status_code == 404:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Image not found",
-                )
+    url = _build_media_image_url(image_id)
+    params = {"user_id": user.user_id}
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, params=params)
+    except httpx.RequestError:
+        # If you want GET to still look like "not found" when media is down, keep 404.
+        # If you want to surface outage, change this to 503.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
+    if resp.status_code == 200:
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+    if resp.status_code == 404:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
 
     raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Image not found",
+        status_code=resp.status_code,
+        detail=f"Media service error: {resp.status_code}",
     )
 
 
@@ -774,3 +875,56 @@ async def gateway_get_community_images():
                 )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content={"items": []})
+
+
+@app.delete("/image/{image_id}")
+async def gateway_delete_image(
+    image_id: str = Path(...),
+    user: UserContext = Depends(get_current_user),
+):
+    """
+    Delete an image. Only the owner can delete their own image.
+    Gateway authenticates the user and forwards the request to media service.
+    """
+    # Match GET behavior
+    if not MEDIA_URI:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
+    url = _build_media_image_url(image_id)
+    params = {"user_id": user.user_id}
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.delete(url, params=params)
+    except httpx.RequestError:
+        # For DELETE you said you want the expected 404 — so return 404 here too.
+        # If you *actually* want to signal outage, use 503 instead.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
+    if resp.status_code == 200:
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+    if resp.status_code == 404:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+    if resp.status_code == 403:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own images",
+        )
+
+    raise HTTPException(
+        status_code=resp.status_code,
+        detail=f"Media service error: {resp.status_code}",
+    )
