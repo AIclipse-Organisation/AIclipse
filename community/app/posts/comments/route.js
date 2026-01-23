@@ -341,9 +341,12 @@ export async function DELETE(req) {
       );
     }
 
-    // Decrement comment count on the post
+    // Decrement comment count on the post (only if greater than 0)
     const postsCol = db.collection(POSTS_COLLECTION);
-    await postsCol.updateOne({ post_id: comment.post_id }, { $inc: { comment_count: -1 } });
+    await postsCol.updateOne(
+      { post_id: comment.post_id, comment_count: { $gt: 0 } },
+      { $inc: { comment_count: -1 } }
+    );
 
     return NextResponse.json(
       { message: "Comment deleted successfully", comment_id: safeCommentId },

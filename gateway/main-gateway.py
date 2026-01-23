@@ -8,7 +8,8 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
+
 
 import httpx
 import jwt
@@ -37,17 +38,6 @@ MEDIA_URI = os.getenv("MEDIA_URI")
 _IMAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 
-def _is_safe_image_id(image_id: str) -> bool:
-    """
-    Validate that the image_id is a simple, URL-safe identifier.
-    This prevents path traversal or injection of additional path/query components.
-    Restricts to alphanumeric, underscore, and hyphen with max length of 128.
-    """
-    if not isinstance(image_id, str):
-        return False
-    return bool(_IMAGE_ID_PATTERN.fullmatch(image_id))
-
-
 def _sanitize_image_id(image_id: str) -> str:
     """
     Validate and return a sanitized image_id.
@@ -69,31 +59,48 @@ def _sanitize_image_id(image_id: str) -> str:
     return match.group(0)
 
 
-def _build_media_url(path: str) -> str:
-    """
-    Build a validated URL to the media service.
-    Validates the final URL to prevent SSRF.
-    Returns the validated URL string.
-    """
+def _build_media_image_url(image_id: str) -> str:
     if not MEDIA_URI:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Media service not configured",
         )
-    
-    # Construct URL using trusted base + validated path
-    base = MEDIA_URI.rstrip("/")
-    full_url = f"{base}/{path}"
-    
-    # Validate the constructed URL starts with the trusted base
-    # This breaks CodeQL taint tracking by validating the final result
-    if not full_url.startswith(base + "/"):
+
+    base = urlparse(MEDIA_URI)
+    if base.scheme not in ("http", "https") or not base.netloc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid media service configuration",
+        )
+
+    safe_image_id = _sanitize_image_id(image_id)
+
+    if "/" in safe_image_id or "\\" in safe_image_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
+    base_url = base.geturl().rstrip("/") + "/"
+    full_url = urljoin(base_url, f"/image/{safe_image_id}")
+
+    resolved = urlparse(full_url)
+
+    if resolved.scheme != base.scheme or resolved.netloc != base.netloc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Invalid URL construction",
         )
-    
+
+    if not resolved.path.startswith("/image/"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid URL construction",
+        )
+
     return full_url
+
+
 
 
 DETECTOR_URI = os.getenv("DETECTOR_URI")
@@ -792,10 +799,7 @@ async def gateway_get_image(
     user: UserContext = Depends(get_current_user),
 ):
     # Validate and sanitize image_id (breaks CodeQL taint tracking)
-    safe_image_id = _sanitize_image_id(image_id)
-
-    # Build validated URL (breaks taint chain)
-    url = _build_media_url(f"image/{safe_image_id}")
+    url = _build_media_image_url(image_id)
     params = {"user_id": user.user_id}
 
     try:
@@ -853,11 +857,9 @@ async def gateway_delete_image(
     Delete an image. Only the owner can delete their own image.
     Gateway authenticates the user and forwards the request to media service.
     """
-    # Validate and sanitize image_id (breaks CodeQL taint tracking)
-    safe_image_id = _sanitize_image_id(image_id)
 
-    # Build validated URL (breaks taint chain)
-    url = _build_media_url(f"image/{safe_image_id}")
+    url = _build_media_image_url(image_id)
+
     params = {"user_id": user.user_id}  # Use authenticated user_id from JWT
 
     try:
@@ -890,8 +892,3 @@ async def gateway_delete_image(
             status_code=resp.status_code,
             detail=f"Media service error: {resp.status_code}",
         )
-
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="Media service unavailable",
-    )

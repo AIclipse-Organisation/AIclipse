@@ -327,9 +327,10 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
             onClick={deletePost}
             disabled={!postId || busy}
             title="Delete this post"
+            aria-label="Delete this post"
             style={{ marginLeft: "8px", color: "#dc3545" }}
           >
-            🗑️ Delete
+            <span aria-hidden="true">🗑️</span> Delete
           </button>
         )}
       </div>
@@ -432,9 +433,10 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
               onClick={() => setIsEditingDescription(true)}
               disabled={busy}
               title="Edit description"
+              aria-label="Edit description"
               style={{ marginLeft: "8px", fontSize: "0.85em", cursor: "pointer", background: "none", border: "none", padding: "0" }}
             >
-              ✏️
+              <span aria-hidden="true">✏️</span>
             </button>
           )}
         </div>
@@ -481,9 +483,10 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
                         onClick={() => deleteComment(c.comment_id)}
                         disabled={commentsBusy}
                         title="Delete this comment"
+                        aria-label="Delete comment"
                         style={{ marginLeft: "8px", color: "#dc3545", fontSize: "0.85em", cursor: "pointer", background: "none", border: "none", padding: "0" }}
                       >
-                        🗑️
+                        <span aria-hidden="true">🗑️</span>
                       </button>
                     )}
                   </div>
