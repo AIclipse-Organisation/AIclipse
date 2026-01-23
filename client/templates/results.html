@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>AICLIPSE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/upload.css" />
+</head>
+
+<body class="app">
+    <div class="app-container">
+        <div data-include="/static/partials/topbar.html"></div>
+        <main class="screen">
+            <div class="grid">
+                <section class="page-header" aria-label="Page title">
+                    <h1 class="page-title">Results</h1>
+                    <div class="page-underline" role="presentation"></div>
+                </section>
+
+                <button class="secondary" id="btn-back">Back</button>
+
+                <img id="preview-image" alt="Selected image preview" />
+
+                <div id="detect-card" class="detection-card" aria-live="polite">
+                    <div class="detection-row">
+                        <div class="detection-main">
+                            <p id="detect-verdict" class="verdict-text label-neutral">—</p>
+
+                            <div class="progress-bar" aria-hidden="true" title="Real vs AI probability">
+                                <div class="fill real-fill" style="width: 0%"></div>
+                                <div class="fill ai-fill" style="width: 0%"></div>
+                            </div>
+
+                            <div class="detection-meta">
+                                <small id="detect-confidence" class="muted">Confidence: —</small>
+                            </div>
+
+                            <div class="action-card">
+                                <h3 class="action-title">Would you like to…</h3>
+
+                                <div class="action-row action-save">
+                                    <span class="action-icon" aria-hidden="true">💾</span>
+                                    <button id="btn-save" disabled type="button" class="action-btn">
+                                        Save image
+                                    </button>
+                                </div>
+
+                                <div class="action-row action-delete">
+                                    <span class="action-icon" aria-hidden="true">🗑️</span>
+                                    <button id="btn-delete" class="action-btn danger" type="button">
+                                        Delete scan
+                                    </button>
+                                </div>
+
+                                <label class="action-row action-publish" id="publish-row">
+                                    <span class="action-icon" aria-hidden="true">👥</span>
+                                    <span class="action-text">Publish to community (public)</span>
+
+                                    <input id="save-public" type="checkbox" class="publish-check" />
+                                    <span class="publish-toggle" aria-hidden="true"></span>
+                                </label>
+
+                                <div id="public-desc-wrap" class="publish-extra" hidden>
+                                    <label for="post-description" class="publish-label">Description</label>
+                                    <textarea id="post-description" rows="3"
+                                        placeholder="Write a short description for the community post..."
+                                        class="publish-textarea"></textarea>
+                                    <small id="post-description-hint" class="muted"></small>
+                                </div>
+
+                                <div id="save-status" class="status-bar"></div>
+                                <div id="save-result" class="muted"></div>
+                            </div>
+
+                            <div id="delete-modal" class="modal-overlay" hidden>
+                                <div class="modal">
+                                    <h3 class="modal-title">Delete scan?</h3>
+                                    <p class="modal-text">
+                                        This action cannot be undone.
+                                    </p>
+
+                                    <div class="modal-actions">
+                                        <button id="cancel-delete" class="secondary" type="button">
+                                            Cancel
+                                        </button>
+                                        <button id="confirm-delete" class="danger" type="button">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- <section class="card">
+                <h2>Raw responses</h2>
+                <p class="muted">Debug view. Last JSON response from the server:</p>
+                <pre id="debug-output">{}</pre>
+            </section> -->
+        </main>
+
+        <div data-include="/static/partials/navbar.html"></div>
+    </div>
+
+    <script src="/static/js/include.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/imageProcessing.js"></script>
+    <script src="/static/js/results.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+
+</html>

@@ -17,6 +17,17 @@ from pydantic.functional_serializers import PlainSerializer
 
 from fastapi import Request
 
+
+def sanitize_for_log(value: str | None) -> str:
+    """
+    Remove newline characters from values before logging to mitigate log injection.
+    """
+    if value is None:
+        return ""
+    # Strip carriage returns and newlines; keep other characters unchanged.
+    return value.replace("\r", "").replace("\n", "")
+
+
 # ---- env ----
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB = os.getenv("MONGO_DB")
@@ -246,6 +257,52 @@ def get_image(image_id: str, user_id: str | None = None):
         return attach_url(doc)
 
     raise HTTPException(status_code=404, detail="Not found")
+
+
+@app.delete("/image/{image_id}")
+def delete_image(image_id: str, user_id: str | None = None):
+    """
+    Delete an image from both MinIO storage and MongoDB.
+    Only the owner (user_id) can delete their image.
+    """
+    if images is None:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Find the image document
+    doc = images.find_one({"image_id": image_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # Security check only owner can delete
+    if user_id is not None and doc.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You can only delete your own images")
+
+    # Delete from MinIO/S3 storage
+    s3_key = doc.get("s3_key")
+    if s3_key:
+        try:
+            s3_internal.delete_object(Bucket=S3_BUCKET, Key=s3_key)
+            logging.info("Deleted image file from MinIO: %s", sanitize_for_log(str(s3_key)))
+        except ClientError as e:
+            logging.exception("Failed to delete image from MinIO: %s", sanitize_for_log(str(s3_key)))
+            raise HTTPException(status_code=500, detail="Failed to delete image from storage") from e
+
+    # Delete from MongoDB
+    result = images.delete_one({"image_id": image_id})
+    if result.deleted_count == 0:
+        logging.warning(
+            "Image %s not found in MongoDB during deletion",
+            sanitize_for_log(str(image_id)),
+        )
+        raise HTTPException(status_code=404, detail="Image not found in database")
+
+    logging.info(
+        "Successfully deleted image %s (user: %s)",
+        sanitize_for_log(str(image_id)),
+        sanitize_for_log(str(user_id) if user_id else ""),
+    )
+    return {"message": "Image deleted successfully", "image_id": image_id}
+
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):

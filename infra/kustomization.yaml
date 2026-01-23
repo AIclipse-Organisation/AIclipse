@@ -19,3 +19,4 @@ resources:
   - k8s-dev/ingress-srv.yaml
   - k8s-dev/ingress-api.yaml
   - k8s/model-cycle-pvc.yaml
+  - k8s/app-configmap.yaml

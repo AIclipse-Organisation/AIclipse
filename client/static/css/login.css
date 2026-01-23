@@ -1,134 +1,239 @@
+/* =========================
+   GLOBAL RESET / SAFETY
+========================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
   margin: 0;
-  padding: 0;
-  background: #f5f5f5;
-  color: #222;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #000;
+  color: #fff;
 }
 
-main {
-  max-width: 960px;
-  margin: 24px auto 40px;
-  padding: 0 16px;
+/* =========================
+   APP CONTAINER
+========================= */
+
+body.app .app-container {
+  position: relative;
+  margin: 0 auto;
+  max-width: 480px;
+  height: 100svh;
+  overflow: hidden;
+  background: #41381a;
 }
 
-.grid {
+/* Background layers */
+body.app .app-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 50% -10%, rgba(255,255,255,0.10), rgba(0,0,0,0) 55%),
+    linear-gradient(to bottom, rgba(0,0,0,0.10), rgba(0,0,0,0.95)),
+    url("https://img.freepik.com/free-photo/portrait-person-ai-robot_23-2151015315.jpg");
+  background-size: cover;
+  background-position: center;
+  opacity: 0.65;
+  z-index: 0;
+}
+
+body.app .app-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0,0,0,0) 35%, rgba(0,0,0,0.75) 100%);
+  z-index: 0;
+}
+
+/* =========================
+   SCREEN + CENTERING
+========================= */
+
+body.app .screen {
+  position: relative;
+  z-index: 1;
+  height: 100svh;
+  display: flex;
+}
+
+.auth-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 18px;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+}
+
+/* =========================
+   BRAND
+========================= */
+
+.brand-hero {
+  display: flex;
+  justify-content: center;
+}
+
+.brand-image {
+  width: 280px;
+  max-width: 80vw;
+}
+
+/* =========================
+   AUTH CARD (CRITICAL FIX)
+========================= */
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(0,0,0,0.40);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.12);
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================
+   TOGGLE
+========================= */
+
+.auth-toggle {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.card {
-  padding: 16px 16px 20px;
+.auth-tab {
+  padding: 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.12);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 15px;
+  cursor: pointer;
 }
 
-.card h2 {
-  margin: 0 0 12px;
-  font-size: 16px;
+.auth-tab.is-active {
+  background: #C9BA83;
+  border-color: #948961;
+  color: #000000;
+  font-weight: 700;
 }
+
+/* =========================
+   PANELS (CONTAINMENT SAFE)
+========================= */
+
+.auth-panels {
+  width: 100%;
+  display: block;
+}
+
+.auth-panel {
+  width: 100%;
+  display: block;
+  position: static !important;
+}
+
+/* Toggle visibility */
+.auth-panel[data-panel="signup"] {
+  display: none;
+}
+
+.auth-panels[data-mode="signup"] .auth-panel[data-panel="signup"] {
+  display: block;
+}
+
+.auth-panels[data-mode="signup"] .auth-panel[data-panel="login"] {
+  display: none;
+}
+
+.auth-panels[data-mode="login"] .auth-panel[data-panel="login"] {
+  display: block;
+}
+
+/* =========================
+   INPUTS
+========================= */
 
 label {
   display: block;
   font-size: 13px;
-  margin-bottom: 4px;
+  margin: 10px 0 6px;
+  color: rgba(255,255,255,0.85);
 }
 
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"] {
+input {
   width: 100%;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  padding: 6px 8px;
-  font-size: 14px;
-  box-sizing: border-box;
-  margin-bottom: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid rgb(255,255,255,0.25);
+  background: rgba(0,0,0,0.45);
+  color: rgba(255,255,255,0.95);
+  outline: none;
 }
 
-input[type="file"] {
-  margin: 8px 0;
+input:focus {
+  border-color: rgba(255,255,255,0.55);
 }
 
-select {
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  padding: 6px 8px;
-  font-size: 14px;
-  background: #ffffff;
-}
+/* =========================
+   BUTTONS
+========================= */
 
-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid #111827;
-  background: #111827;
-  color: #f9fafb;
-  font-size: 14px;
+#btn-login,
+#btn-signup {
+  width: 100%;
+  padding: 13px;
+  margin-top: 6px;
+  border-radius: 10px;
+  border: 1px solid #C9BA83;
+  background: #C9BA83;
+  color: #000000;
+  font-size: 16px;
+  font-weight: 700;
   cursor: pointer;
-  margin-right: 6px;
-  margin-top: 4px;
 }
 
-button.secondary {
-  background: #ffffff;
-  color: #111827;
-  border-color: #d1d5db;
+/* =========================
+   ACCESSIBILITY
+========================= */
+
+.legacy-heading {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
 }
 
-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
+/* =========================
+   STATUS
+========================= */
 
-
-.divider {
-  margin: 14px 0;
-  border: none;
-  border-top: 1px solid #e5e7eb;
-}
-
-
-
-/* App container wrapper */
-body.app {
-  background: #f8f8f8; /* overrides default body background */
-}
-
-/* Constrain everything to phone width */
-body.app .app-container {
-  position: relative;
-  min-height: 100vh;
-  background: #f8f8f8;
-
-  margin: 0 auto;
-  max-width: 480px;
-  border-left: 1px solid #ddd;
-  border-right: 1px solid #ddd;
-}
-
-/* Screen content area
-   Add bottom padding so content doesn't hide behind navbar */
-body.app .screen {
-  padding: 20px;
-  padding-bottom: 80px; /* space for bottom nav */
-}
-
-/* IMPORTANT: override your existing main max-width when in app shell */
-body.app main {
-  max-width: none;
-  margin: 0;
-  padding: 0;
-}
-
-/* Responsive: keep phone width centered on large screens */
-@media (min-width: 768px) {
-  body.app {
-    background: #f5f5f5; /* optional: subtle contrast outside phone shell */
-  }
+#account-status {
+  margin-top: 10px;
+  font-size: 14px;
+  color: rgba(255,255,255,0.85);
 }
