@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import jwt from "jsonwebtoken";
-import { validateUserId, validateImageId } from "./validation.js";
+import { validateUserId, validateImageId, validatePostId } from "./validation.js";
 
 export const runtime = "nodejs"; // required for MongoDB driver
 
@@ -11,6 +11,82 @@ const POSTS_COLLECTION = "community.posts";
 
 // NEW: user collection to lookup poster name
 const USERS_COLLECTION = "auth.users";
+
+
+// COMA
+function safeNumber(n, fallback = 0) {
+  const x = Number(n);
+  return Number.isFinite(x) ? x : fallback;
+}
+
+function safeDiv(a, b) {
+  return b > 0 ? a / b : 0;
+}
+
+// Uses your demo concept: controversial boost only if:
+// - total votes >= 50
+// - vote ratio between 40–60%
+// - controversial_since exists
+// - boost window: 48h–96h after controversial_since
+function isControversial(post, nowSec) {
+  const SECONDS_IN_HOUR = 3600;
+  const MIN_TOTAL_VOTES = 50;
+
+  const up = safeNumber(post.up_vote_count);
+  const down = safeNumber(post.down_vote_count);
+  const total = up + down;
+
+  if (total < MIN_TOTAL_VOTES) return false;
+
+  const controversialSince = safeNumber(post.controversial_since, 0);
+  if (!controversialSince) return false;
+
+  const ratio = (up / total) * 100;
+  const inZone = ratio >= 40 && ratio <= 60;
+  if (!inZone) return false;
+
+  const timeDiff = nowSec - controversialSince;
+  const boostStart = 48 * SECONDS_IN_HOUR; // 48h
+  const boostEnd = 96 * SECONDS_IN_HOUR;   // 96h
+  if (timeDiff < boostStart || timeDiff >= boostEnd) return false;
+
+  return true;
+}
+
+// Convert created_at to unix seconds safely (Date or ISO string)
+function createdAtToUnixSeconds(created_at) {
+  if (!created_at) return 0;
+  if (created_at instanceof Date) {
+    return Math.floor(created_at.getTime() / 1000);
+  }
+  const d = new Date(created_at);
+  const t = d.getTime();
+  return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
+}
+
+// COMA 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Helper function to extract and verify JWT token from Authorization header or cookie
 function getAuthenticatedUserId(req) {
@@ -55,6 +131,32 @@ function getAuthenticatedUserId(req) {
   } catch (err) {
     throw new Error("Invalid or expired token");
   }
+}
+
+// Helper function to extract raw JWT token from request (for forwarding to other services)
+function extractToken(req) {
+  // Try Authorization header first
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+      return parts[1];
+    }
+  }
+  
+  // Fallback to cookie
+  const cookieHeader = req.headers.get("cookie");
+  if (cookieHeader) {
+    const cookies = Object.fromEntries(
+      cookieHeader.split("; ").map(c => {
+        const [key, ...v] = c.split("=");
+        return [key, v.join("=")];
+      })
+    );
+    return cookies.access_token || null;
+  }
+  
+  return null;
 }
 
 // Generates a unique post ID. Uses timestamp and random number to reduce chance of collisions.
@@ -209,98 +311,459 @@ export async function POST(req) {
   }
 }
 
+// PATCH POST
+// PATCH /community/posts?post_id=xxx
+// Allows a user to update their own post's description
+export async function PATCH(req) {
+  let client = null;
+  
+  try {
+    // Verify authentication and get authenticated user_id from JWT token
+    let authenticatedUserId;
+    try {
+      authenticatedUserId = getAuthenticatedUserId(req);
+    } catch (authErr) {
+      return NextResponse.json(
+        { error: "Unauthorized", detail: String(authErr) },
+        { status: 401 }
+      );
+    }
+
+    // Get post_id from query parameters
+    const { searchParams } = new URL(req.url);
+    const post_id = searchParams.get("post_id");
+
+    if (!post_id) {
+      return NextResponse.json(
+        { error: "Missing required parameter: post_id" },
+        { status: 400 }
+      );
+    }
+
+    // Validate post_id format
+    const postIdValidation = validatePostId(post_id);
+    if (!postIdValidation.valid) {
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safePostId = postIdValidation.value;
+
+    // Get description from body
+    const body = await req.json().catch(() => null);
+    const description = (body?.description || "").trim();
+
+    if (!description) {
+      return NextResponse.json(
+        { error: "Description cannot be empty" },
+        { status: 400 }
+      );
+    }
+
+    // Length validation
+    const MAX_DESCRIPTION_LENGTH = 1000;
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      return NextResponse.json(
+        { error: `Description too long (max ${MAX_DESCRIPTION_LENGTH} characters)` },
+        { status: 400 }
+      );
+    }
+
+    if (!MONGO_URI) {
+      throw new Error("MONGO_URI is not set");
+    }
+
+    client = new MongoClient(MONGO_URI);
+    await client.connect();
+
+    const db = client.db(MONGO_DB);
+    const col = db.collection(POSTS_COLLECTION);
+
+    // First find the post to verify ownership
+    const post = await col.findOne({ post_id: safePostId });
+
+    if (!post) {
+      return NextResponse.json(
+        { error: "Post not found" },
+        { status: 404 }
+      );
+    }
+
+    // Security check: ensure the authenticated user owns this post
+    if (post.user_id !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "Forbidden: You can only edit your own posts" },
+        { status: 403 }
+      );
+    }
+
+    // Update the description (MongoDB may report modifiedCount=0 if values are unchanged)
+    await col.updateOne(
+      { post_id: safePostId },
+      { $set: { description, updated_at: new Date() } }
+    );
+
+    // Note: modifiedCount can be 0 if the new description is the same as the old one
+    // This is not an error, just a no-op update
+
+    // Return the updated post
+    const updatedPost = await col.findOne({ post_id: safePostId }, { projection: { _id: 0 } });
+
+    return NextResponse.json(
+      { message: "Post updated successfully", post: updatedPost },
+      { status: 200 }
+    );
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Failed to update post", detail: String(err) },
+      { status: 500 }
+    );
+  } finally {
+    if (client) {
+      try {
+        await client.close();
+      } catch (closeErr) {
+        console.error("Error closing MongoDB connection:", closeErr);
+      }
+    }
+  }
+}
+
+// DELETE POST
+// DELETE /community/posts?post_id=xxx
+// Allows a user to delete their own post
+export async function DELETE(req) {
+  let client = null;
+  
+  try {
+    // Verify authentication and get authenticated user_id from JWT token
+    let authenticatedUserId;
+    try {
+      authenticatedUserId = getAuthenticatedUserId(req);
+    } catch (authErr) {
+      return NextResponse.json(
+        { error: "Unauthorized", detail: String(authErr) },
+        { status: 401 }
+      );
+    }
+
+    // Get post_id from query parameters
+    const { searchParams } = new URL(req.url);
+    const post_id = searchParams.get("post_id");
+
+    if (!post_id) {
+      return NextResponse.json(
+        { error: "Missing required parameter: post_id" },
+        { status: 400 }
+      );
+    }
+
+    // Validate post_id format
+    const postIdValidation = validatePostId(post_id);
+    if (!postIdValidation.valid) {
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const safePostId = postIdValidation.value;
+
+    if (!MONGO_URI) {
+      throw new Error("MONGO_URI is not set");
+    }
+
+    client = new MongoClient(MONGO_URI);
+    await client.connect();
+
+    const db = client.db(MONGO_DB);
+    const col = db.collection(POSTS_COLLECTION);
+
+    // First, find the post to verify ownership
+    const post = await col.findOne({ post_id: safePostId });
+
+    if (!post) {
+      return NextResponse.json(
+        { error: "Post not found" },
+        { status: 404 }
+      );
+    }
+
+    // Security check: ensure the authenticated user owns this post
+    if (post.user_id !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "Forbidden: You can only delete your own posts" },
+        { status: 403 }
+      );
+    }
+
+    // Delete the post
+    const deleteResult = await col.deleteOne({ post_id: safePostId });
+
+    if (deleteResult.deletedCount === 0) {
+      // The post was likely deleted by a concurrent request
+      return NextResponse.json(
+        { error: "Post not found or already deleted" },
+        { status: 404 }
+      );
+    }
+
+    // Delete associated comments and votes
+    const COMMENTS_COLLECTION = "community.comments";
+    const VOTES_COLLECTION = "community.votes";
+    
+    const commentsResult = await db.collection(COMMENTS_COLLECTION).deleteMany({ post_id: safePostId });
+    const votesResult = await db.collection(VOTES_COLLECTION).deleteMany({ post_id: safePostId });
+    
+    console.log(`Deleted ${commentsResult.deletedCount} comments and ${votesResult.deletedCount} votes for post ${safePostId}`);
+
+    // Delete the associated image via gateway
+    const image_id = post.image_id;
+    let imageDeleted = false;
+    if (image_id) {
+      // Validate image_id to prevent SSRF
+      const validation = validateImageId(image_id);
+      if (!validation.valid) {
+        console.warn(`Invalid image_id format: ${image_id}`);
+        // Continue with post deletion even if image_id is invalid - don't attempt image deletion
+      } else {
+        // Use the validated value from the validation result to break taint chain
+        const safeImageId = validation.value;
+        
+        try {
+          const token = extractToken(req);
+
+          if (token) {
+            // Call gateway which will authenticate and forward to media service
+            const GATEWAY_URI = process.env.GATEWAY_URI || "http://gateway-srv:8080";
+            const gatewayUrl = `${GATEWAY_URI}/image/${safeImageId}`;
+            const gatewayResponse = await fetch(gatewayUrl, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            });
+
+            if (gatewayResponse.ok) {
+              console.log(`Successfully deleted image ${safeImageId} via gateway`);
+              imageDeleted = true;
+            } else {
+              const errorText = await gatewayResponse.text().catch(() => 'Unknown error');
+              console.warn(`Failed to delete image ${safeImageId} from gateway: ${gatewayResponse.status} - ${errorText}`);
+            }
+          } else {
+            console.warn('No authentication token available to delete image');
+          }
+        } catch (gatewayError) {
+          console.error(`Error calling gateway to delete image ${safeImageId}:`, gatewayError);
+        }
+      }
+    }
+
+    return NextResponse.json(
+      { 
+        message: imageDeleted 
+          ? "Post deleted successfully (including comments, votes, and image)" 
+          : "Post deleted successfully (comments and votes removed; image deletion was attempted)",
+        post_id: safePostId 
+      },
+      { status: 200 }
+    );
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Failed to delete post", detail: String(err) },
+      { status: 500 }
+    );
+  } finally {
+    if (client) {
+      try {
+        await client.close();
+      } catch (closeErr) {
+        console.error("Error closing MongoDB connection:", closeErr);
+      }
+    }
+  }
+}
+
 // LIST POSTS
 // GET /community/posts
 // Returns the latest community posts (newest first) with actual vote counts from the database.
 // Only returns posts for images that are public (is_public = true).
 export async function GET() {
   let client = null;
-  
+
   try {
     if (!MONGO_URI) {
       throw new Error("MONGO_URI is not set");
     }
 
-    // open Mongo connection
     client = new MongoClient(MONGO_URI);
     await client.connect();
 
     const db = client.db(MONGO_DB);
     const col = db.collection(POSTS_COLLECTION);
+
     const IMAGES_COLLECTION = "images";
     const imagesCol = db.collection(IMAGES_COLLECTION);
 
-    // First, get all public image IDs
+    // 1) public image ids
     const publicImages = await imagesCol
       .find({ is_public: true }, { projection: { image_id: 1 } })
       .toArray();
-    
-    const publicImageIds = publicImages.map(img => img.image_id);
 
-    // Get posts sorted by newest first, but only for public images
+    const publicImageIds = publicImages.map((img) => img.image_id);
+
+    // 2) posts for public images
     const posts = await col
       .find(
-        { image_id: { $in: publicImageIds } }, // Only posts with public images
-        { projection: { _id: 0 } }  // hide Mongo internal _id
+        { image_id: { $in: publicImageIds } },
+        { projection: { _id: 0 } }
       )
-      .sort({ created_at: -1 })     // newest first
-      .limit(100)                   // safety cap to avoid huge responses
+      .sort({ created_at: -1 })
+      .limit(100)
       .toArray();
 
-    // Fetch actual vote counts from the votes collection
+    // If no posts, return early
+    if (!posts.length) {
+      return NextResponse.json({ items: [] }, { status: 200 });
+    }
+
+    // 3) vote aggregation (your existing logic)
     const VOTES_COLLECTION = "community.votes";
     const votesCol = db.collection(VOTES_COLLECTION);
-    
-    // Get all post IDs to query votes
-    const postIds = posts.map(p => p.post_id);
-    
-    // Aggregate vote counts for all posts
-    const voteCountsAgg = await votesCol.aggregate([
-      { $match: { post_id: { $in: postIds } } },
-      {
-        $group: {
-          _id: "$post_id",
-          up_vote_count: {
-            $sum: { $cond: [{ $eq: ["$vote", "up"] }, 1, 0] }
+
+    const postIds = posts.map((p) => p.post_id);
+
+    const voteCountsAgg = await votesCol
+      .aggregate([
+        { $match: { post_id: { $in: postIds } } },
+        {
+          $group: {
+            _id: "$post_id",
+            up_vote_count: {
+              $sum: { $cond: [{ $eq: ["$vote", "up"] }, 1, 0] },
+            },
+            down_vote_count: {
+              $sum: { $cond: [{ $eq: ["$vote", "down"] }, 1, 0] },
+            },
           },
-          down_vote_count: {
-            $sum: { $cond: [{ $eq: ["$vote", "down"] }, 1, 0] }
-          }
-        }
-      }
-    ]).toArray();
-    
-    // Create a map of post_id to vote counts
+        },
+      ])
+      .toArray();
+
     const voteCountsMap = {};
     for (const vc of voteCountsAgg) {
       voteCountsMap[vc._id] = {
         up_vote_count: vc.up_vote_count,
-        down_vote_count: vc.down_vote_count
+        down_vote_count: vc.down_vote_count,
       };
     }
-    
-    // Merge actual vote counts into posts
-    const items = posts.map(post => ({
+
+    // 4) merge votes into posts
+    const items = posts.map((post) => ({
       ...post,
       up_vote_count: voteCountsMap[post.post_id]?.up_vote_count || 0,
-      down_vote_count: voteCountsMap[post.post_id]?.down_vote_count || 0
+      down_vote_count: voteCountsMap[post.post_id]?.down_vote_count || 0,
     }));
 
-    return NextResponse.json({ items }, { status: 200 });
+    // 5) compute averages for normalization
+    const n = items.length || 1;
+
+    const totalClicks = items.reduce(
+      (s, p) => s + safeNumber(p.clicks_count),
+      0
+    );
+    const totalVotes = items.reduce(
+      (s, p) => s + safeNumber(p.up_vote_count) + safeNumber(p.down_vote_count),
+      0
+    );
+    const totalComments = items.reduce(
+      (s, p) => s + safeNumber(p.comment_count),
+      0
+    );
+
+    // Avoid divide by 0 by falling back to 1 (demo-style)
+    const avgClicks = totalClicks / n || 1;
+    const avgVotes = totalVotes / n || 1;
+    const avgComments = totalComments / n || 1;
+
+    // 6) scoring constants (from your demo)
+    const votesWeight = 0.6;
+    const commentsWeight = 0.3;
+    const clicksWeight = 0.1;
+
+    const constantOffset = 2;
+    const gravity = 1.2;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    // 7) compute score per post
+    const ranked = items.map((post) => {
+      const numVotes = safeNumber(post.up_vote_count) + safeNumber(post.down_vote_count);
+      const numClicks = safeNumber(post.clicks_count);
+      const numComments = safeNumber(post.comment_count);
+
+      const votesNorm = safeDiv(numVotes, avgVotes);
+      const clicksNorm = safeDiv(numClicks, avgClicks);
+      const commentsNorm = safeDiv(numComments, avgComments);
+
+      var engagement =
+        votesNorm * votesWeight +
+        clicksNorm * clicksWeight +
+        commentsNorm * commentsWeight;
+
+     
+
+      const createdAtSec = createdAtToUnixSeconds(post.created_at);
+      const ageSeconds = Math.max(nowSec - createdAtSec, 0);
+      const ageHours = ageSeconds / 3600;
+
+      const timeFactor = Math.pow(ageHours + constantOffset, gravity);
+
+      let score = engagement / timeFactor;
+
+      // demo: fresh boost
+
+      if (engagement === 0 && ageHours < 24) {
+      score = Math.max(score, 0.5); 
+    }
+
+    if (ageHours < 24) score *= 1.2;
+
+
+      // demo: controversial boost
+      if (isControversial(post, nowSec)) score *= 2.5;
+
+      return {
+        ...post,
+        score, // NEW: included for sorting + optional UI debug
+        debug: {
+          votesNorm,
+          clicksNorm,
+          commentsNorm,
+          engagement,
+          ageHours,
+        },
+      };
+    });
+
+    // 8) sort by score desc
+    ranked.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+    return NextResponse.json({ items: ranked }, { status: 200 });
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to list posts", detail: String(err) },
       { status: 500 }
     );
   } finally {
-    // Always close connection, even if an error occurred
     if (client) {
       try {
         await client.close();
       } catch (closeErr) {
-        // Log but don't throw - we're already handling the main error
         console.error("Error closing MongoDB connection:", closeErr);
       }
     }
   }
 }
+

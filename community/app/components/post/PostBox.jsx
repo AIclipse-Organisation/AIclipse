@@ -1,7 +1,7 @@
 import "../../styles/postBox.css";
 import { useEffect, useState } from "react";
 
-export default function PostBox({ image, currentUserId, currentUserName, onVoteUpdate }) {
+export default function PostBox({ image, currentUserId, currentUserName, onVoteUpdate, onPostDelete }) {
   const [up, setUp] = useState(Number(image?.up_vote_count ?? 0));
   const [down, setDown] = useState(Number(image?.down_vote_count ?? 0));
   const [error, setError] = useState("");
@@ -13,12 +13,24 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   const [commentText, setCommentText] = useState("");
   const [commentError, setCommentError] = useState("");
 
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState(image?.description || "");
+  const [description, setDescription] = useState(image?.description || "");
+
   const postId = image?.post_id || null;
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
+
+  const isOwner = currentUserId && image?.user_id === currentUserId;
 
   useEffect(() => {
     setIsReported(Boolean(image?.is_reported));
   }, [image?.is_reported]);
+
+  // Sync description when image prop changes
+  useEffect(() => {
+    setDescription(image?.description || "");
+    setEditedDescription(image?.description || "");
+  }, [image?.description]);
 
   // Sync vote counts when image prop changes
   useEffect(() => {
@@ -132,6 +144,43 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
       });
   }
 
+  async function deletePost() {
+    if (!postId) return;
+    if (!isOwner) return setError("You can only delete your own posts.");
+
+    // Confirm before deleting
+    if (!confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/community/posts?post_id=${encodeURIComponent(postId)}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data.error || data.detail || `Failed to delete post (${res.status})`);
+        return;
+      }
+
+      // Notify parent component to remove this post from the list
+      if (onPostDelete) {
+        onPostDelete(postId);
+      }
+    } catch (err) {
+      setError("Network error while deleting post.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submitComment() {
     if (!postId) return setCommentError("Missing post_id.");
     if (!currentUserId) return setCommentError("You must be signed in to comment.");
@@ -171,9 +220,94 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     }
   }
 
+  async function deleteComment(comment_id) {
+    if (!comment_id) return;
+
+    // Confirm before deleting
+    if (!confirm("Are you sure you want to delete this comment?")) {
+      return;
+    }
+
+    setCommentsBusy(true);
+    setCommentError("");
+
+    try {
+      const res = await fetch(`/community/posts/comments?comment_id=${encodeURIComponent(comment_id)}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setCommentError(data.error || data.detail || `Failed to delete comment (${res.status})`);
+        return;
+      }
+
+      // Remove the deleted comment from the list
+      setComments((arr) => arr.filter(c => c.comment_id !== comment_id));
+    } catch (err) {
+      setCommentError("Network error while deleting comment.");
+    } finally {
+      setCommentsBusy(false);
+    }
+  }
+
+  async function updateDescription() {
+    if (!postId) return;
+    if (!isOwner) return setError("You can only edit your own posts.");
+
+    const trimmed = editedDescription.trim();
+    if (!trimmed) return setError("Description cannot be empty.");
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/community/posts?post_id=${encodeURIComponent(postId)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ description: trimmed }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data.error || data.detail || `Failed to update post (${res.status})`);
+        return;
+      }
+
+      // Update the description
+      setDescription(trimmed);
+      setIsEditingDescription(false);
+    } catch (err) {
+      setError("Network error while updating post.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function cancelEdit() {
+    setEditedDescription(description);
+    setIsEditingDescription(false);
+    setError("");
+  }
+
   useEffect(() => {
     if (showComments) loadComments();
   }, [showComments, postId]);
+
+
+  function formatScore(x) {
+    const n = Number(x);
+    if (!Number.isFinite(n)) return "—";
+    // 4 decimals is usually enough to see differences
+    return n.toFixed(6);
+  }
+
+
 
   return (
     <div className="comm_postBox">
@@ -186,6 +320,19 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
         >
           🚩 {isReported ? "(reported)" : "(report)"}
         </button>
+        
+        {isOwner && (
+          <button
+            type="button"
+            onClick={deletePost}
+            disabled={!postId || busy}
+            title="Delete this post"
+            aria-label="Delete this post"
+            style={{ marginLeft: "8px", color: "#dc3545" }}
+          >
+            <span aria-hidden="true">🗑️</span> Delete
+          </button>
+        )}
       </div>
 
       <img
@@ -228,6 +375,12 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
         <strong>Posted by:</strong> {image?.user_name || "Unknown"}
       </div>
 
+      
+      {/* DEV: ranking score */}
+      <div className="comm_score">
+        <strong>Score:</strong> {formatScore(image?.score)}
+      </div>
+
       {(image?.result?.verdict || image?.result?.label) && (
         <div className="comm_detection">
           {image?.result?.verdict && (
@@ -243,7 +396,51 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
         </div>
       )}
 
-      {image?.description && <div className="comm_description">{image.description}</div>}
+      {isEditingDescription ? (
+        <div className="comm_description">
+          <textarea
+            value={editedDescription}
+            onChange={(e) => setEditedDescription(e.target.value)}
+            disabled={busy}
+            maxLength={1000}
+            style={{ width: "100%", minHeight: "60px", padding: "8px", fontSize: "0.95em" }}
+          />
+          <div style={{ marginTop: "8px" }}>
+            <button
+              type="button"
+              onClick={updateDescription}
+              disabled={busy}
+              style={{ marginRight: "8px", padding: "4px 12px", cursor: "pointer" }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              disabled={busy}
+              style={{ padding: "4px 12px", cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="comm_description">
+          {description}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => setIsEditingDescription(true)}
+              disabled={busy}
+              title="Edit description"
+              aria-label="Edit description"
+              style={{ marginLeft: "8px", fontSize: "0.85em", cursor: "pointer", background: "none", border: "none", padding: "0" }}
+            >
+              <span aria-hidden="true">✏️</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {showComments && (
         <div className="comm_commentsWrapper">
@@ -273,15 +470,30 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
           </div>
 
           <div className="comm_commentsList">
-            {comments.map((c) => (
-              <div key={c.comment_id} className="comm_comment">
-                <div className="comm_commentMeta">
-                  {c.user_name || "Unknown"} ·{" "}
-                  {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+            {comments.map((c) => {
+              const isCommentOwner = currentUserId && c.user_id === currentUserId;
+              return (
+                <div key={c.comment_id} className="comm_comment">
+                  <div className="comm_commentMeta">
+                    {c.user_name || "Unknown"} ·{" "}
+                    {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+                    {isCommentOwner && (
+                      <button
+                        type="button"
+                        onClick={() => deleteComment(c.comment_id)}
+                        disabled={commentsBusy}
+                        title="Delete this comment"
+                        aria-label="Delete comment"
+                        style={{ marginLeft: "8px", color: "#dc3545", fontSize: "0.85em", cursor: "pointer", background: "none", border: "none", padding: "0" }}
+                      >
+                        <span aria-hidden="true">🗑️</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="comm_commentText">{c.text}</div>
                 </div>
-                <div className="comm_commentText">{c.text}</div>
-              </div>
-            ))}
+              );
+            })}
 
             {!commentsBusy && comments.length === 0 && (
               <div className="muted">No comments yet.</div>
