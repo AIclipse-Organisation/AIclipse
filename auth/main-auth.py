@@ -713,9 +713,17 @@ async def exchange_api_key(
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     try:
-        await api_keys_coll.update_one({"key_id": key_id}, {"$set": {"last_used_at": _now_utc()}})
+        # Best-effort metadata update; auth result must not depend on this write.
+        await api_keys_coll.update_one(
+            {"key_id": key_id},
+            {"$set": {"last_used_at": _now_utc()}},
+        )
     except Exception:
-        pass
+        logging.warning(
+            "Non-critical: failed to update api key last_used_at (key_id=%s)",
+            key_id,
+            exc_info=True,
+        )
 
     user_doc = await users_coll.find_one({"user_id": key_doc["user_id"]})
     if not user_doc:
@@ -735,6 +743,11 @@ class _HealthzFilter(logging.Filter):
         try:
             return "/healthz" not in record.getMessage()
         except Exception:
+            # Fail-open: never break access logging because of a malformed log record.
+            logging.getLogger("uvicorn.error").debug(
+                "HealthzFilter failed while processing access log record",
+                exc_info=True,
+            )
             return True
 
 
