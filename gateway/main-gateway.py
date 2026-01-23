@@ -661,7 +661,7 @@ async def _checks_impl(file: UploadFile, user: UserContext) -> JSONResponse:
     detector_uri = _require_setting("DETECTOR_URI", DETECTOR_URI)
 
     data = await file.read()
-    _normalized_ct, _ext = _sniff_and_validate_image(data)
+    _sniff_and_validate_image(data)
 
     x_request_id = str(uuid.uuid4())
     url = detector_uri.rstrip("/") + "/v1.0.1/checks"
