@@ -6,8 +6,8 @@ function setStatus(el, type, text) {
   span.textContent = text;
   span.classList.add(
     type === "success" ? "status-success" :
-    type === "error"   ? "status-error" :
-                         "status-info"
+      type === "error" ? "status-error" :
+        "status-info"
   );
   el.appendChild(span);
 }
@@ -90,7 +90,7 @@ window.addEventListener("DOMContentLoaded", () => {
   window.lastFile = null;
   let lastDetectionToken = null;
 
-  
+
 
   // store current user id 
   window.currentUserId = null;
@@ -175,6 +175,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
         if (res.ok) {
           lastDetectionToken = data.detection_token || null;
+          window.lastDetectionToken = lastDetectionToken;
 
           // enable SAVE if we have a token
           if (btnSave) btnSave.disabled = !lastDetectionToken;
@@ -188,7 +189,23 @@ window.addEventListener("DOMContentLoaded", () => {
           if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
 
           // render verdict/progress bar
-          renderDetection(data);
+          // store results for results page
+          sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
+          sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
+
+          // store preview image too (optional but nice)
+          // note: you already have window.lastFile
+          if (window.lastFile) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              sessionStorage.setItem("lastDetectionPreview", reader.result);
+              window.location.href = "/results";
+            };
+            reader.readAsDataURL(window.lastFile);
+          } else {
+            window.location.href = "/results";
+          }
+          return; // stop running upload page UI code
 
           setStatus(detectStatus, "success", "Detection completed.");
         } else {
@@ -216,7 +233,7 @@ window.addEventListener("DOMContentLoaded", () => {
         setStatus(saveStatus, "error", "No file selected.");
         return;
       }
-      if (!lastDetectionToken) {
+      if (!window.lastDetectionToken) {
         setStatus(saveStatus, "error", "No detection token. Run detection first.");
         return;
       }
@@ -246,7 +263,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
       const formData = new FormData();
       formData.append("file", window.lastFile);
-      formData.append("detection_token", lastDetectionToken);
+      formData.append("detection_token", window.lastDetectionToken);
       formData.append("is_public", isPublic ? "true" : "false");
 
       try {
@@ -262,60 +279,60 @@ window.addEventListener("DOMContentLoaded", () => {
 
         setStatus(saveStatus, "success", "Saved image.");
 
-       
-          if (isPublic) {
-            setStatus(saveStatus, "info", "Creating community post...");
 
-            const uploadPayload = (data && typeof data === "object" && data.body && typeof data.body === "object")
-              ? data.body
-              : data;
- 
-            
-            const resolvedImageId =
-              (uploadPayload && uploadPayload.image_id) ||
-              (uploadPayload && uploadPayload.image && uploadPayload.image.image_id) ||
-              (data && data.image && data.image.image_id) || null;
+        if (isPublic) {
+          setStatus(saveStatus, "info", "Creating community post...");
 
-            if (!resolvedImageId) {
-              console.error("Upload response missing image_id. Raw response:", data);
-              setStatus(saveStatus, "error", "Saved image, but could not read image_id from server response.");
-              return;
-            }
+          const uploadPayload = (data && typeof data === "object" && data.body && typeof data.body === "object")
+            ? data.body
+            : data;
 
-            const resolvedVerdict =
-              (uploadPayload && uploadPayload.verdict) ||
-              (uploadPayload && uploadPayload.result && uploadPayload.result.verdict) ||
-              (data && data.verdict) ||
-              null;
 
-            const resolvedLabel =
-              (uploadPayload && uploadPayload.label) ||
-              (uploadPayload && uploadPayload.result && uploadPayload.result.label) ||
-              (data && data.label) ||
-              null;
+          const resolvedImageId =
+            (uploadPayload && uploadPayload.image_id) ||
+            (uploadPayload && uploadPayload.image && uploadPayload.image.image_id) ||
+            (data && data.image && data.image.image_id) || null;
 
-            const resolvedConfidence =
-              (uploadPayload && uploadPayload.confidence) ||
-              (uploadPayload && uploadPayload.result && uploadPayload.result.confidence) ||
-              (data && data.confidence) ||
-              null;
+          if (!resolvedImageId) {
+            console.error("Upload response missing image_id. Raw response:", data);
+            setStatus(saveStatus, "error", "Saved image, but could not read image_id from server response.");
+            return;
+          }
 
-            const postBody = {
-              user_id: window.currentUserId,
-              image_id: resolvedImageId,
-              description,
-              result: {
-                verdict: resolvedVerdict,
-                label: resolvedLabel,
-                confidence: resolvedConfidence,
-              },
-            };
+          const resolvedVerdict =
+            (uploadPayload && uploadPayload.verdict) ||
+            (uploadPayload && uploadPayload.result && uploadPayload.result.verdict) ||
+            (data && data.verdict) ||
+            null;
+
+          const resolvedLabel =
+            (uploadPayload && uploadPayload.label) ||
+            (uploadPayload && uploadPayload.result && uploadPayload.result.label) ||
+            (data && data.label) ||
+            null;
+
+          const resolvedConfidence =
+            (uploadPayload && uploadPayload.confidence) ||
+            (uploadPayload && uploadPayload.result && uploadPayload.result.confidence) ||
+            (data && data.confidence) ||
+            null;
+
+          const postBody = {
+            user_id: window.currentUserId,
+            image_id: resolvedImageId,
+            description,
+            result: {
+              verdict: resolvedVerdict,
+              label: resolvedLabel,
+              confidence: resolvedConfidence,
+            },
+          };
 
 
           const postRes = await fetch("/community/posts", {
             method: "POST",
-            headers: { 
-              "Content-Type": "application/json", 
+            headers: {
+              "Content-Type": "application/json",
               "Accept": "application/json"
             },
             credentials: "include",
@@ -415,9 +432,3 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   })();
 });
-
-
-
-function goToCommunity() {
-  window.location.href = "/community";
-}

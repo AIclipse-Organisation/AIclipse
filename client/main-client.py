@@ -55,6 +55,14 @@ def plan():
 def profile():
     return send_from_directory("templates", "profile.html")
 
+@app.get("/results")
+def results():
+    return send_from_directory("templates", "results.html")
+
+@app.get("/viewscan")
+def viewscan():
+    return send_from_directory("templates", "viewscan.html")
+
 
 
 def _get_token_from_cookie() -> str | None:
