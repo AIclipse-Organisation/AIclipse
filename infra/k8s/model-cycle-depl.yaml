@@ -32,6 +32,13 @@ spec:
             - name: model-data
               mountPath: /app/data
           env:
+            - name: APP_ENV
+              value: "dev"
+            - name: CENTRAL_CONFIG_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-configmap
+                  key: CONFIG_URL
             - name: TRAINING_DATA_PATH
               value: "/app/data"
             - name: MediaServiceUrl
@@ -73,11 +80,11 @@ spec:
             failureThreshold: 60
           resources:
             requests:
-              memory: "2Gi"  
-              cpu: "1000m"  
+              memory: "512Mi"  
+              cpu: "500m"  
             limits:
               memory: "4Gi"  
-              cpu: "2000m"
+              cpu: "1000m"
 ---
 apiVersion: v1
 kind: Service
