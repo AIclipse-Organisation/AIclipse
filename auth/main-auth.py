@@ -729,9 +729,11 @@ async def exchange_api_key(
             {"$set": {"last_used_at": _now_utc()}},
         )
     except Exception:
+        # Sanitize key_id before logging to prevent log injection via newline characters.
+        safe_key_id = str(key_id).replace("\r", "").replace("\n", "")
         logging.warning(
             "Non-critical: failed to update api key",
-            key_id,
+            safe_key_id,
             exc_info=True,
         )
 
