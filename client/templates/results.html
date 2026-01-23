@@ -38,36 +38,40 @@
                             </div>
 
                             <div class="action-card">
-
                                 <h3 class="action-title">Would you like to…</h3>
 
-                                <label class="row action-item action-publish" style="gap: 10px; align-items: center;">
-                                    <input id="save-public" type="checkbox" />
+                                <div class="action-row action-save">
+                                    <span class="action-icon" aria-hidden="true">💾</span>
+                                    <button id="btn-save" disabled type="button" class="action-btn">
+                                        Save image
+                                    </button>
+                                </div>
+
+                                <div class="action-row action-delete">
+                                    <span class="action-icon" aria-hidden="true">🗑️</span>
+                                    <button id="btn-delete" class="action-btn danger" type="button">
+                                        Delete scan
+                                    </button>
+                                </div>
+
+                                <label class="action-row action-publish" id="publish-row">
                                     <span class="action-icon" aria-hidden="true">👥</span>
                                     <span class="action-text">Publish to community (public)</span>
+
+                                    <input id="save-public" type="checkbox" class="publish-check" />
+                                    <span class="publish-toggle" aria-hidden="true"></span>
                                 </label>
 
-                                <div id="public-desc-wrap" hidden style="margin-top: 10px;">
-                                    <label for="post-description">Description</label>
+                                <div id="public-desc-wrap" class="publish-extra" hidden>
+                                    <label for="post-description" class="publish-label">Description</label>
                                     <textarea id="post-description" rows="3"
                                         placeholder="Write a short description for the community post..."
-                                        style="width: 100%; resize: vertical;"></textarea>
+                                        class="publish-textarea"></textarea>
                                     <small id="post-description-hint" class="muted"></small>
-                                </div>
-
-                                <div class="row action-item action-save">
-                                    <span class="action-icon" aria-hidden="true">💾</span>
-                                    <button id="btn-save" disabled type="button">Save image</button>
-                                </div>
-
-                                <div class="row action-item action-delete">
-                                    <span class="action-icon" aria-hidden="true">🗑️</span>
-                                    <button id="btn-delete" class="danger" type="button">Delete scan</button>
                                 </div>
 
                                 <div id="save-status" class="status-bar"></div>
                                 <div id="save-result" class="muted"></div>
-
                             </div>
 
                             <div id="delete-modal" class="modal-overlay" hidden>

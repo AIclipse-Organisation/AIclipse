@@ -1,50 +1,50 @@
 function setDebug(data) {
-    const pre = document.getElementById("debug-output");
-    if (!pre) return;
-    pre.textContent = JSON.stringify(data, null, 2);
+  const pre = document.getElementById("debug-output");
+  if (!pre) return;
+  pre.textContent = JSON.stringify(data, null, 2);
 }
 
 function renderDetection(resp) {
-    const detectCard = document.getElementById("detect-card");
-    const verdictEl = document.getElementById("detect-verdict");
-    const confidenceEl = document.getElementById("detect-confidence");
-    const realFill = document.querySelector(".real-fill");
-    const aiFill = document.querySelector(".ai-fill");
+  const detectCard = document.getElementById("detect-card");
+  const verdictEl = document.getElementById("detect-verdict");
+  const confidenceEl = document.getElementById("detect-confidence");
+  const realFill = document.querySelector(".real-fill");
+  const aiFill = document.querySelector(".ai-fill");
 
-    if (!resp || typeof resp !== "object") {
-        if (detectCard) detectCard.hidden = true;
-        return;
-    }
+  if (!resp || typeof resp !== "object") {
+    if (detectCard) detectCard.hidden = true;
+    return;
+  }
 
-    const label = (resp.label || resp.result || "Unknown").toString();
-    const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
+  const label = (resp.label || resp.result || "Unknown").toString();
+  const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
 
-    const labelLower = label.toLowerCase();
-    const isAi = labelLower.includes("ai");
-    const ai_prob = isAi ? confidence : (1 - confidence);
-    const real_prob = 1 - ai_prob;
+  const labelLower = label.toLowerCase();
+  const isAi = labelLower.includes("ai");
+  const ai_prob = isAi ? confidence : (1 - confidence);
+  const real_prob = 1 - ai_prob;
 
-    let labelClass = "label-neutral";
-    if (labelLower.includes("ai")) {
-        if (labelLower.includes("most likely")) labelClass = "label-strong-ai";
-        else labelClass = "label-medium-ai";
-    } else if (labelLower.includes("real")) {
-        if (labelLower.includes("most likely")) labelClass = "label-strong-real";
-        else labelClass = "label-medium-real";
-    }
+  let labelClass = "label-neutral";
+  if (labelLower.includes("ai")) {
+    if (labelLower.includes("most likely")) labelClass = "label-strong-ai";
+    else labelClass = "label-medium-ai";
+  } else if (labelLower.includes("real")) {
+    if (labelLower.includes("most likely")) labelClass = "label-strong-real";
+    else labelClass = "label-medium-real";
+  }
 
-    if (verdictEl) {
-        verdictEl.textContent = label;
-        verdictEl.className = `verdict-text ${labelClass}`;
-    }
-    if (confidenceEl) confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
+  if (verdictEl) {
+    verdictEl.textContent = label;
+    verdictEl.className = `verdict-text ${labelClass}`;
+  }
+  if (confidenceEl) confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
 
-    if (realFill && aiFill) {
-        realFill.style.width = `${(real_prob * 100).toFixed(2)}%`;
-        aiFill.style.width = `${(ai_prob * 100).toFixed(2)}%`;
-    }
+  if (realFill && aiFill) {
+    realFill.style.width = `${(real_prob * 100).toFixed(2)}%`;
+    aiFill.style.width = `${(ai_prob * 100).toFixed(2)}%`;
+  }
 
-    if (detectCard) detectCard.hidden = false;
+  if (detectCard) detectCard.hidden = false;
 }
 
 function dataURLtoFile(dataUrl, filename = "upload.png") {
@@ -115,6 +115,15 @@ window.addEventListener("DOMContentLoaded", () => {
   // Back button
   const btnBack = document.getElementById("btn-back");
   if (btnBack) btnBack.addEventListener("click", () => history.back());
+
+
+  // Publishing
+  const publish = document.getElementById("save-public");
+  const wrap = document.getElementById("public-desc-wrap");
+
+  publish.addEventListener("change", () => {
+    wrap.hidden = !publish.checked;
+  });
 
   // =========================
   // Delete modal logic
