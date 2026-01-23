@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from pymongo import MongoClient
 from bson import ObjectId
 
@@ -257,6 +257,54 @@ def get_image(image_id: str, user_id: str | None = None):
         return attach_url(doc)
 
     raise HTTPException(status_code=404, detail="Not found")
+
+
+@app.patch("/image/{image_id}")
+def update_image(image_id: str, user_id: str | None = Query(None), is_public: bool | None = Query(None)):
+    """
+    Update an image's is_public field.
+    Only the owner (user_id) can update their image.
+    """
+    if images is None:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Find the image document
+    doc = images.find_one({"image_id": image_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # Security check: only owner can update
+    if user_id is not None and doc.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You can only update your own images")
+
+    # Build update document
+    update_doc = {}
+    if is_public is not None:
+        update_doc["is_public"] = bool(is_public)
+
+    if not update_doc:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+
+    # Update in MongoDB
+    result = images.update_one({"image_id": image_id}, {"$set": update_doc})
+    if result.matched_count == 0:
+        logging.warning(
+            "Image %s not found in MongoDB during update",
+            sanitize_for_log(str(image_id)),
+        )
+        raise HTTPException(status_code=404, detail="Image not found in database")
+
+    # Fetch and return updated document
+    updated_doc = images.find_one({"image_id": image_id}, {"_id": 0})
+    if not updated_doc:
+        raise HTTPException(status_code=404, detail="Image not found after update")
+
+    logging.info(
+        "Successfully updated image %s (user: %s)",
+        sanitize_for_log(str(image_id)),
+        sanitize_for_log(str(user_id) if user_id else ""),
+    )
+    return attach_url(updated_doc)
 
 
 @app.delete("/image/{image_id}")

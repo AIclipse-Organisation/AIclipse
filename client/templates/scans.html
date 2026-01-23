@@ -35,6 +35,21 @@
     <div data-include="/static/partials/navbar.html"></div>
   </div>
 
+  <!-- Modal for making image public -->
+  <div id="make-public-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Make Image Public</h2>
+      <p>Add a description for your post (required, max 1000 characters):</p>
+      <textarea id="public-description-input" maxlength="1000" rows="4" placeholder="Describe your image..."></textarea>
+      <div class="char-count"><span id="char-counter">0</span>/1000</div>
+      <div id="modal-status" class="status-message"></div>
+      <div class="modal-buttons">
+        <button type="button" id="modal-cancel" class="btn-secondary">Cancel</button>
+        <button type="button" id="modal-publish" class="btn-primary">Publish</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/js/include.js"></script>
   <script src="/static/js/app.js"></script>
   <script src="/static/js/main.js"></script>

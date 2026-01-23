@@ -345,9 +345,18 @@ window.addEventListener("DOMContentLoaded", () => {
 
           if (postRes.ok) {
             setStatus(saveStatus, "success", "Saved image + published post.");
+            // Redirect to community after publishing
+            setTimeout(() => {
+              window.location.href = "/community";
+            }, 1000);
           } else {
             setStatus(saveStatus, "error", postJson.error || postJson.detail || `Post failed (${postRes.status})`);
           }
+        } else {
+          // Private image - redirect to scans page
+          setTimeout(() => {
+            window.location.href = "/scans";
+          }, 1000);
         }
 
         if (saveResult) saveResult.textContent = "";

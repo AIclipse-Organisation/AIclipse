@@ -22,6 +22,12 @@ function setupScanTabs() {
   const tabs = document.querySelectorAll(".scans-tab");
   if (!tabs.length) return;
 
+  tabs.forEach((t) => {
+    const isActive = t.dataset.filter === activeFilter;
+    t.classList.toggle("is-active", isActive);
+    t.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
   tabs.forEach((btn) => {
     btn.addEventListener("click", () => {
       activeFilter = btn.dataset.filter || "private";
@@ -181,6 +187,19 @@ function createScanCard(img, index) {
 
   analysis.appendChild(detailsLink);
 
+  // -------------------------
+  // Make Public button (only for private images)
+  // -------------------------
+  if (getVisibility(img) === "private") {
+    const makePublicBtn = makeEl("button", "btn-make-public", "Make Public");
+    makePublicBtn.type = "button";
+    makePublicBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showMakePublicModal(img);
+    });
+    analysis.appendChild(makePublicBtn);
+  }
+
   return card;
 }
 
@@ -223,27 +242,53 @@ async function loadScans() {
   clearEl(containerEl);
 
   try {
-    const response = await fetch("/images", {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "include",
-    });
+    // Fetch both images and posts 
+    const [imagesResponse, postsResponse] = await Promise.all([
+      fetch("/images", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      }),
+      fetch("/community/posts", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      }).catch(() => null), 
+    ]);
 
-    if (!response.ok) {
+    if (!imagesResponse.ok) {
       statusEl.classList.remove("loading");
       statusEl.classList.add("error");
 
-      if (response.status === 401) {
+      if (imagesResponse.status === 401) {
         statusEl.textContent = "Please log in to view your scans.";
         return;
       }
 
-      statusEl.textContent = `Failed to load scans (${response.status})`;
+      statusEl.textContent = `Failed to load scans (${imagesResponse.status})`;
       return;
     }
 
-    const data = await response.json();
-    allScans = data.items || [];
+    const imagesData = await imagesResponse.json();
+    const images = imagesData.items || [];
+    
+    // Fetch posts data if available
+    let posts = [];
+    if (postsResponse && postsResponse.ok) {
+      const postsData = await postsResponse.json().catch(() => ({}));
+      posts = postsData.items || [];
+    }
+
+    const postByImageId = new Map(posts.map((post) => [post.image_id, post]));
+
+    // Merge images with their post data
+    allScans = images.map((img) => {
+      const post = postByImageId.get(img.image_id);
+      if (post) {
+        return { ...img, ...post };
+      }
+      return img;
+    });
 
     statusEl.classList.remove("loading");
     statusEl.textContent = "";
@@ -270,4 +315,183 @@ async function loadScans() {
 window.addEventListener("DOMContentLoaded", () => {
   setupScanTabs();
   loadScans();
+  setupMakePublicModal();
 });
+
+// -------------------------
+// Make Public Modal
+// -------------------------
+let currentImageForPublish = null;
+
+function setupMakePublicModal() {
+  const modal = document.getElementById("make-public-modal");
+  const cancelBtn = document.getElementById("modal-cancel");
+  const publishBtn = document.getElementById("modal-publish");
+  const descInput = document.getElementById("public-description-input");
+  const charCounter = document.getElementById("char-counter");
+  const modalStatus = document.getElementById("modal-status");
+
+  if (!modal || !cancelBtn || !publishBtn || !descInput) return;
+
+  // Character counter
+  if (charCounter) {
+    descInput.addEventListener("input", () => {
+      charCounter.textContent = descInput.value.length;
+    });
+  }
+
+  // Cancel button
+  cancelBtn.addEventListener("click", () => {
+    modal.style.display = "none";
+    descInput.value = "";
+    if (charCounter) charCounter.textContent = "0";
+    if (modalStatus) modalStatus.textContent = "";
+    currentImageForPublish = null;
+  });
+
+  // Publish button
+  publishBtn.addEventListener("click", async () => {
+    if (!currentImageForPublish) return;
+    if (publishBtn.disabled) return; // Prevent double-click
+
+    const description = descInput.value.trim();
+    if (!description) {
+      if (modalStatus) {
+        modalStatus.className = "status-message error";
+        modalStatus.textContent = "Description is required.";
+      }
+      return;
+    }
+
+    if (description.length > 1000) {
+      if (modalStatus) {
+        modalStatus.className = "status-message error";
+        modalStatus.textContent = `Description too long (${description.length}/1000 characters).`;
+      }
+      return;
+    }
+
+    // Disable button during request
+    publishBtn.disabled = true;
+    if (modalStatus) {
+      modalStatus.className = "status-message";
+      modalStatus.textContent = "Publishing...";
+    }
+
+    try {
+      // Get current user ID
+      const meRes = await fetch("/auth/me", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      });
+
+      if (!meRes.ok) {
+        throw new Error("You must be signed in to publish.");
+      }
+
+      const userData = await meRes.json();
+      const userId = userData.user_id;
+
+      // Create post body matching existing structure
+      const postBody = {
+        user_id: userId,
+        image_id: currentImageForPublish.image_id,
+        description,
+        result: {
+          verdict: currentImageForPublish.verdict || null,
+          label: currentImageForPublish.label || null,
+          confidence: currentImageForPublish.confidence || null,
+        },
+      };
+
+      const postRes = await fetch("/community/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify(postBody),
+      });
+
+      if (!postRes.ok) {
+        const errorData = await postRes.json().catch(() => ({}));
+        throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
+      }
+
+      // Update image to set is_public = true
+      const updateRes = await fetch(`/image/${currentImageForPublish.image_id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({ is_public: true }),
+      });
+
+      if (!updateRes.ok) {
+        const errorData = await updateRes.json().catch(() => ({}));
+        throw new Error(errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`);
+      }
+
+      // Success - close modal and reload scans
+      if (modalStatus) {
+        modalStatus.className = "status-message success";
+        modalStatus.textContent = "Published successfully!";
+      }
+
+      setTimeout(() => {
+        modal.style.display = "none";
+        descInput.value = "";
+        if (charCounter) charCounter.textContent = "0";
+        if (modalStatus) modalStatus.textContent = "";
+        currentImageForPublish = null;
+        
+        // Reload scans to reflect the change
+        loadScans();
+      }, 1000);
+
+    } catch (error) {
+      console.error("Error publishing:", error);
+      if (modalStatus) {
+        modalStatus.className = "status-message error";
+        modalStatus.textContent = error.message;
+      }
+    } finally {
+      publishBtn.disabled = false;
+    }
+  });
+
+  // Close modal on backdrop click
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      cancelBtn.click();
+    }
+  });
+
+  // Close modal on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal.style.display === "flex") {
+      cancelBtn.click();
+    }
+  });
+}
+
+function showMakePublicModal(img) {
+  const modal = document.getElementById("make-public-modal");
+  const descInput = document.getElementById("public-description-input");
+  const charCounter = document.getElementById("char-counter");
+  const modalStatus = document.getElementById("modal-status");
+
+  if (!modal || !descInput) return;
+
+  currentImageForPublish = img;
+  descInput.value = "";
+  if (charCounter) charCounter.textContent = "0";
+  if (modalStatus) modalStatus.textContent = "";
+  
+  modal.style.display = "flex";
+  descInput.focus();
+}
