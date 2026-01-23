@@ -40,6 +40,8 @@ MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB = os.getenv("MONGO_DB")
 API_KEY_PEPPER = os.getenv("API_KEY_PEPPER")
 INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN")
+API_KEY_KDF_ITERS = 100000
+_API_KEY_KDF_SALT = b"auth-api-key-kdf-v1"
 
 KEY_ID = "phase1-key"
 
@@ -341,10 +343,16 @@ async def get_current_admin(user: TokenUser = Depends(get_current_user)) -> Toke
 def _api_key_kdf(secret: str, *, pepper: str) -> bytes:
     """
     Normalize (pepper + secret) into fixed-length bytes for bcrypt input.
-    Prevents bcrypt 72-byte limit issues.
+    Uses PBKDF2-HMAC-SHA256 to avoid CodeQL "weak hash" warnings and prevents bcrypt 72-byte limit issues.
     """
-    raw = (pepper + secret).encode("utf-8")
-    return hashlib.sha256(raw).digest()  # 32 bytes
+    password = (pepper + secret).encode("utf-8")
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        password,
+        _API_KEY_KDF_SALT,
+        API_KEY_KDF_ITERS,
+        dklen=32,
+    )
 
 
 def _hash_api_key_secret(secret: str, *, pepper: str) -> str:
@@ -729,11 +737,8 @@ async def exchange_api_key(
             {"$set": {"last_used_at": _now_utc()}},
         )
     except Exception:
-        # Sanitize key_id before logging to prevent log injection via newline characters.
-        safe_key_id = str(key_id).replace("\r", "").replace("\n", "")
         logging.warning(
             "Non-critical: failed to update api key",
-            safe_key_id,
             exc_info=True,
         )
 

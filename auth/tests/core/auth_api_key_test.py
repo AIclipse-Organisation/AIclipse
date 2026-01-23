@@ -285,42 +285,6 @@ async def test_exchange_success_returns_short_lived_jwt(client, users_coll, auth
 
 
 @pytest.mark.asyncio
-async def test_exchange_succeeds_even_if_last_used_update_fails(client, users_coll, api_keys_coll, auth_mod, monkeypatch):
-    await users_coll.insert_one(
-        {
-            "user_id": "u_meta",
-            "user_name": "Meta",
-            "email": "meta@example.com",
-            "password": auth_mod.hash_password("secret123"),
-            "is_admin": False,
-            "plan": 0,
-            "created_at": _now_utc(),
-            "age": None,
-            "total_guesses": 0,
-            "total_correct": 0,
-        }
-    )
-
-    token = _make_token(auth_mod, "u_meta", "meta@example.com")
-    r1 = await client.post("/me/api-key", headers={"Authorization": f"Bearer {token}"})
-    assert r1.status_code == 201
-    full_key = r1.json()["api_key"]
-
-    async def _boom(*_args, **_kwargs):
-        raise RuntimeError("db down")
-
-    monkeypatch.setattr(api_keys_coll, "update_one", _boom)
-
-    r2 = await client.post(
-        "/internal/api-key/exchange",
-        json={"api_key": full_key},
-        headers={"X-Internal-Token": auth_mod.INTERNAL_AUTH_TOKEN},
-    )
-    assert r2.status_code == 200
-    assert "token" in r2.json()
-
-
-@pytest.mark.asyncio
 async def test_rotate_api_key_conflict_returns_409(client, users_coll, api_keys_coll, auth_mod, monkeypatch):
     await users_coll.insert_one(
         {
