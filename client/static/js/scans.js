@@ -188,9 +188,10 @@ function createScanCard(img, index) {
   analysis.appendChild(detailsLink);
 
   // -------------------------
-  // Make Public button (only for private images)
+  // Action buttons
   // -------------------------
   if (getVisibility(img) === "private") {
+    // Make Public button (only for private images)
     const makePublicBtn = makeEl("button", "btn-make-public", "Make Public");
     makePublicBtn.type = "button";
     makePublicBtn.addEventListener("click", (e) => {
@@ -198,6 +199,15 @@ function createScanCard(img, index) {
       showMakePublicModal(img);
     });
     analysis.appendChild(makePublicBtn);
+  } else {
+    // Edit Description button (only for public images)
+    const editBtn = makeEl("button", "btn-make-public", "Edit Description");
+    editBtn.type = "button";
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showEditDescriptionModal(img);
+    });
+    analysis.appendChild(editBtn);
   }
 
   return card;
@@ -319,9 +329,10 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 // -------------------------
-// Make Public Modal
+// Make Public / Edit Description Modal
 // -------------------------
 let currentImageForPublish = null;
+let modalMode = "makePublic"; // "makePublic" or "editDescription"
 
 function setupMakePublicModal() {
   const modal = document.getElementById("make-public-modal");
@@ -375,71 +386,22 @@ function setupMakePublicModal() {
     publishBtn.disabled = true;
     if (modalStatus) {
       modalStatus.className = "status-message";
-      modalStatus.textContent = "Publishing...";
+      modalStatus.textContent = modalMode === "editDescription" ? "Updating..." : "Publishing...";
     }
 
     try {
-      // Get current user ID
-      const meRes = await fetch("/auth/me", {
-        method: "GET",
-        headers: { Accept: "application/json" },
-        credentials: "include",
-      });
-
-      if (!meRes.ok) {
-        throw new Error("You must be signed in to publish.");
-      }
-
-      const userData = await meRes.json();
-      const userId = userData.user_id;
-
-      // Create post body matching existing structure
-      const postBody = {
-        user_id: userId,
-        image_id: currentImageForPublish.image_id,
-        description,
-        result: {
-          verdict: currentImageForPublish.verdict || null,
-          label: currentImageForPublish.label || null,
-          confidence: currentImageForPublish.confidence || null,
-        },
-      };
-
-      const postRes = await fetch("/community/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify(postBody),
-      });
-
-      if (!postRes.ok) {
-        const errorData = await postRes.json().catch(() => ({}));
-        throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
-      }
-
-      // Update image to set is_public = true
-      const updateRes = await fetch(`/image/${currentImageForPublish.image_id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify({ is_public: true }),
-      });
-
-      if (!updateRes.ok) {
-        const errorData = await updateRes.json().catch(() => ({}));
-        throw new Error(errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`);
+      if (modalMode === "editDescription") {
+        // Edit existing post description
+        await handleEditDescription(currentImageForPublish, description, modalStatus);
+      } else {
+        // Make image public (create new post)
+        await handleMakePublic(currentImageForPublish, description, modalStatus);
       }
 
       // Success - close modal and reload scans
       if (modalStatus) {
         modalStatus.className = "status-message success";
-        modalStatus.textContent = "Published successfully!";
+        modalStatus.textContent = modalMode === "editDescription" ? "Updated successfully!" : "Published successfully!";
       }
 
       setTimeout(() => {
@@ -454,7 +416,7 @@ function setupMakePublicModal() {
       }, 1000);
 
     } catch (error) {
-      console.error("Error publishing:", error);
+      console.error("Error:", error);
       if (modalStatus) {
         modalStatus.className = "status-message error";
         modalStatus.textContent = error.message;
@@ -479,18 +441,131 @@ function setupMakePublicModal() {
   });
 }
 
+async function handleMakePublic(img, description, modalStatus) {
+  // Get current user ID
+  const meRes = await fetch("/auth/me", {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    credentials: "include",
+  });
+
+  if (!meRes.ok) {
+    throw new Error("You must be signed in to publish.");
+  }
+
+  const userData = await meRes.json();
+  const userId = userData.user_id;
+
+  // Create post body matching existing structure
+  const postBody = {
+    user_id: userId,
+    image_id: img.image_id,
+    description,
+    result: {
+      verdict: img.verdict || null,
+      label: img.label || null,
+      confidence: img.confidence || null,
+    },
+  };
+
+  const postRes = await fetch("/community/posts", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    credentials: "include",
+    body: JSON.stringify(postBody),
+  });
+
+  if (!postRes.ok) {
+    const errorData = await postRes.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
+  }
+
+  // Update image to set is_public = true
+  const updateRes = await fetch(`/image/${img.image_id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    credentials: "include",
+    body: JSON.stringify({ is_public: true }),
+  });
+
+  if (!updateRes.ok) {
+    const errorData = await updateRes.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`);
+  }
+}
+
+async function handleEditDescription(img, description, modalStatus) {
+  // Find the post_id for this image
+  if (!img.post_id) {
+    throw new Error("No post found for this image");
+  }
+
+  // Update post description
+  const patchRes = await fetch(`/community/posts?post_id=${img.post_id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    credentials: "include",
+    body: JSON.stringify({ description }),
+  });
+
+  if (!patchRes.ok) {
+    const errorData = await patchRes.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.error || `Failed to update description (${patchRes.status})`);
+  }
+}
+
 function showMakePublicModal(img) {
   const modal = document.getElementById("make-public-modal");
+  const modalTitle = modal?.querySelector("h2");
+  const modalText = modal?.querySelector("p");
   const descInput = document.getElementById("public-description-input");
+  const publishBtn = document.getElementById("modal-publish");
   const charCounter = document.getElementById("char-counter");
   const modalStatus = document.getElementById("modal-status");
 
   if (!modal || !descInput) return;
 
+  modalMode = "makePublic";
   currentImageForPublish = img;
   descInput.value = "";
   if (charCounter) charCounter.textContent = "0";
   if (modalStatus) modalStatus.textContent = "";
+  if (modalTitle) modalTitle.textContent = "Make Image Public";
+  if (modalText) modalText.textContent = "Add a description for your post (required, max 1000 characters):";
+  if (publishBtn) publishBtn.textContent = "Publish";
+  
+  modal.style.display = "flex";
+  descInput.focus();
+}
+
+function showEditDescriptionModal(img) {
+  const modal = document.getElementById("make-public-modal");
+  const modalTitle = modal?.querySelector("h2");
+  const modalText = modal?.querySelector("p");
+  const descInput = document.getElementById("public-description-input");
+  const publishBtn = document.getElementById("modal-publish");
+  const charCounter = document.getElementById("char-counter");
+  const modalStatus = document.getElementById("modal-status");
+
+  if (!modal || !descInput) return;
+
+  modalMode = "editDescription";
+  currentImageForPublish = img;
+  descInput.value = img.description || "";
+  if (charCounter) charCounter.textContent = descInput.value.length.toString();
+  if (modalStatus) modalStatus.textContent = "";
+  if (modalTitle) modalTitle.textContent = "Edit Description";
+  if (modalText) modalText.textContent = "Update your post description (required, max 1000 characters):";
+  if (publishBtn) publishBtn.textContent = "Update";
   
   modal.style.display = "flex";
   descInput.focus();
