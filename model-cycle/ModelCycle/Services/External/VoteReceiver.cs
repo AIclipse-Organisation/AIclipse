@@ -2,6 +2,7 @@ using StackExchange.Redis;
 using MongoDB.Driver;
 using ModelCycle.Domain;
 using ModelCycle.Services.Training;
+using System.Linq;
 
 namespace ModelCycle.Services;
 
@@ -75,9 +76,10 @@ public class VoteReceiver : BackgroundService
             }
             catch (Exception ex)
             catch (MongoException ex)
-            {
+        var postIdField = entry.Values.FirstOrDefault(field => field.Name == "post_id");
+        if (postIdField.Name.HasValue)
                 _logger.LogError(ex, "MongoDB error in VoteReceiver loop");
-                await Task.Delay(5000, stoppingToken);
+            postIdStr = postIdField.Value;
             }
             {
                 _logger.LogError(ex, "Error in VoteReceiver loop");
