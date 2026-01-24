@@ -39,7 +39,11 @@ public class VoteReceiver : BackgroundService
                 await db.StreamCreateConsumerGroupAsync(StreamKey, ConsumerGroup, StreamPosition.NewMessages);
             }
         }
-        catch (RedisServerException ex) when (ex.Message.Contains("BUSYGROUP")) { }
+        catch (RedisServerException ex) when (ex.Message.Contains("BUSYGROUP"))
+        {
+            // Consumer group already exists; this is expected in concurrent startup and can be safely ignored.
+            _logger.LogDebug(ex, "Redis consumer group '{ConsumerGroup}' on stream '{StreamKey}' already exists (BUSYGROUP).", ConsumerGroup, StreamKey);
+        }
 
         _logger.LogInformation("[Model-Cycle] .NET Vote Receiver Started.");
 
