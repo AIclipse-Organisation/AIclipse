@@ -165,7 +165,7 @@ jobs:
               sleep 2
             done
           }
-          for claim in data-redis-0 data-mongo-0 s3-pvc; do
+          for claim in data-redis-0 data-mongo-0 data-s3-0; do
             wait_pvc "$claim"
           done
 
@@ -176,7 +176,7 @@ jobs:
           set -euo pipefail
           kubectl rollout status -n "$NAMESPACE" statefulset/redis --timeout=${{ inputs.rollout_timeout }}
           kubectl rollout status -n "$NAMESPACE" statefulset/mongo --timeout=${{ inputs.rollout_timeout }}
-          kubectl rollout status -n "$NAMESPACE" deployment/s3-depl --timeout=${{ inputs.rollout_timeout }}
+          kubectl rollout status -n "$NAMESPACE" statefulset/s3 --timeout=${{ inputs.rollout_timeout }}
 
       - name: Deploy service
         # Patch image tag in the deployment manifest to the CI-built tag.
