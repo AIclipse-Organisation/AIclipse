@@ -64,11 +64,21 @@ public class VoteReceiver : BackgroundService
                     using (var scope = _scopeFactory.CreateScope())
                     {
                         await ProcessMessageAsync(entry, scope.ServiceProvider);
-                    }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                     await db.StreamAcknowledgeAsync(StreamKey, ConsumerGroup, entry.Id);
-                }
+                // Graceful shutdown requested, exit the loop without logging an error.
+                return;
+            }
+            catch (RedisException ex)
+            {
+                _logger.LogError(ex, "Redis error in VoteReceiver loop");
             }
             catch (Exception ex)
+            catch (MongoException ex)
+            {
+                _logger.LogError(ex, "MongoDB error in VoteReceiver loop");
+                await Task.Delay(5000, stoppingToken);
+            }
             {
                 _logger.LogError(ex, "Error in VoteReceiver loop");
                 await Task.Delay(5000, stoppingToken);
