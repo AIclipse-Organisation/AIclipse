@@ -9,13 +9,40 @@ using ModelCycle.Services.Training;
 using ModelCycle.Services;
 using ModelCycle.Services.External;
 using StackExchange.Redis;
+using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var redisConnectString = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
-builder.Services.AddSingleton<IConnectionMultiplexer>(
-    ConnectionMultiplexer.Connect(redisConnectString)
-);
+var mongoUri = Environment.GetEnvironmentVariable("MONGO_URI") ?? "mongodb://localhost:27017";
+var mongoDbName = Environment.GetEnvironmentVariable("MONGO_DB") ?? "aiclipse";
+
+Console.WriteLine($"[Mongo] Connecting to {mongoDbName}...");
+
+builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoUri));
+builder.Services.AddScoped<IMongoDatabase>(sp => 
+    sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDbName));
+
+var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST") ?? "localhost";
+var redisPortStr = Environment.GetEnvironmentVariable("REDIS_PORT") ?? "6379";
+var redisPassword = Environment.GetEnvironmentVariable("REDIS_PASSWORD");
+
+int.TryParse(redisPortStr, out var redisPort);
+
+var configOptions = new ConfigurationOptions
+{
+    EndPoints = { { redisHost, redisPort } },
+    Password = string.IsNullOrEmpty(redisPassword) ? null : redisPassword,
+    AbortOnConnectFail = false, 
+    ConnectRetry = 5,
+    KeepAlive = 60
+};
+
+Console.WriteLine($"[Redis] Connecting to {redisHost}:{redisPort}...");
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp => 
+    ConnectionMultiplexer.Connect(configOptions));
+
+builder.Services.AddHostedService<VoteReceiver>();
 
 string configUrl = Environment.GetEnvironmentVariable("CENTRAL_CONFIG_URL") 
                    ?? throw new Exception("CENTRAL_CONFIG_URL env var is missing!");

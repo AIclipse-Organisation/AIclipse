@@ -14,10 +14,12 @@ public class ConfidenceService: IConfidenceService
     
     public ConfidenceResult Evaluate(VoteData voteData)
     {
+        // TODO - Add these to the hosted variables
         // User averages found in research - Added in
         double userAccuracyAi  = 0.8; 
         double userAccuracyReal = 0.8; 
         
+        // TODO - Add these to the hosted variables
         // Model accuracy - will get from model versioning history later
         double modelAccuracyAi = 0.8;
         double modelAccuracyReal = 0.8;
@@ -45,6 +47,7 @@ public class ConfidenceService: IConfidenceService
         double pAi   = 1.0 - pReal;
 
         double probability = trainingLabel == "ai" ? pAi : pReal;
+        Console.WriteLine("Votes: AI - " + voteData.UserAiVotes + ", NotAI - " + voteData.UserNotAiVotes);
         Console.WriteLine("Probability: " + probability);
         bool isReady = probability >= 0.8;
 

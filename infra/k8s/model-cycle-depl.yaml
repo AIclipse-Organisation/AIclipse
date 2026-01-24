@@ -32,6 +32,19 @@ spec:
             - name: model-data
               mountPath: /app/data
           env:
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+            - name: MONGO_DB
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+            - name: REDIS_HOST
+              value: "redis-srv"    
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-sec      
+                  key: REDIS_PASSWORD
             - name: APP_ENV
               value: "dev"
             - name: CENTRAL_CONFIG_URL
