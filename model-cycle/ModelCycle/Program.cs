@@ -95,7 +95,7 @@ builder.Services.AddCors(options =>
 });
 
 
-var dbPath = Path.Combine("/app/data", "modelcycle.db");
+var dbPath = Path.Join("/app/data", "modelcycle.db");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
