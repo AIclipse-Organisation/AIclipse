@@ -133,3 +133,111 @@
 .error {
   color: var(--error-color, #dc3545);
 }
+
+/* =========================
+   Make Public (INLINE, namespaced)
+   ========================= */
+
+.make-public-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.10);
+}
+
+.btn-make-public {
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 800;
+
+  background: var(--accent, #c9a64b);
+  color: #111;
+}
+
+.btn-make-public:hover {
+  filter: brightness(1.05);
+}
+
+.make-public-form {
+  margin-top: 12px;
+}
+
+.make-public-text {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.70);
+}
+
+.make-public-textarea {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.92);
+  font: inherit;
+}
+
+.make-public-textarea:focus {
+  outline: none;
+  border-color: rgba(201,166,75,0.9);
+}
+
+.make-public-count {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 12px;
+  color: rgba(255,255,255,0.50);
+}
+
+.make-public-status {
+  margin-top: 10px;
+  min-height: 18px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+}
+
+.make-public-status.is-error { color: #e04646; }
+.make-public-status.is-success { color: #18c46c; }
+
+.make-public-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.make-public-btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.make-public-btn--secondary {
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.88);
+}
+
+.make-public-btn--secondary:hover {
+  background: rgba(255,255,255,0.14);
+}
+
+.make-public-btn--primary {
+  background: var(--accent, #c9a64b);
+  color: #111;
+}
+
+.make-public-btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

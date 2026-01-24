@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <title>View Scan</title>
@@ -32,20 +33,47 @@
           <!-- Populated from JS -->
           <dl class="meta-list" id="meta-list"></dl>
 
-          
           <div id="edit-section" style="display: none; margin-top: 20px;">
             <h3 style="color: white;">Edit Description</h3>
-            <textarea 
-              id="description-input" 
-              style="width: 100%; min-height: 100px; padding: 8px; font-size: 1em;"
-              maxlength="1000"
-              placeholder="Enter a description for your post..."
-            ></textarea>
+            <textarea id="description-input" style="width: 100%; min-height: 100px; padding: 8px; font-size: 1em;"
+              maxlength="1000" placeholder="Enter a description for your post..."></textarea>
             <div style="margin-top: 10px;">
               <button id="save-btn">Save</button>
               <button id="cancel-edit-btn">Cancel</button>
             </div>
             <div id="edit-status" style="margin-top: 10px;"></div>
+          </div>
+
+          <!-- Make Public (ONLY for private scans) -->
+          <div id="make-public-section" class="make-public-section" style="display:none;">
+            <button type="button" id="btn-make-public" class="btn-make-public">
+              Make Public
+            </button>
+
+            <!-- Inline form: hidden until user clicks Make Public -->
+            <div id="make-public-form" class="make-public-form" hidden>
+              <p class="make-public-text">
+                Add a description for your post (required, max 1000 characters):
+              </p>
+
+              <textarea id="make-public-description" class="make-public-textarea" maxlength="1000" rows="4"
+                placeholder="Describe your image..."></textarea>
+
+              <div class="make-public-count">
+                <span id="make-public-count">0</span>/1000
+              </div>
+
+              <div id="make-public-status" class="make-public-status"></div>
+
+              <div class="make-public-actions">
+                <button type="button" id="make-public-cancel" class="make-public-btn make-public-btn--secondary">
+                  Cancel
+                </button>
+                <button type="button" id="make-public-publish" class="make-public-btn make-public-btn--primary">
+                  Publish
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="viewscan-actions">
@@ -63,4 +91,5 @@
   <script src="/static/js/main.js"></script>
   <script src="/static/js/viewscan.js"></script>
 </body>
+
 </html>

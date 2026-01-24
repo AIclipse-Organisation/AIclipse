@@ -132,8 +132,6 @@ function createScanCard(img, index) {
   const h3 = makeEl("h3", null, "Analysis");
   analysis.appendChild(h3);
 
-  // Remove "Our model says" completely per your request
-
   // Verdict line: use accurate backend label
   // Also: color matches bar fill
   const verdictLine = makeEl("div", `scan-verdict-line verdict-text ${type === "safe" ? "is-safe" : "is-risk"}`);
@@ -151,7 +149,7 @@ function createScanCard(img, index) {
   track.appendChild(fill);
   analysis.appendChild(track);
 
-  // Meta: uploaded date (same as before but without HTML string)
+  // Meta: uploaded date
   const meta = makeEl("div", "scan-meta");
 
   const uploadedText = img.uploaded_at
@@ -165,7 +163,7 @@ function createScanCard(img, index) {
   // View more details link
   // -------------------------
   const detailsLink = makeEl("a", "scan-details-link", "View more details");
-  detailsLink.href = "/viewscan.html";
+  detailsLink.href = "/viewscan";
 
   detailsLink.addEventListener("click", (e) => {
     e.preventDefault();
@@ -187,21 +185,9 @@ function createScanCard(img, index) {
 
   analysis.appendChild(detailsLink);
 
-  // -------------------------
-  // Action buttons
-  // -------------------------
-  if (getVisibility(img) === "private") {
-    // Make Public button (only for private images)
-    const makePublicBtn = makeEl("button", "btn-make-public", "Make Public");
-    makePublicBtn.type = "button";
-    makePublicBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      showMakePublicModal(img);
-    });
-    analysis.appendChild(makePublicBtn);
-  } else {
-    // Public scans: no Edit Description button (removed)
-  }
+  // NOTE:
+  // Make Public button removed from scans page.
+  // Publishing is now only available on the viewscan page.
 
   return card;
 }
@@ -318,193 +304,4 @@ async function loadScans() {
 window.addEventListener("DOMContentLoaded", () => {
   setupScanTabs();
   loadScans();
-  setupMakePublicModal();
 });
-
-// -------------------------
-// Make Public Modal
-// -------------------------
-let currentImageForPublish = null;
-
-function setupMakePublicModal() {
-  const modal = document.getElementById("make-public-modal");
-  const cancelBtn = document.getElementById("modal-cancel");
-  const publishBtn = document.getElementById("modal-publish");
-  const descInput = document.getElementById("public-description-input");
-  const charCounter = document.getElementById("char-counter");
-  const modalStatus = document.getElementById("modal-status");
-
-  if (!modal || !cancelBtn || !publishBtn || !descInput) return;
-
-  // Character counter
-  if (charCounter) {
-    descInput.addEventListener("input", () => {
-      charCounter.textContent = descInput.value.length;
-    });
-  }
-
-  // Cancel button
-  cancelBtn.addEventListener("click", () => {
-    modal.style.display = "none";
-    descInput.value = "";
-    if (charCounter) charCounter.textContent = "0";
-    if (modalStatus) modalStatus.textContent = "";
-    currentImageForPublish = null;
-  });
-
-  // Publish button (Make Public only)
-  publishBtn.addEventListener("click", async () => {
-    if (!currentImageForPublish) return;
-    if (publishBtn.disabled) return; // Prevent double-click
-
-    const description = descInput.value.trim();
-    if (!description) {
-      if (modalStatus) {
-        modalStatus.className = "status-message error";
-        modalStatus.textContent = "Description is required.";
-      }
-      return;
-    }
-
-    if (description.length > 1000) {
-      if (modalStatus) {
-        modalStatus.className = "status-message error";
-        modalStatus.textContent = `Description too long (${description.length}/1000 characters).`;
-      }
-      return;
-    }
-
-    // Disable button during request
-    publishBtn.disabled = true;
-    if (modalStatus) {
-      modalStatus.className = "status-message";
-      modalStatus.textContent = "Publishing...";
-    }
-
-    try {
-      // Make image public (create new post)
-      await handleMakePublic(currentImageForPublish, description);
-
-      // Success - close modal and reload scans
-      if (modalStatus) {
-        modalStatus.className = "status-message success";
-        modalStatus.textContent = "Published successfully!";
-      }
-
-      setTimeout(() => {
-        modal.style.display = "none";
-        descInput.value = "";
-        if (charCounter) charCounter.textContent = "0";
-        if (modalStatus) modalStatus.textContent = "";
-        currentImageForPublish = null;
-
-        // Reload scans to reflect the change
-        loadScans();
-      }, 1000);
-    } catch (error) {
-      console.error("Error:", error);
-      if (modalStatus) {
-        modalStatus.className = "status-message error";
-        modalStatus.textContent = error.message;
-      }
-    } finally {
-      publishBtn.disabled = false;
-    }
-  });
-
-  // Close modal on backdrop click
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) {
-      cancelBtn.click();
-    }
-  });
-
-  // Close modal on Escape key
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && modal.style.display === "flex") {
-      cancelBtn.click();
-    }
-  });
-}
-
-async function handleMakePublic(img, description) {
-  // Get current user ID
-  const meRes = await fetch("/auth/me", {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    credentials: "include",
-  });
-
-  if (!meRes.ok) {
-    throw new Error("You must be signed in to publish.");
-  }
-
-  const userData = await meRes.json();
-  const userId = userData.user_id;
-
-  // Create post body matching existing structure
-  const postBody = {
-    user_id: userId,
-    image_id: img.image_id,
-    description,
-    result: {
-      verdict: img.verdict || null,
-      label: img.label || null,
-      confidence: img.confidence || null,
-    },
-  };
-
-  const postRes = await fetch("/community/posts", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify(postBody),
-  });
-
-  if (!postRes.ok) {
-    const errorData = await postRes.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
-  }
-
-  // Update image to set is_public = true
-  const updateRes = await fetch(`/image/${img.image_id}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify({ is_public: true }),
-  });
-
-  if (!updateRes.ok) {
-    const errorData = await updateRes.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`);
-  }
-}
-
-function showMakePublicModal(img) {
-  const modal = document.getElementById("make-public-modal");
-  const modalTitle = modal?.querySelector("h2");
-  const modalText = modal?.querySelector("p");
-  const descInput = document.getElementById("public-description-input");
-  const publishBtn = document.getElementById("modal-publish");
-  const charCounter = document.getElementById("char-counter");
-  const modalStatus = document.getElementById("modal-status");
-
-  if (!modal || !descInput) return;
-
-  currentImageForPublish = img;
-  descInput.value = "";
-  if (charCounter) charCounter.textContent = "0";
-  if (modalStatus) modalStatus.textContent = "";
-  if (modalTitle) modalTitle.textContent = "Make Image Public";
-  if (modalText) modalText.textContent = "Add a description for your post (required, max 1000 characters):";
-  if (publishBtn) publishBtn.textContent = "Publish";
-
-  modal.style.display = "flex";
-  descInput.focus();
-}
