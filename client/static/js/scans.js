@@ -143,6 +143,8 @@ function createScanCard(img, index) {
   track.setAttribute("role", "img");
   track.setAttribute("aria-label", `Confidence ${pct}%`);
 
+  if (type === "risk") track.classList.add("is-risk");
+
   const fill = makeEl("div", `confidence-fill ${type === "risk" ? "is-risk" : ""}`);
   fill.style.width = `${pct}%`;
 
