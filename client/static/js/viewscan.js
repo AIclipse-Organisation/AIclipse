@@ -56,6 +56,36 @@ function isPrivateScan(img) {
   return true; // default to private if missing
 }
 
+// -------------------------
+// True toggle selected button styling
+// - Adds/removes .is-selected on click
+// - Keeps selection even after focus moves away
+// - Ensures only one "primary" button is selected at a time
+// -------------------------
+function setupToggleSelectedButtons() {
+  const primaryButtons = [
+    document.getElementById("btn-make-public"),
+    document.getElementById("btn-edit-description"),
+  ].filter(Boolean);
+
+  const clearOthers = (exceptEl) => {
+    primaryButtons.forEach((btn) => {
+      if (btn && btn !== exceptEl) btn.classList.remove("is-selected");
+    });
+  };
+
+  primaryButtons.forEach((btn) => {
+    if (btn.dataset.toggleBound) return;
+    btn.dataset.toggleBound = "1";
+
+    btn.addEventListener("click", () => {
+      const willBeSelected = !btn.classList.contains("is-selected");
+      clearOthers(btn);
+      btn.classList.toggle("is-selected", willBeSelected);
+    });
+  });
+}
+
 // Renders a definition list from whatever keys exist.
 // Also renders “known” fields in a nicer order first.
 function renderMeta(img) {
@@ -154,6 +184,9 @@ function renderScan(img, title) {
 
   // Inline Make Public UI (ONLY when private)
   setupMakePublicInline(img);
+
+  // True toggle selection state for main buttons
+  setupToggleSelectedButtons();
 }
 
 // -------------------------

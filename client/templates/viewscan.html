@@ -20,9 +20,13 @@
         <div class="page-underline" role="presentation"></div>
       </section>
 
-      <div id="viewscan-status" class="status-message"></div>
+      <!-- <div id="viewscan-status" class="status-message"></div> -->
 
       <section id="viewscan-card" class="viewscan-card" hidden>
+
+        <!-- Back button ABOVE the image (not overlay) -->
+        <a href="/scans" class="back-to-scans-btn">Back to Scans</a>
+
         <div class="viewscan-image-wrap">
           <img id="viewscan-image" class="viewscan-image" alt="Selected scan image" />
         </div>
@@ -44,11 +48,7 @@
                 Update the description (required, max 1000 characters):
               </p>
 
-              <textarea
-                id="edit-description-input"
-                class="edit-desc-textarea"
-                maxlength="1000"
-                rows="4"
+              <textarea id="edit-description-input" class="edit-desc-textarea" maxlength="1000" rows="4"
                 placeholder="Update your description..."></textarea>
 
               <div class="edit-desc-count">
@@ -58,10 +58,10 @@
               <div id="edit-description-status" class="edit-desc-status"></div>
 
               <div class="edit-desc-actions">
-                <button type="button" id="edit-description-cancel" class="edit-desc-btn edit-desc-btn--secondary">
+                <button type="button" id="edit-description-cancel" class="edit-desc-btn-cancel edit-desc-btn--secondary">
                   Cancel
                 </button>
-                <button type="button" id="edit-description-save" class="edit-desc-btn edit-desc-btn--primary">
+                <button type="button" id="edit-description-save" class="edit-desc-btn-save edit-desc-btn--primary">
                   Save
                 </button>
               </div>
@@ -90,19 +90,17 @@
               <div id="make-public-status" class="make-public-status"></div>
 
               <div class="make-public-actions">
-                <button type="button" id="make-public-cancel" class="make-public-btn make-public-btn--secondary">
+                <button type="button" id="make-public-cancel" class="make-public-btn-cancel make-public-btn--secondary">
                   Cancel
                 </button>
-                <button type="button" id="make-public-publish" class="make-public-btn make-public-btn--primary">
+                <button type="button" id="make-public-publish" class="make-public-btn-publish make-public-btn--primary">
                   Publish
                 </button>
               </div>
             </div>
           </div>
 
-          <div class="viewscan-actions">
-            <a class="secondary-link" href="/scans">Back to Scans</a>
-          </div>
+          <div class="viewscan-actions" hidden></div>
         </div>
       </section>
     </main>

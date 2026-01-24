@@ -50,17 +50,51 @@
   background: var(--accent, #c9a64b);
 }
 
-/* Card */
+/* =========================
+   Not-a-card layout (keep same classes/ids)
+   ========================= */
+
 .viewscan-card {
   margin: 12px 16px 24px;
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 12px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.03);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 
+/* Back button ABOVE image */
+.back-to-scans-btn {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: fit-content;
+  margin: 0 0 12px 0;
+  padding: 10px 14px;
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+
+  background: transparent;
+  color: #fff;
+  border: 1px solid var(--btn-outline-color);
+
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.back-to-scans-btn:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* Image */
 .viewscan-image-wrap {
-  background: rgba(255,255,255,0.04);
+  background: transparent;
 }
 
 .viewscan-image {
@@ -68,10 +102,12 @@
   display: block;
   max-height: 360px;
   object-fit: cover;
+  border-radius: 12px;
 }
 
+/* Details block */
 .viewscan-meta {
-  padding: 14px 14px 16px;
+  padding: 14px 0 0;
 }
 
 .viewscan-heading {
@@ -81,12 +117,14 @@
   color: rgba(255,255,255,0.92);
 }
 
-/* Definition list meta */
+/* Definition list meta (no divider here to avoid double line) */
 .meta-list {
   display: grid;
   grid-template-columns: 120px 1fr;
   gap: 8px 12px;
   margin: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .meta-key {
@@ -101,24 +139,7 @@
   word-break: break-word;
 }
 
-/* Actions */
-.viewscan-actions {
-  margin-top: 14px;
-}
-
-.secondary-link {
-  display: inline-block;
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 12px;
-  color: rgba(255,255,255,0.80);
-}
-
-.secondary-link:hover {
-  text-decoration: underline;
-}
-
-/* Status (reuse your style semantics) */
+/* Status */
 .status-message {
   padding: 1rem;
   text-align: center;
@@ -135,16 +156,26 @@
 }
 
 /* =========================
-   Edit Description (INLINE)
+   Sections (single divider before actions)
    ========================= */
 
-.edit-desc-section {
-  margin-top: 12px;
+.edit-desc-section,
+.make-public-section {
+  margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid rgba(255,255,255,0.10);
 }
 
-.btn-edit-description {
+/* =========================
+   Buttons (NO shared/global grouped styling)
+   Each class repeats the same design on purpose
+   ========================= */
+
+/* Big buttons */
+.btn-make-public {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+
   width: 100%;
   padding: 12px 14px;
   border-radius: 10px;
@@ -153,25 +184,185 @@
   font: inherit;
   font-weight: 800;
 
-  background: rgba(255,255,255,0.10);
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
   color: rgba(255,255,255,0.92);
-  border: 1px solid rgba(255,255,255,0.14);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
 
-.btn-edit-description:hover {
-  background: rgba(255,255,255,0.14);
+.btn-make-public:hover,
+.btn-make-public.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
 }
 
+.btn-edit-description {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 800;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-edit-description:hover,
+.btn-edit-description.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* Small action buttons */
+.make-public-btn-cancel {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.make-public-btn-cancel:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.make-public-btn-cancel--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.make-public-btn-publish {
+  --btn-outline-color: #5f8affe0;
+  --btn-hover-color: #5f8affe0;
+
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.make-public-btn-publish:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.make-public-btn-publish--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.edit-desc-btn-cancel {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.edit-desc-btn-cancel:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.edit-desc-btn-cancel--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.edit-desc-btn-save {
+  --btn-outline-color: #18c46c;
+  --btn-hover-color: #18c46c;
+
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.edit-desc-btn-save:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.edit-desc-btn-save--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Disabled state (still specific, not grouped) */
+.make-public-btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.edit-desc-btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* =========================
+   Inline forms
+   ========================= */
+
+.make-public-form,
 .edit-desc-form {
   margin-top: 12px;
 }
 
+.make-public-text,
 .edit-desc-text {
   margin: 0 0 10px;
   font-size: 13px;
   color: rgba(255,255,255,0.70);
 }
 
+.make-public-textarea,
 .edit-desc-textarea {
   width: 100%;
   min-height: 90px;
@@ -185,11 +376,13 @@
   font: inherit;
 }
 
+.make-public-textarea:focus,
 .edit-desc-textarea:focus {
   outline: none;
-  border-color: rgba(201,166,75,0.9);
+  border-color: rgba(207,184,124,0.95);
 }
 
+.make-public-count,
 .edit-desc-count {
   margin-top: 6px;
   text-align: right;
@@ -197,6 +390,7 @@
   color: rgba(255,255,255,0.50);
 }
 
+.make-public-status,
 .edit-desc-status {
   margin-top: 10px;
   min-height: 18px;
@@ -204,148 +398,16 @@
   color: rgba(255,255,255,0.75);
 }
 
+.make-public-status.is-error { color: #e04646; }
 .edit-desc-status.is-error { color: #e04646; }
+
+.make-public-status.is-success { color: #18c46c; }
 .edit-desc-status.is-success { color: #18c46c; }
 
+.make-public-actions,
 .edit-desc-actions {
   margin-top: 12px;
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-}
-
-.edit-desc-btn {
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  font-weight: 700;
-}
-
-.edit-desc-btn--secondary {
-  background: rgba(255,255,255,0.10);
-  color: rgba(255,255,255,0.88);
-}
-
-.edit-desc-btn--secondary:hover {
-  background: rgba(255,255,255,0.14);
-}
-
-.edit-desc-btn--primary {
-  background: var(--accent, #c9a64b);
-  color: #111;
-}
-
-.edit-desc-btn--primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* =========================
-   Make Public (INLINE, namespaced)
-   ========================= */
-
-.make-public-section {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255,255,255,0.10);
-}
-
-.btn-make-public {
-  width: 100%;
-  padding: 12px 14px;
-  border: 0;
-  border-radius: 10px;
-  cursor: pointer;
-
-  font: inherit;
-  font-weight: 800;
-
-  background: var(--accent, #c9a64b);
-  color: #111;
-}
-
-.btn-make-public:hover {
-  filter: brightness(1.05);
-}
-
-.make-public-form {
-  margin-top: 12px;
-}
-
-.make-public-text {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: rgba(255,255,255,0.70);
-}
-
-.make-public-textarea {
-  width: 100%;
-  min-height: 90px;
-  resize: vertical;
-
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.92);
-  font: inherit;
-}
-
-.make-public-textarea:focus {
-  outline: none;
-  border-color: rgba(201,166,75,0.9);
-}
-
-.make-public-count {
-  margin-top: 6px;
-  text-align: right;
-  font-size: 12px;
-  color: rgba(255,255,255,0.50);
-}
-
-.make-public-status {
-  margin-top: 10px;
-  min-height: 18px;
-  font-size: 13px;
-  color: rgba(255,255,255,0.75);
-}
-
-.make-public-status.is-error { color: #e04646; }
-.make-public-status.is-success { color: #18c46c; }
-
-.make-public-actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.make-public-btn {
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  font-weight: 700;
-}
-
-.make-public-btn--secondary {
-  background: rgba(255,255,255,0.10);
-  color: rgba(255,255,255,0.88);
-}
-
-.make-public-btn--secondary:hover {
-  background: rgba(255,255,255,0.14);
-}
-
-.make-public-btn--primary {
-  background: var(--accent, #c9a64b);
-  color: #111;
-}
-
-.make-public-btn--primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
