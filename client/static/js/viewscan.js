@@ -57,33 +57,22 @@ function isPrivateScan(img) {
 }
 
 // -------------------------
-// True toggle selected button styling
-// - Adds/removes .is-selected on click
-// - Keeps selection even after focus moves away
-// - Ensures only one "primary" button is selected at a time
+// Button selection helpers
+// - Selected state is driven by whether the dropdown is open
 // -------------------------
-function setupToggleSelectedButtons() {
-  const primaryButtons = [
-    document.getElementById("btn-make-public"),
-    document.getElementById("btn-edit-description"),
-  ].filter(Boolean);
+function setSelected(btn, on) {
+  if (!btn) return;
+  btn.classList.toggle("is-selected", !!on);
+}
 
-  const clearOthers = (exceptEl) => {
-    primaryButtons.forEach((btn) => {
-      if (btn && btn !== exceptEl) btn.classList.remove("is-selected");
-    });
-  };
+function hidePanel(panel) {
+  if (!panel) return;
+  panel.hidden = true;
+}
 
-  primaryButtons.forEach((btn) => {
-    if (btn.dataset.toggleBound) return;
-    btn.dataset.toggleBound = "1";
-
-    btn.addEventListener("click", () => {
-      const willBeSelected = !btn.classList.contains("is-selected");
-      clearOthers(btn);
-      btn.classList.toggle("is-selected", willBeSelected);
-    });
-  });
+function showPanel(panel) {
+  if (!panel) return;
+  panel.hidden = false;
 }
 
 // Renders a definition list from whatever keys exist.
@@ -101,11 +90,24 @@ function renderMeta(img) {
 
   // Fields to hide
   const hiddenFields = new Set([
-    "image_id", "url", "is_reported", "s3_key", "user_id",
-    "_id", "post_id", "is_public",
-    "clicks_count", "comment_count", "controversial_since",
-    "created_at", "debug", "down_vote_count", "result",
-    "score", "up_vote_count", "user_name"
+    "image_id",
+    "url",
+    "is_reported",
+    "s3_key",
+    "user_id",
+    "_id",
+    "post_id",
+    "is_public",
+    "clicks_count",
+    "comment_count",
+    "controversial_since",
+    "created_at",
+    "debug",
+    "down_vote_count",
+    "result",
+    "score",
+    "up_vote_count",
+    "user_name",
   ]);
 
   // ---- Show only allowed fields ----
@@ -126,24 +128,36 @@ function renderMeta(img) {
 
   // Show any other non-hidden fields (but skip description since we showed it above)
   const alreadyShown = new Set([
-    "is_public", "uploaded_at", "label", "verdict", "confidence", "description", "updated_at"
+    "is_public",
+    "uploaded_at",
+    "label",
+    "verdict",
+    "confidence",
+    "description",
+    "updated_at",
   ]);
 
-  Object.keys(img || {}).sort().forEach((key) => {
-    if (hiddenFields.has(key) || alreadyShown.has(key)) return;
+  Object.keys(img || {})
+    .sort()
+    .forEach((key) => {
+      if (hiddenFields.has(key) || alreadyShown.has(key)) return;
 
-    const val = img[key];
-    let out;
+      const val = img[key];
+      let out;
 
-    if (val === null || val === undefined) out = "N/A";
-    else if (typeof val === "object") {
-      try { out = JSON.stringify(val); } catch (_) { out = "[object]"; }
-    } else {
-      out = String(val);
-    }
+      if (val === null || val === undefined) out = "N/A";
+      else if (typeof val === "object") {
+        try {
+          out = JSON.stringify(val);
+        } catch (_) {
+          out = "[object]";
+        }
+      } else {
+        out = String(val);
+      }
 
-    addMeta(key, out);
-  });
+      addMeta(key, out);
+    });
 }
 
 function renderScan(img, title) {
@@ -184,9 +198,6 @@ function renderScan(img, title) {
 
   // Inline Make Public UI (ONLY when private)
   setupMakePublicInline(img);
-
-  // True toggle selection state for main buttons
-  setupToggleSelectedButtons();
 }
 
 // -------------------------
@@ -194,6 +205,7 @@ function renderScan(img, title) {
 // Requirements:
 // - "Edit Description" button is visible only when scan has post_id
 // - Clicking it reveals textarea + Save/Cancel
+// - Clicking it again closes it + unselects
 // - Cancel hides it and resets the value
 // - Save PATCHes the post description and updates the meta on this page
 // -------------------------
@@ -217,6 +229,7 @@ function setupEditDescriptionInline(img) {
 
   if (!shouldShow) {
     form.hidden = true;
+    setSelected(openBtn, false);
     return;
   }
 
@@ -238,7 +251,7 @@ function setupEditDescriptionInline(img) {
   };
 
   const openForm = () => {
-    originalDescription = (currentScan && currentScan.description) ? String(currentScan.description) : "";
+    originalDescription = currentScan && currentScan.description ? String(currentScan.description) : "";
     input.value = originalDescription;
     syncCount();
     setFormStatus("", null);
@@ -249,12 +262,13 @@ function setupEditDescriptionInline(img) {
     hasUnsavedChanges = false;
     formOpen = true;
 
-    form.hidden = false;
+    showPanel(form);
+    setSelected(openBtn, true);
     input.focus();
   };
 
   const closeForm = () => {
-    form.hidden = true;
+    hidePanel(form);
     input.value = "";
     if (countEl) countEl.textContent = "0";
     setFormStatus("", null);
@@ -264,12 +278,27 @@ function setupEditDescriptionInline(img) {
 
     hasUnsavedChanges = false;
     formOpen = false;
+
+    setSelected(openBtn, false);
+  };
+
+  const toggleForm = () => {
+    // If opening Edit Description, close Make Public if it exists
+    const makePublicForm = document.getElementById("make-public-form");
+    const makePublicBtn = document.getElementById("btn-make-public");
+    if (makePublicForm && !makePublicForm.hidden) {
+      hidePanel(makePublicForm);
+      setSelected(makePublicBtn, false);
+    }
+
+    if (form.hidden) openForm();
+    else closeForm();
   };
 
   // Bind once
   if (!openBtn.dataset.bound) {
     openBtn.dataset.bound = "1";
-    openBtn.addEventListener("click", openForm);
+    openBtn.addEventListener("click", toggleForm);
   }
 
   if (!input.dataset.bound) {
@@ -346,9 +375,9 @@ async function patchPostDescription(postId, description) {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "Accept": "application/json"
+      Accept: "application/json",
     },
-    body: JSON.stringify({ description })
+    body: JSON.stringify({ description }),
   });
 
   const data = await response.json().catch(() => ({}));
@@ -365,6 +394,7 @@ async function patchPostDescription(postId, description) {
 // Requirements:
 // - "Make Public" button is visible only when scan is private
 // - Clicking it reveals a description box + Publish/Cancel
+// - Clicking it again closes it + unselects
 // - Cancel hides it again
 // - Publish posts + updates image visibility, then redirects to Scans (Public tab)
 // -------------------------
@@ -388,6 +418,7 @@ function setupMakePublicInline(img) {
 
   if (!shouldShow) {
     form.hidden = true;
+    setSelected(makePublicBtn, false);
     return;
   }
 
@@ -399,25 +430,43 @@ function setupMakePublicInline(img) {
   };
 
   const openForm = () => {
-    form.hidden = false;
+    showPanel(form);
     formInput.value = "";
     if (formCount) formCount.textContent = "0";
     setFormStatus("", null);
+
+    setSelected(makePublicBtn, true);
     formInput.focus();
   };
 
   const closeForm = () => {
-    form.hidden = true;
+    hidePanel(form);
     formInput.value = "";
     if (formCount) formCount.textContent = "0";
     setFormStatus("", null);
+
     publishBtn.disabled = false;
     publishBtn.textContent = "Publish";
+
+    setSelected(makePublicBtn, false);
+  };
+
+  const toggleForm = () => {
+    // If opening Make Public, close Edit Description if it exists
+    const editForm = document.getElementById("edit-description-form");
+    const editBtn = document.getElementById("btn-edit-description");
+    if (editForm && !editForm.hidden) {
+      hidePanel(editForm);
+      setSelected(editBtn, false);
+    }
+
+    if (form.hidden) openForm();
+    else closeForm();
   };
 
   if (!makePublicBtn.dataset.bound) {
     makePublicBtn.dataset.bound = "1";
-    makePublicBtn.addEventListener("click", openForm);
+    makePublicBtn.addEventListener("click", toggleForm);
   }
 
   if (!formInput.dataset.bound) {
@@ -517,7 +566,9 @@ async function handleMakePublic(img, description) {
 
   if (!updateRes.ok) {
     const errorData = await updateRes.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`);
+    throw new Error(
+      errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`
+    );
   }
 }
 
