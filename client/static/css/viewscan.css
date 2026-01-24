@@ -135,6 +135,114 @@
 }
 
 /* =========================
+   Edit Description (INLINE)
+   ========================= */
+
+.edit-desc-section {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.10);
+}
+
+.btn-edit-description {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 800;
+
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.92);
+  border: 1px solid rgba(255,255,255,0.14);
+}
+
+.btn-edit-description:hover {
+  background: rgba(255,255,255,0.14);
+}
+
+.edit-desc-form {
+  margin-top: 12px;
+}
+
+.edit-desc-text {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.70);
+}
+
+.edit-desc-textarea {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.92);
+  font: inherit;
+}
+
+.edit-desc-textarea:focus {
+  outline: none;
+  border-color: rgba(201,166,75,0.9);
+}
+
+.edit-desc-count {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 12px;
+  color: rgba(255,255,255,0.50);
+}
+
+.edit-desc-status {
+  margin-top: 10px;
+  min-height: 18px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+}
+
+.edit-desc-status.is-error { color: #e04646; }
+.edit-desc-status.is-success { color: #18c46c; }
+
+.edit-desc-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.edit-desc-btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.edit-desc-btn--secondary {
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.88);
+}
+
+.edit-desc-btn--secondary:hover {
+  background: rgba(255,255,255,0.14);
+}
+
+.edit-desc-btn--primary {
+  background: var(--accent, #c9a64b);
+  color: #111;
+}
+
+.edit-desc-btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* =========================
    Make Public (INLINE, namespaced)
    ========================= */
 

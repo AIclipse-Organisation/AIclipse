@@ -33,15 +33,39 @@
           <!-- Populated from JS -->
           <dl class="meta-list" id="meta-list"></dl>
 
-          <div id="edit-section" style="display: none; margin-top: 20px;">
-            <h3 style="color: white;">Edit Description</h3>
-            <textarea id="description-input" style="width: 100%; min-height: 100px; padding: 8px; font-size: 1em;"
-              maxlength="1000" placeholder="Enter a description for your post..."></textarea>
-            <div style="margin-top: 10px;">
-              <button id="save-btn">Save</button>
-              <button id="cancel-edit-btn">Cancel</button>
+          <!-- Edit Description (INLINE, only for public posts with post_id) -->
+          <div id="edit-description-section" class="edit-desc-section" style="display:none;">
+            <button type="button" id="btn-edit-description" class="btn-edit-description">
+              Edit Description
+            </button>
+
+            <div id="edit-description-form" class="edit-desc-form" hidden>
+              <p class="edit-desc-text">
+                Update the description (required, max 1000 characters):
+              </p>
+
+              <textarea
+                id="edit-description-input"
+                class="edit-desc-textarea"
+                maxlength="1000"
+                rows="4"
+                placeholder="Update your description..."></textarea>
+
+              <div class="edit-desc-count">
+                <span id="edit-description-count">0</span>/1000
+              </div>
+
+              <div id="edit-description-status" class="edit-desc-status"></div>
+
+              <div class="edit-desc-actions">
+                <button type="button" id="edit-description-cancel" class="edit-desc-btn edit-desc-btn--secondary">
+                  Cancel
+                </button>
+                <button type="button" id="edit-description-save" class="edit-desc-btn edit-desc-btn--primary">
+                  Save
+                </button>
+              </div>
             </div>
-            <div id="edit-status" style="margin-top: 10px;"></div>
           </div>
 
           <!-- Make Public (ONLY for private scans) -->

@@ -149,116 +149,182 @@ function renderScan(img, title) {
   card.hidden = false;
   setStatus("", null);
 
-  // Public post edit section (only when post_id exists)
-  if (img.post_id) {
-    showEditSection(img);
-  } else {
-    // If not a post, ensure edit UI is hidden
-    const editSection = document.getElementById("edit-section");
-    if (editSection) editSection.style.display = "none";
-  }
+  // Edit Description (INLINE, only when post_id exists)
+  setupEditDescriptionInline(img);
 
   // Inline Make Public UI (ONLY when private)
   setupMakePublicInline(img);
 }
 
 // -------------------------
-// Edit section (existing public-post edit)
+// Edit Description (INLINE)
+// Requirements:
+// - "Edit Description" button is visible only when scan has post_id
+// - Clicking it reveals textarea + Save/Cancel
+// - Cancel hides it and resets the value
+// - Save PATCHes the post description and updates the meta on this page
 // -------------------------
-function showEditSection(img) {
-  const editSection = document.getElementById("edit-section");
-  const descriptionInput = document.getElementById("description-input");
+function setupEditDescriptionInline(img) {
+  const section = document.getElementById("edit-description-section");
+  const openBtn = document.getElementById("btn-edit-description");
+  const form = document.getElementById("edit-description-form");
+  const input = document.getElementById("edit-description-input");
+  const countEl = document.getElementById("edit-description-count");
+  const statusEl = document.getElementById("edit-description-status");
+  const saveBtn = document.getElementById("edit-description-save");
+  const cancelBtn = document.getElementById("edit-description-cancel");
 
-  if (!editSection || !descriptionInput) return;
-
-  const originalDescription = img.description || "";
-  descriptionInput.value = originalDescription;
-  editSection.style.display = "block";
-
-  let hasUnsavedChanges = false;
-  descriptionInput.addEventListener("input", () => {
-    hasUnsavedChanges = descriptionInput.value.trim() !== originalDescription;
-  });
-
-  window.addEventListener("beforeunload", (e) => {
-    if (hasUnsavedChanges) {
-      e.preventDefault();
-      e.returnValue = "";
-    }
-  });
-
-  const saveBtn = document.getElementById("save-btn");
-  const cancelBtn = document.getElementById("cancel-edit-btn");
-
-  if (saveBtn) {
-    saveBtn.onclick = () => {
-      hasUnsavedChanges = false;
-      saveDescription(img.post_id);
-    };
-  }
-
-  if (cancelBtn) {
-    cancelBtn.onclick = () => {
-      if (hasUnsavedChanges && !confirm("You have unsaved changes. Are you sure you want to leave?")) return;
-      sessionStorage.removeItem("selectedScan");
-      sessionStorage.removeItem("selectedScanTitle");
-      window.location.href = "/community";
-    };
-  }
-}
-
-async function saveDescription(postId) {
-  const descriptionInput = document.getElementById("description-input");
-  const editStatus = document.getElementById("edit-status");
-  const saveBtn = document.getElementById("save-btn");
-
-  if (!descriptionInput || !editStatus || !saveBtn) return;
-
-  const description = descriptionInput.value.trim();
-
-  if (!description) {
-    editStatus.textContent = "Description cannot be empty.";
+  if (!section || !openBtn || !form || !input || !statusEl || !saveBtn || !cancelBtn) {
+    if (section) section.style.display = img && img.post_id ? "block" : "none";
     return;
   }
 
-  saveBtn.disabled = true;
-  saveBtn.textContent = "Saving...";
-  editStatus.textContent = "";
+  const shouldShow = !!(img && img.post_id);
+  section.style.display = shouldShow ? "block" : "none";
 
-  try {
-    const response = await fetch(`/community/posts?post_id=${encodeURIComponent(postId)}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({ description })
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      editStatus.textContent = data.error || data.detail || `Failed to update (${response.status})`;
-      saveBtn.disabled = false;
-      saveBtn.textContent = "Save Changes";
-      return;
-    }
-
-    editStatus.textContent = "✓ Description updated successfully!";
-    editStatus.style.color = "#28a745";
-
-    sessionStorage.removeItem("selectedScan");
-    sessionStorage.removeItem("selectedScanTitle");
-
-    setTimeout(() => {
-      window.location.href = "/community";
-    }, 1500);
-
-  } catch (error) {
-    saveBtn.disabled = false;
-    saveBtn.textContent = "Save Changes";
+  if (!shouldShow) {
+    form.hidden = true;
+    return;
   }
+
+  const maxLen = 1000;
+  let originalDescription = img.description || "";
+  let formOpen = false;
+  let hasUnsavedChanges = false;
+
+  const setFormStatus = (text, kind) => {
+    statusEl.classList.remove("is-error", "is-success");
+    if (kind === "error") statusEl.classList.add("is-error");
+    if (kind === "success") statusEl.classList.add("is-success");
+    statusEl.textContent = text || "";
+  };
+
+  const syncCount = () => {
+    if (!countEl) return;
+    countEl.textContent = String(input.value.length);
+  };
+
+  const openForm = () => {
+    originalDescription = (currentScan && currentScan.description) ? String(currentScan.description) : "";
+    input.value = originalDescription;
+    syncCount();
+    setFormStatus("", null);
+
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save";
+
+    hasUnsavedChanges = false;
+    formOpen = true;
+
+    form.hidden = false;
+    input.focus();
+  };
+
+  const closeForm = () => {
+    form.hidden = true;
+    input.value = "";
+    if (countEl) countEl.textContent = "0";
+    setFormStatus("", null);
+
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save";
+
+    hasUnsavedChanges = false;
+    formOpen = false;
+  };
+
+  // Bind once
+  if (!openBtn.dataset.bound) {
+    openBtn.dataset.bound = "1";
+    openBtn.addEventListener("click", openForm);
+  }
+
+  if (!input.dataset.bound) {
+    input.dataset.bound = "1";
+    input.addEventListener("input", () => {
+      syncCount();
+      hasUnsavedChanges = input.value.trim() !== originalDescription.trim();
+    });
+  }
+
+  // Warn only if the form is open AND changes exist
+  if (!window.__editDescBeforeUnloadBound) {
+    window.__editDescBeforeUnloadBound = true;
+    window.addEventListener("beforeunload", (e) => {
+      if (formOpen && hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
+  }
+
+  if (!cancelBtn.dataset.bound) {
+    cancelBtn.dataset.bound = "1";
+    cancelBtn.addEventListener("click", () => {
+      closeForm();
+    });
+  }
+
+  if (!saveBtn.dataset.bound) {
+    saveBtn.dataset.bound = "1";
+    saveBtn.addEventListener("click", async () => {
+      if (!currentScan || !currentScan.post_id) return;
+      if (saveBtn.disabled) return;
+
+      const description = input.value.trim();
+
+      if (!description) {
+        setFormStatus("Description cannot be empty.", "error");
+        return;
+      }
+      if (description.length > maxLen) {
+        setFormStatus(`Description too long (${description.length}/${maxLen}).`, "error");
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving...";
+      setFormStatus("Saving...", null);
+
+      try {
+        await patchPostDescription(currentScan.post_id, description);
+
+        // Update local + rerender meta so Details -> Description updates immediately
+        currentScan.description = description;
+        currentScan.updated_at = new Date().toISOString();
+        renderMeta(currentScan);
+
+        setFormStatus("✓ Description updated.", "success");
+
+        // Close after a short beat so user sees success
+        setTimeout(() => closeForm(), 600);
+      } catch (err) {
+        setFormStatus(err?.message || "Failed to update description.", "error");
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save";
+      }
+    });
+  }
+}
+
+async function patchPostDescription(postId, description) {
+  const response = await fetch(`/community/posts?post_id=${encodeURIComponent(postId)}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify({ description })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || data.detail || `Failed to update (${response.status})`);
+  }
+
+  return data;
 }
 
 // -------------------------
