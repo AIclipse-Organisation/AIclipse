@@ -105,6 +105,64 @@
   border-radius: 12px;
 }
 
+/* =========================
+   Verdict block (matches scans page)
+   ========================= */
+
+.verdict-block {
+  margin-top: 12px;
+}
+
+.verdict-line {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  letter-spacing: 0.2px;
+  color: rgba(255,255,255,0.80);
+}
+
+/* Make verdict text match bar color */
+.verdict-text {
+  font-weight: 700;
+}
+
+.verdict-text.is-safe {
+  color: #18c46c;
+}
+
+.verdict-text.is-risk {
+  color: #e04646;
+}
+
+/* confidence bar
+   - remainder (track) is red
+   - fill overlays it
+*/
+.confidence-track {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: #e04646; /* red remainder */
+  overflow: hidden;
+}
+
+/* ✅ If AI/fake, remainder becomes green */
+.confidence-track.is-risk {
+  background: #18c46c;
+}
+
+.confidence-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: #18c46c; /* green fill by default (real) */
+}
+
+.confidence-fill.is-risk {
+  background: #e04646; /* red fill for fake */
+}
+
 /* Details block */
 .viewscan-meta {
   padding: 14px 0 0;

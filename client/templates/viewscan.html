@@ -31,6 +31,15 @@
           <img id="viewscan-image" class="viewscan-image" alt="Selected scan image" />
         </div>
 
+        <!-- Verdict line + bar just below the image -->
+        <div id="verdict-block" class="verdict-block" hidden aria-label="Scan result">
+          <div id="verdict-line" class="verdict-line verdict-text"></div>
+
+          <div id="verdict-bar" class="confidence-track" hidden aria-label="Scan result bar">
+            <div id="verdict-fill" class="confidence-fill"></div>
+          </div>
+        </div>
+
         <div class="viewscan-meta">
           <h2 class="viewscan-heading">Details</h2>
 
@@ -80,7 +89,7 @@
                 Add a description for your post (required, max 1000 characters):
               </p>
 
-              <textarea id="make-public-description" class="make-public-textarea" maxlength="1000" rows="4"
+              <textarea id="make-public-description" class="make-public-textarea" maxlength="1000" (rows="4"
                 placeholder="Describe your image..."></textarea>
 
               <div class="make-public-count">

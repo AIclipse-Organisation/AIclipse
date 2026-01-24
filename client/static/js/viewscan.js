@@ -38,6 +38,15 @@ function toPercent(confidence) {
   return `${Math.round(clamped * 100)}%`;
 }
 
+// Scans page uses number percent for bar width.
+// Keep this helper local to viewscan so we can do width like scans.
+function toPercentNumber(confidence) {
+  const n = Number(confidence);
+  if (!Number.isFinite(n)) return 0;
+  const clamped = Math.max(0, Math.min(1, n));
+  return Math.round(clamped * 100);
+}
+
 function formatDate(dt) {
   if (!dt) return "N/A";
   const d = new Date(dt);
@@ -73,6 +82,72 @@ function hidePanel(panel) {
 function showPanel(panel) {
   if (!panel) return;
   panel.hidden = false;
+}
+
+// -------------------------
+// Verdict + confidence helpers (match scans page behavior)
+// -------------------------
+function verdictType(img) {
+  const v = (img && img.verdict != null ? String(img.verdict) : "").toLowerCase();
+  const l = (img && img.label != null ? String(img.label) : "").toLowerCase();
+
+  // safe signals
+  if (v.includes("real") || v === "safe" || l.includes("real")) return "safe";
+
+  // risk signals
+  if (v.includes("ai") || v.includes("fake") || v.includes("deepfake") || v === "deepfake") return "risk";
+  if (l.includes("ai") || l.includes("fake") || l.includes("deepfake")) return "risk";
+
+  // unknown: match scans page (red)
+  return "risk";
+}
+
+function verdictLineText(img) {
+  const label = (img && img.label != null ? String(img.label) : "").trim();
+  if (label) return label;
+
+  const pct = toPercentNumber(img && img.confidence);
+  return `${pct.toFixed(2)}% ${verdictType(img) === "safe" ? "Likely Real" : "Likely AI"}`;
+}
+
+function renderVerdictBlock(img) {
+  const block = document.getElementById("verdict-block");
+  const line = document.getElementById("verdict-line");
+  const track = document.getElementById("verdict-bar");
+  const fill = document.getElementById("verdict-fill");
+
+  if (!block || !line || !track || !fill) return;
+
+  if (!img) {
+    block.hidden = true;
+    track.hidden = true;
+    line.textContent = "";
+    line.classList.remove("is-safe", "is-risk");
+    track.classList.remove("is-risk");
+    fill.classList.remove("is-risk");
+    fill.style.width = "0%";
+    return;
+  }
+
+  const pct = toPercentNumber(img.confidence);
+  const type = verdictType(img); // safe | risk
+
+  // text line
+  line.textContent = verdictLineText(img);
+  line.classList.remove("is-safe", "is-risk");
+  line.classList.add(type === "safe" ? "is-safe" : "is-risk");
+
+  // bar (track + fill), exactly like scans page
+  track.classList.toggle("is-risk", type === "risk");
+  fill.classList.toggle("is-risk", type === "risk");
+  fill.style.width = `${pct}%`;
+
+  // a11y
+  track.setAttribute("role", "img");
+  track.setAttribute("aria-label", `Confidence ${pct}%`);
+
+  block.hidden = false;
+  track.hidden = false;
 }
 
 // Renders a definition list from whatever keys exist.
@@ -113,7 +188,6 @@ function renderMeta(img) {
   // ---- Show only allowed fields ----
   addMeta("Visibility", visibilityOf(img));
   addMeta("Uploaded", formatDate(img.uploaded_at));
-  addMeta("Label", img.label != null ? String(img.label) : "N/A");
   addMeta("Verdict", img.verdict != null ? String(img.verdict) : "N/A");
   addMeta("Confidence", toPercent(img.confidence));
 
@@ -188,6 +262,9 @@ function renderScan(img, title) {
     imageEl.alt = "No image available.";
     imageEl.style.display = "none";
   }
+
+  // Verdict block (line + bar) just below image
+  renderVerdictBlock(img);
 
   renderMeta(img);
   card.hidden = false;
