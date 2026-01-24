@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import { getRedis } from "./lib/redis.js"
+import { getRedis } from "./redis/redis.js"
 
 const MONGO_URI = process.env.MONGO_URI || "";
 const MONGO_DB = process.env.MONGO_DB || "aiclipse";
