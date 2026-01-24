@@ -267,30 +267,26 @@ async function saveDescription(postId) {
 // - "Make Public" button is visible only when scan is private
 // - Clicking it reveals a description box + Publish/Cancel
 // - Cancel hides it again
-// - Publish posts + updates image visibility, then hides UI and updates meta + title
+// - Publish posts + updates image visibility, then redirects to Scans (Public tab)
 // -------------------------
 function setupMakePublicInline(img) {
-  const makePublicBtn = document.getElementById("btn-make-public"); // button you already add in HTML
-  const makePublicSection = document.getElementById("make-public-section"); // wrapper that contains the button
-  const form = document.getElementById("make-public-form"); // hidden form block
+  const makePublicBtn = document.getElementById("btn-make-public");
+  const makePublicSection = document.getElementById("make-public-section");
+  const form = document.getElementById("make-public-form");
   const formInput = document.getElementById("make-public-description");
   const formCount = document.getElementById("make-public-count");
   const publishBtn = document.getElementById("make-public-publish");
   const cancelBtn = document.getElementById("make-public-cancel");
   const formStatus = document.getElementById("make-public-status");
 
-  // If you haven't added the inline form markup yet, fail silently.
   if (!makePublicSection || !makePublicBtn || !form || !formInput || !publishBtn || !cancelBtn || !formStatus) {
-    // Still hide the section if it exists and we shouldn't show it
     if (makePublicSection) makePublicSection.style.display = isPrivateScan(img) ? "block" : "none";
     return;
   }
 
-  // Show/hide based on privacy
   const shouldShow = isPrivateScan(img);
   makePublicSection.style.display = shouldShow ? "block" : "none";
 
-  // If not private, ensure form is closed
   if (!shouldShow) {
     form.hidden = true;
     return;
@@ -320,7 +316,6 @@ function setupMakePublicInline(img) {
     publishBtn.textContent = "Publish";
   };
 
-  // Wire up only once per page load (avoid stacking handlers if renderScan runs again)
   if (!makePublicBtn.dataset.bound) {
     makePublicBtn.dataset.bound = "1";
     makePublicBtn.addEventListener("click", openForm);
@@ -363,23 +358,12 @@ function setupMakePublicInline(img) {
       try {
         await handleMakePublic(currentScan, description);
 
-        setFormStatus("Published successfully!", "success");
+        // Clean session data (optional)
+        sessionStorage.removeItem("selectedScan");
+        sessionStorage.removeItem("selectedScanTitle");
 
-        // Update local state so UI reflects new public status
-        currentScan.is_public = true;
-        currentScan.description = description;
-
-        // Update header title to (Public) if it contains (Private)
-        const titleEl = document.getElementById("viewscan-title");
-        if (titleEl && titleEl.textContent) {
-          titleEl.textContent = titleEl.textContent.replace(/\(Private\)/i, "(Public)");
-        }
-
-        // Re-render meta and hide make-public UI
-        renderMeta(currentScan);
-        closeForm();
-        makePublicSection.style.display = "none";
-
+        // Redirect to Scans and force Public tab
+        window.location.href = "/scans?tab=public";
       } catch (err) {
         setFormStatus(err?.message || "Failed to publish.", "error");
         publishBtn.disabled = false;
@@ -390,7 +374,6 @@ function setupMakePublicInline(img) {
 }
 
 async function handleMakePublic(img, description) {
-  // Get current user ID
   const meRes = await fetch("/auth/me", {
     method: "GET",
     headers: { Accept: "application/json" },
@@ -403,7 +386,6 @@ async function handleMakePublic(img, description) {
   const userId = userData.user_id;
   if (!userId) throw new Error("Could not read current user.");
 
-  // Create post
   const postBody = {
     user_id: userId,
     image_id: img.image_id,
@@ -427,7 +409,6 @@ async function handleMakePublic(img, description) {
     throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
   }
 
-  // Update image visibility
   const updateRes = await fetch(`/image/${img.image_id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Accept: "application/json" },

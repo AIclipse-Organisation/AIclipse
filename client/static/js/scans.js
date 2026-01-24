@@ -298,6 +298,15 @@ async function loadScans() {
   }
 }
 
+// If URL is /scans?tab=public, default to public tab
+(function applyTabFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = (params.get("tab") || "").toLowerCase();
+  if (tab === "public" || tab === "private") {
+    activeFilter = tab;
+  }
+})();
+
 // -------------------------
 // Init
 // -------------------------
