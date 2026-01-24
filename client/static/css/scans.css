@@ -207,26 +207,6 @@
 
 
 
-
-
-/* Make Public Button */
-.btn-make-public {
-  display: inline-block;
-  margin-top: 10px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  background: #5f8affe0;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-make-public:hover {
-  background: #4a73e6;
-}
-
 /* Modal */
 .modal {
   display: none;
