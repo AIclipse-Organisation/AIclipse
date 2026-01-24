@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: community-vote-worker-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: community-vote-worker } }
+  template:
+    metadata: { labels: { app: community-vote-worker } }
+    spec:
+      containers:
+        - name: worker
+          image: aiclipse/community
+          command: ["node", "voteFlushWorker.js"]
+          env:
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+            - name: MONGO_DB
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+
+            - name: REDIS_HOST
+              value: redis-srv
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-sec
+                  key: REDIS_PASSWORD
