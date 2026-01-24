@@ -8,6 +8,7 @@ on:
       - 'infra/k8s/model-cycle-depl.yaml'
       - 'infra/k8s/model-cycle-pvc.yaml'
       - 'infra/k8s-dev/model-cycle-secrets.yaml'
+      - 'infra/k8s/app-configmap.yaml'
       - 'infra/k8s-dev/dev-secrets.yaml'
       - 'infra/kustomization.yaml'
       - 'skaffold.yaml'
@@ -63,6 +64,7 @@ jobs:
       service_port: 3000
       health_path: /healthz
       secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      extra_apply_yaml: infra/k8s/app-configmap.yaml
       extra_secrets_yaml: infra/k8s-dev/model-cycle-secrets.yaml
       extra_pvc_yaml: infra/k8s/model-cycle-pvc.yaml
       extra_pvc_name: model-cycle-pvc
