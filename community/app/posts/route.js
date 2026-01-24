@@ -3,7 +3,7 @@ import { MongoClient } from "mongodb";
 import jwt from "jsonwebtoken";
 import { validateUserId, validateImageId, validatePostId } from "./validation.js";
 
-import { getRedis } from "../../lib/redis.js"
+import { getRedis } from "../../redis/redis.js"
 
 
 export const runtime = "nodejs"; // required for MongoDB driver
