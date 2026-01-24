@@ -189,10 +189,6 @@ jobs:
             wait_pvc "$claim"
           done
 
-          if [ -n "${{ inputs.extra_pvc_name }}" ]; then
-            wait_pvc "${{ inputs.extra_pvc_name }}"
-          fi
-
       - name: Wait deps
         # Ensure Redis/Mongo statefulsets and S3 deployment are ready before testing the app.
         shell: bash
@@ -221,6 +217,36 @@ jobs:
           kubectl -n "$NAMESPACE" patch deployment/${{ inputs.deployment_name }} \
             --type=strategic \
             -p '{"spec":{"template":{"spec":{"containers":[{"name":"'"${{ inputs.container_name }}"'","imagePullPolicy":"Never"}]}}}}'
+
+      - name: Wait extra PVC (post-deploy, optional)
+        if: ${{ inputs.extra_pvc_name != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TO_SEC=$(echo '${{ inputs.rollout_timeout }}' | sed 's/s$//')
+          wait_pvc() {
+            local name="$1"
+            local deadline=$(( $(date +%s) + TO_SEC ))
+            echo ">> waiting PVC/$name"
+            while true; do
+              if kubectl -n "$NAMESPACE" get pvc "$name" >/dev/null 2>&1; then
+                phase=$(kubectl -n "$NAMESPACE" get pvc "$name" -o jsonpath='{.status.phase}')
+                if [ "$phase" = "Bound" ]; then
+                  echo "OK PVC/$name Bound"
+                  return 0
+                fi
+              fi
+              if [ $(date +%s) -ge $deadline ]; then
+                echo "timeout PVC/$name"
+                kubectl -n "$NAMESPACE" get sc,pv,pvc || true
+                kubectl -n "$NAMESPACE" describe pvc "$name" || true
+                kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
+                return 1
+              fi
+              sleep 2
+            done
+          }
+          wait_pvc "${{ inputs.extra_pvc_name }}"
 
       - name: Wait for rollout
         # The app must be ready before probing.
@@ -252,8 +278,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          kubectl -n "$NAMESPACE" get sc,pv,pvc,pods || true
+          kubectl -n "$NAMESPACE" get sc,pv,pvc,pods -o wide || true
           kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
+
+          POD=$(kubectl -n "$NAMESPACE" get pod -l app=${{ inputs.svc_name }} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [ -n "$POD" ]; then
+            kubectl -n "$NAMESPACE" describe pod "$POD" || true
+          fi
+
           if kubectl -n "$NAMESPACE" get deploy/${{ inputs.deployment_name }} >/dev/null 2>&1; then
             kubectl logs -n "$NAMESPACE" deploy/${{ inputs.deployment_name }} --all-containers=true --tail=-1 || true
           fi
