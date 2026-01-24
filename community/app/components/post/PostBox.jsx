@@ -22,11 +22,6 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
   const isOwner = currentUserId && image?.user_id === currentUserId;
   
-  const [myVote, setMyVote] = useState(image?.user_vote ?? null);
-
-  useEffect(() => {
-    setMyVote(image?.user_vote ?? null);
-  }, [image?.user_vote]);
 
 
 
