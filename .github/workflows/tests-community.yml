@@ -59,6 +59,6 @@ jobs:
       container_name: community
       service_name: community-srv
       service_port: 3000
-      health_path: /healthz
+      health_path: /community/healthz
       secrets_yaml: infra/k8s-dev/dev-secrets.yaml
       readiness_selector: app=community

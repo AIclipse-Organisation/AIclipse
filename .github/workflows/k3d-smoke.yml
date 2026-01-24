@@ -19,6 +19,12 @@ on:
       health_path:        { type: string,  required: true }  # e.g. /healthz
       secrets_yaml:       { type: string,  required: true }  # dev secrets for deps + service
       readiness_selector: { type: string,  required: true }  # reserved, not used here
+
+      # NEW: optional extra resources (service-specific)
+      extra_secrets_yaml: { type: string,  required: false, default: "" } # e.g. infra/k8s-dev/model-cycle-secrets.yaml
+      extra_pvc_yaml:     { type: string,  required: false, default: "" } # e.g. infra/k8s/model-cycle-pvc.yaml
+      extra_pvc_name:     { type: string,  required: false, default: "" } # e.g. model-cycle-pvc
+
       rollout_timeout:    { type: string,  required: false, default: "90s" }
       namespace:          { type: string,  required: false, default: "default" }
       k3d_version:        { type: string,  required: false, default: "v5.7.4" }   # pinned for reproducibility
@@ -109,6 +115,20 @@ jobs:
         # Supplies creds/URIs for deps and the service under test.
         run: kubectl apply -n "$NAMESPACE" -f "${{ inputs.secrets_yaml }}"
 
+      - name: Apply extra secrets (optional)
+        if: ${{ inputs.extra_secrets_yaml != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_secrets_yaml }}"
+
+      - name: Apply extra PVC (optional)
+        if: ${{ inputs.extra_pvc_yaml != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_pvc_yaml }}"
+
       - name: Apply Redis, Mongo, S3
         shell: bash
         # mongo-depl.yaml contains its own StorageClass named hostpath-retain with a different provisioner.
@@ -168,6 +188,10 @@ jobs:
           for claim in data-redis-0 data-mongo-0 data-s3-0; do
             wait_pvc "$claim"
           done
+
+          if [ -n "${{ inputs.extra_pvc_name }}" ]; then
+            wait_pvc "${{ inputs.extra_pvc_name }}"
+          fi
 
       - name: Wait deps
         # Ensure Redis/Mongo statefulsets and S3 deployment are ready before testing the app.
