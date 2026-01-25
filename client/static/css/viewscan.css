@@ -472,13 +472,34 @@
 
 
 
-
-
-
-
-
-
 /* Delete confirmation modal */
+
+.btn-delete-post {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-delete-post:hover,
+.btn-delete-post.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
 .modal {
   display: none;
   position: fixed;
@@ -516,9 +537,35 @@
 
 
 
+/* =========================
+  Comments
+   ========================= */
 
+.btn-show-comments {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
 
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
 
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-show-comments:hover,
+.btn-show-comments.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
+}
 
 /* Comments section */
 .comments-container {
