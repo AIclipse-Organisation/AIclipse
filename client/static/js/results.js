@@ -8,8 +8,8 @@ function renderDetection(resp) {
   const detectCard = document.getElementById("detect-card");
   const verdictEl = document.getElementById("detect-verdict");
   const confidenceEl = document.getElementById("detect-confidence");
-  const realFill = document.querySelector(".real-fill");
-  const aiFill = document.querySelector(".ai-fill");
+  const track = document.querySelector(".progress-bar");
+  const fill = document.querySelector(".progress-fill");
 
   if (!resp || typeof resp !== "object") {
     if (detectCard) detectCard.hidden = true;
@@ -17,15 +17,15 @@ function renderDetection(resp) {
   }
 
   const label = (resp.label || resp.result || "Unknown").toString();
-  const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
+  const confidenceRaw = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
+  const confidence = Math.max(0, Math.min(1, Number(confidenceRaw) || 0));
+  const pct = confidence * 100;
 
   const labelLower = label.toLowerCase();
-  const isAi = labelLower.includes("ai");
-  const ai_prob = isAi ? confidence : (1 - confidence);
-  const real_prob = 1 - ai_prob;
+  const isRisk = labelLower.includes("ai") || labelLower.includes("fake") || labelLower.includes("deepfake");
 
   let labelClass = "label-neutral";
-  if (labelLower.includes("ai")) {
+  if (labelLower.includes("ai") || labelLower.includes("fake") || labelLower.includes("deepfake")) {
     if (labelLower.includes("most likely")) labelClass = "label-strong-ai";
     else labelClass = "label-medium-ai";
   } else if (labelLower.includes("real")) {
@@ -33,15 +33,19 @@ function renderDetection(resp) {
     else labelClass = "label-medium-real";
   }
 
+  const hasPercent = /\d+(\.\d+)?%/.test(label);
+  const verdictText = hasPercent ? label : `${pct.toFixed(2)}% ${label}`;
+
   if (verdictEl) {
-    verdictEl.textContent = label;
+    verdictEl.textContent = verdictText;
     verdictEl.className = `verdict-text ${labelClass}`;
   }
-  if (confidenceEl) confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
+  if (confidenceEl) confidenceEl.textContent = `Confidence: ${pct.toFixed(1)}%`;
 
-  if (realFill && aiFill) {
-    realFill.style.width = `${(real_prob * 100).toFixed(2)}%`;
-    aiFill.style.width = `${(ai_prob * 100).toFixed(2)}%`;
+  if (track && fill) {
+    track.classList.toggle("is-risk", isRisk);
+    fill.classList.toggle("is-risk", isRisk);
+    fill.style.width = `${pct.toFixed(2)}%`;
   }
 
   if (detectCard) detectCard.hidden = false;

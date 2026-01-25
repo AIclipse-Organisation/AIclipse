@@ -202,16 +202,28 @@ button:disabled {
   height: 26px;
   border-radius: 999px;
   overflow: hidden;
-  background: #f1f5f9;
-  border: 1px solid #e6eef6;
+  background: #e04646;
+  /* border: 1px solid #e6eef6; */
   margin: 10px auto;
   max-width: 520px;
+}
+
+.progress-bar.is-risk {
+  background: #18c46c;
 }
 
 .fill {
   height: 100%;
   transition: width 400ms ease;
   border-radius: 999px;
+}
+
+.fill.progress-fill {
+  background: #18c46c;
+}
+
+.fill.progress-fill.is-risk {
+  background: #e04646;
 }
 
 .real-fill { background: #32cd32; }
