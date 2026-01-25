@@ -10,7 +10,7 @@ const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
 const FLUSH_ZSET = "clicks:flush_at";
-const FLUSH_DEBOUNCE_MS = 60_000; 
+const FLUSH_DEBOUNCE_MS = 30_000; 
 const DELTA_TTL_SECONDS = 60 * 60; // safety TTL 1 hour
 
 // Rate limit: only count one click per user per post within this window
