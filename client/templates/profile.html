@@ -18,51 +18,79 @@
         <h1 id="page-title" class="page-title">Profile</h1>
         <div class="page-underline" role="presentation"></div>
       </section>
-      <button id="btn-logout" class="secondary">Log out</button>
-      
-      <!-- User Details Section -->
-      <section class="user-details-section">
-        <h2>User Details</h2>
-        <div id="user-details-status" class="status-message"></div>
+
+      <!-- PROFILE SUMMARY (top) -->
+      <section class="profile-summary" aria-label="Profile summary">
+        <div class="profile-summary-left">
+          <!-- Avatar (image) -->
+          <div class="profile-avatar">
+            <img
+              src="/static/images/profile.png"
+              alt="Profile"
+              class="profile-avatar-img"
+            />
+          </div>
+
+          <div class="profile-identity">
+            <div id="detail-username" class="profile-username">-</div>
+            <div id="detail-email" class="profile-email">-</div>
+
+            <!-- Plan BELOW name/email -->
+            <div class="profile-plan">
+              <span class="meta-label">Plan</span>
+              <span id="detail-plan" class="meta-value">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right side: member since + monthly usage (LEFT ALIGNED) -->
+        <div class="profile-summary-right profile-stats-left">
+          <div class="profile-meta">
+            <span class="meta-label">Member Since</span>
+            <span id="detail-created" class="meta-value">-</span>
+          </div>
+
+          <div class="profile-meta">
+            <span class="meta-label">Monthly Usage</span>
+            <span id="detail-monthly-usage" class="meta-value">-</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- STATUS -->
+      <div id="user-details-status" class="status-message"></div>
+
+      <!-- DETAILS (below profile section) -->
+      <section class="user-details-section" aria-label="User stats">
+        <h2>Details</h2>
+
         <div id="user-details-container" class="user-details-container" style="display:none;">
-          <div class="user-detail-item">
-            <span class="detail-label">Username:</span>
-            <span id="detail-username" class="detail-value">-</span>
-          </div>
-          <div class="user-detail-item">
-            <span class="detail-label">Email:</span>
-            <span id="detail-email" class="detail-value">-</span>
-          </div>
-          <div class="user-detail-item">
-            <span class="detail-label">Plan:</span>
-            <span id="detail-plan" class="detail-value">-</span>
-          </div>
-          <div class="user-detail-item">
-            <span class="detail-label">Member Since:</span>
-            <span id="detail-created" class="detail-value">-</span>
-          </div>
           <div class="user-detail-item">
             <span class="detail-label">Total Guesses:</span>
             <span id="detail-total-guesses" class="detail-value">-</span>
           </div>
+
           <div class="user-detail-item">
             <span class="detail-label">Total Correct:</span>
             <span id="detail-total-correct" class="detail-value">-</span>
           </div>
+
           <div class="user-detail-item">
             <span class="detail-label">AI Detection Accuracy:</span>
             <span id="detail-acc-ai" class="detail-value">-</span>
           </div>
+
           <div class="user-detail-item">
             <span class="detail-label">Real Detection Accuracy:</span>
             <span id="detail-acc-real" class="detail-value">-</span>
           </div>
-          <div class="user-detail-item">
-            <span class="detail-label">Monthly Usage:</span>
-            <span id="detail-monthly-usage" class="detail-value">-</span>
-          </div>
         </div>
       </section>
+
+      <!-- LOGOUT (bottom) -->
+      <div class="profile-footer">
+        <button id="btn-logout" class="secondary logout-btn">Log out</button>
+      </div>
     </main>
 
     <div data-include="/static/partials/navbar.html"></div>
