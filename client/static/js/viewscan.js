@@ -620,12 +620,14 @@ function setupDeletePost(img) {
   const modalConfirm = document.getElementById("modal-confirm");
   const modalCancel = document.getElementById("modal-cancel");
 
+  if (modal) modal.hidden = true;
+
   const showModal = () => {
-    if (modal) modal.style.display = "flex";
+    if (modal) modal.hidden = false;
   };
 
   const hideModal = () => {
-    if (modal) modal.style.display = "none";
+    if (modal) modal.hidden = true;
   };
 
   if (!deleteBtn.dataset.bound) {
