@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import { validateUserId, validatePostId } from "../validation.js";
+import { getRedis } from "../../../redis/redis.js"
 
-export const runtime = "nodejs"; // required for MongoDB driver
+export const runtime = "nodejs";
 
 const MONGO_URI = process.env.MONGO_URI || "";
 const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
-const CLICKS_COLLECTION = "community.clicks";
 
-// Rate limit: only count one click per user per post within this time window
-const CLICK_COOLDOWN_MS = 60 * 1000; // 1 minute
+const FLUSH_ZSET = "clicks:flush_at";
+const FLUSH_DEBOUNCE_MS = 60_000; 
+const DELTA_TTL_SECONDS = 60 * 60; // safety TTL 1 hour
 
+// Rate limit: only count one click per user per post within this window
+const CLICK_COOLDOWN_SECONDS = 60; 
 
 export async function POST(req) {
   let client = null;
@@ -21,114 +24,79 @@ export async function POST(req) {
     const post_id = body?.post_id || null;
     const user_id = body?.user_id || null;
 
-    // basic validation
     if (!post_id) {
       return NextResponse.json({ error: "Missing post_id" }, { status: 400 });
     }
 
-    // validate post_id format
     const postIdValidation = validatePostId(post_id);
     if (!postIdValidation.valid) {
-      return NextResponse.json(
-        { error: postIdValidation.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: postIdValidation.error }, { status: 400 });
     }
-    const safePostId = postIdValidation.value; // Use sanitized string value
+    const safePostId = postIdValidation.value;
 
-    // validate user_id format if provided
     let safeUserId = null;
     if (user_id) {
       const userIdValidation = validateUserId(user_id);
       if (!userIdValidation.valid) {
-        return NextResponse.json(
-          { error: userIdValidation.error },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: userIdValidation.error }, { status: 400 });
       }
-      safeUserId = userIdValidation.value; // Use sanitized string value
+      safeUserId = userIdValidation.value;
     }
 
-    // user_id is optional, but if provided enables rate limiting
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
+    if (!MONGO_URI) throw new Error("MONGO_URI is not set");
 
+    // Ensure post exists (Mongo source of truth)
     client = new MongoClient(MONGO_URI);
     await client.connect();
-
     const db = client.db(MONGO_DB);
     const posts = db.collection(POSTS_COLLECTION);
-    const clicks = db.collection(CLICKS_COLLECTION);
 
-    let shouldIncrement = true;
-
-    // If user_id provided, check rate limiting
-    if (safeUserId) {
-      const now = new Date();
-      const cooldownThreshold = new Date(now.getTime() - CLICK_COOLDOWN_MS);
-
-      // Check if user recently clicked this post
-      const recentClick = await clicks.findOne({
-        post_id: safePostId,
-        user_id: safeUserId,
-        clicked_at: { $gte: cooldownThreshold }
-      });
-
-      if (recentClick) {
-        // User clicked too recently, don't increment
-        shouldIncrement = false;
-      } else {
-        // Record this click with upsert to track user's last click time
-        await clicks.updateOne(
-          { post_id: safePostId, user_id: safeUserId },
-          {
-            $set: { clicked_at: now },
-            $setOnInsert: { created_at: now }
-          },
-          { upsert: true }
-        );
-      }
-    }
-
-    // Increment click count only if rate limit passed (or no user_id provided)
-    let result;
-    if (shouldIncrement) {
-      result = await posts.findOneAndUpdate(
-        { post_id: safePostId },
-        { $inc: { clicks_count: 1 } },
-        {
-          returnDocument: "after",
-          projection: { _id: 0, clicks_count: 1 },
-        }
-      );
-    } else {
-      // Just fetch current count without incrementing
-      result = await posts.findOne(
-        { post_id: safePostId },
-        { projection: { _id: 0, clicks_count: 1 } }
-      );
-      result = { value: result };
-    }
-
-    if (!result.value) {
+    const postDoc = await posts.findOne(
+      { post_id: safePostId },
+      { projection: { _id: 0, post_id: 1, clicks_count: 1 } }
+    );
+    if (!postDoc) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
+    const redis = getRedis();
+
+    // Rate limit in Redis (only if user_id provided)
+    let counted = true;
+    if (safeUserId) {
+      const rlKey = `click:cooldown:${safePostId}:${safeUserId}`;
+      // SET key 1 NX EX 60 => only first click in window counts
+      const ok = await redis.set(rlKey, "1", "NX", "EX", CLICK_COOLDOWN_SECONDS);
+      if (!ok) counted = false;
+    }
+
+    const deltaKey = `post:${safePostId}:click_deltas`;
+    const flushAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
+
+    if (counted) {
+      const pipe = redis.pipeline();
+      pipe.hincrby(deltaKey, "count", 1);
+      pipe.zadd(FLUSH_ZSET, flushAtSec, safePostId);
+      pipe.expire(deltaKey, DELTA_TTL_SECONDS);
+      await pipe.exec();
+    }
+
+    // Return current count fast: base + pending delta
+    const pending = await redis.hget(deltaKey, "count");
+    const pendingCount = Number(pending || 0);
+    const base = Number(postDoc.clicks_count || 0);
+
     return NextResponse.json(
       {
-        post_id,
-        clicks_count: result.value.clicks_count,
-        counted: shouldIncrement
+        post_id: safePostId,
+        clicks_count: base + pendingCount,
+        counted,
       },
       { status: 200 }
     );
   } catch (err) {
     return NextResponse.json(
-      {
-        error: "Failed to increment clicks",
-        detail: String(err),
-      },
+      { error: "Failed to increment clicks", detail: String(err) },
       { status: 500 }
     );
   } finally {
@@ -139,4 +107,3 @@ export async function POST(req) {
     }
   }
 }
-
