@@ -110,6 +110,13 @@ window.addEventListener("DOMContentLoaded", () => {
       window.lastFile = file || null;
       lastDetectionToken = null;
 
+      const uploadLabel = document.querySelector('label.file-upload');
+
+      if (uploadLabel) {
+        uploadLabel.classList.toggle("is-selected", !!file);
+      }
+
+
       if (previewImg) {
         // cleanup old blob url
         if (lastPreviewUrl) {

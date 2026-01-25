@@ -66,6 +66,12 @@ function dataURLtoFile(dataUrl, filename = "upload.png") {
   return new File([bytes], filename, { type: mime });
 }
 
+// Button selection helpers
+function setSelected(btn, on) {
+  if (!btn) return;
+  btn.classList.toggle("is-selected", !!on);
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   const stored = sessionStorage.getItem("lastDetectionResponse");
   const preview = sessionStorage.getItem("lastDetectionPreview");
@@ -120,14 +126,29 @@ window.addEventListener("DOMContentLoaded", () => {
   const btnBack = document.getElementById("btn-back");
   if (btnBack) btnBack.addEventListener("click", () => history.back());
 
-
-  // Publishing
-  const publish = document.getElementById("save-public");
+  // Publishing (button toggle + dropdown)
+  const publishBtn = document.getElementById("btn-publish-toggle");
+  const publishCheck = document.getElementById("save-public");
   const wrap = document.getElementById("public-desc-wrap");
 
-  publish.addEventListener("change", () => {
-    wrap.hidden = !publish.checked;
-  });
+  // Ensure dropdown starts closed
+  if (wrap) wrap.hidden = true;
+  if (publishCheck) publishCheck.checked = false;
+  setSelected(publishBtn, false);
+
+  if (publishBtn && publishCheck && wrap && !publishBtn.dataset.bound) {
+    publishBtn.dataset.bound = "1";
+
+    publishBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      publishCheck.checked = !publishCheck.checked;
+      wrap.hidden = !publishCheck.checked;
+
+      // Selected state stays filled while open
+      setSelected(publishBtn, publishCheck.checked);
+    });
+  }
 
   // =========================
   // Delete modal logic

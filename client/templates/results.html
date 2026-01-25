@@ -19,7 +19,7 @@
                     <div class="page-underline" role="presentation"></div>
                 </section>
 
-                <button class="secondary" id="btn-back">Back</button>
+                <button type="button" class="btn-results-back" id="btn-back">Back</button>
 
                 <img id="preview-image" alt="Selected image preview" />
 
@@ -33,46 +33,37 @@
                                 <div class="fill ai-fill" style="width: 0%"></div>
                             </div>
 
-                            <div class="detection-meta">
-                                <small id="detect-confidence" class="muted">Confidence: —</small>
+                            <!-- Actions (no action-card wrapper) -->
+                            <h3 class="results-actions-title">Would you like to…</h3>
+
+                            <!-- Save image (green outline) -->
+                            <button id="btn-save" disabled type="button" class="btn-save-image">
+                                💾 Save image
+                            </button>
+
+                            <!-- Delete scan (same as cancel outline) -->
+                            <button id="btn-delete" class="btn-delete-scan" type="button">
+                                🗑️ Delete scan
+                            </button>
+
+                            <!-- Publish (button toggle that drops down) -->
+                            <button id="btn-publish-toggle" type="button" class="btn-publish">
+                                👥 Publish to community (public)
+                            </button>
+
+                            <!-- keep checkbox for compatibility (JS toggles it) -->
+                            <input id="save-public" type="checkbox" hidden />
+
+                            <div id="public-desc-wrap" class="publish-extra" hidden>
+                                <label for="post-description" class="publish-label">Description</label>
+                                <textarea id="post-description" rows="3"
+                                    placeholder="Write a short description for the community post..."
+                                    class="publish-textarea"></textarea>
+                                <small id="post-description-hint" class="muted"></small>
                             </div>
 
-                            <div class="action-card">
-                                <h3 class="action-title">Would you like to…</h3>
-
-                                <div class="action-row action-save">
-                                    <span class="action-icon" aria-hidden="true">💾</span>
-                                    <button id="btn-save" disabled type="button" class="action-btn">
-                                        Save image
-                                    </button>
-                                </div>
-
-                                <div class="action-row action-delete">
-                                    <span class="action-icon" aria-hidden="true">🗑️</span>
-                                    <button id="btn-delete" class="action-btn danger" type="button">
-                                        Delete scan
-                                    </button>
-                                </div>
-
-                                <label class="action-row action-publish" id="publish-row">
-                                    <span class="action-icon" aria-hidden="true">👥</span>
-                                    <span class="action-text">Publish to community (public)</span>
-
-                                    <input id="save-public" type="checkbox" class="publish-check" />
-                                    <span class="publish-toggle" aria-hidden="true"></span>
-                                </label>
-
-                                <div id="public-desc-wrap" class="publish-extra" hidden>
-                                    <label for="post-description" class="publish-label">Description</label>
-                                    <textarea id="post-description" rows="3"
-                                        placeholder="Write a short description for the community post..."
-                                        class="publish-textarea"></textarea>
-                                    <small id="post-description-hint" class="muted"></small>
-                                </div>
-
-                                <div id="save-status" class="status-bar"></div>
-                                <div id="save-result" class="muted"></div>
-                            </div>
+                            <div id="save-status" class="status-bar"></div>
+                            <div id="save-result" class="muted"></div>
 
                             <div id="delete-modal" class="modal-overlay" hidden>
                                 <div class="modal">
