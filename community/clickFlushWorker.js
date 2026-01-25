@@ -28,17 +28,14 @@ async function flushOnce({ redis, posts }) {
   for (const postId of duePostIds) {
     const deltaKey = `post:${postId}:click_deltas`;
 
-    // Only one worker flushes a post at a time
     const lockKey = `lock:flush:clicks:${postId}`;
     const gotLock = await redis.set(lockKey, "1", "NX", "EX", 30);
     if (!gotLock) continue;
 
     try {
-      // Re-check still due
       const score = await redis.zscore(FLUSH_ZSET, postId);
       if (!score || Number(score) > nowSec) continue;
 
-      // We store a single integer field "count"
       const raw = await redis.hget(deltaKey, "count");
       const delta = Number(raw || 0);
 
@@ -52,7 +49,6 @@ async function flushOnce({ redis, posts }) {
         );
       }
 
-      // Clear redis state after successful flush
       const pipe = redis.pipeline();
       pipe.del(deltaKey);
       pipe.zrem(FLUSH_ZSET, postId);
