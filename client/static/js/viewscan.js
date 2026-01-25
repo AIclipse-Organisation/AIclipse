@@ -178,10 +178,8 @@ function renderMeta(img) {
     "controversial_since",
     "created_at",
     "debug",
-    "down_vote_count",
     "result",
     "score",
-    "up_vote_count",
     "user_name",
   ]);
 
@@ -194,6 +192,14 @@ function renderMeta(img) {
   // Always show description field (even if empty/not set yet)
   const descValue = img.description ? String(img.description) : "(No description yet)";
   addMeta("Description", descValue);
+
+  // Show vote counts for public posts
+  if (!isPrivateScan(img)) {
+    const upVotes = img.up_vote_count !== undefined ? img.up_vote_count : 0;
+    const downVotes = img.down_vote_count !== undefined ? img.down_vote_count : 0;
+    addMeta("Up Votes", String(upVotes));
+    addMeta("Down Votes", String(downVotes));
+  }
 
   // Show updated_at if it exists (formatted like uploaded_at)
   if (img.updated_at) {
@@ -209,6 +215,8 @@ function renderMeta(img) {
     "confidence",
     "description",
     "updated_at",
+    "up_vote_count",
+    "down_vote_count",
   ]);
 
   Object.keys(img || {})
@@ -272,6 +280,12 @@ function renderScan(img, title) {
 
   // Edit Description (INLINE, only when post_id exists)
   setupEditDescriptionInline(img);
+
+  // Show Comments (only for public posts with post_id)
+  setupShowComments(img);
+
+  // Delete Post (only for public posts with post_id)
+  setupDeletePost(img);
 
   // Inline Make Public UI (ONLY when private)
   setupMakePublicInline(img);
@@ -464,6 +478,217 @@ async function patchPostDescription(postId, description) {
   }
 
   return data;
+}
+
+// -------------------------
+// Show Comments
+// Requirements:
+// - "Show Comments" button is visible only when scan is public and has post_id
+// - Clicking it fetches and displays all comments for the post
+// - Clicking again collapses the comments
+// -------------------------
+function setupShowComments(img) {
+  const section = document.getElementById("show-comments-section");
+  const showBtn = document.getElementById("btn-show-comments");
+  const container = document.getElementById("comments-container");
+  const statusEl = document.getElementById("comments-status");
+  const listEl = document.getElementById("comments-list");
+
+  if (!section || !showBtn || !container || !statusEl || !listEl) {
+    if (section) section.style.display = "none";
+    return;
+  }
+
+  // Show only for public posts with post_id
+  const shouldShow = !!(img && img.post_id && !isPrivateScan(img));
+  section.style.display = shouldShow ? "block" : "none";
+
+  if (!shouldShow) {
+    return;
+  }
+
+  let commentsVisible = false;
+
+  const setStatus = (text, isError) => {
+    statusEl.textContent = text || "";
+  };
+
+  const renderComments = (comments) => {
+    clearEl(listEl);
+
+    if (!comments || comments.length === 0) {
+      listEl.appendChild(makeEl("div", "comment-empty", "No comments yet."));
+      return;
+    }
+
+    comments.forEach((comment) => {
+      const commentDiv = makeEl("div", "comment-item");
+
+      const header = makeEl("div", "comment-header");
+      const username = makeEl("span", "comment-username", comment.user_name || "Anonymous");
+      const date = makeEl("span", "comment-date", comment.created_at ? new Date(comment.created_at).toLocaleString() : "");
+      header.appendChild(username);
+      header.appendChild(date);
+
+      const body = makeEl("div", "comment-body", comment.text || "");
+
+      commentDiv.appendChild(header);
+      commentDiv.appendChild(body);
+      listEl.appendChild(commentDiv);
+    });
+  };
+
+  const toggleComments = async () => {
+    if (commentsVisible) {
+      // Hide comments
+      container.hidden = true;
+      commentsVisible = false;
+      showBtn.textContent = "Show Comments";
+      setSelected(showBtn, false);
+    } else {
+      // Show and fetch comments
+      container.hidden = false;
+      commentsVisible = true;
+      showBtn.textContent = "Hide Comments";
+      setSelected(showBtn, true);
+
+      setStatus("Loading comments...", false);
+      clearEl(listEl);
+
+      try {
+        const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(currentScan.post_id)}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          credentials: "include",
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setStatus(data.error || data.detail || `Failed to load comments (${res.status})`, true);
+          return;
+        }
+
+        setStatus("", false);
+        renderComments(data.items || []);
+      } catch (err) {
+        setStatus("Network error loading comments.", true);
+      }
+    }
+  };
+
+  if (!showBtn.dataset.bound) {
+    showBtn.dataset.bound = "1";
+    showBtn.addEventListener("click", toggleComments);
+  }
+}
+
+// -------------------------
+// Delete Post
+// Requirements:
+// - "Delete Post" button is visible only when scan is public and has post_id
+// - Clicking it confirms with the user before deleting
+// - Deletes the post from community (same as community PostBox)
+// - Redirects to scans page after successful deletion
+// -------------------------
+function setupDeletePost(img) {
+  const section = document.getElementById("delete-post-section");
+  const deleteBtn = document.getElementById("btn-delete-post");
+  const statusEl = document.getElementById("delete-post-status");
+
+  if (!section || !deleteBtn || !statusEl) {
+    if (section) section.style.display = "none";
+    return;
+  }
+
+  // Show only for public posts with post_id
+  const shouldShow = !!(img && img.post_id && !isPrivateScan(img));
+  section.style.display = shouldShow ? "block" : "none";
+
+  if (!shouldShow) {
+    return;
+  }
+
+  const setStatus = (text, kind) => {
+    statusEl.classList.remove("is-error", "is-success");
+    if (kind === "error") statusEl.classList.add("is-error");
+    if (kind === "success") statusEl.classList.add("is-success");
+    statusEl.textContent = text || "";
+  };
+
+  const modal = document.getElementById("delete-modal");
+  const modalConfirm = document.getElementById("modal-confirm");
+  const modalCancel = document.getElementById("modal-cancel");
+
+  const showModal = () => {
+    if (modal) modal.style.display = "flex";
+  };
+
+  const hideModal = () => {
+    if (modal) modal.style.display = "none";
+  };
+
+  if (!deleteBtn.dataset.bound) {
+    deleteBtn.dataset.bound = "1";
+    deleteBtn.addEventListener("click", () => {
+      if (!currentScan || !currentScan.post_id) return;
+      showModal();
+    });
+  }
+
+  if (modalCancel && !modalCancel.dataset.bound) {
+    modalCancel.dataset.bound = "1";
+    modalCancel.addEventListener("click", hideModal);
+  }
+
+  if (modalConfirm && !modalConfirm.dataset.bound) {
+    modalConfirm.dataset.bound = "1";
+    modalConfirm.addEventListener("click", async () => {
+      if (!currentScan || !currentScan.post_id) return;
+
+      hideModal();
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting...";
+      setStatus("Deleting post...", null);
+
+      try {
+        const res = await fetch(`/community/posts?post_id=${encodeURIComponent(currentScan.post_id)}`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.error || data.detail || `Failed to delete post (${res.status})`);
+        }
+
+        setStatus("✓ Post deleted. Redirecting...", "success");
+
+        // Clean session data
+        sessionStorage.removeItem("selectedScan");
+        sessionStorage.removeItem("selectedScanTitle");
+
+        // Redirect to scans page after a brief delay
+        setTimeout(() => {
+          window.location.href = "/scans";
+        }, 800);
+      } catch (err) {
+        setStatus(err?.message || "Failed to delete post.", "error");
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = "Delete Post";
+      }
+    });
+  }
+
+  // Close modal on backdrop click
+  if (modal && !modal.dataset.bound) {
+    modal.dataset.bound = "1";
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) hideModal();
+    });
+  }
 }
 
 // -------------------------

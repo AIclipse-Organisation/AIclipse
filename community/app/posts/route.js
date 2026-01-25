@@ -64,29 +64,6 @@ function createdAtToUnixSeconds(created_at) {
   return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
 }
 
-// COMA 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Helper function to extract and verify JWT token from Authorization header or cookie
 function getAuthenticatedUserId(req) {
@@ -275,7 +252,7 @@ export async function POST(req) {
     // This ensures all community posts are visible to everyone
     try {
       const GATEWAY_URI = process.env.GATEWAY_URI || "http://localhost:8000";
-      const imageUpdateUrl = `${GATEWAY_URI}/media/image/${safeImageId}`;
+      const imageUpdateUrl = `${GATEWAY_URI}/image/${safeImageId}`;
       
       await fetch(imageUpdateUrl, {
         method: "PATCH",
