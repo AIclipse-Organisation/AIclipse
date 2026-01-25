@@ -34,7 +34,7 @@ public class VoteReceiver : BackgroundService
         
         try
         {
-            if (!(await db.KeyExistsAsync(StreamKey)) || 
+            if (!(await db.KeyExistsAsync(StreamKey)) ||
                 (await db.StreamGroupInfoAsync(StreamKey)).All(x => x.Name != ConsumerGroup))
             {
                 await db.StreamCreateConsumerGroupAsync(StreamKey, ConsumerGroup, StreamPosition.NewMessages);
@@ -42,12 +42,11 @@ public class VoteReceiver : BackgroundService
         }
         catch (RedisServerException ex) when (ex.Message.Contains("BUSYGROUP"))
         {
-            // Consumer group already exists; this is expected in concurrent startup and can be safely ignored.
-            _logger.LogDebug(ex, "Redis consumer group '{ConsumerGroup}' on stream '{StreamKey}' already exists (BUSYGROUP).", ConsumerGroup, StreamKey);
+            _logger.LogDebug("Redis consumer group '{ConsumerGroup}' already exists.", ConsumerGroup);
         }
 
         _logger.LogInformation("[Model-Cycle] .NET Vote Receiver Started.");
-
+        
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -65,25 +64,28 @@ public class VoteReceiver : BackgroundService
                     using (var scope = _scopeFactory.CreateScope())
                     {
                         await ProcessMessageAsync(entry, scope.ServiceProvider);
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    }
+                    
                     await db.StreamAcknowledgeAsync(StreamKey, ConsumerGroup, entry.Id);
-                // Graceful shutdown requested, exit the loop without logging an error.
-                return;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Graceful shutdown
+                break;
             }
             catch (RedisException ex)
             {
                 _logger.LogError(ex, "Redis error in VoteReceiver loop");
+                await Task.Delay(5000, stoppingToken); 
+            }
+            catch (MongoException ex)
+            {
+                _logger.LogError(ex, "MongoDB error in VoteReceiver loop");
             }
             catch (Exception ex)
-            catch (MongoException ex)
-        var postIdField = entry.Values.FirstOrDefault(field => field.Name == "post_id");
-        if (postIdField.Name.HasValue)
-                _logger.LogError(ex, "MongoDB error in VoteReceiver loop");
-            postIdStr = postIdField.Value;
-            }
             {
-                _logger.LogError(ex, "Error in VoteReceiver loop");
-                await Task.Delay(5000, stoppingToken);
+                _logger.LogError(ex, "Unexpected error in VoteReceiver loop");
             }
         }
     }
