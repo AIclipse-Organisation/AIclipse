@@ -260,12 +260,8 @@ textarea {
   align-items: center;
   justify-content: center;
 
-  align-self: flex-start;
-  /* ✅ left aligned */
-  width: auto;
-  /* ✅ NOT full width */
-
-  margin: 0 0 14px 0;
+  width: fit-content;
+  margin: 0 0 12px 0;
   padding: 10px 14px;
   border-radius: 999px;
 
@@ -273,8 +269,11 @@ textarea {
   font-weight: 600;
   color: #fff;
 
+  background: transparent;
   border: 1px solid var(--btn-outline-color);
+
   cursor: pointer;
+  box-sizing: border-box;
 
   transition: background 160ms ease, color 160ms ease;
 }
