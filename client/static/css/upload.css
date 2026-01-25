@@ -452,7 +452,45 @@ textarea {
 }
 
 .modal-actions button {
-  flex: 1;
-  padding: 10px 12px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 14px;
   border-radius: 10px;
+
+  font-weight: 700;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.92);
+
+  background: transparent;
+  cursor: pointer;
+
+  border: 1px solid transparent;
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+/* Cancel — neutral outline */
+.modal-actions .secondary {
+  --btn-outline-color: rgba(255, 255, 255, 0.35);
+  --btn-hover-color: rgba(255, 255, 255, 0.85);
+
+  border-color: var(--btn-outline-color);
+}
+
+.modal-actions .secondary:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* Delete — danger (red, same as delete scan) */
+.modal-actions .danger {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  border-color: var(--btn-outline-color);
+}
+
+.modal-actions .danger:hover {
+  background: var(--btn-hover-color);
+  color: #111;
 }
