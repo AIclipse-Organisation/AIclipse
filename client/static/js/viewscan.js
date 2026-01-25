@@ -102,6 +102,143 @@ function verdictType(img) {
   return "risk";
 }
 
+// -------------------------
+// Votes helpers (up/down -> "real %" + label)
+// Rules:
+// - real% = up / (up+down) * 100
+// - 0 votes => hidden
+// Thresholds (community):
+// 40-60 not sure
+// 61-85 likely real (upvote majority)
+// 61-85 likely ai (downvote majority)
+// 86-100 most likely real (upvote majority)
+// 86-100 most likely ai (downvote majority)
+// -------------------------
+function getVoteCounts(img) {
+  const up = Number(img && img.up_vote_count);
+  const down = Number(img && img.down_vote_count);
+  return {
+    up: Number.isFinite(up) ? up : 0,
+    down: Number.isFinite(down) ? down : 0,
+  };
+}
+
+function voteRealPercent(img) {
+  const { up, down } = getVoteCounts(img);
+  const total = up + down;
+  if (total <= 0) return null; // no votes
+  const pct = (up / total) * 100;
+  return Math.max(0, Math.min(100, pct));
+}
+
+function voteBucket(pctReal) {
+  // pctReal is 0..100 (upvote share = "real")
+  // Determine direction by majority, then apply the same strength bands.
+  if (pctReal >= 40 && pctReal <= 60) return { text: "Not sure", type: "neutral" };
+
+  if (pctReal > 60) {
+    // Upvote majority => Real
+    if (pctReal >= 86) return { text: "Most Likely Real", type: "safe" };
+    return { text: "Likely Real", type: "safe" }; // 61-85
+  }
+
+  // Downvote majority => AI (strength based on AI share)
+  const pctAI = 100 - pctReal;
+  if (pctAI >= 86) return { text: "Most Likely AI", type: "risk" };
+  return { text: "Likely AI", type: "risk" }; // 61-85 AI share (i.e. pctReal 39-15)
+}
+
+function renderVotesBlock(img) {
+  const block = document.getElementById("votes-block");
+  const line = document.getElementById("votes-line");
+  const track = document.getElementById("votes-bar");
+  const fill = document.getElementById("votes-fill");
+
+  if (!block || !line || !track || !fill) return;
+
+  // Only for public posts (votes matter there)
+  if (!img || isPrivateScan(img)) {
+    block.hidden = true;
+    track.hidden = true;
+    line.textContent = "";
+    line.classList.remove("is-safe", "is-risk", "is-neutral");
+    fill.style.width = "0%";
+
+    // reset any inline styling we may apply below
+    track.style.removeProperty("background");
+    fill.style.removeProperty("background");
+
+    return;
+  }
+
+  const pctReal = voteRealPercent(img);
+
+  // ✅ No votes yet -> show "No community votes" and a grey bar
+  if (pctReal === null) {
+    line.textContent = "No community votes";
+    line.classList.remove("is-safe", "is-risk");
+    line.classList.add("is-neutral");
+
+    // Grey bar (track + fill)
+    const grey = "rgba(255, 255, 255, 0.22)";
+    track.classList.remove("is-risk");
+    fill.classList.remove("is-risk");
+
+    track.style.background = grey;
+    fill.style.background = grey;
+
+    // fill full width so it looks like a single grey bar
+    fill.style.width = "100%";
+
+    // a11y
+    track.setAttribute("role", "img");
+    track.setAttribute("aria-label", "No community votes");
+
+    block.hidden = false;
+    track.hidden = false;
+    return;
+  }
+
+  const { up, down } = getVoteCounts(img);
+  const bucket = voteBucket(pctReal);
+
+  // Text
+  // Text: show % for the *majority side*
+  // - safe => show "real%" (up share)
+  // - risk => show "ai%" (down share)
+  // - neutral => show real% (fine either way)
+  const pctAI = 100 - pctReal;
+  const displayPct = bucket.type === "risk" ? pctAI : pctReal;
+
+  line.textContent = `${displayPct.toFixed(0)}% ${bucket.text} (Community)`;
+
+  line.classList.remove("is-safe", "is-risk", "is-neutral");
+  if (bucket.type === "safe") line.classList.add("is-safe");
+  else if (bucket.type === "risk") line.classList.add("is-risk");
+  else line.classList.add("is-neutral");
+
+  // Bar: green fill = "real %" , red remainder = the rest (AI)
+  fill.classList.remove("is-risk");  // keep fill green
+  track.classList.remove("is-risk"); // keep track red
+  fill.style.width = `${pctReal}%`;
+
+  // reset inline styling (in case it was "no votes" previously)
+  track.style.removeProperty("background");
+  fill.style.removeProperty("background");
+
+  // a11y
+  track.setAttribute("role", "img");
+  track.setAttribute(
+    "aria-label",
+    bucket.type === "risk"
+      ? `Vote confidence ${pctAI.toFixed(0)}% AI`
+      : `Vote confidence ${pctReal.toFixed(0)}% real`
+  );
+
+  block.hidden = false;
+  track.hidden = false;
+}
+
 function verdictLineText(img) {
   const label = (img && img.label != null ? String(img.label) : "").trim();
   if (label) return label;
@@ -273,6 +410,9 @@ function renderScan(img, title) {
 
   // Verdict block (line + bar) just below image
   renderVerdictBlock(img);
+
+  // Votes block (line + bar) just below verdict bar
+  renderVotesBlock(img);
 
   renderMeta(img);
   card.hidden = false;
@@ -526,7 +666,11 @@ function setupShowComments(img) {
 
       const header = makeEl("div", "comment-header");
       const username = makeEl("span", "comment-username", comment.user_name || "Anonymous");
-      const date = makeEl("span", "comment-date", comment.created_at ? new Date(comment.created_at).toLocaleString() : "");
+      const date = makeEl(
+        "span",
+        "comment-date",
+        comment.created_at ? new Date(comment.created_at).toLocaleString() : ""
+      );
       header.appendChild(username);
       header.appendChild(date);
 

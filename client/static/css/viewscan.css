@@ -11,7 +11,7 @@
   margin: 0px 16px 10px;
   padding-bottom: 20px;
 
-  border-bottom: 1px solid rgba(255,255,255,0.10);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .viewscan-tab {
@@ -24,17 +24,17 @@
   font-weight: 700;
   letter-spacing: 0.2px;
 
-  color: rgba(255,255,255,0.38);
+  color: rgba(255, 255, 255, 0.38);
   font-size: large;
   position: relative;
 }
 
 .viewscan-tab:hover {
-  color: rgba(255,255,255,0.60);
+  color: rgba(255, 255, 255, 0.60);
 }
 
 .viewscan-tab.is-active {
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .viewscan-tab.is-active::after {
@@ -119,7 +119,7 @@
   font-weight: 800;
   margin: 0 0 10px;
   letter-spacing: 0.2px;
-  color: rgba(255,255,255,0.80);
+  color: rgba(255, 255, 255, 0.80);
 }
 
 /* Make verdict text match bar color */
@@ -143,7 +143,8 @@
   width: 100%;
   height: 14px;
   border-radius: 999px;
-  background: #e04646; /* red remainder */
+  background: #e04646;
+  /* red remainder */
   overflow: hidden;
 }
 
@@ -156,11 +157,46 @@
   height: 100%;
   width: 0%;
   border-radius: 999px;
-  background: #18c46c; /* green fill by default (real) */
+  background: #18c46c;
+  /* green fill by default (real) */
 }
 
 .confidence-fill.is-risk {
-  background: #e04646; /* red fill for fake */
+  background: #e04646;
+  /* red fill for fake */
+}
+
+
+/* =========================
+   Votes block (same bar design)
+   ========================= */
+
+.votes-block {
+  margin-top: 10px;
+  /* sits below verdict bar */
+}
+
+.votes-line {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.80);
+}
+
+/* Reuse same classes as verdict text */
+.votes-line.is-safe {
+  color: #18c46c;
+}
+
+.votes-line.is-risk {
+  color: #e04646;
+}
+
+/* "Not sure" */
+.votes-line.is-neutral {
+  color: rgba(255, 255, 255, 0.70);
 }
 
 /* Details block */
@@ -172,7 +208,7 @@
   margin: 0 0 12px;
   font-size: 16px;
   font-weight: 800;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 /* Definition list meta (no divider here to avoid double line) */
@@ -187,12 +223,12 @@
 
 .meta-key {
   font-size: 12px;
-  color: rgba(255,255,255,0.60);
+  color: rgba(255, 255, 255, 0.60);
 }
 
 .meta-value {
   font-size: 12px;
-  color: rgba(255,255,255,0.88);
+  color: rgba(255, 255, 255, 0.88);
   margin: 0;
   word-break: break-word;
 }
@@ -206,7 +242,7 @@
 .loading {
   padding: 2rem;
   text-align: center;
-  color: rgba(255,255,255,0.55);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .error {
@@ -221,7 +257,7 @@
 .make-public-section {
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid rgba(255,255,255,0.10);
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 /* =========================
@@ -244,7 +280,7 @@
 
   border: 1px solid var(--btn-outline-color);
   background: transparent;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
@@ -269,7 +305,7 @@
 
   border: 1px solid var(--btn-outline-color);
   background: transparent;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
@@ -294,7 +330,7 @@
 
   border: 1px solid var(--btn-outline-color);
   background: transparent;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
@@ -322,7 +358,7 @@
 
   border: 1px solid var(--btn-outline-color);
   background: transparent;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
@@ -350,7 +386,7 @@
 
   border: 1px solid var(--btn-outline-color);
   background: transparent;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
@@ -378,7 +414,7 @@
 
   border: 1px solid var(--btn-outline-color);
   background: transparent;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
@@ -417,7 +453,7 @@
 .edit-desc-text {
   margin: 0 0 10px;
   font-size: 13px;
-  color: rgba(255,255,255,0.70);
+  color: rgba(255, 255, 255, 0.70);
 }
 
 .make-public-textarea,
@@ -428,16 +464,16 @@
 
   padding: 10px;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.92);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
   font: inherit;
 }
 
 .make-public-textarea:focus,
 .edit-desc-textarea:focus {
   outline: none;
-  border-color: rgba(207,184,124,0.95);
+  border-color: rgba(207, 184, 124, 0.95);
 }
 
 .make-public-count,
@@ -445,7 +481,7 @@
   margin-top: 6px;
   text-align: right;
   font-size: 12px;
-  color: rgba(255,255,255,0.50);
+  color: rgba(255, 255, 255, 0.50);
 }
 
 .make-public-status,
@@ -453,14 +489,24 @@
   margin-top: 10px;
   min-height: 18px;
   font-size: 13px;
-  color: rgba(255,255,255,0.75);
+  color: rgba(255, 255, 255, 0.75);
 }
 
-.make-public-status.is-error { color: #e04646; }
-.edit-desc-status.is-error { color: #e04646; }
+.make-public-status.is-error {
+  color: #e04646;
+}
 
-.make-public-status.is-success { color: #18c46c; }
-.edit-desc-status.is-success { color: #18c46c; }
+.edit-desc-status.is-error {
+  color: #e04646;
+}
+
+.make-public-status.is-success {
+  color: #18c46c;
+}
+
+.edit-desc-status.is-success {
+  color: #18c46c;
+}
 
 .make-public-actions,
 .edit-desc-actions {
@@ -489,7 +535,7 @@
 
   border: 1px solid var(--btn-outline-color);
   background: transparent;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
@@ -612,7 +658,7 @@
 
   border: 1px solid var(--btn-outline-color);
   background: transparent;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
