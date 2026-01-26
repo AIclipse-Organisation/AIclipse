@@ -546,6 +546,32 @@
   color: #111;
 }
 
+.btn-delete-scan {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-delete-scan:hover,
+.btn-delete-scan.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
 /* =========================
    Modal (Results-style)
    ========================= */
