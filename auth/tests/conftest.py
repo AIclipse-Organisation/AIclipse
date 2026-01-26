@@ -81,6 +81,17 @@ class InsertResult:
     inserted_id: str = "fake"
 
 
+@dataclass
+class DeleteResult:
+    deleted_count: int = 0
+
+
+@dataclass
+class UpdateResult:
+    matched_count: int = 0
+    modified_count: int = 0
+
+
 class FakeUsersColl:
     def __init__(self):
         self._docs: List[Dict[str, Any]] = []
@@ -153,6 +164,77 @@ class FakeUsersColl:
         return FakeCursor([])
 
 
+class FakeApiKeysColl:
+    """
+    In-memory replacement for Mongo collection used by API key routes.
+    Supports only methods used by auth/main-auth.py.
+    """
+
+    def __init__(self):
+        self._docs: List[Dict[str, Any]] = []
+
+    async def create_index(self, *_args, **_kwargs):
+        return "ok"
+
+    async def find_one(self, query: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if "user_id" in query:
+            uid = query["user_id"]
+            for d in self._docs:
+                if d.get("user_id") == uid:
+                    return dict(d)
+            return None
+        if "key_id" in query:
+            kid = query["key_id"]
+            for d in self._docs:
+                if d.get("key_id") == kid:
+                    return dict(d)
+            return None
+        return None
+
+    async def replace_one(self, query: Dict[str, Any], doc: Dict[str, Any], upsert: bool = False):
+        uid = query.get("user_id")
+        if uid is None:
+            # Only user_id-based replace is needed.
+            if upsert:
+                self._docs.append(dict(doc))
+            return
+
+        for i, d in enumerate(self._docs):
+            if d.get("user_id") == uid:
+                self._docs[i] = dict(doc)
+                return
+
+        if upsert:
+            self._docs.append(dict(doc))
+
+    async def delete_one(self, query: Dict[str, Any]) -> DeleteResult:
+        uid = query.get("user_id")
+        if uid is None:
+            return DeleteResult(0)
+
+        for i, d in enumerate(self._docs):
+            if d.get("user_id") == uid:
+                self._docs.pop(i)
+                return DeleteResult(1)
+
+        return DeleteResult(0)
+
+    async def update_one(self, query: Dict[str, Any], update: Dict[str, Any]) -> UpdateResult:
+        kid = query.get("key_id")
+        if kid is None:
+            return UpdateResult(0, 0)
+
+        patch = update.get("$set", {})
+        for i, d in enumerate(self._docs):
+            if d.get("key_id") == kid:
+                d2 = dict(d)
+                d2.update(patch)
+                self._docs[i] = d2
+                return UpdateResult(1, 1)
+
+        return UpdateResult(0, 0)
+
+
 @pytest.fixture(scope="session")
 def auth_mod():
     return _load_auth_module()
@@ -162,12 +244,27 @@ def auth_mod():
 def users_coll(auth_mod):
     coll = FakeUsersColl()
     auth_mod.users_coll = coll
-    auth_mod.mongo_client = object()
+
+    # Make sure required settings exist for tests that use API key routes.
+    auth_mod.API_KEY_PEPPER = "test-pepper"
+    auth_mod.INTERNAL_AUTH_TOKEN = "test-internal-token"
+
+    return coll
+
+
+@pytest.fixture()
+def api_keys_coll(auth_mod):
+    coll = FakeApiKeysColl()
+    auth_mod.api_keys_coll = coll
+
+    auth_mod.API_KEY_PEPPER = "test-pepper"
+    auth_mod.INTERNAL_AUTH_TOKEN = "test-internal-token"
+
     return coll
 
 
 @pytest_asyncio.fixture()
-async def client(auth_mod, users_coll):
+async def client(auth_mod, users_coll, api_keys_coll):
     transport = httpx.ASGITransport(app=auth_mod.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
