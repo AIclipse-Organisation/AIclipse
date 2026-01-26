@@ -10,6 +10,7 @@ const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 
 const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
+const USERS_COLLECTION = "auth.users";
 
 // Helper function to extract and verify JWT token from Authorization header or cookie
 function getAuthenticatedUserId(req) {
@@ -126,6 +127,7 @@ export async function POST(req) {
     const db = client.db(MONGO_DB);
     const posts = db.collection(POSTS_COLLECTION);
     const votes = db.collection(VOTES_COLLECTION);
+    const users = db.collection(USERS_COLLECTION);
 
     // make sure post exists
     const postExists = await posts.findOne(
@@ -138,22 +140,53 @@ export async function POST(req) {
 
     const now = new Date();
 
-    // Atomic operation: upsert vote and get old value to determine count changes
-    // This prevents race conditions by handling the entire vote logic in a single operation
-    const voteResult = await votes.findOneAndUpdate(
+    // Check if user has already voted on this post
+    const existingVote = await votes.findOne(
       { post_id: safePostId, user_id: safeUserId },
-      {
-        $set: { vote, updated_at: now },
-        $setOnInsert: { created_at: now }
-      },
-      {
-        upsert: true,
-        returnDocument: "before", // get old value to know what changed
-        projection: { _id: 0, vote: 1 }
-      }
+      { projection: { vote: 1 } }
     );
 
-    const oldVote = voteResult?.value?.vote; // undefined if new vote, "up" or "down" if existing
+    let shouldIncrementGuesses = false;
+    let shouldDecrementGuesses = false;
+
+    if (existingVote) {
+      // User has voted before on this post
+      if (existingVote.vote === vote) {
+        // Clicking the same vote again -> Toggle off (delete vote)
+        await votes.deleteOne({ post_id: safePostId, user_id: safeUserId });
+        shouldDecrementGuesses = true;
+      } else {
+        // Changing vote (up to down or down to up)
+        await votes.updateOne(
+          { post_id: safePostId, user_id: safeUserId },
+          { $set: { vote, updated_at: now } }
+        );
+        // No change to total_guesses
+      }
+    } else {
+      // First time voting on this post -> Create vote
+      await votes.insertOne({
+        post_id: safePostId,
+        user_id: safeUserId,
+        vote,
+        created_at: now,
+        updated_at: now
+      });
+      shouldIncrementGuesses = true;
+    }
+
+    // Update user's total_guesses
+    if (shouldIncrementGuesses) {
+      await users.updateOne(
+        { user_id: safeUserId },
+        { $inc: { total_guesses: 1 } }
+      );
+    } else if (shouldDecrementGuesses) {
+      await users.updateOne(
+        { user_id: safeUserId },
+        { $inc: { total_guesses: -1 } }
+      );
+    }
 
     // Don't update post counts - they should be calculated from votes collection
     // The GET endpoint will aggregate the real counts from community.votes
@@ -182,7 +215,7 @@ export async function POST(req) {
         post_id,
         up_vote_count: Number(upCount),
         down_vote_count: Number(downCount),
-        ...(oldVote === vote && { message: "Vote already recorded" })
+        vote_removed: shouldDecrementGuesses
       },
       { status: 200 }
     );
