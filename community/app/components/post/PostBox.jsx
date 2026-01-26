@@ -1,5 +1,15 @@
 import "../../styles/postBox.css";
 import { useEffect, useState } from "react";
+import {
+  voteOnPost,
+  fetchComments,
+  trackPostClick,
+  reportPostAPI,
+  deletePostAPI,
+  submitCommentAPI,
+  deleteCommentAPI,
+  formatScore
+} from "./postBoxActions";
 
 export default function PostBox({ image, currentUserId, currentUserName, onVoteUpdate, onPostDelete }) {
   const [up, setUp] = useState(Number(image?.up_vote_count ?? 0));
@@ -47,32 +57,17 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     setBusy(true);
 
     try {
-      const res = await fetch(`/community/posts/vote`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ post_id: postId, user_id: currentUserId, vote: direction }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(data.error || data.detail || `Vote failed (${res.status})`);
-        return;
-      }
-
-      // Update with authoritative counts from server (this is the source of truth)
-      const newUp = Number(data.up_vote_count ?? 0);
-      const newDown = Number(data.down_vote_count ?? 0);
-      setUp(newUp);
-      setDown(newDown);
+      const result = await voteOnPost(postId, currentUserId, direction);
+      
+      setUp(result.up_vote_count);
+      setDown(result.down_vote_count);
       
       // Notify parent component of the vote count change
       if (onVoteUpdate) {
-        onVoteUpdate(postId, newUp, newDown);
+        onVoteUpdate(postId, result.up_vote_count, result.down_vote_count);
       }
     } catch (err) {
-      setError("Network error while voting.");
+      setError(err.message || "Network error while voting.");
     } finally {
       setBusy(false);
     }
@@ -85,39 +80,17 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     setCommentError("");
 
     try {
-      const res = await fetch(
-        `/community/posts/comments?post_id=${encodeURIComponent(postId)}`,
-        { credentials: "include", headers: { Accept: "application/json" } }
-      );
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setCommentError(data.error || data.detail || `Failed to load comments (${res.status})`);
-        return;
-      }
-
-      setComments(Array.isArray(data.items) ? data.items : []);
-    } catch {
-      setCommentError("Network error while loading comments.");
+      const items = await fetchComments(postId);
+      setComments(items);
+    } catch (err) {
+      setCommentError(err.message || "Network error while loading comments.");
     } finally {
       setCommentsBusy(false);
     }
   }
 
   function handleClick() {
-    if (!postId) return;
-
-    fetch("/community/posts/click", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ post_id: postId }),
-    }).catch((err) => {
-      // Click tracking is non-critical; errors are ignored in production
-      if (process.env.NODE_ENV === "development") {
-        console.error("Failed to record post click:", err);
-      }
-    });
+    trackPostClick(postId);
   }
 
   function reportPost() {
@@ -125,15 +98,9 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
     setIsReported(true);
 
-    fetch("/community/posts/report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ post_id: postId }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.is_reported === false) setIsReported(false);
+    reportPostAPI(postId)
+      .then((isReported) => {
+        setIsReported(isReported);
       })
       .catch(() => {
         setIsReported(false);
@@ -154,25 +121,14 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     setError("");
 
     try {
-      const res = await fetch(`/community/posts?post_id=${encodeURIComponent(postId)}`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(data.error || data.detail || `Failed to delete post (${res.status})`);
-        return;
-      }
-
+      await deletePostAPI(postId);
+      
       // Notify parent component to remove this post from the list
       if (onPostDelete) {
         onPostDelete(postId);
       }
     } catch (err) {
-      setError("Network error while deleting post.");
+      setError(err.message || "Network error while deleting post.");
     } finally {
       setBusy(false);
     }
@@ -190,28 +146,11 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     setCommentError("");
 
     try {
-      const res = await fetch(`/community/posts/comments`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          post_id: postId,
-          user_id: currentUserId,
-          user_name: currentUserName,
-          text,
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setCommentError(data.error || data.detail || `Comment failed (${res.status})`);
-        return;
-      }
-
+      const data = await submitCommentAPI(postId, currentUserId, currentUserName, text);
       setComments((arr) => [data, ...arr]);
       setCommentText("");
-    } catch {
-      setCommentError("Network error while posting comment.");
+    } catch (err) {
+      setCommentError(err.message || "Network error while posting comment.");
     } finally {
       setCommentsBusy(false);
     }
@@ -229,23 +168,12 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     setCommentError("");
 
     try {
-      const res = await fetch(`/community/posts/comments?comment_id=${encodeURIComponent(comment_id)}`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setCommentError(data.error || data.detail || `Failed to delete comment (${res.status})`);
-        return;
-      }
-
+      await deleteCommentAPI(comment_id);
+      
       // Remove the deleted comment from the list
       setComments((arr) => arr.filter(c => c.comment_id !== comment_id));
     } catch (err) {
-      setCommentError("Network error while deleting comment.");
+      setCommentError(err.message || "Network error while deleting comment.");
     } finally {
       setCommentsBusy(false);
     }
@@ -254,16 +182,6 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   useEffect(() => {
     if (showComments) loadComments();
   }, [showComments, postId]);
-
-
-  function formatScore(x) {
-    const n = Number(x);
-    if (!Number.isFinite(n)) return "—";
-    // 4 decimals is usually enough to see differences
-    return n.toFixed(6);
-  }
-
-
 
   return (
     <div className="comm_postBox">
@@ -284,7 +202,7 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
             disabled={!postId || busy}
             title="Delete this post"
             aria-label="Delete this post"
-            style={{ marginLeft: "8px", color: "#dc3545" }}
+            className="comm_deleteButton"
           >
             <span aria-hidden="true">🗑️</span> Delete
           </button>
@@ -381,7 +299,7 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
             disabled={busy}
             title="Edit description"
             aria-label="Edit description"
-            style={{ marginLeft: "8px", fontSize: "0.85em", cursor: "pointer", background: "none", border: "none", padding: "0" }}
+            className="comm_editButton"
           >
             <span aria-hidden="true">✏️</span>
           </button>
@@ -430,7 +348,7 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
                         disabled={commentsBusy}
                         title="Delete this comment"
                         aria-label="Delete comment"
-                        style={{ marginLeft: "8px", color: "#dc3545", fontSize: "0.85em", cursor: "pointer", background: "none", border: "none", padding: "0" }}
+                        className="comm_deleteCommentButton"
                       >
                         <span aria-hidden="true">🗑️</span>
                       </button>

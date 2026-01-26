@@ -226,3 +226,29 @@
 .muted {
   opacity: 0.6;
 }
+
+/* Action Buttons */
+
+.comm_deleteButton {
+  margin-left: 8px;
+  color: #dc3545;
+}
+
+.comm_editButton {
+  margin-left: 8px;
+  font-size: 0.85em;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.comm_deleteCommentButton {
+  margin-left: 8px;
+  color: #dc3545;
+  font-size: 0.85em;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
