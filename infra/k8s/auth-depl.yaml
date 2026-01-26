@@ -18,6 +18,10 @@ spec:
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
             - name: MONGO_DB
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+            - name: INTERNAL_AUTH_TOKEN
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
+            - name: API_KEY_PEPPER
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: API_KEY_PEPPER } }
           ports: [{ name: http, containerPort: 3000 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }

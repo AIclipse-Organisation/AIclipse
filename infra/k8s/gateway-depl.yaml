@@ -16,6 +16,8 @@ spec:
               valueFrom: { secretKeyRef: { name: jwt-sec, key: JWT_KEY } }
             - name: DETECTION_TOKEN_SECRET
               valueFrom: { secretKeyRef: { name: jwt-sec, key: DETECTION_TOKEN_SECRET } }
+            - name: INTERNAL_AUTH_TOKEN
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
             - name: AUTH_URI
               value: "http://auth-srv:3000"
             - name: MEDIA_URI

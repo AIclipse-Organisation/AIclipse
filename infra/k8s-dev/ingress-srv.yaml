@@ -12,13 +12,6 @@ spec:
     - host: aiclipse.local
       http:
         paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: gateway-srv
-                port:
-                  number: 8080
           - path: /community
             pathType: Prefix
             backend:

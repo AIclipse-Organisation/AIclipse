@@ -29,6 +29,9 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
 
   const isOwner = currentUserId && image?.user_id === currentUserId;
+  
+
+
 
   useEffect(() => {
     setIsReported(Boolean(image?.is_reported));

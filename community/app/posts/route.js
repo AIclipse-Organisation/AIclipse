@@ -3,6 +3,9 @@ import { MongoClient } from "mongodb";
 import jwt from "jsonwebtoken";
 import { validateUserId, validateImageId, validatePostId } from "./validation.js";
 
+import { getRedis } from "../../redis/redis.js"
+
+
 export const runtime = "nodejs"; // required for MongoDB driver
 
 const MONGO_URI = process.env.MONGO_URI || "";
@@ -570,9 +573,7 @@ export async function GET() {
   let client = null;
 
   try {
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
+    if (!MONGO_URI) throw new Error("MONGO_URI is not set");
 
     client = new MongoClient(MONGO_URI);
     await client.connect();
@@ -592,79 +593,59 @@ export async function GET() {
 
     // 2) posts for public images
     const posts = await col
-      .find(
-        { image_id: { $in: publicImageIds } },
-        { projection: { _id: 0 } }
-      )
+      .find({ image_id: { $in: publicImageIds } }, { projection: { _id: 0 } })
       .sort({ created_at: -1 })
       .limit(100)
       .toArray();
 
-    // If no posts, return early
     if (!posts.length) {
       return NextResponse.json({ items: [] }, { status: 200 });
     }
 
-    // 3) vote aggregation (your existing logic)
-    const VOTES_COLLECTION = "community.votes";
-    const votesCol = db.collection(VOTES_COLLECTION);
+    // 3) fetch pending deltas from Redis in one roundtrip
+    const redis = getRedis();
+    const deltaKeys = posts.map((p) => `post:${p.post_id}:vote_deltas`);
 
-    const postIds = posts.map((p) => p.post_id);
+    const pipe = redis.pipeline();
+    for (const k of deltaKeys) pipe.hgetall(k);
+    const pipeRes = await pipe.exec();
 
-    const voteCountsAgg = await votesCol
-      .aggregate([
-        { $match: { post_id: { $in: postIds } } },
-        {
-          $group: {
-            _id: "$post_id",
-            up_vote_count: {
-              $sum: { $cond: [{ $eq: ["$vote", "up"] }, 1, 0] },
-            },
-            down_vote_count: {
-              $sum: { $cond: [{ $eq: ["$vote", "down"] }, 1, 0] },
-            },
-          },
-        },
-      ])
-      .toArray();
-
-    const voteCountsMap = {};
-    for (const vc of voteCountsAgg) {
-      voteCountsMap[vc._id] = {
-        up_vote_count: vc.up_vote_count,
-        down_vote_count: vc.down_vote_count,
+    // Map post_id -> {up, down}
+    const deltasByPostId = {};
+    for (let i = 0; i < posts.length; i++) {
+      const postId = posts[i].post_id;
+      const data = pipeRes?.[i]?.[1] || {};
+      deltasByPostId[postId] = {
+        up: Number(data.up || 0),
+        down: Number(data.down || 0),
       };
     }
 
-    // 4) merge votes into posts
-    const items = posts.map((post) => ({
-      ...post,
-      up_vote_count: voteCountsMap[post.post_id]?.up_vote_count || 0,
-      down_vote_count: voteCountsMap[post.post_id]?.down_vote_count || 0,
-    }));
+    // 4) merge: base counts from posts + pending redis deltas
+    const items = posts.map((post) => {
+      const d = deltasByPostId[post.post_id] || { up: 0, down: 0 };
+      return {
+        ...post,
+        up_vote_count: Number(post.up_vote_count || 0) + d.up,
+        down_vote_count: Number(post.down_vote_count || 0) + d.down,
+      };
+    });
 
     // 5) compute averages for normalization
     const n = items.length || 1;
 
-    const totalClicks = items.reduce(
-      (s, p) => s + safeNumber(p.clicks_count),
-      0
-    );
+    const totalClicks = items.reduce((s, p) => s + safeNumber(p.clicks_count), 0);
     const totalVotes = items.reduce(
       (s, p) => s + safeNumber(p.up_vote_count) + safeNumber(p.down_vote_count),
       0
     );
-    const totalComments = items.reduce(
-      (s, p) => s + safeNumber(p.comment_count),
-      0
-    );
+    const totalComments = items.reduce((s, p) => s + safeNumber(p.comment_count), 0);
 
-    // Avoid divide by 0 by falling back to 1 (demo-style)
     const avgClicks = totalClicks / n || 1;
     const avgVotes = totalVotes / n || 1;
     const avgComments = totalComments / n || 1;
 
-    // 6) scoring constants (from your demo)
+    // 6) scoring constants
     const votesWeight = 0.6;
     const commentsWeight = 0.3;
     const clicksWeight = 0.1;
@@ -684,12 +665,10 @@ export async function GET() {
       const clicksNorm = safeDiv(numClicks, avgClicks);
       const commentsNorm = safeDiv(numComments, avgComments);
 
-      var engagement =
+      const engagement =
         votesNorm * votesWeight +
         clicksNorm * clicksWeight +
         commentsNorm * commentsWeight;
-
-     
 
       const createdAtSec = createdAtToUnixSeconds(post.created_at);
       const ageSeconds = Math.max(nowSec - createdAtSec, 0);
@@ -699,28 +678,16 @@ export async function GET() {
 
       let score = engagement / timeFactor;
 
-      // demo: fresh boost
+      // demo boosts
+      if (engagement === 0 && ageHours < 24) score = Math.max(score, 0.5);
+      if (ageHours < 24) score *= 1.2;
 
-      if (engagement === 0 && ageHours < 24) {
-      score = Math.max(score, 0.5); 
-    }
-
-    if (ageHours < 24) score *= 1.2;
-
-
-      // demo: controversial boost
       if (isControversial(post, nowSec)) score *= 2.5;
 
       return {
         ...post,
-        score, // NEW: included for sorting + optional UI debug
-        debug: {
-          votesNorm,
-          clicksNorm,
-          commentsNorm,
-          engagement,
-          ageHours,
-        },
+        score,
+        debug: { votesNorm, clicksNorm, commentsNorm, engagement, ageHours },
       };
     });
 
@@ -743,4 +710,3 @@ export async function GET() {
     }
   }
 }
-

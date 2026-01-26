@@ -16,6 +16,8 @@ resources:
   #- k8s/observer-depl.yaml
   - k8s/client-depl.yaml
   - k8s/community-depl.yaml
+  - k8s/community-flush-worker-depl.yaml
   - k8s-dev/ingress-srv.yaml
+  - k8s-dev/ingress-api.yaml
   - k8s/model-cycle-pvc.yaml
   - k8s/app-configmap.yaml

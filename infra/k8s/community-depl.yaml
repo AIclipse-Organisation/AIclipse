@@ -19,6 +19,16 @@ spec:
             - name: GATEWAY_URI
               value: http://gateway-srv:8080
 
+            - name: REDIS_HOST
+              value: redis-srv
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-sec
+                  key: REDIS_PASSWORD
+
           ports: [{ name: http, containerPort: 3000 }]
 
           readinessProbe:
