@@ -58,28 +58,34 @@
 
       <!-- DETAILS (below profile section) -->
       <section class="user-details-section" aria-label="User stats">
-        <h2>Details</h2>
+        <!-- <h2>Details</h2> -->
 
-        <div id="user-details-container" class="user-details-container" style="display:none;">
-          <div class="user-detail-item">
-            <span class="detail-label">Total Guesses:</span>
-            <span id="detail-total-guesses" class="detail-value">-</span>
+        <!-- WRAPPER keeps the same ID so your JS can still toggle display -->
+        <div id="user-details-container" style="display:none;">
+
+          <!-- INNER div is the grid (this is what your CSS targets) -->
+          <div class="user-details-container">
+            <div class="user-detail-item">
+              <span class="detail-label">Total Guesses:</span>
+              <span id="detail-total-guesses" class="detail-value">-</span>
+            </div>
+
+            <div class="user-detail-item">
+              <span class="detail-label">Total Correct:</span>
+              <span id="detail-total-correct" class="detail-value">-</span>
+            </div>
+
+            <div class="user-detail-item">
+              <span class="detail-label">AI Detection Accuracy:</span>
+              <span id="detail-acc-ai" class="detail-value">-</span>
+            </div>
+
+            <div class="user-detail-item">
+              <span class="detail-label">Real Detection Accuracy:</span>
+              <span id="detail-acc-real" class="detail-value">-</span>
+            </div>
           </div>
 
-          <div class="user-detail-item">
-            <span class="detail-label">Total Correct:</span>
-            <span id="detail-total-correct" class="detail-value">-</span>
-          </div>
-
-          <div class="user-detail-item">
-            <span class="detail-label">AI Detection Accuracy:</span>
-            <span id="detail-acc-ai" class="detail-value">-</span>
-          </div>
-
-          <div class="user-detail-item">
-            <span class="detail-label">Real Detection Accuracy:</span>
-            <span id="detail-acc-real" class="detail-value">-</span>
-          </div>
         </div>
       </section>
 
