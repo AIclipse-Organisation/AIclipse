@@ -24,11 +24,7 @@
         <div class="profile-summary-left">
           <!-- Avatar (image) -->
           <div class="profile-avatar">
-            <img
-              src="/static/images/profile.png"
-              alt="Profile"
-              class="profile-avatar-img"
-            />
+            <img src="/static/images/profile.png" alt="Profile" class="profile-avatar-img" />
           </div>
 
           <div class="profile-identity">
@@ -89,7 +85,26 @@
 
       <!-- LOGOUT (bottom) -->
       <div class="profile-footer">
-        <button id="btn-logout" class="secondary logout-btn">Log out</button>
+        <button id="btn-logout" class="btn-logout">Log out</button>
+      </div>
+
+      <!-- Logout confirm modal (same design as results modal) -->
+      <div id="logout-modal" class="modal-overlay" hidden>
+        <div class="modal">
+          <h3 class="modal-title">Log out?</h3>
+          <p class="modal-text">
+            You’ll need to log in again to access your account.
+          </p>
+
+          <div class="modal-actions">
+            <button id="cancel-logout" class="secondary" type="button">
+              Cancel
+            </button>
+            <button id="confirm-logout" class="danger" type="button">
+              Log out
+            </button>
+          </div>
+        </div>
       </div>
     </main>
 
