@@ -427,6 +427,9 @@ function renderScan(img, title) {
   // Delete Post (only for public posts with post_id)
   setupDeletePost(img);
 
+  // Delete Scan (only for private scans)
+  setupDeleteScan(img);
+
   // Inline Make Public UI (ONLY when private)
   setupMakePublicInline(img);
 }
@@ -824,6 +827,116 @@ function setupDeletePost(img) {
         setStatus(err?.message || "Failed to delete post.", "error");
         deleteBtn.disabled = false;
         deleteBtn.textContent = "Delete Post";
+      }
+    });
+  }
+
+  // Close modal on backdrop click
+  if (modal && !modal.dataset.bound) {
+    modal.dataset.bound = "1";
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) hideModal();
+    });
+  }
+}
+
+// -------------------------
+// Delete Scan
+// Requirements:
+// - "Delete Scan" button is visible only when scan is private
+// - Clicking it confirms with the user before deleting
+// - Deletes the scan/image from the system
+// - Redirects to scans page after successful deletion
+// -------------------------
+function setupDeleteScan(img) {
+  const section = document.getElementById("delete-scan-section");
+  const deleteBtn = document.getElementById("btn-delete-scan");
+  const statusEl = document.getElementById("delete-scan-status");
+
+  if (!section || !deleteBtn || !statusEl) {
+    if (section) section.style.display = "none";
+    return;
+  }
+
+  // Show only for private scans
+  const shouldShow = !!(img && img.image_id && isPrivateScan(img));
+  section.style.display = shouldShow ? "block" : "none";
+
+  if (!shouldShow) {
+    return;
+  }
+
+  const setStatus = (text, kind) => {
+    statusEl.classList.remove("is-error", "is-success");
+    if (kind === "error") statusEl.classList.add("is-error");
+    if (kind === "success") statusEl.classList.add("is-success");
+    statusEl.textContent = text || "";
+  };
+
+  const modal = document.getElementById("delete-scan-modal");
+  const modalConfirm = document.getElementById("scan-modal-confirm");
+  const modalCancel = document.getElementById("scan-modal-cancel");
+
+  if (modal) modal.hidden = true;
+
+  const showModal = () => {
+    if (modal) modal.hidden = false;
+  };
+
+  const hideModal = () => {
+    if (modal) modal.hidden = true;
+  };
+
+  if (!deleteBtn.dataset.bound) {
+    deleteBtn.dataset.bound = "1";
+    deleteBtn.addEventListener("click", () => {
+      if (!currentScan || !currentScan.image_id) return;
+      showModal();
+    });
+  }
+
+  if (modalCancel && !modalCancel.dataset.bound) {
+    modalCancel.dataset.bound = "1";
+    modalCancel.addEventListener("click", hideModal);
+  }
+
+  if (modalConfirm && !modalConfirm.dataset.bound) {
+    modalConfirm.dataset.bound = "1";
+    modalConfirm.addEventListener("click", async () => {
+      if (!currentScan || !currentScan.image_id) return;
+
+      hideModal();
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting...";
+      setStatus("Deleting scan...", null);
+
+      try {
+        const res = await fetch(`/image/${encodeURIComponent(currentScan.image_id)}`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.error || data.detail || `Failed to delete scan (${res.status})`);
+        }
+
+        setStatus("✓ Scan deleted. Redirecting...", "success");
+
+        // Clean session data
+        sessionStorage.removeItem("selectedScan");
+        sessionStorage.removeItem("selectedScanTitle");
+
+        // Redirect to scans page after a brief delay
+        setTimeout(() => {
+          window.location.href = "/scans";
+        }, 800);
+      } catch (err) {
+        setStatus(err?.message || "Failed to delete scan.", "error");
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = "Delete Scan";
       }
     });
   }

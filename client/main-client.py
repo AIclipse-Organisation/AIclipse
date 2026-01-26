@@ -515,6 +515,36 @@ def update_image(image_id: str):
     return jsonify(data), resp.status_code
 
 
+@app.delete("/image/<string:image_id>")
+def delete_image(image_id: str):
+    """
+    Delete an image.
+    Proxy to Gateway DELETE /image/{image_id}.
+    """
+    token = _get_token_from_cookie()
+    if not token:
+        return jsonify({"detail": "Not authenticated"}), 401
+
+    url = f"{GATEWAY_URI}/image/{image_id}"
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+
+    try:
+        resp = requests.delete(url, headers=headers, timeout=10)
+    except requests.RequestException:
+        logging.exception("Gateway DELETE /image/{image_id} request failed")
+        return jsonify({"detail": "Gateway unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        return jsonify({"detail": "Invalid JSON from gateway on DELETE /image"}), 502
+
+    return jsonify(data), resp.status_code
+
+
 @app.post("/community/posts")
 def create_community_post():
 
