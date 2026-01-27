@@ -27,4 +27,7 @@ public class MediaImageResponse
 
     [JsonPropertyName("is_public")]
     public required bool IsPublic { get; set; }
+    
+    [JsonPropertyName("model_version")]
+    public required string ModelVersion { get; set; }
 }

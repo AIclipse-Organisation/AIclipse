@@ -10,6 +10,21 @@ public class ModelCycleConfig
 
     [JsonPropertyName("REPLAY_BUFFER_RATIO")]
     public double ReplayBufferRatio { get; set; }
+    
+    [JsonPropertyName("USER_ACCURACY_AI")]
+    public double UserAccuracyAi { get; set; }
+
+    [JsonPropertyName("USER_ACCURACY_REAL")]
+    public double UserAccuracyReal { get; set; }
+
+    [JsonPropertyName("MODEL_ACCURACY_AI")]
+    public double ModelAccuracyAi { get; set; }
+
+    [JsonPropertyName("MODEL_ACCURACY_REAL")]
+    public double ModelAccuracyReal { get; set; }
+
+    [JsonPropertyName("CONFIDENCE_THRESHOLD")]
+    public double ConfidenceThreshold { get; set; }
 
     public static ModelCycleConfig LoadModelConfig(string filePath)
     {

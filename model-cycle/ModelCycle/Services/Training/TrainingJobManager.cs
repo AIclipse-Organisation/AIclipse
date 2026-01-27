@@ -1,12 +1,9 @@
 using ModelCycle.Data;
 using ModelCycle.Models;
+using Microsoft.EntityFrameworkCore;
+using ModelCycle.Services; 
 
 namespace ModelCycle.Services.Training;
-
-using Microsoft.EntityFrameworkCore;
-using ModelCycle.Data;
-using ModelCycle.Models;
-using ModelCycle.Services; 
 
 public class TrainingJobManager : ITrainingJobManager
 {
@@ -38,7 +35,8 @@ public class TrainingJobManager : ITrainingJobManager
         public string OutputDir => Path.Combine(JobRootPath, "output");
         public string BaseModelDir => Path.Combine(JobRootPath, "base_model");
         public string GoldenDir { get; } 
-        public string OutputModelPath => Path.Combine(OutputDir, "model.safetensors");
+        
+        public string OutputModelPath => Path.Combine(OutputDir, "pytorch_model.bin");
         public string MetricsPath => Path.Combine(OutputDir, "metrics.json");
 
         private readonly ILogger _logger;
@@ -80,7 +78,6 @@ public class TrainingJobManager : ITrainingJobManager
             throw new DirectoryNotFoundException($"Golden set not found at {goldenPath}.");
         }
         
-        // Ensure directories exist
         Directory.CreateDirectory(Path.Combine(jobPath, "data"));
         Directory.CreateDirectory(Path.Combine(jobPath, "output"));
         Directory.CreateDirectory(Path.Combine(jobPath, "base_model"));
@@ -138,7 +135,7 @@ public class TrainingJobManager : ITrainingJobManager
         if (string.IsNullOrEmpty(latestModel.MinioObjectPath))
              throw new InvalidOperationException($"Model {latestModel.Version} has no MinIO path.");
         
-        string targetWeightsFile = Path.Combine(scope.BaseModelDir, "model.safetensors");
+        string targetWeightsFile = Path.Combine(scope.BaseModelDir, "pytorch_model.bin");
         _logger.LogInformation("Downloading weights {Version} from {Path}...", latestModel.Version, latestModel.MinioObjectPath);
 
         try

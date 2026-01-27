@@ -31,15 +31,6 @@ public class QueuedTrainingWorker : BackgroundService
 
                 //Run training script
                 var jobId = await trainingService.RunTrainingCycleAsync();
-
-                if (jobId.HasValue)
-                {
-                    _logger.LogInformation("Training Job {JobId} completed successfully.", jobId);
-                }
-                else
-                {
-                    _logger.LogInformation("Training job checked but found insufficient data.");
-                }
             }
             catch (Exception ex)
             {

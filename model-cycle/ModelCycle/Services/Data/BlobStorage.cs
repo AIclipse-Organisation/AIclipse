@@ -116,4 +116,12 @@ public class BlobStorageService : IBlobStorageService
             throw;
         }
     }
+    public async Task DeleteFileAsync(string bucketName, string objectName)
+    {
+        var args = new RemoveObjectArgs()
+            .WithBucket(bucketName)
+            .WithObject(objectName);
+
+        await _minioClient.RemoveObjectAsync(args);
+    }
 }

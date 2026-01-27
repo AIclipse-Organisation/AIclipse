@@ -13,7 +13,7 @@ const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
 
 const FLUSH_ZSET = "votes:flush_at";
-const FLUSH_DEBOUNCE_MS = 30_000; // 30 seconds
+const FLUSH_DEBOUNCE_MS = 5_000; // 30 seconds
 const DELTA_TTL_SECONDS = 60 * 60; // safety TTL 1 hour
 
 function getAuthenticatedUserId(req) {

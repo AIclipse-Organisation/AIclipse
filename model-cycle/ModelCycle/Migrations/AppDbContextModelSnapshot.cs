@@ -111,19 +111,41 @@ namespace ModelCycle.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<double>("CurrentProbability")
+                        .HasColumnType("REAL");
+
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("MinioObjectPath")
+                    b.Property<string>("MediaImageId")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("OriginalBucketId")
+                    b.Property<double>("ModelConfidenceScore")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("ModelVersion")
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("PostId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("S3Key")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("UserAiVotes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserRealVotes")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 

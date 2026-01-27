@@ -7,4 +7,5 @@ public class VoteData
     public int UserNotAiVotes { get; set; }
     
     public double ModelConfidence { get; set; }
+    public string? Label { get; set; }
 }

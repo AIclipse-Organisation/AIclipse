@@ -7,8 +7,15 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Folder Include="Migrations\" />
         <Folder Include="Python\" />
         <Folder Include="python_scripts\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="python_scripts\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
     </ItemGroup>
 
     <ItemGroup>
