@@ -9,7 +9,7 @@ public class TrainingImage
     [Key]
     public Guid Id { get; set; }
     
-    public Guid PostId { get; set; } 
+    public string? PostId { get; set; } 
 
     public required string MediaImageId { get; set; } 
     public required string S3Key { get; set; }

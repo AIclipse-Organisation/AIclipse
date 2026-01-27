@@ -2,7 +2,7 @@
 
 public class VoteData
 {
-    public Guid PostId { get; set; }
+    public string? PostId { get; set; }
     public int UserAiVotes { get; set; }
     public int UserNotAiVotes { get; set; }
     

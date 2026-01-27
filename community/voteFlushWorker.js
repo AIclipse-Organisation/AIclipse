@@ -6,6 +6,7 @@ const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
 const FLUSH_ZSET = "votes:flush_at";
+const MODEL_STREAM_KEY = "events:model_cycle";
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -45,6 +46,12 @@ async function flushOnce({ redis, posts }) {
             },
             $set: { updated_at: new Date() },
           }
+        );
+        await redis.xadd(
+          MODEL_STREAM_KEY,
+          "*",
+          "post_id", postId,
+          "trigger", "vote_flush"
         );
       }
 

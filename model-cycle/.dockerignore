@@ -49,3 +49,8 @@ obj/
 *.suo
 *.swp
 .vs
+
+bin/
+obj/
+.git/
+.vs/
