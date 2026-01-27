@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import jwt from "jsonwebtoken";
 import { validateUserId, validatePostId } from "../validation.js";
+import { getRedis } from "../../../redis/redis.js";
 
-export const runtime = "nodejs"; 
+export const runtime = "nodejs";
 
 const MONGO_URI = process.env.MONGO_URI || "";
 const MONGO_DB = process.env.MONGO_DB || "aiclipse";
@@ -12,11 +13,13 @@ const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
 const USERS_COLLECTION = "auth.users";
 
-// Helper function to extract and verify JWT token from Authorization header or cookie
+const FLUSH_ZSET = "votes:flush_at";
+const FLUSH_DEBOUNCE_MS = 30_000; // 30 seconds
+const DELTA_TTL_SECONDS = 60 * 60; // safety TTL 1 hour
+
 function getAuthenticatedUserId(req) {
   let token = null;
-  
-  // Try Authorization header first
+
   const authHeader = req.headers.get("authorization");
   if (authHeader) {
     const parts = authHeader.split(" ");
@@ -24,53 +27,38 @@ function getAuthenticatedUserId(req) {
       token = parts[1];
     }
   }
-  
-  // Fallback to cookie if no Authorization header
+
   if (!token) {
     const cookieHeader = req.headers.get("cookie");
     if (cookieHeader) {
       const cookies = Object.fromEntries(
-        cookieHeader.split("; ").map(c => {
+        cookieHeader.split("; ").map((c) => {
           const [key, ...v] = c.split("=");
           return [key, v.join("=")];
-        })
+        }),
       );
       token = cookies.access_token;
     }
   }
-  
-  if (!token) {
-    throw new Error("Missing authentication token");
-  }
-  
-  try {
-    // Decode without verification to get the user_id
-    // In production, you should verify the JWT signature using the public key from auth service
-    const decoded = jwt.decode(token);
-    
-    if (!decoded || !decoded.sub) {
-      throw new Error("Invalid token payload");
-    }
-    
-    return decoded.sub; // user_id is stored in 'sub' claim
-  } catch (err) {
-    throw new Error("Invalid or expired token");
-  }
-}
 
+  if (!token) throw new Error("Missing authentication token");
+
+  const decoded = jwt.decode(token);
+  if (!decoded || !decoded.sub) throw new Error("Invalid token payload");
+  return decoded.sub;
+}
 
 export async function POST(req) {
   let client = null;
 
   try {
-    // Verify authentication and get authenticated user_id from JWT token
     let authenticatedUserId;
     try {
       authenticatedUserId = getAuthenticatedUserId(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -78,49 +66,36 @@ export async function POST(req) {
 
     const post_id = body?.post_id || null;
     const user_id = body?.user_id || null;
-    const vote = body?.vote || null; 
+    const vote = body?.vote || null;
 
-    // basic validation
     if (!post_id || !user_id || (vote !== "up" && vote !== "down")) {
       return NextResponse.json(
         { error: "Missing/invalid fields: post_id, user_id, vote('up'|'down')" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // validate user_id format
     const userIdValidation = validateUserId(user_id);
     if (!userIdValidation.valid) {
-      return NextResponse.json(
-        { error: userIdValidation.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: userIdValidation.error }, { status: 400 });
     }
-    const safeUserId = userIdValidation.value; // Use sanitized string value
+    const safeUserId = userIdValidation.value;
 
-    // validate post_id format
     const postIdValidation = validatePostId(post_id);
     if (!postIdValidation.valid) {
-      return NextResponse.json(
-        { error: postIdValidation.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: postIdValidation.error }, { status: 400 });
     }
-    const safePostId = postIdValidation.value; // Use sanitized string value
+    const safePostId = postIdValidation.value;
 
-    // Security check: ensure user_id in request matches authenticated user
     if (safeUserId !== authenticatedUserId) {
       return NextResponse.json(
         { error: "Forbidden: Cannot vote on behalf of other users" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
+    if (!MONGO_URI) throw new Error("MONGO_URI is not set");
 
-    // connect to Mongo 
     client = new MongoClient(MONGO_URI);
     await client.connect();
 
@@ -129,53 +104,71 @@ export async function POST(req) {
     const votes = db.collection(VOTES_COLLECTION);
     const users = db.collection(USERS_COLLECTION);
 
-    // make sure post exists
-    const postExists = await posts.findOne(
+    // Ensure post exists
+    const postDoc = await posts.findOne(
       { post_id: safePostId },
-      { projection: { _id: 0, post_id: 1 } }
+      { projection: { _id: 0, post_id: 1, up_vote_count: 1, down_vote_count: 1 } },
     );
-    if (!postExists) {
+    if (!postDoc) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
     const now = new Date();
 
-    // Check if user has already voted on this post
-    const existingVote = await votes.findOne(
+
+    const existing = await votes.findOne(
       { post_id: safePostId, user_id: safeUserId },
-      { projection: { vote: 1 } }
+      { projection: { _id: 1, vote: 1 } },
     );
 
-    let shouldIncrementGuesses = false;
-    let shouldDecrementGuesses = false;
+    const oldVote = existing?.vote; // undefined | "up" | "down"
+    let newUserVote = null; // null | "up" | "down"
 
-    if (existingVote) {
-      // User has voted before on this post
-      if (existingVote.vote === vote) {
-        // Clicking the same vote again -> Toggle off (delete vote)
-        await votes.deleteOne({ post_id: safePostId, user_id: safeUserId });
-        shouldDecrementGuesses = true;
-      } else {
-        // Changing vote (up to down or down to up)
-        await votes.updateOne(
-          { post_id: safePostId, user_id: safeUserId },
-          { $set: { vote, updated_at: now } }
-        );
-        // No change to total_guesses
-      }
-    } else {
-      // First time voting on this post -> Create vote
+    // Compute deltas based on Reddit rules:
+    // - none -> up/down  : +1
+    // - up -> up         : remove => -1
+    // - down -> down     : remove => -1
+    // - up -> down       : up -1, down +1
+    // - down -> up       : down -1, up +1
+    let deltaUp = 0;
+    let deltaDown = 0;
+
+    if (!existing) {
+      // create vote
       await votes.insertOne({
         post_id: safePostId,
         user_id: safeUserId,
         vote,
         created_at: now,
-        updated_at: now
+        updated_at: now,
       });
-      shouldIncrementGuesses = true;
+      newUserVote = vote;
+      if (vote === "up") deltaUp = 1;
+      else deltaDown = 1;
+    } else if (oldVote === vote) {
+      // toggle off -> delete vote doc
+      await votes.deleteOne({ _id: existing._id });
+      newUserVote = null;
+      if (oldVote === "up") deltaUp = -1;
+      else deltaDown = -1;
+    } else {
+      // switch vote
+      await votes.updateOne(
+        { _id: existing._id },
+        { $set: { vote, updated_at: now } },
+      );
+      newUserVote = vote;
+
+      if (oldVote === "up") deltaUp -= 1;
+      if (oldVote === "down") deltaDown -= 1;
+      if (vote === "up") deltaUp += 1;
+      if (vote === "down") deltaDown += 1;
     }
 
-    // Update user's total_guesses
+    // Update user's total_guesses based on whether a vote was added or removed
+    const shouldIncrementGuesses = (!existing); // First time voting
+    const shouldDecrementGuesses = (existing && oldVote === vote); // Toggle off
+    
     if (shouldIncrementGuesses) {
       await users.updateOne(
         { user_id: safeUserId },
@@ -188,48 +181,48 @@ export async function POST(req) {
       );
     }
 
-    // Don't update post counts - they should be calculated from votes collection
-    // The GET endpoint will aggregate the real counts from community.votes
-    
-    // Calculate actual vote counts from the votes collection (source of truth)
-    const actualCounts = await votes.aggregate([
-      { $match: { post_id: safePostId } },
-      {
-        $group: {
-          _id: null,
-          up_vote_count: {
-            $sum: { $cond: [{ $eq: ["$vote", "up"] }, 1, 0] }
-          },
-          down_vote_count: {
-            $sum: { $cond: [{ $eq: ["$vote", "down"] }, 1, 0] }
-          }
-        }
-      }
-    ]).toArray();
+    // Buffer deltas in Redis and debounce flush
+    const redis = getRedis();
+    const deltaKey = `post:${safePostId}:vote_deltas`;
+    const flushAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
 
-    const upCount = actualCounts[0]?.up_vote_count ?? 0;
-    const downCount = actualCounts[0]?.down_vote_count ?? 0;
+    if (deltaUp !== 0 || deltaDown !== 0) {
+      const pipe = redis.pipeline();
+      if (deltaUp !== 0) pipe.hincrby(deltaKey, "up", deltaUp);
+      if (deltaDown !== 0) pipe.hincrby(deltaKey, "down", deltaDown);
+
+      pipe.zadd(FLUSH_ZSET, flushAtSec, safePostId);
+      pipe.expire(deltaKey, DELTA_TTL_SECONDS);
+      await pipe.exec();
+    }
+
+    // Return "current" counts fast: base counts from posts + pending redis deltas
+    const pending = await redis.hgetall(deltaKey);
+    const pendingUp = Number(pending?.up || 0);
+    const pendingDown = Number(pending?.down || 0);
+
+    const baseUp = Number(postDoc?.up_vote_count || 0);
+    const baseDown = Number(postDoc?.down_vote_count || 0);
 
     return NextResponse.json(
       {
-        post_id,
-        up_vote_count: Number(upCount),
-        down_vote_count: Number(downCount),
-        vote_removed: shouldDecrementGuesses
+        post_id: safePostId,
+        up_vote_count: baseUp + pendingUp,
+        down_vote_count: baseDown + pendingDown,
+        user_vote: newUserVote, 
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
- 
     return NextResponse.json(
       { error: "Failed to vote", detail: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
- 
     if (client) {
-      try { await client.close(); } catch {}
+      try {
+        await client.close();
+      } catch {}
     }
   }
 }
-
