@@ -2,7 +2,7 @@ namespace ModelCycle.Domain;
 
 public class EvaluateImageRequest
 {
-    public Guid PostId { get; set; } 
+    public string? PostId { get; set; } 
 
     public required string MediaImageId { get; set; } 
 
