@@ -1,0 +1,24 @@
+﻿alertmanager:
+  enabled: false
+
+grafana:
+  enabled: true
+
+prometheus:
+  prometheusSpec:
+    retention: 24h
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+
+prometheus-node-exporter:
+  enabled: false
+
+nodeExporter:
+  enabled: false
