@@ -19,6 +19,13 @@ on:
       health_path:        { type: string,  required: true }  # e.g. /healthz
       secrets_yaml:       { type: string,  required: true }  # dev secrets for deps + service
       readiness_selector: { type: string,  required: true }  # reserved, not used here
+
+      # NEW: optional extra resources (service-specific)
+      extra_secrets_yaml: { type: string,  required: false, default: "" } # e.g. infra/k8s-dev/model-cycle-secrets.yaml
+      extra_pvc_yaml:     { type: string,  required: false, default: "" } # e.g. infra/k8s/model-cycle-pvc.yaml
+      extra_pvc_name:     { type: string,  required: false, default: "" } # e.g. model-cycle-pvc
+      extra_apply_yaml:   { type: string,  required: false, default: "" } # e.g. infra/k8s/app-configmap.yaml
+
       rollout_timeout:    { type: string,  required: false, default: "90s" }
       namespace:          { type: string,  required: false, default: "default" }
       k3d_version:        { type: string,  required: false, default: "v5.7.4" }   # pinned for reproducibility
@@ -109,6 +116,27 @@ jobs:
         # Supplies creds/URIs for deps and the service under test.
         run: kubectl apply -n "$NAMESPACE" -f "${{ inputs.secrets_yaml }}"
 
+      - name: Apply extra secrets (optional)
+        if: ${{ inputs.extra_secrets_yaml != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_secrets_yaml }}"
+
+      - name: Apply extra manifests (optional)
+        if: ${{ inputs.extra_apply_yaml != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_apply_yaml }}"
+
+      - name: Apply extra PVC (optional)
+        if: ${{ inputs.extra_pvc_yaml != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_pvc_yaml }}"
+
       - name: Apply Redis, Mongo, S3
         shell: bash
         # mongo-depl.yaml contains its own StorageClass named hostpath-retain with a different provisioner.
@@ -198,6 +226,36 @@ jobs:
             --type=strategic \
             -p '{"spec":{"template":{"spec":{"containers":[{"name":"'"${{ inputs.container_name }}"'","imagePullPolicy":"Never"}]}}}}'
 
+      - name: Wait extra PVC (post-deploy, optional)
+        if: ${{ inputs.extra_pvc_name != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TO_SEC=$(echo '${{ inputs.rollout_timeout }}' | sed 's/s$//')
+          wait_pvc() {
+            local name="$1"
+            local deadline=$(( $(date +%s) + TO_SEC ))
+            echo ">> waiting PVC/$name"
+            while true; do
+              if kubectl -n "$NAMESPACE" get pvc "$name" >/dev/null 2>&1; then
+                phase=$(kubectl -n "$NAMESPACE" get pvc "$name" -o jsonpath='{.status.phase}')
+                if [ "$phase" = "Bound" ]; then
+                  echo "OK PVC/$name Bound"
+                  return 0
+                fi
+              fi
+              if [ $(date +%s) -ge $deadline ]; then
+                echo "timeout PVC/$name"
+                kubectl -n "$NAMESPACE" get sc,pv,pvc || true
+                kubectl -n "$NAMESPACE" describe pvc "$name" || true
+                kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
+                return 1
+              fi
+              sleep 2
+            done
+          }
+          wait_pvc "${{ inputs.extra_pvc_name }}"
+
       - name: Wait for rollout
         # The app must be ready before probing.
         run: kubectl rollout status -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} --timeout=${{ inputs.rollout_timeout }}
@@ -228,8 +286,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          kubectl -n "$NAMESPACE" get sc,pv,pvc,pods || true
+          kubectl -n "$NAMESPACE" get sc,pv,pvc,pods -o wide || true
           kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
+
+          POD=$(kubectl -n "$NAMESPACE" get pod -l app=${{ inputs.svc_name }} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [ -n "$POD" ]; then
+            kubectl -n "$NAMESPACE" describe pod "$POD" || true
+            kubectl -n "$NAMESPACE" logs "$POD" --all-containers=true --tail=-1 || true
+          fi
+
           if kubectl -n "$NAMESPACE" get deploy/${{ inputs.deployment_name }} >/dev/null 2>&1; then
             kubectl logs -n "$NAMESPACE" deploy/${{ inputs.deployment_name }} --all-containers=true --tail=-1 || true
           fi
