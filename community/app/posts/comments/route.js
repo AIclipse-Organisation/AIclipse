@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import jwt from "jsonwebtoken";
 import { validateUserId, validatePostId, validateCommentId } from "../validation.js";
+import { getRedis } from "../../../redis/redis.js"
+
 
 export const runtime = "nodejs";
 
@@ -10,6 +12,11 @@ const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 
 const POSTS_COLLECTION = "community.posts";
 const COMMENTS_COLLECTION = "community.comments";
+
+const FLUSH_ZSET = "comments:flush_at";
+const FLUSH_DEBOUNCE_MS = 30_000; // 30 seconds
+const DELTA_TTL_SECONDS = 60 * 60; // 1 hour safety TTL
+
 
 // Helper function to extract and verify JWT token from Authorization header or cookie
 function getAuthenticatedUserId(req) {
@@ -247,7 +254,40 @@ export async function POST(req) {
     await commentsCol.insertOne(doc);
 
     // counter on the post to show number of comments
-    await postsCol.updateOne({ post_id: safePostId }, { $inc: { comment_count: 1 } });
+    // await postsCol.updateOne({ post_id: safePostId }, { $inc: { comment_count: 1 } });
+
+    // Buffer comment_count delta in Redis and debounce flush
+    const redis = getRedis();
+    const deltaKey = `post:${safePostId}:comment_deltas`;
+    const flushAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
+
+    const pipe = redis.pipeline();
+    pipe.hincrby(deltaKey, "count", 1);
+    pipe.zadd(FLUSH_ZSET, flushAtSec, safePostId);
+    pipe.expire(deltaKey, DELTA_TTL_SECONDS);
+    await pipe.exec();
+
+    const pending = await redis.hget(deltaKey, "count");
+    const pendingCount = Number(pending || 0);
+
+    const postDoc = await postsCol.findOne(
+      { post_id: safePostId },
+      { projection: { _id: 0, comment_count: 1 } }
+    );
+
+    return NextResponse.json(
+      {
+        ...doc,
+        comment_count: Number(postDoc?.comment_count || 0) + pendingCount,
+      },
+      { status: 201 }
+    );
+
+
+
+
+
+
 
     return NextResponse.json(doc, { status: 201 });
   } catch (err) {
@@ -341,12 +381,17 @@ export async function DELETE(req) {
       );
     }
 
-    // Decrement comment count on the post (only if greater than 0)
-    const postsCol = db.collection(POSTS_COLLECTION);
-    await postsCol.updateOne(
-      { post_id: comment.post_id, comment_count: { $gt: 0 } },
-      { $inc: { comment_count: -1 } }
-    );
+   // Buffer comment_count delta in Redis (decrement) and debounce flush
+    const redis = getRedis();
+    const deltaKey = `post:${comment.post_id}:comment_deltas`;
+    const flushAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
+
+    const pipe = redis.pipeline();
+    pipe.hincrby(deltaKey, "count", -1);
+    pipe.zadd(FLUSH_ZSET, flushAtSec, comment.post_id);
+    pipe.expire(deltaKey, DELTA_TTL_SECONDS);
+    await pipe.exec();
+
 
     return NextResponse.json(
       { message: "Comment deleted successfully", comment_id: safeCommentId },

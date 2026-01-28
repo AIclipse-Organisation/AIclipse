@@ -1,12 +1,11 @@
 import { MongoClient } from "mongodb";
-import { getRedis } from "./redis/redis.js"
+import { getRedis } from "./redis/redis.js";
 
 const MONGO_URI = process.env.MONGO_URI || "";
 const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
-const FLUSH_ZSET = "votes:flush_at";
-const MODEL_STREAM_KEY = "events:model_cycle";
+const FLUSH_ZSET = "comments:flush_at";
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -15,14 +14,20 @@ function sleep(ms) {
 async function flushOnce({ redis, posts }) {
   const nowSec = Math.floor(Date.now() / 1000);
 
-  // PuLL IDS
-  const duePostIds = await redis.zrangebyscore(FLUSH_ZSET, "-inf", nowSec, "LIMIT", 0, 200);
+  const duePostIds = await redis.zrangebyscore(
+    FLUSH_ZSET,
+    "-inf",
+    nowSec,
+    "LIMIT",
+    0,
+    300
+  );
   if (!duePostIds.length) return 0;
 
   for (const postId of duePostIds) {
-    const postKey = `post:${postId}:vote_deltas`;
+    const deltaKey = `post:${postId}:comment_deltas`;
 
-    const lockKey = `lock:flush:${postId}`;
+    const lockKey = `lock:flush:comments:${postId}`;
     const gotLock = await redis.set(lockKey, "1", "NX", "EX", 30);
     if (!gotLock) continue;
 
@@ -30,31 +35,37 @@ async function flushOnce({ redis, posts }) {
       const score = await redis.zscore(FLUSH_ZSET, postId);
       if (!score || Number(score) > nowSec) continue;
 
-      const deltas = await redis.hgetall(postKey);
-      const deltaUp = Number(deltas?.up || 0);
-      const deltaDown = Number(deltas?.down || 0);
+      const raw = await redis.hget(deltaKey, "count");
+      const delta = Number(raw || 0);
 
-      if (deltaUp !== 0 || deltaDown !== 0) {
-        await posts.updateOne(
-          { post_id: postId },
-          {
-            $inc: {
-              ...(deltaUp ? { up_vote_count: deltaUp } : {}),
-              ...(deltaDown ? { down_vote_count: deltaDown } : {}),
-            },
-            $set: { updated_at: new Date() },
-          }
-        );
-        await redis.xadd(
-          MODEL_STREAM_KEY,
-          "*",
-          "post_id", postId,
-          "trigger", "vote_flush"
-        );
+      if (delta !== 0) {
+        if (delta > 0) {
+          await posts.updateOne(
+            { post_id: postId },
+            {
+              $inc: { comment_count: delta },
+              $set: { updated_at: new Date() },
+            }
+          );
+        } else {
+          await posts.updateOne(
+            { post_id: postId },
+            [
+              {
+                $set: {
+                  comment_count: {
+                    $max: [0, { $add: ["$comment_count", delta] }],
+                  },
+                  updated_at: new Date(),
+                },
+              },
+            ]
+          );
+        }
       }
 
       const pipe = redis.pipeline();
-      pipe.del(postKey);
+      pipe.del(deltaKey);
       pipe.zrem(FLUSH_ZSET, postId);
       await pipe.exec();
     } finally {
@@ -75,20 +86,20 @@ async function main() {
   const db = mongo.db(MONGO_DB);
   const posts = db.collection(POSTS_COLLECTION);
 
-  console.log("[voteFlushWorker] started");
+  console.log("[commentFlushWorker] started");
 
   while (true) {
     try {
       const n = await flushOnce({ redis, posts });
       await sleep(n ? 250 : 1000);
     } catch (e) {
-      console.error("[voteFlushWorker] error:", e?.message || e);
+      console.error("[commentFlushWorker] error:", e?.message || e);
       await sleep(1000);
     }
   }
 }
 
 main().catch((e) => {
-  console.error("[voteFlushWorker] fatal:", e);
+  console.error("[commentFlushWorker] fatal:", e);
   process.exit(1);
 });
