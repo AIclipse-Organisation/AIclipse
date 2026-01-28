@@ -11,6 +11,7 @@ const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 
 const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
+const USERS_COLLECTION = "auth.users";
 
 const FLUSH_ZSET = "votes:flush_at";
 const FLUSH_DEBOUNCE_MS = 30_000; // 30 seconds
@@ -101,6 +102,7 @@ export async function POST(req) {
     const db = client.db(MONGO_DB);
     const posts = db.collection(POSTS_COLLECTION);
     const votes = db.collection(VOTES_COLLECTION);
+    const users = db.collection(USERS_COLLECTION);
 
     // Ensure post exists
     const postDoc = await posts.findOne(
@@ -161,6 +163,22 @@ export async function POST(req) {
       if (oldVote === "down") deltaDown -= 1;
       if (vote === "up") deltaUp += 1;
       if (vote === "down") deltaDown += 1;
+    }
+
+    // Update user's total_guesses based on whether a vote was added or removed
+    const shouldIncrementGuesses = (!existing); // First time voting
+    const shouldDecrementGuesses = (existing && oldVote === vote); // Toggle off
+    
+    if (shouldIncrementGuesses) {
+      await users.updateOne(
+        { user_id: safeUserId },
+        { $inc: { total_guesses: 1 } }
+      );
+    } else if (shouldDecrementGuesses) {
+      await users.updateOne(
+        { user_id: safeUserId },
+        { $inc: { total_guesses: -1 } }
+      );
     }
 
     // Buffer deltas in Redis and debounce flush

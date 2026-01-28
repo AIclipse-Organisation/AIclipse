@@ -100,6 +100,11 @@
   overflow: hidden;
 }
 
+/* ✅ ADDED: if AI/fake, remainder becomes green */
+.confidence-track.is-risk {
+  background: #18c46c;
+}
+
 .confidence-fill {
   height: 100%;
   width: 0%;
@@ -133,7 +138,7 @@
 }
 
 .error {
-  color: var(--error-color, #dc3545);
+  color: var(--error-color, #e04646);
 }
 
 /* =========================
@@ -188,7 +193,6 @@
   border-radius: 999px;
   background: var(--accent, #c9a64b);
 }
-
 
 .scan-details-link {
   display: inline-block;

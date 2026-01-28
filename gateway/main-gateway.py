@@ -14,6 +14,7 @@ import httpx
 import jwt
 
 from fastapi import (
+    Body,
     Depends,
     FastAPI,
     File,
@@ -982,6 +983,64 @@ async def gateway_get_image(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Image not found",
+        )
+
+    raise HTTPException(
+        status_code=resp.status_code,
+        detail=f"Media service error: {resp.status_code}",
+    )
+
+
+class UpdateImageRequest(BaseModel):
+    is_public: Optional[bool] = None
+
+
+@app.patch("/image/{image_id}")
+async def gateway_update_image(
+    image_id: str = Path(...),
+    body: UpdateImageRequest = Body(...),
+    user: UserContext = Depends(get_current_user),
+):
+    """
+    Update an image's properties (e.g., is_public).
+    Only the owner can update their image.
+    """
+    if not MEDIA_URI:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
+    url = _build_media_image_url(image_id)
+    params = {"user_id": user.user_id}
+    
+    if body and body.is_public is not None:
+        params["is_public"] = bool(body.is_public)
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.patch(url, params=params)
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Media service unreachable",
+        )
+
+    if resp.status_code == 200:
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+    if resp.status_code == 404:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+    if resp.status_code == 403:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: You can only update your own images",
         )
 
     raise HTTPException(
