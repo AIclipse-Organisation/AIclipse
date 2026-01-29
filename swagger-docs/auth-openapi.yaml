@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Auth Service
-  version: "0.0.1"
+  version: "0.0.2"
 servers:
   - url: http://auth-srv:3000
 
@@ -12,7 +12,228 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+    internalTokenAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+      description: Internal service-to-service token for protected internal endpoints.
+
+  schemas:
+    UserPublic:
+      type: object
+      required: [user_id, user_name, email, is_admin, plan, created_at]
+      properties:
+        user_id:
+          type: string
+          description: Application-level user identifier.
+        user_name:
+          type: string
+        email:
+          type: string
+          format: email
+        is_admin:
+          type: boolean
+          default: false
+        plan:
+          type: integer
+          format: int32
+          minimum: 0
+          default: 0
+        created_at:
+          type: string
+          format: date-time
+        age:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+        total_guesses:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+        total_correct:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+        acc_guessing_ai:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+        acc_guessing_real:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+
+    SignupRequest:
+      type: object
+      required: [user_name, email, password]
+      properties:
+        user_name:
+          type: string
+          minLength: 1
+          description: Display name of the user.
+        email:
+          type: string
+          format: email
+          description: Unique email address.
+        password:
+          type: string
+          format: password
+          description: Plain-text password to be hashed on the server.
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    LoginResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: JWT access token.
+        user:
+          $ref: "#/components/schemas/UserPublic"
+
+    UpdateMeRequest:
+      type: object
+      properties:
+        user_name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    AdminUpdateUserRequest:
+      type: object
+      properties:
+        user_name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        age:
+          type: integer
+          format: int32
+          minimum: 0
+        is_admin:
+          type: boolean
+
+    DeleteMeResponse:
+      type: object
+      required: [deleted, user_id, message]
+      properties:
+        deleted:
+          type: boolean
+        user_id:
+          type: string
+        message:
+          type: string
+
+    AdminDeleteUserResponse:
+      type: object
+      required: [deleted, user]
+      properties:
+        deleted:
+          type: boolean
+        user:
+          type: object
+          required: [user_id, email]
+          properties:
+            user_id:
+              type: string
+            email:
+              type: string
+              format: email
+
+    ApiKeyPublic:
+      type: object
+      required: [key_id, created_at, last4]
+      properties:
+        key_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        last4:
+          type: string
+          description: Last 4 characters of the secret portion.
+
+    ApiKeyGetResponse:
+      type: object
+      properties:
+        key:
+          allOf:
+            - $ref: "#/components/schemas/ApiKeyPublic"
+          nullable: true
+
+    ApiKeyCreateResponse:
+      type: object
+      required: [api_key, key]
+      properties:
+        api_key:
+          type: string
+          description: Full API key in format "{key_id}.{secret}". Returned only on rotation/creation.
+        key:
+          $ref: "#/components/schemas/ApiKeyPublic"
+
+    ApiKeyExchangeRequest:
+      type: object
+      required: [api_key]
+      properties:
+        api_key:
+          type: string
+          description: Full API key in format "{key_id}.{secret}".
+
+    ApiKeyExchangeResponse:
+      type: object
+      required: [token, exp]
+      properties:
+        token:
+          type: string
+          description: Short-lived JWT issued for API-key access.
+        exp:
+          type: integer
+          format: int64
+          description: Expiry as UNIX timestamp (seconds).
+
+    ApiKeyRevokeResponse:
+      type: object
+      required: [revoked]
+      properties:
+        revoked:
+          type: boolean
+          description: True if a key existed and was deleted.
+
 paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+
   /signup:
     post:
       summary: Create user
@@ -22,65 +243,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [user_name, email, password]
-              properties:
-                user_name:
-                  type: string
-                  minLength: 1
-                  description: Display name of the user.
-                email:
-                  type: string
-                  format: email
-                  description: Unique email address.
-                password:
-                  type: string
-                  format: password
-                  description: Plain-text password to be hashed on the server.
+              $ref: "#/components/schemas/SignupRequest"
       responses:
         "201":
           description: User created
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  [user_id, user_name, email, is_admin, plan, created_at]
-                properties:
-                  user_id:
-                    type: string
-                    description: Application-level user identifier.
-                  user_name:
-                    type: string
-                  email:
-                    type: string
-                    format: email
-                  is_admin:
-                    type: boolean
-                    default: false
-                  plan:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    default: 0
-                  created_at:
-                    type: string
-                    format: date-time
-                  age:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    nullable: true
-                  total_guesses:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    nullable: true
-                  total_correct:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    nullable: true
+                $ref: "#/components/schemas/UserPublic"
         "400":
           description: Invalid payload
         "409":
@@ -95,51 +265,21 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [email, password]
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  format: password
+              $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
           description: Login successful
           content:
             application/json:
               schema:
-                type: object
-                required: [token, user]
-                properties:
-                  token:
-                    type: string
-                    description: JWT access token.
-                  user:
-                    type: object
-                    required: [user_id, user_name, email, is_admin, plan]
-                    properties:
-                      user_id:
-                        type: string
-                      user_name:
-                        type: string
-                      email:
-                        type: string
-                        format: email
-                      is_admin:
-                        type: boolean
-                      plan:
-                        type: integer
-                        format: int32
+                $ref: "#/components/schemas/LoginResponse"
         "401":
           description: Invalid credentials
 
   /.well-known/jwks.json:
     get:
       summary: JSON Web Key Set (JWKS)
-      description: >
-        Return public keys used to verify JWT signatures issued by Auth Service.
+      description: Return public keys used to verify JWT signatures issued by Auth Service.
       responses:
         "200":
           description: JWKS document
@@ -180,46 +320,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  [user_id, user_name, email, is_admin, plan, created_at]
-                properties:
-                  user_id:
-                    type: string
-                  user_name:
-                    type: string
-                  email:
-                    type: string
-                    format: email
-                  is_admin:
-                    type: boolean
-                  plan:
-                    type: integer
-                    format: int32
-                  created_at:
-                    type: string
-                    format: date-time
-                  age:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    nullable: true
-                  total_guesses:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    nullable: true
-                  total_correct:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    nullable: true
+                $ref: "#/components/schemas/UserPublic"
         "401":
           description: Unauthorized
+
     patch:
       summary: Update current user profile
-      description: >
-        Update profile fields for the authenticated user (name, email, password).
+      description: Update profile fields for the authenticated user (name, email, password).
       security:
         - bearerAuth: []
       requestBody:
@@ -227,60 +334,19 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                user_name:
-                  type: string
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  format: password
+              $ref: "#/components/schemas/UpdateMeRequest"
       responses:
         "200":
           description: Updated user profile
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  [user_id, user_name, email, is_admin, plan, created_at]
-                properties:
-                  user_id:
-                    type: string
-                  user_name:
-                    type: string
-                  email:
-                    type: string
-                    format: email
-                  is_admin:
-                    type: boolean
-                  plan:
-                    type: integer
-                    format: int32
-                  created_at:
-                    type: string
-                    format: date-time
-                  age:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    nullable: true
-                  total_guesses:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    nullable: true
-                  total_correct:
-                    type: integer
-                    format: int32
-                    minimum: 0
-                    nullable: true
+                $ref: "#/components/schemas/UserPublic"
         "400":
           description: Invalid payload
         "401":
           description: Unauthorized
+
     delete:
       summary: Delete current user account
       description: Permanently delete the authenticated user's account.
@@ -292,23 +358,14 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [deleted, user_id, message]
-                properties:
-                  deleted:
-                    type: boolean
-                  user_id:
-                    type: string
-                  message:
-                    type: string
+                $ref: "#/components/schemas/DeleteMeResponse"
         "401":
           description: Unauthorized
 
   /admin/users:
     get:
       summary: List users
-      description: >
-        Admin-only endpoint to list users, optionally filtered by user_name.
+      description: Admin-only endpoint to list users, optionally filtered by user_name.
       security:
         - bearerAuth: []
       parameters:
@@ -329,27 +386,11 @@ paths:
                   items:
                     type: array
                     items:
-                      type: object
-                      required:
-                        [user_id, user_name, email, is_admin, plan, created_at]
-                      properties:
-                        user_id:
-                          type: string
-                        user_name:
-                          type: string
-                        email:
-                          type: string
-                          format: email
-                        is_admin:
-                          type: boolean
-                        plan:
-                          type: integer
-                          format: int32
-                        created_at:
-                          type: string
-                          format: date-time
+                      $ref: "#/components/schemas/UserPublic"
         "401":
           description: Unauthorized
+        "403":
+          description: Admin privileges required
 
   /admin/user/{user_id}:
     get:
@@ -369,33 +410,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  [user_id, user_name, email, is_admin, plan, created_at]
-                properties:
-                  user_id:
-                    type: string
-                  user_name:
-                    type: string
-                  email:
-                    type: string
-                    format: email
-                  is_admin:
-                    type: boolean
-                  plan:
-                    type: integer
-                    format: int32
-                  created_at:
-                    type: string
-                    format: date-time
+                $ref: "#/components/schemas/UserPublic"
         "401":
           description: Unauthorized
+        "403":
+          description: Admin privileges required
         "404":
           description: User not found
+
     patch:
       summary: Update user (admin)
-      description: >
-        Admin-only endpoint to update a user's info (name, email, password, age, is_admin).
+      description: Admin-only endpoint to update a user's info (name, email, password, age, is_admin).
       security:
         - bearerAuth: []
       parameters:
@@ -409,53 +434,23 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                user_name:
-                  type: string
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  format: password
-                age:
-                  type: integer
-                  format: int32
-                  minimum: 0
-                is_admin:
-                  type: boolean
+              $ref: "#/components/schemas/AdminUpdateUserRequest"
       responses:
         "200":
           description: Updated user
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  [user_id, user_name, email, is_admin, plan, created_at]
-                properties:
-                  user_id:
-                    type: string
-                  user_name:
-                    type: string
-                  email:
-                    type: string
-                    format: email
-                  is_admin:
-                    type: boolean
-                  plan:
-                    type: integer
-                    format: int32
-                  created_at:
-                    type: string
-                    format: date-time
+                $ref: "#/components/schemas/UserPublic"
         "400":
           description: Invalid payload
         "401":
           description: Unauthorized
+        "403":
+          description: Admin privileges required
         "404":
           description: User not found
+
     delete:
       summary: Delete user (admin)
       description: Admin-only endpoint to delete a user by user_id.
@@ -473,20 +468,88 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [deleted, user]
-                properties:
-                  deleted:
-                    type: boolean
-                  user:
-                    type: object
-                    properties:
-                      user_id:
-                        type: string
-                      email:
-                        type: string
-                        format: email
+                $ref: "#/components/schemas/AdminDeleteUserResponse"
         "401":
           description: Unauthorized
+        "403":
+          description: Admin privileges required
         "404":
           description: User not found
+
+  /me/api-key:
+    get:
+      summary: Get current user's API key metadata
+      description: Return API key metadata for the authenticated user (no secret is ever returned here).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: API key metadata (or null if none)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyGetResponse"
+        "401":
+          description: Unauthorized
+
+    post:
+      summary: Rotate current user's API key
+      description: >
+        Create/replace the user's API key and return the full key once.
+        The full key is only returned on this endpoint response.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: API key created/rotated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreateResponse"
+        "401":
+          description: Unauthorized
+        "409":
+          description: API key rotation conflict; retry
+
+    delete:
+      summary: Revoke current user's API key
+      description: Delete the user's API key (if it exists).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Revocation status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyRevokeResponse"
+        "401":
+          description: Unauthorized
+
+  /internal/api-key/exchange:
+    post:
+      summary: Exchange API key for short-lived JWT (internal)
+      description: >
+        Internal endpoint used by Gateway to exchange an API key for a short-lived JWT.
+        Requires X-Internal-Token header.
+      security:
+        - internalTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyExchangeRequest"
+      responses:
+        "200":
+          description: Exchange successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyExchangeResponse"
+        "401":
+          description: Invalid API key
+        "403":
+          description: Forbidden
+        "500":
+          description: Server error
