@@ -3,7 +3,12 @@
 // - Reads selected scan object from sessionStorage
 // - Shows it (image + meta)
 // - Shows passed title e.g. "Scan 1 (Private)"
+// - Supports editing post descriptions (for public posts)
+// - Allows making PRIVATE scans public from this page only
+//   (no modal: static inline publish UI that shows/hides)
 // =========================
+
+let currentScan = null;
 
 function clearEl(el) {
   while (el.firstChild) el.removeChild(el.firstChild);
@@ -33,6 +38,15 @@ function toPercent(confidence) {
   return `${Math.round(clamped * 100)}%`;
 }
 
+// Scans page uses number percent for bar width.
+// Keep this helper local to viewscan so we can do width like scans.
+function toPercentNumber(confidence) {
+  const n = Number(confidence);
+  if (!Number.isFinite(n)) return 0;
+  const clamped = Math.max(0, Math.min(1, n));
+  return Math.round(clamped * 100);
+}
+
 function formatDate(dt) {
   if (!dt) return "N/A";
   const d = new Date(dt);
@@ -43,6 +57,234 @@ function formatDate(dt) {
 function visibilityOf(img) {
   if (img && typeof img.is_public === "boolean") return img.is_public ? "Public" : "Private";
   return "Private";
+}
+
+function isPrivateScan(img) {
+  if (!img) return false;
+  if (typeof img.is_public === "boolean") return img.is_public === false;
+  return true; // default to private if missing
+}
+
+// -------------------------
+// Button selection helpers
+// - Selected state is driven by whether the dropdown is open
+// -------------------------
+function setSelected(btn, on) {
+  if (!btn) return;
+  btn.classList.toggle("is-selected", !!on);
+}
+
+function hidePanel(panel) {
+  if (!panel) return;
+  panel.hidden = true;
+}
+
+function showPanel(panel) {
+  if (!panel) return;
+  panel.hidden = false;
+}
+
+// -------------------------
+// Verdict + confidence helpers (match scans page behavior)
+// -------------------------
+function verdictType(img) {
+  const v = (img && img.verdict != null ? String(img.verdict) : "").toLowerCase();
+  const l = (img && img.label != null ? String(img.label) : "").toLowerCase();
+
+  // safe signals
+  if (v.includes("real") || v === "safe" || l.includes("real")) return "safe";
+
+  // risk signals
+  if (v.includes("ai") || v.includes("fake") || v.includes("deepfake") || v === "deepfake") return "risk";
+  if (l.includes("ai") || l.includes("fake") || l.includes("deepfake")) return "risk";
+
+  // unknown: match scans page (red)
+  return "risk";
+}
+
+// -------------------------
+// Votes helpers (up/down -> "real %" + label)
+// Rules:
+// - real% = up / (up+down) * 100
+// - 0 votes => hidden
+// Thresholds (community):
+// 40-60 not sure
+// 61-85 likely real (upvote majority)
+// 61-85 likely ai (downvote majority)
+// 86-100 most likely real (upvote majority)
+// 86-100 most likely ai (downvote majority)
+// -------------------------
+function getVoteCounts(img) {
+  const up = Number(img && img.up_vote_count);
+  const down = Number(img && img.down_vote_count);
+  return {
+    up: Number.isFinite(up) ? up : 0,
+    down: Number.isFinite(down) ? down : 0,
+  };
+}
+
+function voteRealPercent(img) {
+  const { up, down } = getVoteCounts(img);
+  const total = up + down;
+  if (total <= 0) return null; // no votes
+  const pct = (up / total) * 100;
+  return Math.max(0, Math.min(100, pct));
+}
+
+function voteBucket(pctReal) {
+  // pctReal is 0..100 (upvote share = "real")
+  // Determine direction by majority, then apply the same strength bands.
+  if (pctReal >= 40 && pctReal <= 60) return { text: "Not sure", type: "neutral" };
+
+  if (pctReal > 60) {
+    // Upvote majority => Real
+    if (pctReal >= 86) return { text: "Most Likely Real", type: "safe" };
+    return { text: "Likely Real", type: "safe" }; // 61-85
+  }
+
+  // Downvote majority => AI (strength based on AI share)
+  const pctAI = 100 - pctReal;
+  if (pctAI >= 86) return { text: "Most Likely AI", type: "risk" };
+  return { text: "Likely AI", type: "risk" }; // 61-85 AI share (i.e. pctReal 39-15)
+}
+
+function renderVotesBlock(img) {
+  const block = document.getElementById("votes-block");
+  const line = document.getElementById("votes-line");
+  const track = document.getElementById("votes-bar");
+  const fill = document.getElementById("votes-fill");
+
+  if (!block || !line || !track || !fill) return;
+
+  // Only for public posts (votes matter there)
+  if (!img || isPrivateScan(img)) {
+    block.hidden = true;
+    track.hidden = true;
+    line.textContent = "";
+    line.classList.remove("is-safe", "is-risk", "is-neutral");
+    fill.style.width = "0%";
+
+    // reset any inline styling we may apply below
+    track.style.removeProperty("background");
+    fill.style.removeProperty("background");
+
+    return;
+  }
+
+  const pctReal = voteRealPercent(img);
+
+  // ✅ No votes yet -> show "No community votes" and a grey bar
+  if (pctReal === null) {
+    line.textContent = "No community votes";
+    line.classList.remove("is-safe", "is-risk");
+    line.classList.add("is-neutral");
+
+    // Grey bar (track + fill)
+    const grey = "rgba(255, 255, 255, 0.22)";
+    track.classList.remove("is-risk");
+    fill.classList.remove("is-risk");
+
+    track.style.background = grey;
+    fill.style.background = grey;
+
+    // fill full width so it looks like a single grey bar
+    fill.style.width = "100%";
+
+    // a11y
+    track.setAttribute("role", "img");
+    track.setAttribute("aria-label", "No community votes");
+
+    block.hidden = false;
+    track.hidden = false;
+    return;
+  }
+
+  const { up, down } = getVoteCounts(img);
+  const bucket = voteBucket(pctReal);
+
+  // Text
+  // Text: show % for the *majority side*
+  // - safe => show "real%" (up share)
+  // - risk => show "ai%" (down share)
+  // - neutral => show real% (fine either way)
+  const pctAI = 100 - pctReal;
+  const displayPct = bucket.type === "risk" ? pctAI : pctReal;
+
+  line.textContent = `${displayPct.toFixed(0)}% ${bucket.text} (Community)`;
+
+  line.classList.remove("is-safe", "is-risk", "is-neutral");
+  if (bucket.type === "safe") line.classList.add("is-safe");
+  else if (bucket.type === "risk") line.classList.add("is-risk");
+  else line.classList.add("is-neutral");
+
+  // Bar: green fill = "real %" , red remainder = the rest (AI)
+  fill.classList.remove("is-risk");  // keep fill green
+  track.classList.remove("is-risk"); // keep track red
+  fill.style.width = `${pctReal}%`;
+
+  // reset inline styling (in case it was "no votes" previously)
+  track.style.removeProperty("background");
+  fill.style.removeProperty("background");
+
+  // a11y
+  track.setAttribute("role", "img");
+  track.setAttribute(
+    "aria-label",
+    bucket.type === "risk"
+      ? `Vote confidence ${pctAI.toFixed(0)}% AI`
+      : `Vote confidence ${pctReal.toFixed(0)}% real`
+  );
+
+  block.hidden = false;
+  track.hidden = false;
+}
+
+function verdictLineText(img) {
+  const label = (img && img.label != null ? String(img.label) : "").trim();
+  if (label) return label;
+
+  const pct = toPercentNumber(img && img.confidence);
+  return `${pct.toFixed(2)}% ${verdictType(img) === "safe" ? "Likely Real" : "Likely AI"}`;
+}
+
+function renderVerdictBlock(img) {
+  const block = document.getElementById("verdict-block");
+  const line = document.getElementById("verdict-line");
+  const track = document.getElementById("verdict-bar");
+  const fill = document.getElementById("verdict-fill");
+
+  if (!block || !line || !track || !fill) return;
+
+  if (!img) {
+    block.hidden = true;
+    track.hidden = true;
+    line.textContent = "";
+    line.classList.remove("is-safe", "is-risk");
+    track.classList.remove("is-risk");
+    fill.classList.remove("is-risk");
+    fill.style.width = "0%";
+    return;
+  }
+
+  const pct = toPercentNumber(img.confidence);
+  const type = verdictType(img); // safe | risk
+
+  // text line
+  line.textContent = verdictLineText(img);
+  line.classList.remove("is-safe", "is-risk");
+  line.classList.add(type === "safe" ? "is-safe" : "is-risk");
+
+  // bar (track + fill), exactly like scans page
+  track.classList.toggle("is-risk", type === "risk");
+  fill.classList.toggle("is-risk", type === "risk");
+  fill.style.width = `${pct}%`;
+
+  // a11y
+  track.setAttribute("role", "img");
+  track.setAttribute("aria-label", `Confidence ${pct}%`);
+
+  block.hidden = false;
+  track.hidden = false;
 }
 
 // Renders a definition list from whatever keys exist.
@@ -58,37 +300,88 @@ function renderMeta(img) {
     metaList.appendChild(makeEl("dd", "meta-value", value));
   };
 
-  // ---- Priority fields (common + important) ----
+  // Fields to hide
+  const hiddenFields = new Set([
+    "image_id",
+    "url",
+    "is_reported",
+    "s3_key",
+    "user_id",
+    "_id",
+    "post_id",
+    "is_public",
+    "clicks_count",
+    "comment_count",
+    "controversial_since",
+    "created_at",
+    "debug",
+    "result",
+    "score",
+    "user_name",
+  ]);
+
+  // ---- Show only allowed fields ----
   addMeta("Visibility", visibilityOf(img));
-  addMeta("Image ID", img.image_id != null ? String(img.image_id) : "N/A");
   addMeta("Uploaded", formatDate(img.uploaded_at));
-  addMeta("Label", img.label != null ? String(img.label) : "N/A");
   addMeta("Verdict", img.verdict != null ? String(img.verdict) : "N/A");
   addMeta("Confidence", toPercent(img.confidence));
-  addMeta("URL", img.url != null ? String(img.url) : "N/A");
 
-  // ---- Dump the raw payload keys too (so you KNOW what comes in) ----
-  // This is exactly what you asked for: see everything that arrives.
-  const seen = new Set(["is_public", "image_id", "uploaded_at", "label", "verdict", "confidence", "url"]);
+  // Always show description field (even if empty/not set yet)
+  const descValue = img.description ? String(img.description) : "(No description yet)";
+  addMeta("Description", descValue);
 
-  Object.keys(img || {}).sort().forEach((key) => {
-    if (seen.has(key)) return;
+  // Show vote counts for public posts
+  if (!isPrivateScan(img)) {
+    const upVotes = img.up_vote_count !== undefined ? img.up_vote_count : 0;
+    const downVotes = img.down_vote_count !== undefined ? img.down_vote_count : 0;
+    addMeta("Up Votes", String(upVotes));
+    addMeta("Down Votes", String(downVotes));
+  }
 
-    const val = img[key];
-    let out;
+  // Show updated_at if it exists (formatted like uploaded_at)
+  if (img.updated_at) {
+    addMeta("Updated", formatDate(img.updated_at));
+  }
 
-    if (val === null || val === undefined) out = "N/A";
-    else if (typeof val === "object") {
-      try { out = JSON.stringify(val); } catch (_) { out = "[object]"; }
-    } else {
-      out = String(val);
-    }
+  // Show any other non-hidden fields (but skip description since we showed it above)
+  const alreadyShown = new Set([
+    "is_public",
+    "uploaded_at",
+    "label",
+    "verdict",
+    "confidence",
+    "description",
+    "updated_at",
+    "up_vote_count",
+    "down_vote_count",
+  ]);
 
-    addMeta(key, out);
-  });
+  Object.keys(img || {})
+    .sort()
+    .forEach((key) => {
+      if (hiddenFields.has(key) || alreadyShown.has(key)) return;
+
+      const val = img[key];
+      let out;
+
+      if (val === null || val === undefined) out = "N/A";
+      else if (typeof val === "object") {
+        try {
+          out = JSON.stringify(val);
+        } catch (_) {
+          out = "[object]";
+        }
+      } else {
+        out = String(val);
+      }
+
+      addMeta(key, out);
+    });
 }
 
 function renderScan(img, title) {
+  currentScan = img;
+
   const card = document.getElementById("viewscan-card");
   const imageEl = document.getElementById("viewscan-image");
   const titleEl = document.getElementById("viewscan-title");
@@ -115,11 +408,734 @@ function renderScan(img, title) {
     imageEl.style.display = "none";
   }
 
+  // Verdict block (line + bar) just below image
+  renderVerdictBlock(img);
+
+  // Votes block (line + bar) just below verdict bar
+  renderVotesBlock(img);
+
   renderMeta(img);
   card.hidden = false;
   setStatus("", null);
+
+  // Edit Description (INLINE, only when post_id exists)
+  setupEditDescriptionInline(img);
+
+  // Show Comments (only for public posts with post_id)
+  setupShowComments(img);
+
+  // Delete Post (only for public posts with post_id)
+  setupDeletePost(img);
+
+  // Delete Scan (only for private scans)
+  setupDeleteScan(img);
+
+  // Inline Make Public UI (ONLY when private)
+  setupMakePublicInline(img);
 }
 
+// -------------------------
+// Edit Description (INLINE)
+// Requirements:
+// - "Edit Description" button is visible only when scan has post_id
+// - Clicking it reveals textarea + Save/Cancel
+// - Clicking it again closes it + unselects
+// - Cancel hides it and resets the value
+// - Save PATCHes the post description and updates the meta on this page
+// -------------------------
+function setupEditDescriptionInline(img) {
+  const section = document.getElementById("edit-description-section");
+  const openBtn = document.getElementById("btn-edit-description");
+  const form = document.getElementById("edit-description-form");
+  const input = document.getElementById("edit-description-input");
+  const countEl = document.getElementById("edit-description-count");
+  const statusEl = document.getElementById("edit-description-status");
+  const saveBtn = document.getElementById("edit-description-save");
+  const cancelBtn = document.getElementById("edit-description-cancel");
+
+  if (!section || !openBtn || !form || !input || !statusEl || !saveBtn || !cancelBtn) {
+    if (section) section.style.display = img && img.post_id ? "block" : "none";
+    return;
+  }
+
+  const shouldShow = !!(img && img.post_id);
+  section.style.display = shouldShow ? "block" : "none";
+
+  if (!shouldShow) {
+    form.hidden = true;
+    setSelected(openBtn, false);
+    return;
+  }
+
+  const maxLen = 1000;
+  let originalDescription = img.description || "";
+  let formOpen = false;
+  let hasUnsavedChanges = false;
+
+  const setFormStatus = (text, kind) => {
+    statusEl.classList.remove("is-error", "is-success");
+    if (kind === "error") statusEl.classList.add("is-error");
+    if (kind === "success") statusEl.classList.add("is-success");
+    statusEl.textContent = text || "";
+  };
+
+  const syncCount = () => {
+    if (!countEl) return;
+    countEl.textContent = String(input.value.length);
+  };
+
+  const openForm = () => {
+    originalDescription = currentScan && currentScan.description ? String(currentScan.description) : "";
+    input.value = originalDescription;
+    syncCount();
+    setFormStatus("", null);
+
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save";
+
+    hasUnsavedChanges = false;
+    formOpen = true;
+
+    showPanel(form);
+    setSelected(openBtn, true);
+    input.focus();
+  };
+
+  const closeForm = () => {
+    hidePanel(form);
+    input.value = "";
+    if (countEl) countEl.textContent = "0";
+    setFormStatus("", null);
+
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save";
+
+    hasUnsavedChanges = false;
+    formOpen = false;
+
+    setSelected(openBtn, false);
+  };
+
+  const toggleForm = () => {
+    // If opening Edit Description, close Make Public if it exists
+    const makePublicForm = document.getElementById("make-public-form");
+    const makePublicBtn = document.getElementById("btn-make-public");
+    if (makePublicForm && !makePublicForm.hidden) {
+      hidePanel(makePublicForm);
+      setSelected(makePublicBtn, false);
+    }
+
+    if (form.hidden) openForm();
+    else closeForm();
+  };
+
+  // Bind once
+  if (!openBtn.dataset.bound) {
+    openBtn.dataset.bound = "1";
+    openBtn.addEventListener("click", toggleForm);
+  }
+
+  if (!input.dataset.bound) {
+    input.dataset.bound = "1";
+    input.addEventListener("input", () => {
+      syncCount();
+      hasUnsavedChanges = input.value.trim() !== originalDescription.trim();
+    });
+  }
+
+  // Warn only if the form is open AND changes exist
+  if (!window.__editDescBeforeUnloadBound) {
+    window.__editDescBeforeUnloadBound = true;
+    window.addEventListener("beforeunload", (e) => {
+      if (formOpen && hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
+  }
+
+  if (!cancelBtn.dataset.bound) {
+    cancelBtn.dataset.bound = "1";
+    cancelBtn.addEventListener("click", () => {
+      closeForm();
+    });
+  }
+
+  if (!saveBtn.dataset.bound) {
+    saveBtn.dataset.bound = "1";
+    saveBtn.addEventListener("click", async () => {
+      if (!currentScan || !currentScan.post_id) return;
+      if (saveBtn.disabled) return;
+
+      const description = input.value.trim();
+
+      if (!description) {
+        setFormStatus("Description cannot be empty.", "error");
+        return;
+      }
+      if (description.length > maxLen) {
+        setFormStatus(`Description too long (${description.length}/${maxLen}).`, "error");
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving...";
+      setFormStatus("Saving...", null);
+
+      try {
+        await patchPostDescription(currentScan.post_id, description);
+
+        // Update local + rerender meta so Details -> Description updates immediately
+        currentScan.description = description;
+        currentScan.updated_at = new Date().toISOString();
+        renderMeta(currentScan);
+
+        setFormStatus("✓ Description updated.", "success");
+
+        // Close after a short beat so user sees success
+        setTimeout(() => closeForm(), 600);
+      } catch (err) {
+        setFormStatus(err?.message || "Failed to update description.", "error");
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save";
+      }
+    });
+  }
+}
+
+async function patchPostDescription(postId, description) {
+  const response = await fetch(`/community/posts?post_id=${encodeURIComponent(postId)}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ description }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || data.detail || `Failed to update (${response.status})`);
+  }
+
+  return data;
+}
+
+// -------------------------
+// Show Comments
+// Requirements:
+// - "Show Comments" button is visible only when scan is public and has post_id
+// - Clicking it fetches and displays all comments for the post
+// - Clicking again collapses the comments
+// -------------------------
+function setupShowComments(img) {
+  const section = document.getElementById("show-comments-section");
+  const showBtn = document.getElementById("btn-show-comments");
+  const container = document.getElementById("comments-container");
+  const statusEl = document.getElementById("comments-status");
+  const listEl = document.getElementById("comments-list");
+
+  if (!section || !showBtn || !container || !statusEl || !listEl) {
+    if (section) section.style.display = "none";
+    return;
+  }
+
+  // Show only for public posts with post_id
+  const shouldShow = !!(img && img.post_id && !isPrivateScan(img));
+  section.style.display = shouldShow ? "block" : "none";
+
+  if (!shouldShow) {
+    return;
+  }
+
+  let commentsVisible = false;
+
+  const setStatus = (text, isError) => {
+    statusEl.textContent = text || "";
+  };
+
+  const renderComments = (comments) => {
+    clearEl(listEl);
+
+    if (!comments || comments.length === 0) {
+      listEl.appendChild(makeEl("div", "comment-empty", "No comments yet."));
+      return;
+    }
+
+    comments.forEach((comment) => {
+      const commentDiv = makeEl("div", "comment-item");
+
+      const header = makeEl("div", "comment-header");
+      const username = makeEl("span", "comment-username", comment.user_name || "Anonymous");
+      const date = makeEl(
+        "span",
+        "comment-date",
+        comment.created_at ? new Date(comment.created_at).toLocaleString() : ""
+      );
+      header.appendChild(username);
+      header.appendChild(date);
+
+      const body = makeEl("div", "comment-body", comment.text || "");
+
+      commentDiv.appendChild(header);
+      commentDiv.appendChild(body);
+      listEl.appendChild(commentDiv);
+    });
+  };
+
+  const toggleComments = async () => {
+    if (commentsVisible) {
+      // Hide comments
+      container.hidden = true;
+      commentsVisible = false;
+      showBtn.textContent = "Show Comments";
+      setSelected(showBtn, false);
+    } else {
+      // Show and fetch comments
+      container.hidden = false;
+      commentsVisible = true;
+      showBtn.textContent = "Hide Comments";
+      setSelected(showBtn, true);
+
+      setStatus("Loading comments...", false);
+      clearEl(listEl);
+
+      try {
+        const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(currentScan.post_id)}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          credentials: "include",
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setStatus(data.error || data.detail || `Failed to load comments (${res.status})`, true);
+          return;
+        }
+
+        setStatus("", false);
+        renderComments(data.items || []);
+      } catch (err) {
+        setStatus("Network error loading comments.", true);
+      }
+    }
+  };
+
+  if (!showBtn.dataset.bound) {
+    showBtn.dataset.bound = "1";
+    showBtn.addEventListener("click", toggleComments);
+  }
+}
+
+// -------------------------
+// Delete Post
+// Requirements:
+// - "Delete Post" button is visible only when scan is public and has post_id
+// - Clicking it confirms with the user before deleting
+// - Deletes the post from community (same as community PostBox)
+// - Redirects to scans page after successful deletion
+// -------------------------
+function setupDeletePost(img) {
+  const section = document.getElementById("delete-post-section");
+  const deleteBtn = document.getElementById("btn-delete-post");
+  const statusEl = document.getElementById("delete-post-status");
+
+  if (!section || !deleteBtn || !statusEl) {
+    if (section) section.style.display = "none";
+    return;
+  }
+
+  // Show only for public posts with post_id
+  const shouldShow = !!(img && img.post_id && !isPrivateScan(img));
+  section.style.display = shouldShow ? "block" : "none";
+
+  if (!shouldShow) {
+    return;
+  }
+
+  const setStatus = (text, kind) => {
+    statusEl.classList.remove("is-error", "is-success");
+    if (kind === "error") statusEl.classList.add("is-error");
+    if (kind === "success") statusEl.classList.add("is-success");
+    statusEl.textContent = text || "";
+  };
+
+  const modal = document.getElementById("delete-modal");
+  const modalConfirm = document.getElementById("modal-confirm");
+  const modalCancel = document.getElementById("modal-cancel");
+
+  if (modal) modal.hidden = true;
+
+  const showModal = () => {
+    if (modal) modal.hidden = false;
+  };
+
+  const hideModal = () => {
+    if (modal) modal.hidden = true;
+  };
+
+  if (!deleteBtn.dataset.bound) {
+    deleteBtn.dataset.bound = "1";
+    deleteBtn.addEventListener("click", () => {
+      if (!currentScan || !currentScan.post_id) return;
+      showModal();
+    });
+  }
+
+  if (modalCancel && !modalCancel.dataset.bound) {
+    modalCancel.dataset.bound = "1";
+    modalCancel.addEventListener("click", hideModal);
+  }
+
+  if (modalConfirm && !modalConfirm.dataset.bound) {
+    modalConfirm.dataset.bound = "1";
+    modalConfirm.addEventListener("click", async () => {
+      if (!currentScan || !currentScan.post_id) return;
+
+      hideModal();
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting...";
+      setStatus("Deleting post...", null);
+
+      try {
+        const res = await fetch(`/community/posts?post_id=${encodeURIComponent(currentScan.post_id)}`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.error || data.detail || `Failed to delete post (${res.status})`);
+        }
+
+        setStatus("✓ Post deleted. Redirecting...", "success");
+
+        // Clean session data
+        sessionStorage.removeItem("selectedScan");
+        sessionStorage.removeItem("selectedScanTitle");
+
+        // Redirect to scans page after a brief delay
+        setTimeout(() => {
+          window.location.href = "/scans";
+        }, 800);
+      } catch (err) {
+        setStatus(err?.message || "Failed to delete post.", "error");
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = "Delete Post";
+      }
+    });
+  }
+
+  // Close modal on backdrop click
+  if (modal && !modal.dataset.bound) {
+    modal.dataset.bound = "1";
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) hideModal();
+    });
+  }
+}
+
+// -------------------------
+// Delete Scan
+// Requirements:
+// - "Delete Scan" button is visible only when scan is private
+// - Clicking it confirms with the user before deleting
+// - Deletes the scan/image from the system
+// - Redirects to scans page after successful deletion
+// -------------------------
+function setupDeleteScan(img) {
+  const section = document.getElementById("delete-scan-section");
+  const deleteBtn = document.getElementById("btn-delete-scan");
+  const statusEl = document.getElementById("delete-scan-status");
+
+  if (!section || !deleteBtn || !statusEl) {
+    if (section) section.style.display = "none";
+    return;
+  }
+
+  // Show only for private scans
+  const shouldShow = !!(img && img.image_id && isPrivateScan(img));
+  section.style.display = shouldShow ? "block" : "none";
+
+  if (!shouldShow) {
+    return;
+  }
+
+  const setStatus = (text, kind) => {
+    statusEl.classList.remove("is-error", "is-success");
+    if (kind === "error") statusEl.classList.add("is-error");
+    if (kind === "success") statusEl.classList.add("is-success");
+    statusEl.textContent = text || "";
+  };
+
+  const modal = document.getElementById("delete-scan-modal");
+  const modalConfirm = document.getElementById("scan-modal-confirm");
+  const modalCancel = document.getElementById("scan-modal-cancel");
+
+  if (modal) modal.hidden = true;
+
+  const showModal = () => {
+    if (modal) modal.hidden = false;
+  };
+
+  const hideModal = () => {
+    if (modal) modal.hidden = true;
+  };
+
+  if (!deleteBtn.dataset.bound) {
+    deleteBtn.dataset.bound = "1";
+    deleteBtn.addEventListener("click", () => {
+      if (!currentScan || !currentScan.image_id) return;
+      showModal();
+    });
+  }
+
+  if (modalCancel && !modalCancel.dataset.bound) {
+    modalCancel.dataset.bound = "1";
+    modalCancel.addEventListener("click", hideModal);
+  }
+
+  if (modalConfirm && !modalConfirm.dataset.bound) {
+    modalConfirm.dataset.bound = "1";
+    modalConfirm.addEventListener("click", async () => {
+      if (!currentScan || !currentScan.image_id) return;
+
+      hideModal();
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting...";
+      setStatus("Deleting scan...", null);
+
+      try {
+        const res = await fetch(`/image/${encodeURIComponent(currentScan.image_id)}`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.error || data.detail || `Failed to delete scan (${res.status})`);
+        }
+
+        setStatus("✓ Scan deleted. Redirecting...", "success");
+
+        // Clean session data
+        sessionStorage.removeItem("selectedScan");
+        sessionStorage.removeItem("selectedScanTitle");
+
+        // Redirect to scans page after a brief delay
+        setTimeout(() => {
+          window.location.href = "/scans";
+        }, 800);
+      } catch (err) {
+        setStatus(err?.message || "Failed to delete scan.", "error");
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = "Delete Scan";
+      }
+    });
+  }
+
+  // Close modal on backdrop click
+  if (modal && !modal.dataset.bound) {
+    modal.dataset.bound = "1";
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) hideModal();
+    });
+  }
+}
+
+// -------------------------
+// Make Public (INLINE, no modal)
+// Requirements:
+// - "Make Public" button is visible only when scan is private
+// - Clicking it reveals a description box + Publish/Cancel
+// - Clicking it again closes it + unselects
+// - Cancel hides it again
+// - Publish posts + updates image visibility, then redirects to Scans (Public tab)
+// -------------------------
+function setupMakePublicInline(img) {
+  const makePublicBtn = document.getElementById("btn-make-public");
+  const makePublicSection = document.getElementById("make-public-section");
+  const form = document.getElementById("make-public-form");
+  const formInput = document.getElementById("make-public-description");
+  const formCount = document.getElementById("make-public-count");
+  const publishBtn = document.getElementById("make-public-publish");
+  const cancelBtn = document.getElementById("make-public-cancel");
+  const formStatus = document.getElementById("make-public-status");
+
+  if (!makePublicSection || !makePublicBtn || !form || !formInput || !publishBtn || !cancelBtn || !formStatus) {
+    if (makePublicSection) makePublicSection.style.display = isPrivateScan(img) ? "block" : "none";
+    return;
+  }
+
+  const shouldShow = isPrivateScan(img);
+  makePublicSection.style.display = shouldShow ? "block" : "none";
+
+  if (!shouldShow) {
+    form.hidden = true;
+    setSelected(makePublicBtn, false);
+    return;
+  }
+
+  const setFormStatus = (text, kind) => {
+    formStatus.classList.remove("is-error", "is-success");
+    if (kind === "error") formStatus.classList.add("is-error");
+    if (kind === "success") formStatus.classList.add("is-success");
+    formStatus.textContent = text || "";
+  };
+
+  const openForm = () => {
+    showPanel(form);
+    formInput.value = "";
+    if (formCount) formCount.textContent = "0";
+    setFormStatus("", null);
+
+    setSelected(makePublicBtn, true);
+    formInput.focus();
+  };
+
+  const closeForm = () => {
+    hidePanel(form);
+    formInput.value = "";
+    if (formCount) formCount.textContent = "0";
+    setFormStatus("", null);
+
+    publishBtn.disabled = false;
+    publishBtn.textContent = "Publish";
+
+    setSelected(makePublicBtn, false);
+  };
+
+  const toggleForm = () => {
+    // If opening Make Public, close Edit Description if it exists
+    const editForm = document.getElementById("edit-description-form");
+    const editBtn = document.getElementById("btn-edit-description");
+    if (editForm && !editForm.hidden) {
+      hidePanel(editForm);
+      setSelected(editBtn, false);
+    }
+
+    if (form.hidden) openForm();
+    else closeForm();
+  };
+
+  if (!makePublicBtn.dataset.bound) {
+    makePublicBtn.dataset.bound = "1";
+    makePublicBtn.addEventListener("click", toggleForm);
+  }
+
+  if (!formInput.dataset.bound) {
+    formInput.dataset.bound = "1";
+    formInput.addEventListener("input", () => {
+      if (formCount) formCount.textContent = String(formInput.value.length);
+    });
+  }
+
+  if (!cancelBtn.dataset.bound) {
+    cancelBtn.dataset.bound = "1";
+    cancelBtn.addEventListener("click", () => {
+      closeForm();
+    });
+  }
+
+  if (!publishBtn.dataset.bound) {
+    publishBtn.dataset.bound = "1";
+    publishBtn.addEventListener("click", async () => {
+      if (!currentScan) return;
+      if (publishBtn.disabled) return;
+
+      const description = formInput.value.trim();
+      if (!description) {
+        setFormStatus("Description is required.", "error");
+        return;
+      }
+      if (description.length > 1000) {
+        setFormStatus(`Description too long (${description.length}/1000).`, "error");
+        return;
+      }
+
+      publishBtn.disabled = true;
+      publishBtn.textContent = "Publishing...";
+      setFormStatus("Publishing...", null);
+
+      try {
+        await handleMakePublic(currentScan, description);
+
+        // Clean session data (optional)
+        sessionStorage.removeItem("selectedScan");
+        sessionStorage.removeItem("selectedScanTitle");
+
+        // Redirect to Scans and force Public tab
+        window.location.href = "/scans?tab=public";
+      } catch (err) {
+        setFormStatus(err?.message || "Failed to publish.", "error");
+        publishBtn.disabled = false;
+        publishBtn.textContent = "Publish";
+      }
+    });
+  }
+}
+
+async function handleMakePublic(img, description) {
+  const meRes = await fetch("/auth/me", {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    credentials: "include",
+  });
+
+  if (!meRes.ok) throw new Error("You must be signed in to publish.");
+
+  const userData = await meRes.json().catch(() => ({}));
+  const userId = userData.user_id;
+  if (!userId) throw new Error("Could not read current user.");
+
+  const postBody = {
+    user_id: userId,
+    image_id: img.image_id,
+    description,
+    result: {
+      verdict: img.verdict || null,
+      label: img.label || null,
+      confidence: img.confidence || null,
+    },
+  };
+
+  const postRes = await fetch("/community/posts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    credentials: "include",
+    body: JSON.stringify(postBody),
+  });
+
+  if (!postRes.ok) {
+    const errorData = await postRes.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
+  }
+
+  const updateRes = await fetch(`/image/${img.image_id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ is_public: true }),
+  });
+
+  if (!updateRes.ok) {
+    const errorData = await updateRes.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`
+    );
+  }
+}
+
+// -------------------------
+// Init
+// -------------------------
 window.addEventListener("DOMContentLoaded", () => {
   let img = null;
   let title = null;

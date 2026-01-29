@@ -22,6 +22,12 @@ function setupScanTabs() {
   const tabs = document.querySelectorAll(".scans-tab");
   if (!tabs.length) return;
 
+  tabs.forEach((t) => {
+    const isActive = t.dataset.filter === activeFilter;
+    t.classList.toggle("is-active", isActive);
+    t.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
   tabs.forEach((btn) => {
     btn.addEventListener("click", () => {
       activeFilter = btn.dataset.filter || "private";
@@ -126,8 +132,6 @@ function createScanCard(img, index) {
   const h3 = makeEl("h3", null, "Analysis");
   analysis.appendChild(h3);
 
-  // Remove "Our model says" completely per your request
-
   // Verdict line: use accurate backend label
   // Also: color matches bar fill
   const verdictLine = makeEl("div", `scan-verdict-line verdict-text ${type === "safe" ? "is-safe" : "is-risk"}`);
@@ -139,13 +143,15 @@ function createScanCard(img, index) {
   track.setAttribute("role", "img");
   track.setAttribute("aria-label", `Confidence ${pct}%`);
 
+  if (type === "risk") track.classList.add("is-risk");
+
   const fill = makeEl("div", `confidence-fill ${type === "risk" ? "is-risk" : ""}`);
   fill.style.width = `${pct}%`;
 
   track.appendChild(fill);
   analysis.appendChild(track);
 
-  // Meta: uploaded date (same as before but without HTML string)
+  // Meta: uploaded date
   const meta = makeEl("div", "scan-meta");
 
   const uploadedText = img.uploaded_at
@@ -159,7 +165,7 @@ function createScanCard(img, index) {
   // View more details link
   // -------------------------
   const detailsLink = makeEl("a", "scan-details-link", "View more details");
-  detailsLink.href = "/viewscan.html";
+  detailsLink.href = "/viewscan";
 
   detailsLink.addEventListener("click", (e) => {
     e.preventDefault();
@@ -180,6 +186,10 @@ function createScanCard(img, index) {
   });
 
   analysis.appendChild(detailsLink);
+
+  // NOTE:
+  // Make Public button removed from scans page.
+  // Publishing is now only available on the viewscan page.
 
   return card;
 }
@@ -223,27 +233,53 @@ async function loadScans() {
   clearEl(containerEl);
 
   try {
-    const response = await fetch("/images", {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "include",
-    });
+    // Fetch both images and posts
+    const [imagesResponse, postsResponse] = await Promise.all([
+      fetch("/images", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      }),
+      fetch("/community/posts", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      }).catch(() => null),
+    ]);
 
-    if (!response.ok) {
+    if (!imagesResponse.ok) {
       statusEl.classList.remove("loading");
       statusEl.classList.add("error");
 
-      if (response.status === 401) {
+      if (imagesResponse.status === 401) {
         statusEl.textContent = "Please log in to view your scans.";
         return;
       }
 
-      statusEl.textContent = `Failed to load scans (${response.status})`;
+      statusEl.textContent = `Failed to load scans (${imagesResponse.status})`;
       return;
     }
 
-    const data = await response.json();
-    allScans = data.items || [];
+    const imagesData = await imagesResponse.json();
+    const images = imagesData.items || [];
+
+    // Fetch posts data if available
+    let posts = [];
+    if (postsResponse && postsResponse.ok) {
+      const postsData = await postsResponse.json().catch(() => ({}));
+      posts = postsData.items || [];
+    }
+
+    const postByImageId = new Map(posts.map((post) => [post.image_id, post]));
+
+    // Merge images with their post data
+    allScans = images.map((img) => {
+      const post = postByImageId.get(img.image_id);
+      if (post) {
+        return { ...img, ...post };
+      }
+      return img;
+    });
 
     statusEl.classList.remove("loading");
     statusEl.textContent = "";
@@ -263,6 +299,15 @@ async function loadScans() {
     statusEl.textContent = `Error: ${error.message}`;
   }
 }
+
+// If URL is /scans?tab=public, default to public tab
+(function applyTabFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = (params.get("tab") || "").toLowerCase();
+  if (tab === "public" || tab === "private") {
+    activeFilter = tab;
+  }
+})();
 
 // -------------------------
 // Init

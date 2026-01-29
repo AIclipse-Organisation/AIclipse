@@ -11,7 +11,7 @@
   margin: 0px 16px 10px;
   padding-bottom: 20px;
 
-  border-bottom: 1px solid rgba(255,255,255,0.10);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .viewscan-tab {
@@ -24,17 +24,17 @@
   font-weight: 700;
   letter-spacing: 0.2px;
 
-  color: rgba(255,255,255,0.38);
+  color: rgba(255, 255, 255, 0.38);
   font-size: large;
   position: relative;
 }
 
 .viewscan-tab:hover {
-  color: rgba(255,255,255,0.60);
+  color: rgba(255, 255, 255, 0.60);
 }
 
 .viewscan-tab.is-active {
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .viewscan-tab.is-active::after {
@@ -50,17 +50,51 @@
   background: var(--accent, #c9a64b);
 }
 
-/* Card */
+/* =========================
+   Not-a-card layout (keep same classes/ids)
+   ========================= */
+
 .viewscan-card {
   margin: 12px 16px 24px;
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 12px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.03);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 
+/* Back button ABOVE image */
+.back-to-scans-btn {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: fit-content;
+  margin: 0 0 12px 0;
+  padding: 10px 14px;
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+
+  background: transparent;
+  color: #fff;
+  border: 1px solid var(--btn-outline-color);
+
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.back-to-scans-btn:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* Image */
 .viewscan-image-wrap {
-  background: rgba(255,255,255,0.04);
+  background: transparent;
 }
 
 .viewscan-image {
@@ -68,57 +102,138 @@
   display: block;
   max-height: 360px;
   object-fit: cover;
+  border-radius: 12px;
 }
 
+/* =========================
+   Verdict block (matches scans page)
+   ========================= */
+
+.verdict-block {
+  margin-top: 12px;
+}
+
+.verdict-line {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.80);
+}
+
+/* Make verdict text match bar color */
+.verdict-text {
+  font-weight: 700;
+}
+
+.verdict-text.is-safe {
+  color: #18c46c;
+}
+
+.verdict-text.is-risk {
+  color: #e04646;
+}
+
+/* confidence bar
+   - remainder (track) is red
+   - fill overlays it
+*/
+.confidence-track {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: #e04646;
+  /* red remainder */
+  overflow: hidden;
+}
+
+/* ✅ If AI/fake, remainder becomes green */
+.confidence-track.is-risk {
+  background: #18c46c;
+}
+
+.confidence-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: #18c46c;
+  /* green fill by default (real) */
+}
+
+.confidence-fill.is-risk {
+  background: #e04646;
+  /* red fill for fake */
+}
+
+
+/* =========================
+   Votes block (same bar design)
+   ========================= */
+
+.votes-block {
+  margin-top: 10px;
+  /* sits below verdict bar */
+}
+
+.votes-line {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.80);
+}
+
+/* Reuse same classes as verdict text */
+.votes-line.is-safe {
+  color: #18c46c;
+}
+
+.votes-line.is-risk {
+  color: #e04646;
+}
+
+/* "Not sure" */
+.votes-line.is-neutral {
+  color: rgba(255, 255, 255, 0.70);
+}
+
+/* Details block */
 .viewscan-meta {
-  padding: 14px 14px 16px;
+  padding: 14px 0 0;
 }
 
 .viewscan-heading {
   margin: 0 0 12px;
   font-size: 16px;
   font-weight: 800;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
 }
 
-/* Definition list meta */
+/* Definition list meta (no divider here to avoid double line) */
 .meta-list {
   display: grid;
   grid-template-columns: 120px 1fr;
   gap: 8px 12px;
   margin: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .meta-key {
   font-size: 12px;
-  color: rgba(255,255,255,0.60);
+  color: rgba(255, 255, 255, 0.60);
 }
 
 .meta-value {
   font-size: 12px;
-  color: rgba(255,255,255,0.88);
+  color: rgba(255, 255, 255, 0.88);
   margin: 0;
   word-break: break-word;
 }
 
-/* Actions */
-.viewscan-actions {
-  margin-top: 14px;
-}
-
-.secondary-link {
-  display: inline-block;
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 12px;
-  color: rgba(255,255,255,0.80);
-}
-
-.secondary-link:hover {
-  text-decoration: underline;
-}
-
-/* Status (reuse your style semantics) */
+/* Status */
 .status-message {
   padding: 1rem;
   text-align: center;
@@ -127,9 +242,511 @@
 .loading {
   padding: 2rem;
   text-align: center;
-  color: rgba(255,255,255,0.55);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .error {
   color: var(--error-color, #dc3545);
+}
+
+/* =========================
+   Sections (single divider before actions)
+   ========================= */
+
+.edit-desc-section,
+.make-public-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* =========================
+   Buttons (NO shared/global grouped styling)
+   Each class repeats the same design on purpose
+   ========================= */
+
+/* Big buttons */
+.btn-make-public {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-make-public:hover,
+.btn-make-public.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.btn-edit-description {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-edit-description:hover,
+.btn-edit-description.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* Small action buttons */
+.make-public-btn-cancel {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 600;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.make-public-btn-cancel:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.make-public-btn-cancel--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.make-public-btn-publish {
+  --btn-outline-color: #5f8affe0;
+  --btn-hover-color: #5f8affe0;
+
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.make-public-btn-publish:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.make-public-btn-publish--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.edit-desc-btn-cancel {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 600;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.edit-desc-btn-cancel:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.edit-desc-btn-cancel--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.edit-desc-btn-save {
+  --btn-outline-color: #18c46c;
+  --btn-hover-color: #18c46c;
+
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 600;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.edit-desc-btn-save:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.edit-desc-btn-save--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Disabled state (still specific, not grouped) */
+.make-public-btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.edit-desc-btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* =========================
+   Inline forms
+   ========================= */
+
+.make-public-form,
+.edit-desc-form {
+  margin-top: 12px;
+}
+
+.make-public-text,
+.edit-desc-text {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.70);
+}
+
+.make-public-textarea,
+.edit-desc-textarea {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  font: inherit;
+}
+
+.make-public-textarea:focus,
+.edit-desc-textarea:focus {
+  outline: none;
+  border-color: rgba(207, 184, 124, 0.95);
+}
+
+.make-public-count,
+.edit-desc-count {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.50);
+}
+
+.make-public-status,
+.edit-desc-status {
+  margin-top: 10px;
+  min-height: 18px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.make-public-status.is-error {
+  color: #e04646;
+}
+
+.edit-desc-status.is-error {
+  color: #e04646;
+}
+
+.make-public-status.is-success {
+  color: #18c46c;
+}
+
+.edit-desc-status.is-success {
+  color: #18c46c;
+}
+
+.make-public-actions,
+.edit-desc-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+
+
+/* Delete confirmation modal */
+
+.btn-delete-post {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-delete-post:hover,
+.btn-delete-post.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.btn-delete-scan {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-delete-scan:hover,
+.btn-delete-scan.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* =========================
+   Modal (Results-style)
+   ========================= */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal-overlay[hidden] {
+  display: none !important;
+}
+
+.modal {
+  width: 90%;
+  max-width: 360px;
+  background: #111;
+  border-radius: 14px;
+  padding: 18px 16px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.modal-text {
+  font-size: 14px;
+  color: #ccc;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-actions button {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+
+  font-weight: 700;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.92);
+
+  background: transparent;
+  cursor: pointer;
+
+  border: 1px solid transparent;
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+/* Cancel — neutral outline */
+.modal-actions .secondary {
+  --btn-outline-color: rgba(255, 255, 255, 0.35);
+  --btn-hover-color: rgba(255, 255, 255, 0.85);
+
+  border-color: var(--btn-outline-color);
+}
+
+.modal-actions .secondary:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* Delete — danger (red) */
+.modal-actions .danger {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  border-color: var(--btn-outline-color);
+}
+
+.modal-actions .danger:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+
+
+/* =========================
+  Comments
+   ========================= */
+
+.btn-show-comments {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-show-comments:hover,
+.btn-show-comments.is-selected {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* Comments section */
+.comments-container {
+  margin-top: 16px;
+}
+
+.comments-status {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comment-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.comment-username {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+}
+
+.comment-date {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.comment-body {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.comment-empty {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  padding: 20px;
 }
