@@ -10,7 +10,16 @@ export default function RootLayout({ children }) {
           <div className="app-container">
             <Topbar />
 
-            <main className="screen">{children}</main>
+            <main className="screen">
+
+              <section className="page-header" aria-label="Page title">
+                <h1 className="page-title">Home</h1>
+                <div className="page-underline" role="presentation" />
+              </section>
+
+              {children}
+
+            </main>
 
             <BottomNav />
           </div>

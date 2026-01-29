@@ -108,8 +108,6 @@ export default function Page() {
   return (
     <main>
       <section>
-        <h2>Community Images</h2>
-
         <div className="comm_grid">
           {items.map((img) => (
             <PostBox

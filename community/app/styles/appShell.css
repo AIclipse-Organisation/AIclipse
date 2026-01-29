@@ -5,6 +5,26 @@ html, body {
   background: #222222;
 }
 
+.page-header {
+  padding: 6px 0 18px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #CFB87C;
+}
+
+.page-underline {
+  margin-top: 12px;
+  height: 1px;
+  width: 100%;
+  background: #CFB87C;
+}
+
+
 /* App shell wrapper */
 .app {
   background: #222222;
