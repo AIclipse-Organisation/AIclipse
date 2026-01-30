@@ -1,9 +1,10 @@
+import asyncio
 import base64
 import importlib.util
-import json
 import os
 import sys
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -21,13 +22,19 @@ def _gateway_root() -> Path:
 
 
 def _entrypoint_path() -> Path:
-    p = _gateway_root() / "main-gateway.py"
+    p = _gateway_root() / "app" / "main_gateway.py"
     if not p.exists():
         raise RuntimeError(f"Expected gateway entrypoint at: {p}")
     return p
 
 
 def _load_gateway_module():
+    root = _gateway_root()
+
+    root_str = str(root)
+    if root_str not in sys.path:
+        sys.path.insert(0, root_str)
+
     entry = _entrypoint_path()
     spec = importlib.util.spec_from_file_location("gateway_service", entry)
     if spec is None or spec.loader is None:
@@ -119,11 +126,66 @@ def make_auth_token(
     )
 
 
+def _patch_async_client_in_module(monkeypatch, mod, factory) -> None:
+    if mod is None:
+        return
+
+    if hasattr(mod, "httpx"):
+        monkeypatch.setattr(mod.httpx, "AsyncClient", factory, raising=False)
+
+    monkeypatch.setattr(mod, "AsyncClient", factory, raising=False)
+
+
+@asynccontextmanager
+async def _run_asgi_lifespan(app, timeout_s: float = 10.0):
+    scope = {"type": "lifespan", "asgi": {"spec_version": "2.0"}}
+
+    recv_q: asyncio.Queue = asyncio.Queue()
+    send_q: asyncio.Queue = asyncio.Queue()
+
+    async def receive():
+        return await recv_q.get()
+
+    async def send(message):
+        await send_q.put(message)
+
+    task = asyncio.create_task(app(scope, receive, send))
+
+    await recv_q.put({"type": "lifespan.startup"})
+    msg = await asyncio.wait_for(send_q.get(), timeout=timeout_s)
+    if msg["type"] == "lifespan.startup.failed":
+        detail = msg.get("message") or msg.get("detail") or str(msg)
+        task.cancel()
+        raise RuntimeError(f"ASGI lifespan startup failed: {detail}")
+    if msg["type"] != "lifespan.startup.complete":
+        task.cancel()
+        raise RuntimeError(f"Unexpected lifespan message during startup: {msg}")
+
+    try:
+        yield
+    finally:
+        await recv_q.put({"type": "lifespan.shutdown"})
+        msg2 = await asyncio.wait_for(send_q.get(), timeout=timeout_s)
+        if msg2["type"] == "lifespan.shutdown.failed":
+            detail = msg2.get("message") or msg2.get("detail") or str(msg2)
+            task.cancel()
+            raise RuntimeError(f"ASGI lifespan shutdown failed: {detail}")
+        if msg2["type"] != "lifespan.shutdown.complete":
+            task.cancel()
+            raise RuntimeError(f"Unexpected lifespan message during shutdown: {msg2}")
+
+        await asyncio.wait_for(task, timeout=timeout_s)
+
+
 @pytest.fixture(scope="session")
 def gateway_mod():
     os.environ.setdefault("AUTH_URI", "http://auth")
     os.environ.setdefault("DETECTOR_URI", "http://detector")
+    os.environ.setdefault("MEDIA_URI", "http://media")
     os.environ.setdefault("DETECTION_TOKEN_SECRET", "test-detection-secret")
+    os.environ.setdefault("INTERNAL_AUTH_TOKEN", "test-internal-token")
+    os.environ.setdefault("CPU_POOL_WORKERS", "4")
+    os.environ.setdefault("HTTP_TIMEOUT_S", "10")
 
     return _load_gateway_module()
 
@@ -131,25 +193,6 @@ def gateway_mod():
 @pytest.fixture()
 def upstream_router() -> UpstreamRouter:
     return UpstreamRouter()
-
-
-@pytest.fixture()
-def patch_upstreams(gateway_mod, upstream_router, monkeypatch):
-    transport = httpx.MockTransport(upstream_router.handler)
-    orig_async_client = httpx.AsyncClient
-
-    def _factory(*args, **kwargs):
-        kwargs.setdefault("transport", transport)
-        return orig_async_client(*args, **kwargs)
-
-    monkeypatch.setattr(gateway_mod.httpx, "AsyncClient", _factory)
-
-    gateway_mod.AUTH_URI = os.getenv("AUTH_URI")
-    gateway_mod.DETECTOR_URI = os.getenv("DETECTOR_URI")
-    gateway_mod.MEDIA_URI = os.getenv("MEDIA_URI")
-    gateway_mod.DETECTION_TOKEN_SECRET = os.getenv("DETECTION_TOKEN_SECRET")
-
-    return upstream_router
 
 
 @pytest.fixture()
@@ -166,8 +209,33 @@ def register_auth_jwks(upstream_router, auth_keypair):
     return True
 
 
+@pytest.fixture()
+def patch_upstreams(gateway_mod, upstream_router, auth_keypair, monkeypatch) -> UpstreamRouter:
+    transport = httpx.MockTransport(upstream_router.handler)
+    orig_async_client = httpx.AsyncClient
+
+    def _factory(*args, **kwargs):
+        kwargs.setdefault("transport", transport)
+        return orig_async_client(*args, **kwargs)
+
+    _patch_async_client_in_module(monkeypatch, gateway_mod, _factory)
+
+    for m in list(sys.modules.values()):
+        name = getattr(m, "__name__", "")
+        if name.startswith("app."):
+            _patch_async_client_in_module(monkeypatch, m, _factory)
+
+    def _jwks_handler(_req: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=200, json={"keys": [auth_keypair.jwk]})
+
+    upstream_router.add(host="auth", method="GET", path="/.well-known/jwks.json", handler=_jwks_handler)
+
+    return upstream_router
+
+
 @pytest_asyncio.fixture()
 async def client(gateway_mod, patch_upstreams):
-    transport = httpx.ASGITransport(app=gateway_mod.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+    async with _run_asgi_lifespan(gateway_mod.app):
+        transport = httpx.ASGITransport(app=gateway_mod.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            yield c

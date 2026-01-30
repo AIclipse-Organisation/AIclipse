@@ -13,9 +13,7 @@ PNG_1X1_BLACK = base64.b64decode(
 
 
 @pytest.mark.asyncio
-async def test_v1_checks_with_api_key_ok(client, patch_upstreams, gateway_mod, auth_keypair, register_auth_jwks):
-    gateway_mod.INTERNAL_AUTH_TOKEN = "test-internal-token"
-
+async def test_v1_checks_with_api_key_ok(client, patch_upstreams, auth_keypair):
     api_key = "ak_test.sk_test"
     user_id = "u_api_key"
     now = int(time.time())
@@ -65,9 +63,7 @@ async def test_v1_checks_with_api_key_ok(client, patch_upstreams, gateway_mod, a
 
 
 @pytest.mark.asyncio
-async def test_v1_checks_with_api_key_invalid_key(client, patch_upstreams, gateway_mod):
-    gateway_mod.INTERNAL_AUTH_TOKEN = "test-internal-token"
-
+async def test_v1_checks_with_api_key_invalid_key(client, patch_upstreams):
     def auth_exchange_handler(_req: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={"detail": "Invalid API key"})
 
@@ -84,9 +80,7 @@ async def test_v1_checks_with_api_key_invalid_key(client, patch_upstreams, gatew
 
 
 @pytest.mark.asyncio
-async def test_v1_checks_with_api_key_exchange_forbidden(client, patch_upstreams, gateway_mod):
-    gateway_mod.INTERNAL_AUTH_TOKEN = "test-internal-token"
-
+async def test_v1_checks_with_api_key_exchange_forbidden(client, patch_upstreams):
     def auth_exchange_handler(_req: httpx.Request) -> httpx.Response:
         return httpx.Response(403, json={"detail": "Forbidden"})
 
@@ -103,9 +97,7 @@ async def test_v1_checks_with_api_key_exchange_forbidden(client, patch_upstreams
 
 
 @pytest.mark.asyncio
-async def test_v1_checks_with_api_key_exchange_returns_bad_json(client, patch_upstreams, gateway_mod):
-    gateway_mod.INTERNAL_AUTH_TOKEN = "test-internal-token"
-
+async def test_v1_checks_with_api_key_exchange_returns_bad_json(client, patch_upstreams):
     def auth_exchange_handler(_req: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=b"not-json", headers={"content-type": "application/json"})
 
