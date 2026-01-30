@@ -282,6 +282,43 @@
   background-color: rgba(244, 67, 54, 0.20);
 }
 
+.comm_iconBtn {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.comm_iconBtn:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.comm_iconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* icon image size */
+.comm_icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  object-fit: contain;
+}
+
+/* optional: slightly bigger on touch devices */
+@media (min-width: 420px) {
+  .comm_icon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
 /* =========================
    COMMENTS SECTION
    ========================= */
@@ -320,7 +357,7 @@
   color: rgba(255,255,255,0.45);
 }
 
-.comm_commentButton {
+/* .comm_commentButton {
   width: 100%;
   padding: 10px 12px;
   border-radius: 12px;
@@ -334,6 +371,31 @@
 
 .comm_commentButton:hover {
   background: rgba(255,255,255,0.12);
+} */
+
+.comm_commentButton {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.comm_commentButton:hover {
+  background: var(--btn-hover-color);
+  color: #111;
 }
 
 .comm_commentsList {

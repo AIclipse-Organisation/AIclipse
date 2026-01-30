@@ -355,24 +355,51 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
             onClick={() => vote("up")}
             disabled={busy || !postId}
             title="Upvote"
+            aria-label="Upvote"
+            className={`comm_iconBtn comm_voteUp ${/* optional */ ""}`}
           >
-            ⬆️
+            <img
+              className="comm_icon"
+              src="/static/images/upvote.png"
+              alt=""
+              aria-hidden="true"
+            />
           </button>
           <span>{up}</span>
+
           <button
             type="button"
             onClick={() => vote("down")}
             disabled={busy || !postId}
             title="Downvote"
+            aria-label="Downvote"
+            className={`comm_iconBtn comm_voteDown ${/* optional */ ""}`}
           >
-            ⬇️
+            <img
+              className="comm_icon"
+              src="/static/images/downvote.png"
+              alt=""
+              aria-hidden="true"
+            />
           </button>
           <span>{down}</span>
         </div>
 
         <div className="comm_CommentsCell">
-          <button type="button" onClick={() => setShowComments((v) => !v)} disabled={!postId}>
-            💬
+          <button
+            type="button"
+            onClick={() => setShowComments((v) => !v)}
+            disabled={!postId}
+            title="Comments"
+            aria-label="Toggle comments"
+            className="comm_iconBtn"
+          >
+            <img
+              className="comm_icon"
+              src="/static/images/comment.png"
+              alt=""
+              aria-hidden="true"
+            />
           </button>
         </div>
       </div>
