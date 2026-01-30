@@ -1,5 +1,5 @@
 import "../../styles/postBox.css";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   voteOnPost,
   fetchComments,
@@ -29,31 +29,39 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
 
   const isOwner = currentUserId && image?.user_id === currentUserId;
-  
-
-
 
   useEffect(() => {
     setIsReported(Boolean(image?.is_reported));
   }, [image?.is_reported]);
 
-  // Sync description when image prop changes
   useEffect(() => {
     setDescription(image?.description || "");
   }, [image?.description]);
 
-  // Sync vote counts when image prop changes
   useEffect(() => {
     setUp(Number(image?.up_vote_count ?? 0));
     setDown(Number(image?.down_vote_count ?? 0));
   }, [image?.up_vote_count, image?.down_vote_count]);
 
+  const posterName = image?.user_name || "Unknown";
+
+  const timeText = useMemo(() => {
+    const d = image?.uploaded_at ? new Date(image.uploaded_at) : null;
+    if (!d || Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString();
+  }, [image?.uploaded_at]);
+
+  const initials = useMemo(() => {
+    const s = String(posterName || "").trim();
+    if (!s) return "?";
+    const parts = s.split(/\s+/).slice(0, 2);
+    return parts.map(p => p[0]?.toUpperCase()).join("") || "?";
+  }, [posterName]);
+
   async function vote(direction) {
     if (!postId) return setError("Missing post_id from feed.");
     if (!currentUserId) return setError("You must be signed in to vote.");
     if (direction !== "up" && direction !== "down") return;
-    
-    // Prevent multiple simultaneous votes
     if (busy) return;
 
     setError("");
@@ -61,11 +69,9 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
     try {
       const result = await voteOnPost(postId, currentUserId, direction);
-      
       setUp(result.up_vote_count);
       setDown(result.down_vote_count);
-      
-      // Notify parent component of the vote count change
+
       if (onVoteUpdate) {
         onVoteUpdate(postId, result.up_vote_count, result.down_vote_count);
       }
@@ -115,7 +121,6 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     if (!postId) return;
     if (!isOwner) return setError("You can only delete your own posts.");
 
-    // Confirm before deleting
     if (!confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
       return;
     }
@@ -125,11 +130,7 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
     try {
       await deletePostAPI(postId);
-      
-      // Notify parent component to remove this post from the list
-      if (onPostDelete) {
-        onPostDelete(postId);
-      }
+      if (onPostDelete) onPostDelete(postId);
     } catch (err) {
       setError(err.message || "Network error while deleting post.");
     } finally {
@@ -162,7 +163,6 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   async function deleteComment(comment_id) {
     if (!comment_id) return;
 
-    // Confirm before deleting
     if (!confirm("Are you sure you want to delete this comment?")) {
       return;
     }
@@ -172,8 +172,6 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
     try {
       await deleteCommentAPI(comment_id);
-      
-      // Remove the deleted comment from the list
       setComments((arr) => arr.filter(c => c.comment_id !== comment_id));
     } catch (err) {
       setCommentError(err.message || "Network error while deleting comment.");
@@ -184,55 +182,140 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
   useEffect(() => {
     if (showComments) loadComments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showComments, postId]);
 
   return (
     <div className="comm_postBox">
       <div className="comm_topRow">
-        <button
-          type="button"
-          onClick={reportPost}
-          disabled={!postId || isReported}
-          title={isReported ? "Already reported" : "Report this post"}
-        >
-          🚩 {isReported ? "(reported)" : "(report)"}
-        </button>
-        
-        {isOwner && (
+        <div className="comm_headerLeft">
+          <div className="comm_avatar" aria-hidden="true">
+            {/* If you ever have an avatar URL later, drop an <img> here */}
+            <div className="comm_avatarInitials">{initials}</div>
+          </div>
+
+          <div className="comm_headerMeta">
+            <div className="comm_headerNameLine">
+              <div className="comm_headerName">{posterName}</div>
+            </div>
+            {timeText && <div className="comm_headerTime">{timeText}</div>}
+          </div>
+        </div>
+
+        <div className="comm_headerActions">
           <button
             type="button"
-            onClick={deletePost}
-            disabled={!postId || busy}
-            title="Delete this post"
-            aria-label="Delete this post"
-            className="comm_deleteButton"
+            onClick={reportPost}
+            disabled={!postId || isReported}
+            title={isReported ? "Already reported" : "Report this post"}
           >
-            <span aria-hidden="true">🗑️</span> Delete
+            🚩 {isReported ? "(reported)" : "(report)"}
           </button>
-        )}
+
+          {isOwner && (
+            <button
+              type="button"
+              onClick={deletePost}
+              disabled={!postId || busy}
+              title="Delete this post"
+              aria-label="Delete this post"
+              className="comm_deleteButton"
+            >
+              <span aria-hidden="true">🗑️</span> Delete
+            </button>
+          )}
+        </div>
       </div>
 
-      <img
-        className="comm_postImage"
-        src={image?.url}
-        alt={image?.label || "Community image"}
-        onClick={handleClick}
-      />
+      {/* BODY TEXT (description FIRST like YouTube) */}
+      <div className="comm_body">
+        <div className="comm_description">
+          {description}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  const editData = {
+                    post_id: image.post_id,
+                    image_id: image.image_id,
+                    description: description,
+                    url: image.url,
+                    uploaded_at: image.uploaded_at,
+                    label: image.label,
+                    verdict: image.verdict,
+                    confidence: image.confidence,
+                    is_public: image.is_public
+                  };
+                  sessionStorage.setItem("selectedScan", JSON.stringify(editData));
+                  sessionStorage.setItem("selectedScanTitle", `Edit Post`);
+                  window.location.href = "/viewscan";
+                } catch (err) {
+                  console.error("Failed to store scan data:", err);
+                }
+              }}
+              disabled={busy}
+              title="Edit description"
+              aria-label="Edit description"
+              className="comm_editButton"
+            >
+              <span aria-hidden="true">✏️</span>
+            </button>
+          )}
+        </div>
 
+        {/* DEV INFO (kept, but subtle) */}
+        <div className="comm_metaBlock">
+          <div className="comm_poster">
+            <strong>Posted by:</strong> {posterName}
+          </div>
+
+          <div className="comm_score">
+            <strong>Score:</strong> {formatScore(image?.score)}
+          </div>
+
+          {(image?.result?.verdict || image?.result?.label) && (
+            <div className="comm_detection">
+              {image?.result?.verdict && (
+                <div>
+                  <strong>Verdict:</strong> {String(image.result.verdict)}
+                </div>
+              )}
+              {image?.result?.label && (
+                <div>
+                  <strong>Label:</strong> {String(image.result.label)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* IMAGE */}
+      <div className="comm_postImageWrap">
+        <img
+          className="comm_postImage"
+          src={image?.url}
+          alt={image?.label || "Community image"}
+          onClick={handleClick}
+        />
+      </div>
+
+      {/* ACTIONS (like/dislike/comment) */}
       <div className="comm_bottomRow">
         <div className="comm_votesCell">
-          <button 
-            type="button" 
-            onClick={() => vote("up")} 
+          <button
+            type="button"
+            onClick={() => vote("up")}
             disabled={busy || !postId}
             title="Upvote"
           >
             ⬆️
           </button>
           <span>{up}</span>
-          <button 
-            type="button" 
-            onClick={() => vote("down")} 
+          <button
+            type="button"
+            onClick={() => vote("down")}
             disabled={busy || !postId}
             title="Downvote"
           >
@@ -248,67 +331,7 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
         </div>
       </div>
 
-      <div className="comm_poster">
-        <strong>Posted by:</strong> {image?.user_name || "Unknown"}
-      </div>
-
-      
-      {/* DEV: ranking score */}
-      <div className="comm_score">
-        <strong>Score:</strong> {formatScore(image?.score)}
-      </div>
-
-      {(image?.result?.verdict || image?.result?.label) && (
-        <div className="comm_detection">
-          {image?.result?.verdict && (
-            <div>
-              <strong>Verdict:</strong> {String(image.result.verdict)}
-            </div>
-          )}
-          {image?.result?.label && (
-            <div>
-              <strong>Label:</strong> {String(image.result.label)}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="comm_description">
-        {description}
-        {isOwner && (
-          <button
-            type="button"
-            onClick={() => {
-              // Only store minimal data needed for editing
-              try {
-                const editData = {
-                  post_id: image.post_id,
-                  image_id: image.image_id,
-                  description: description,
-                  url: image.url,
-                  uploaded_at: image.uploaded_at,
-                  label: image.label,
-                  verdict: image.verdict,
-                  confidence: image.confidence,
-                  is_public: image.is_public
-                };
-                sessionStorage.setItem("selectedScan", JSON.stringify(editData));
-                sessionStorage.setItem("selectedScanTitle", `Edit Post`);
-                window.location.href = "/viewscan";
-              } catch (err) {
-                console.error("Failed to store scan data:", err);
-              }
-            }}
-            disabled={busy}
-            title="Edit description"
-            aria-label="Edit description"
-            className="comm_editButton"
-          >
-            <span aria-hidden="true">✏️</span>
-          </button>
-        )}
-      </div>
-
+      {/* COMMENTS */}
       {showComments && (
         <div className="comm_commentsWrapper">
           <div className="comm_commentsHeader">

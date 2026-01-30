@@ -1,268 +1,384 @@
+/* =========================
+   COMMUNITY FEED LAYOUT
+   (YouTube-like: single column)
+   ========================= */
+
 .comm_grid {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-evenly;
-  align-items: center;
-  flex-direction: row-reverse;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 14px;
+
+  /* centered feed like YouTube */
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 12px 12px 90px;
+
   overflow: auto;
 }
 
-/* ───────── Post Card ───────── */
+/* =========================
+   POST CARD (YouTube-like)
+   ========================= */
 
 .comm_postBox {
-  width: 160px;
-  background: #0f0f0f;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  color: white;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+
+  /* Only divider should be BELOW each post */
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  padding-bottom: 12px;
 }
 
-.comm_postBox:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
-}
-
-/* ───────── Top Row ───────── */
+/* =========================
+   HEADER ROW
+   (avatar + name + time) + actions (report/delete)
+   ========================= */
 
 .comm_topRow {
   display: flex;
-  justify-content: flex-end;
-  padding: 6px;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.75),
-    rgba(0, 0, 0, 0)
-  );
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  padding: 12px 12px 10px;
+  background: transparent;
+}
+
+.comm_headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.comm_avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+
+  display: grid;
+  place-items: center;
+}
+
+.comm_avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.comm_avatarInitials {
+  font-weight: 800;
+  font-size: 12px;
+  opacity: 0.9;
+  color:#CFB87C;
+}
+
+/* meta: name on top, date below */
+.comm_headerMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.comm_headerNameLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.comm_headerName {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color:#CFB87C;
+}
+
+.comm_headerTime {
+  font-size: 12px;
+  opacity: 0.55;
+  white-space: nowrap;
+  color:#fff;
+}
+
+/* right side actions */
+.comm_headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .comm_topRow button {
-  background: none;
-  border: none;
-  color: #aaa;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.65);
   font-size: 12px;
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0.85;
+  padding: 6px 8px;
+  border-radius: 10px;
 }
 
 .comm_topRow button:hover {
+  background: rgba(255, 255, 255, 0.06);
   opacity: 1;
-  color: #ff6b6b;
 }
 
-/* ───────── Image ───────── */
+.comm_topRow button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_deleteButton {
+  color: rgba(255, 107, 107, 0.95);
+}
+
+/* =========================
+   BODY / TEXT
+   ========================= */
+
+.comm_body {
+  padding: 0 12px 10px;
+}
+
+.comm_description {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.35;
+  opacity: 0.92;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color:#fff;
+}
+
+.comm_editButton {
+  margin-left: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: rgba(255,255,255,0.85);
+}
+
+.comm_editButton:hover {
+  background: rgba(255,255,255,0.10);
+}
+
+.comm_metaBlock {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 0; 
+  color:#fff;
+}
+
+.comm_score,
+.comm_detection div,
+.comm_poster {
+  font-size: 12px;
+  opacity: 0.70;
+}
+
+/* =========================
+   IMAGE (YouTube-like big image)
+   ========================= */
+
+.comm_postImageWrap {
+  padding: 0 12px 10px;
+}
 
 .comm_postImage {
   width: 100%;
-  height: 160px;
+  height: auto;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
+
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
-/* ───────── Bottom Row ───────── */
+/* =========================
+   ACTION ROW (like/dislike/comment)
+   ========================= */
 
 .comm_bottomRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 8px;
-  background: #111;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
 
-/* ───────── Votes ───────── */
+  padding: 10px 12px;
+  background: transparent;
+
+  border-top: 0; /* was divider; removed */
+}
 
 .comm_votesCell {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+  color:#fff;
 }
 
-.comm_votesCell button {
-  background: #1a1a1a;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 6px;
-  font-size: 14px;
+.comm_votesCell button,
+.comm_CommentsCell button {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 16px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
+
+  color: rgba(255,255,255,0.85);
 }
 
-.comm_votesCell button:hover {
-  background: #2a2a2a;
-  transform: translateY(-1px);
+.comm_votesCell button:hover,
+.comm_CommentsCell button:hover {
+  background: rgba(255,255,255,0.06);
 }
 
-.comm_votesCell button:disabled {
-  opacity: 0.5;
+.comm_votesCell button:disabled,
+.comm_CommentsCell button:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
+/* counts next to icons */
+.comm_votesCell span {
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.9;
+  min-width: 14px;
+  text-align: left;
+}
+
 .voteActive {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline: 2px solid rgba(255, 255, 255, 0.18);
 }
 
 .comm_voteUp.active {
-  background-color: #4caf50;
-  color: white;
+  background-color: rgba(76, 175, 80, 0.20);
 }
 
 .comm_voteDown.active {
-  background-color: #f44336;
-  color: white;
+  background-color: rgba(244, 67, 54, 0.20);
 }
 
-.comm_voteBlock {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.comm_voteMeta {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.comm_voteNumber {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.comm_voteLabel {
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-/* ───────── Comments Button ───────── */
-
-.comm_CommentsCell {
-  display: flex;
-  align-items: center;
-}
-
-.comm_CommentsCell button {
-  background: #1a1a1a;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-
-.comm_CommentsCell button:hover {
-  background: #2a2a2a;
-  transform: translateY(-1px);
-}
-
-/* ───────── Meta / Details ───────── */
-
-.comm_poster {
-  font-size: 12px;
-  opacity: 0.8;
-  padding-top: 8px;
-}
-
-.comm_detection div {
-  font-size: 12px;
-}
-
-.comm_detection div:first-child {
-  opacity: 0.85;
-}
-
-.comm_detection div:last-child {
-  opacity: 0.75;
-}
-
-.comm_description {
-  margin-top: 6px;
-}
-
-/* ───────── Comments Section ───────── */
+/* =========================
+   COMMENTS SECTION
+   ========================= */
 
 .comm_commentsWrapper {
-  padding-top: 10px;
+  padding: 12px;
+  border-top: 0; /* was divider; removed */
 }
 
 .comm_commentsHeader {
-  font-size: 12px;
-  opacity: 0.8;
-  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.85;
+  margin-bottom: 10px;
+  color:#fff;
 }
 
 .comm_commentInputWrapper {
   display: grid;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .comm_commentInput {
   width: 100%;
-  padding: 8px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  color: white;
+  outline: none;
+}
+
+.comm_commentInput::placeholder {
+  color: rgba(255,255,255,0.45);
 }
 
 .comm_commentButton {
   width: 100%;
-  padding: 10px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.92);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.comm_commentButton:hover {
+  background: rgba(255,255,255,0.12);
 }
 
 .comm_commentsList {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .comm_comment {
-  padding: 10px;
+  padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
 }
 
 .comm_commentMeta {
   font-size: 12px;
   opacity: 0.7;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color:#fff;
 }
 
 .comm_commentText {
   white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  opacity: 0.92;
+  color:#fff;
+}
+
+.comm_deleteCommentButton {
+  margin-left: auto;
+  color: rgba(255, 107, 107, 0.95);
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.comm_deleteCommentButton:hover {
+  background: rgba(255,255,255,0.06);
 }
 
 .muted {
   opacity: 0.6;
-}
-
-/* ───────── Action Buttons ───────── */
-
-.comm_deleteButton {
-  margin-left: 8px;
-  color: #dc3545;
-}
-
-.comm_editButton {
-  margin-left: 8px;
-  font-size: 0.85em;
-  cursor: pointer;
-  background: none;
-  border: none;
-  padding: 0;
-}
-
-.comm_deleteCommentButton {
-  margin-left: 8px;
-  color: #dc3545;
-  font-size: 0.85em;
-  cursor: pointer;
-  background: none;
-  border: none;
-  padding: 0;
+  font-size: 12px;
+  padding-top: 8px;
 }
