@@ -386,3 +386,98 @@
   font-size: 12px;
   padding-top: 8px;
 }
+
+/* =========================
+   3-dot actions menu
+   ========================= */
+
+.comm_menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.comm_menuBtn {
+  background: transparent;
+  border: 0;
+  color: rgba(255,255,255,0.85);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.comm_menuBtn:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.comm_menuBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_topRow .comm_menuBtn {
+  font-size: 20px;   
+  padding: 8px 12px; 
+  line-height: 1;
+}
+
+.comm_menuPanel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 50;
+
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 12px;
+
+  background: rgba(20,20,20,0.98);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+}
+
+.comm_menuItem {
+  width: 100%;
+  text-align: left;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 10px;
+  border-radius: 10px;
+
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+
+  color: rgba(255,255,255,0.92);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.comm_menuItem:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.comm_menuItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_menuItemDanger {
+  color: rgba(255, 107, 107, 0.95);
+}
+
+.comm_menuItemMuted {
+  color: rgba(255,255,255,0.60);
+  cursor: default;
+}
+
+.comm_menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: transparent; 
+}

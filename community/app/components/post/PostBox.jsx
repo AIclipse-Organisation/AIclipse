@@ -30,6 +30,16 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
   const isOwner = currentUserId && image?.user_id === currentUserId;
 
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  function closeMenu() {
+    setMenuOpen(false);
+  }
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [postId]);
+
   useEffect(() => {
     setIsReported(Boolean(image?.is_reported));
   }, [image?.is_reported]);
@@ -203,66 +213,102 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
         </div>
 
         <div className="comm_headerActions">
-          <button
-            type="button"
-            onClick={reportPost}
-            disabled={!postId || isReported}
-            title={isReported ? "Already reported" : "Report this post"}
-          >
-            🚩 {isReported ? "(reported)" : "(report)"}
-          </button>
-
-          {isOwner && (
+          <div className="comm_menu">
             <button
               type="button"
-              onClick={deletePost}
-              disabled={!postId || busy}
-              title="Delete this post"
-              aria-label="Delete this post"
-              className="comm_deleteButton"
+              className="comm_menuBtn"
+              onClick={() => setMenuOpen((v) => !v)}
+              disabled={!postId}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen ? "true" : "false"}
+              title="Post actions"
             >
-              <span aria-hidden="true">🗑️</span> Delete
+              ⋮
             </button>
-          )}
+
+            {menuOpen && <div className="comm_menuBackdrop" onClick={closeMenu} />}
+
+            {menuOpen && (
+              <div className="comm_menuPanel" role="menu">
+                {isOwner && (
+                  <button
+                    type="button"
+                    className="comm_menuItem"
+                    role="menuitem"
+                    onClick={() => {
+                      closeMenu();
+                      try {
+                        const editData = {
+                          post_id: image.post_id,
+                          image_id: image.image_id,
+                          description: description,
+                          url: image.url,
+                          uploaded_at: image.uploaded_at,
+                          label: image.label,
+                          verdict: image.verdict,
+                          confidence: image.confidence,
+                          is_public: image.is_public
+                        };
+                        sessionStorage.setItem("selectedScan", JSON.stringify(editData));
+                        sessionStorage.setItem("selectedScanTitle", `Edit Post`);
+                        window.location.href = "/viewscan";
+                      } catch (err) {
+                        console.error("Failed to store scan data:", err);
+                      }
+                    }}
+                    disabled={busy}
+                    title="Edit description"
+                    aria-label="Edit description"
+                  >
+                    <span aria-hidden="true">✏️</span> Edit description
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="comm_menuItem"
+                  role="menuitem"
+                  onClick={() => {
+                    closeMenu();
+                    reportPost();
+                  }}
+                  disabled={!postId || isReported}
+                  title={isReported ? "Already reported" : "Report this post"}
+                >
+                  <span aria-hidden="true">🚩</span> {isReported ? "Reported" : "Report"}
+                </button>
+
+                {isOwner && (
+                  <button
+                    type="button"
+                    className="comm_menuItem comm_menuItemDanger"
+                    role="menuitem"
+                    onClick={() => {
+                      closeMenu();
+                      deletePost();
+                    }}
+                    disabled={!postId || busy}
+                    title="Delete this post"
+                    aria-label="Delete this post"
+                  >
+                    <span aria-hidden="true">🗑️</span> Delete
+                  </button>
+                )}
+
+                {!isOwner && isReported && (
+                  <div className="comm_menuItem comm_menuItemMuted" role="presentation">
+                    Already reported
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* BODY TEXT (description FIRST like YouTube) */}
       <div className="comm_body">
-        <div className="comm_description">
-          {description}
-          {isOwner && (
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  const editData = {
-                    post_id: image.post_id,
-                    image_id: image.image_id,
-                    description: description,
-                    url: image.url,
-                    uploaded_at: image.uploaded_at,
-                    label: image.label,
-                    verdict: image.verdict,
-                    confidence: image.confidence,
-                    is_public: image.is_public
-                  };
-                  sessionStorage.setItem("selectedScan", JSON.stringify(editData));
-                  sessionStorage.setItem("selectedScanTitle", `Edit Post`);
-                  window.location.href = "/viewscan";
-                } catch (err) {
-                  console.error("Failed to store scan data:", err);
-                }
-              }}
-              disabled={busy}
-              title="Edit description"
-              aria-label="Edit description"
-              className="comm_editButton"
-            >
-              <span aria-hidden="true">✏️</span>
-            </button>
-          )}
-        </div>
+        <div className="comm_description">{description}</div>
 
         {/* DEV INFO (kept, but subtle) */}
         <div className="comm_metaBlock">
