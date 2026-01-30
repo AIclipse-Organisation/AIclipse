@@ -16,7 +16,7 @@ export default function Topbar() {
           <img src="/static/images/profile.png" alt="Profile" />
         </a>
         <div id="current-user-chip" className="badge muted">
-          Not signed in
+          raphy · plan 0
         </div>
       </div>
     </div>
