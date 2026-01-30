@@ -52,7 +52,7 @@ const firstKey = `post:${postId}:click_first_at`;
 
       const pipe = redis.pipeline();
       pipe.del(deltaKey);
-      pipe.del(firstKey)
+      pipe.del(firstKey);
       pipe.zrem(FLUSH_ZSET, postId);
       await pipe.exec();
     } finally {
