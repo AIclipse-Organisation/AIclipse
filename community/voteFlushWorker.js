@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import { getRedis } from "./redis/redis.js"
+import { getRedis } from "./redis/redis.js";
 
 const MONGO_URI = process.env.MONGO_URI || "";
 const MONGO_DB = process.env.MONGO_DB || "aiclipse";
@@ -15,20 +15,25 @@ function sleep(ms) {
 async function flushOnce({ redis, posts }) {
   const nowSec = Math.floor(Date.now() / 1000);
 
-  // PuLL IDS
-  const duePostIds = await redis.zrangebyscore(FLUSH_ZSET, "-inf", nowSec, "LIMIT", 0, 200);
+  const duePostIds = await redis.zrangebyscore(
+    FLUSH_ZSET,
+    "-inf",
+    nowSec,
+    "LIMIT",
+    0,
+    200,
+  );
   if (!duePostIds.length) return 0;
 
   for (const postId of duePostIds) {
     const postKey = `post:${postId}:vote_deltas`;
+    const firstKey = `post:${postId}:vote_first_at`;
 
-    //   only one worker flushes a post at a time
     const lockKey = `lock:flush:${postId}`;
     const gotLock = await redis.set(lockKey, "1", "NX", "EX", 30);
     if (!gotLock) continue;
 
     try {
-      // Re-check that it's still due (in case a new vote extended flush_at)
       const score = await redis.zscore(FLUSH_ZSET, postId);
       if (!score || Number(score) > nowSec) continue;
 
@@ -45,19 +50,21 @@ async function flushOnce({ redis, posts }) {
               ...(deltaDown ? { down_vote_count: deltaDown } : {}),
             },
             $set: { updated_at: new Date() },
-          }
+          },
         );
         await redis.xadd(
           MODEL_STREAM_KEY,
           "*",
-          "post_id", postId,
-          "trigger", "vote_flush"
+          "post_id",
+          postId,
+          "trigger",
+          "vote_flush",
         );
       }
 
-      // Clear redis state after successful flush
       const pipe = redis.pipeline();
       pipe.del(postKey);
+      pipe.del(firstKey); 
       pipe.zrem(FLUSH_ZSET, postId);
       await pipe.exec();
     } finally {
@@ -83,7 +90,6 @@ async function main() {
   while (true) {
     try {
       const n = await flushOnce({ redis, posts });
-      // if flushed something, loop quickly; otherwise back off
       await sleep(n ? 250 : 1000);
     } catch (e) {
       console.error("[voteFlushWorker] error:", e?.message || e);
