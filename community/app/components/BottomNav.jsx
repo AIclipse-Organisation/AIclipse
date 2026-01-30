@@ -8,7 +8,7 @@ export default function BottomNav() {
 
   return (
     <nav className="navbar" id="bottom-nav" aria-label="Bottom navigation">
-      <a className={linkClass("/home")} href="/home">Home</a>
+      <a className={linkClass("/home")} href="/community">Home</a>
       <a className={linkClass("/scans")} href="/scans">Scans</a>
       <a className={linkClass("/imgProcessing")} href="/imgProcessing">Upload</a>
       <a className={linkClass("/notification")} href="/notification">Notification</a>
