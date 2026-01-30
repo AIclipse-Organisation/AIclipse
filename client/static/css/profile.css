@@ -1,0 +1,346 @@
+/* =========================
+   PROFILE – TOP SUMMARY
+   ========================= */
+
+.profile-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+
+  /* NOT a card */
+  padding: 8px 0 14px;
+  margin-top: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+
+  /* subtle divider */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.profile-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* =========================
+   PROFILE AVATAR (IMAGE)
+   ========================= */
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* =========================
+   IDENTITY + PLAN BELOW
+   ========================= */
+
+.profile-identity {
+  min-width: 0;
+}
+
+.profile-username {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-email {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 500;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Plan row under username/email */
+.profile-plan {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+/* =========================
+   META STYLES
+   ========================= */
+
+.meta-label {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.meta-value {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* =========================
+   RIGHT SIDE (LEFT-ALIGNED)
+   ========================= */
+
+.profile-summary-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+/* Make the right column left aligned for readability */
+.profile-stats-left {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.profile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* When in left-aligned mode */
+.profile-stats-left .profile-meta {
+  align-items: flex-start;
+}
+
+/* =========================
+   DETAILS SECTION
+   ========================= */
+
+.user-details-section {
+  margin-top: 16px;
+}
+
+.user-details-section h2 {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 18px;
+  margin: 14px 0 10px;
+}
+
+/* Container is NOT a card anymore */
+.user-details-container {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  padding: 0;              
+  border: 0;             
+  border-radius: 0;
+  background: transparent;  
+}
+
+/* Each stat becomes its own “stat box” */
+.user-detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;      
+  justify-content: center;   
+  gap: 6px;
+
+  padding: 16px 14px;
+  min-height: 96px;         
+  border-radius: 14px;
+
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+
+  text-align: center;
+}
+
+.detail-label {
+  order: 2;                 
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.detail-value {
+  order: 1;                   
+  font-size: 28px;           
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1;
+}
+
+/* Small screens: stack boxes */
+@media (max-width: 420px) {
+  .user-details-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* =========================
+   FOOTER / LOGOUT
+   ========================= */
+
+.profile-footer {
+  margin-top: 22px;
+  padding-bottom: 10px;
+}
+
+.logout-btn {
+  width: 100%;
+}
+
+/* =========================
+   SMALL SCREENS SAFETY
+   ========================= */
+
+@media (max-width: 420px) {
+  .profile-summary {
+    gap: 12px;
+  }
+
+  .profile-avatar {
+    width: 56px;
+    height: 56px;
+  }
+
+  .profile-username {
+    font-size: 15px;
+  }
+}
+
+
+/* =========================
+   Logout
+   ========================= */
+
+.btn-logout {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-logout:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* =========================
+   Modal (same as Results)
+   ========================= */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal {
+  width: 90%;
+  max-width: 360px;
+  background: #111;
+  border-radius: 14px;
+  padding: 18px 16px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.modal-text {
+  font-size: 14px;
+  color: #ccc;
+  margin-bottom: 18px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-actions button {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+
+  font-weight: 700;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.92);
+
+  background: transparent;
+  cursor: pointer;
+
+  border: 1px solid transparent;
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+/* Cancel — neutral outline */
+.modal-actions .secondary {
+  --btn-outline-color: rgba(255, 255, 255, 0.35);
+  --btn-hover-color: rgba(255, 255, 255, 0.85);
+  border-color: var(--btn-outline-color);
+}
+
+.modal-actions .secondary:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* Confirm logout — danger red */
+.modal-actions .danger {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+  border-color: var(--btn-outline-color);
+}
+
+.modal-actions .danger:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* Make hidden actually hidden */
+[hidden] {
+  display: none !important;
+}

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <title>View Scan</title>
@@ -19,11 +20,33 @@
         <div class="page-underline" role="presentation"></div>
       </section>
 
-      <div id="viewscan-status" class="status-message"></div>
+      <!-- <div id="viewscan-status" class="status-message"></div> -->
 
       <section id="viewscan-card" class="viewscan-card" hidden>
+
+        <!-- Back button ABOVE the image (not overlay) -->
+        <a href="/scans" class="back-to-scans-btn">Back to Scans</a>
+
         <div class="viewscan-image-wrap">
           <img id="viewscan-image" class="viewscan-image" alt="Selected scan image" />
+        </div>
+
+        <!-- Verdict line + bar just below the image -->
+        <div id="verdict-block" class="verdict-block" hidden aria-label="Scan result">
+          <div id="verdict-line" class="verdict-line verdict-text"></div>
+
+          <div id="verdict-bar" class="confidence-track" hidden aria-label="Scan result bar">
+            <div id="verdict-fill" class="confidence-fill"></div>
+          </div>
+
+          <!-- Votes line + bar just below the verdict bar -->
+          <div id="votes-block" class="votes-block" hidden aria-label="Vote-based result">
+            <div id="votes-line" class="votes-line verdict-text"></div>
+
+            <div id="votes-bar" class="confidence-track" hidden aria-label="Vote result bar">
+              <div id="votes-fill" class="confidence-fill"></div>
+            </div>
+          </div>
         </div>
 
         <div class="viewscan-meta">
@@ -32,12 +55,128 @@
           <!-- Populated from JS -->
           <dl class="meta-list" id="meta-list"></dl>
 
-          <div class="viewscan-actions">
-            <a class="secondary-link" href="/scans">Back to Scans</a>
+          <!-- Edit Description (INLINE, only for public posts with post_id) -->
+          <div id="edit-description-section" class="edit-desc-section" style="display:none;">
+            <button type="button" id="btn-edit-description" class="btn-edit-description">
+              Edit Post Description
+            </button>
+
+            <div id="edit-description-form" class="edit-desc-form" hidden>
+              <p class="edit-desc-text">
+                Update the description (required, max 1000 characters):
+              </p>
+
+              <textarea id="edit-description-input" class="edit-desc-textarea" maxlength="1000" rows="4"
+                placeholder="Update your description..."></textarea>
+
+              <div class="edit-desc-count">
+                <span id="edit-description-count">0</span>/1000
+              </div>
+
+              <div id="edit-description-status" class="edit-desc-status"></div>
+
+              <div class="edit-desc-actions">
+                <button type="button" id="edit-description-cancel"
+                  class="edit-desc-btn-cancel edit-desc-btn--secondary">
+                  Cancel
+                </button>
+                <button type="button" id="edit-description-save" class="edit-desc-btn-save edit-desc-btn--primary">
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
+
+          <!-- Show Comments -->
+          <div id="show-comments-section" class="show-comments-section" style="display:none;">
+            <button type="button" id="btn-show-comments" class="btn-show-comments">
+              Show Comments
+            </button>
+
+            <div id="comments-container" class="comments-container" hidden>
+              <div id="comments-status" class="comments-status"></div>
+              <div id="comments-list" class="comments-list"></div>
+            </div>
+          </div>
+
+          <!-- Delete Post -->
+          <div id="delete-post-section" class="delete-post-section" style="display:none;">
+            <button type="button" id="btn-delete-post" class="btn-delete-post">
+              Delete Post
+            </button>
+            <div id="delete-post-status" class="delete-post-status"></div>
+          </div>
+
+          <!-- Make Public (ONLY for private scans) -->
+          <div id="make-public-section" class="make-public-section" style="display:none;">
+            <button type="button" id="btn-make-public" class="btn-make-public">
+              Publish to Community
+            </button>
+
+          <!-- Delete Scan (ONLY for private scans) -->
+          <div id="delete-scan-section" class="delete-scan-section" style="display:none;">
+            <button type="button" id="btn-delete-scan" class="btn-delete-scan">
+              Delete Scan
+            </button>
+            <div id="delete-scan-status" class="delete-scan-status"></div>
+          </div>
+
+            <!-- Inline form: hidden until user clicks Make Public -->
+            <div id="make-public-form" class="make-public-form" hidden>
+              <p class="make-public-text">
+                Add a description for your post (required, max 1000 characters):
+              </p>
+
+              <textarea id="make-public-description" class="make-public-textarea" maxlength="1000" (rows="4"
+                placeholder="Describe your image..."></textarea>
+
+              <div class="make-public-count">
+                <span id="make-public-count">0</span>/1000
+              </div>
+
+              <div id="make-public-status" class="make-public-status"></div>
+
+              <div class="make-public-actions">
+                <button type="button" id="make-public-cancel" class="make-public-btn-cancel make-public-btn--secondary">
+                  Cancel
+                </button>
+                <button type="button" id="make-public-publish" class="make-public-btn-publish make-public-btn--primary">
+                  Publish
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="viewscan-actions" hidden></div>
         </div>
       </section>
     </main>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal-overlay" hidden>
+      <div class="modal">
+        <h3 class="modal-title">Delete Post</h3>
+        <p class="modal-text">Are you sure you want to delete this post? This action cannot be undone.</p>
+
+        <div class="modal-actions">
+          <button type="button" id="modal-cancel" class="secondary">Cancel</button>
+          <button type="button" id="modal-confirm" class="danger">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Scan Confirmation Modal -->
+    <div id="delete-scan-modal" class="modal-overlay" hidden>
+      <div class="modal">
+        <h3 class="modal-title">Delete Scan</h3>
+        <p class="modal-text">Are you sure you want to delete this scan? This action cannot be undone.</p>
+
+        <div class="modal-actions">
+          <button type="button" id="scan-modal-cancel" class="secondary">Cancel</button>
+          <button type="button" id="scan-modal-confirm" class="danger">Delete</button>
+        </div>
+      </div>
+    </div>
 
     <div data-include="/static/partials/navbar.html"></div>
   </div>
@@ -47,4 +186,5 @@
   <script src="/static/js/main.js"></script>
   <script src="/static/js/viewscan.js"></script>
 </body>
+
 </html>

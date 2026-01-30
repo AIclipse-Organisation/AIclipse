@@ -1,11 +1,13 @@
-.comm_grid{
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-evenly;
-    align-items: center;
-    flex-direction: row-reverse;
-    overflow: auto;
+.comm_grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  align-items: center;
+  flex-direction: row-reverse;
+  overflow: auto;
 }
+
+/* ───────── Post Card ───────── */
 
 .comm_postBox {
   width: 160px;
@@ -15,8 +17,9 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   display: flex;
   flex-direction: column;
+  gap: 8px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  color:white;
+  color: white;
 }
 
 .comm_postBox:hover {
@@ -58,6 +61,8 @@
   height: 160px;
   object-fit: cover;
   display: block;
+  border-radius: 12px;
+  cursor: pointer;
 }
 
 /* ───────── Bottom Row ───────── */
@@ -71,10 +76,11 @@
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Votes */
+/* ───────── Votes ───────── */
 
 .comm_votesCell {
   display: flex;
+  align-items: center;
   gap: 6px;
 }
 
@@ -98,7 +104,48 @@
   cursor: not-allowed;
 }
 
-/* Comments */
+.voteActive {
+  outline: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.comm_voteUp.active {
+  background-color: #4caf50;
+  color: white;
+}
+
+.comm_voteDown.active {
+  background-color: #f44336;
+  color: white;
+}
+
+.comm_voteBlock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comm_voteMeta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.comm_voteNumber {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.comm_voteLabel {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* ───────── Comments Button ───────── */
+
+.comm_CommentsCell {
+  display: flex;
+  align-items: center;
+}
 
 .comm_CommentsCell button {
   background: #1a1a1a;
@@ -115,42 +162,7 @@
   transform: translateY(-1px);
 }
 
-.comm_postBox {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.comm_topRow {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.comm_postImage {
-  width: 100%;
-  border-radius: 12px;
-  cursor: pointer;
-}
-
-.comm_bottomRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.comm_votesCell {
-  display: flex;
-  align-items: center;
-}
-
-.comm_votesCell span {
-  margin: 0 10px;
-}
-
-.comm_CommentsCell {
-  display: flex;
-  align-items: center;
-}
+/* ───────── Meta / Details ───────── */
 
 .comm_poster {
   font-size: 12px;
@@ -173,6 +185,8 @@
 .comm_description {
   margin-top: 6px;
 }
+
+/* ───────── Comments Section ───────── */
 
 .comm_commentsWrapper {
   padding-top: 10px;
@@ -227,40 +241,28 @@
   opacity: 0.6;
 }
 
-.voteActive {
-  outline: 2px solid rgba(255,255,255,0.25);
+/* ───────── Action Buttons ───────── */
+
+.comm_deleteButton {
+  margin-left: 8px;
+  color: #dc3545;
 }
 
-
-.comm_voteUp.active {
-  background-color: #4caf50;
-  color: white;
+.comm_editButton {
+  margin-left: 8px;
+  font-size: 0.85em;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
 }
 
-.comm_voteDown.active {
-  background-color: #f44336; 
-  color: white;
-}
-
-
-.comm_voteBlock {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.comm_voteMeta {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.comm_voteNumber {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.comm_voteLabel {
-  font-size: 11px;
-  opacity: 0.7;
+.comm_deleteCommentButton {
+  margin-left: 8px;
+  color: #dc3545;
+  font-size: 0.85em;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
 }
