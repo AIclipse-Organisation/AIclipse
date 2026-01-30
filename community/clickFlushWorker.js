@@ -27,6 +27,7 @@ async function flushOnce({ redis, posts }) {
 
   for (const postId of duePostIds) {
     const deltaKey = `post:${postId}:click_deltas`;
+const firstKey = `post:${postId}:click_first_at`;
 
     const lockKey = `lock:flush:clicks:${postId}`;
     const gotLock = await redis.set(lockKey, "1", "NX", "EX", 30);
@@ -51,6 +52,7 @@ async function flushOnce({ redis, posts }) {
 
       const pipe = redis.pipeline();
       pipe.del(deltaKey);
+      pipe.del(firstKey)
       pipe.zrem(FLUSH_ZSET, postId);
       await pipe.exec();
     } finally {
