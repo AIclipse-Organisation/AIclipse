@@ -248,6 +248,7 @@
   cursor: pointer;
 
   color: rgba(255,255,255,0.85);
+  display:flex;
 }
 
 .comm_votesCell button:hover,
@@ -317,6 +318,59 @@
     width: 20px;
     height: 20px;
   }
+}
+
+/* =========================
+   NEW: unified pill actions (icon + text inside same button)
+   ========================= */
+
+.comm_actionsRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.comm_actionBtn {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  color: rgba(255,255,255,0.92);
+  line-height: 1;
+}
+
+.comm_actionBtn:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.comm_actionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_actionText {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+
+.comm_actionsLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.comm_actionsRight {
+  display: flex;
+  align-items: center;
 }
 
 /* =========================

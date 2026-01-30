@@ -349,57 +349,45 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
 
       {/* ACTIONS (like/dislike/comment) */}
       <div className="comm_bottomRow">
-        <div className="comm_votesCell">
+        {/* LEFT: votes */}
+        <div className="comm_actionsLeft">
           <button
             type="button"
             onClick={() => vote("up")}
             disabled={busy || !postId}
-            title="Upvote"
-            aria-label="Upvote"
-            className={`comm_iconBtn comm_voteUp ${/* optional */ ""}`}
+            title="Vote Real"
+            aria-label="Vote Real"
+            className="comm_actionBtn comm_voteUp"
           >
-            <img
-              className="comm_icon"
-              src="/static/images/upvote.png"
-              alt=""
-              aria-hidden="true"
-            />
+            <img className="comm_icon" src="/static/images/upvote.png" alt="" aria-hidden="true" />
+            <span className="comm_actionText">Real ({up})</span>
           </button>
-          <span>{up}</span>
 
           <button
             type="button"
             onClick={() => vote("down")}
             disabled={busy || !postId}
-            title="Downvote"
-            aria-label="Downvote"
-            className={`comm_iconBtn comm_voteDown ${/* optional */ ""}`}
+            title="Vote AI"
+            aria-label="Vote AI"
+            className="comm_actionBtn comm_voteDown"
           >
-            <img
-              className="comm_icon"
-              src="/static/images/downvote.png"
-              alt=""
-              aria-hidden="true"
-            />
+            <img className="comm_icon" src="/static/images/downvote.png" alt="" aria-hidden="true" />
+            <span className="comm_actionText">AI ({down})</span>
           </button>
-          <span>{down}</span>
         </div>
 
-        <div className="comm_CommentsCell">
+        {/* RIGHT: comments */}
+        <div className="comm_actionsRight">
           <button
             type="button"
             onClick={() => setShowComments((v) => !v)}
             disabled={!postId}
             title="Comments"
             aria-label="Toggle comments"
-            className="comm_iconBtn"
+            className="comm_actionBtn comm_commentBtn"
           >
-            <img
-              className="comm_icon"
-              src="/static/images/comment.png"
-              alt=""
-              aria-hidden="true"
-            />
+            <img className="comm_icon" src="/static/images/comment.png" alt="" aria-hidden="true" />
+            <span className="comm_actionText">Comments ({comments.length})</span>
           </button>
         </div>
       </div>
