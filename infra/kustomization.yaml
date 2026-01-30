@@ -18,7 +18,7 @@ resources:
   - k8s/community-depl.yaml
   - k8s/click-flush-depl.yaml
   - k8s/vote-flush-depl.yaml
-  - k8s/comments-worker-depl.yaml
+  - k8s/comments-flush-depl.yaml
   - k8s-dev/ingress-srv.yaml
   - k8s-dev/ingress-api.yaml
   - k8s/model-cycle-pvc.yaml

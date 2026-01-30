@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import jwt from "jsonwebtoken";
-import { validateUserId, validatePostId, validateCommentId } from "../validation.js";
-import { getRedis } from "../../../redis/redis.js"
-
+import {
+  validateUserId,
+  validatePostId,
+  validateCommentId,
+} from "../validation.js";
+import { getRedis } from "../../../redis/redis.js";
 
 export const runtime = "nodejs";
 
@@ -15,13 +18,13 @@ const COMMENTS_COLLECTION = "community.comments";
 
 const FLUSH_ZSET = "comments:flush_at";
 const FLUSH_DEBOUNCE_MS = 30_000; // 30 seconds
+const FLUSH_MAX_WAIT_SEC = 60;
 const DELTA_TTL_SECONDS = 60 * 60; // 1 hour safety TTL
-
 
 // Helper function to extract and verify JWT token from Authorization header or cookie
 function getAuthenticatedUserId(req) {
   let token = null;
-  
+
   // Try Authorization header first
   const authHeader = req.headers.get("authorization");
   if (authHeader) {
@@ -30,34 +33,34 @@ function getAuthenticatedUserId(req) {
       token = parts[1];
     }
   }
-  
+
   // Fallback to cookie if no Authorization header
   if (!token) {
     const cookieHeader = req.headers.get("cookie");
     if (cookieHeader) {
       const cookies = Object.fromEntries(
-        cookieHeader.split("; ").map(c => {
+        cookieHeader.split("; ").map((c) => {
           const [key, ...v] = c.split("=");
           return [key, v.join("=")];
-        })
+        }),
       );
       token = cookies.access_token;
     }
   }
-  
+
   if (!token) {
     throw new Error("Missing authentication token");
   }
-  
+
   try {
     // Decode without verification to get the user_id
     // In production, you should verify the JWT signature using the public key from auth service
     const decoded = jwt.decode(token);
-    
+
     if (!decoded || !decoded.sub) {
       throw new Error("Invalid token payload");
     }
-    
+
     return decoded.sub; // user_id is stored in 'sub' claim
   } catch (err) {
     throw new Error("Invalid or expired token");
@@ -72,7 +75,8 @@ function makeCommentId() {
 // Normalizes and validates a comment string
 function normalizeComment(raw) {
   // must be a plain string (prevents object/operator style payloads)
-  if (typeof raw !== "string") return { ok: false, error: "Comment must be text." };
+  if (typeof raw !== "string")
+    return { ok: false, error: "Comment must be text." };
 
   // normalize newlines and whitespace
   let text = raw.replace(/\r\n/g, "\n").trim();
@@ -112,7 +116,7 @@ export async function GET(req) {
     if (!postIdValidation.valid) {
       return NextResponse.json(
         { error: postIdValidation.error },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const safePostId = postIdValidation.value; // Use sanitized string value
@@ -138,7 +142,7 @@ export async function GET(req) {
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to list comments", detail: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     if (client) {
@@ -164,7 +168,7 @@ export async function POST(req) {
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -179,13 +183,13 @@ export async function POST(req) {
     if (!normalized.ok) {
       return NextResponse.json({ error: normalized.error }, { status: 400 });
     }
-    const text = normalized.text; 
+    const text = normalized.text;
 
     // validate required fields
     if (!post_id || !user_id || !user_name || !text) {
       return NextResponse.json(
         { error: "Missing required fields: post_id, user_id, user_name, text" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -194,7 +198,7 @@ export async function POST(req) {
     if (!userIdValidation.valid) {
       return NextResponse.json(
         { error: userIdValidation.error },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const safeUserId = userIdValidation.value; // Use sanitized string value
@@ -203,7 +207,7 @@ export async function POST(req) {
     if (safeUserId !== authenticatedUserId) {
       return NextResponse.json(
         { error: "Forbidden: Cannot post comments on behalf of other users" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -212,7 +216,7 @@ export async function POST(req) {
     if (!postIdValidation.valid) {
       return NextResponse.json(
         { error: postIdValidation.error },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const safePostId = postIdValidation.value; // Use sanitized string value
@@ -221,7 +225,6 @@ export async function POST(req) {
       throw new Error("MONGO_URI is not set");
     }
 
-    
     client = new MongoClient(MONGO_URI);
     await client.connect();
 
@@ -229,10 +232,10 @@ export async function POST(req) {
     const postsCol = db.collection(POSTS_COLLECTION);
     const commentsCol = db.collection(COMMENTS_COLLECTION);
 
-    // ensure the post exists 
+    // ensure the post exists
     const postExists = await postsCol.findOne(
       { post_id: safePostId },
-      { projection: { _id: 0, post_id: 1 } }
+      { projection: { _id: 0, post_id: 1 } },
     );
     if (!postExists) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
@@ -244,9 +247,9 @@ export async function POST(req) {
     const doc = {
       comment_id: makeCommentId(),
       post_id: safePostId,
-      user_id: safeUserId, 
-      user_name, 
-      text, 
+      user_id: safeUserId,
+      user_name,
+      text,
       created_at: now,
       updated_at: now,
     };
@@ -259,12 +262,23 @@ export async function POST(req) {
     // Buffer comment_count delta in Redis and debounce flush
     const redis = getRedis();
     const deltaKey = `post:${safePostId}:comment_deltas`;
-    const flushAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
+    const firstKey = `post:${safePostId}:comment_first_at`;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const debounceAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
+
+    // set burst start once
+    await redis.set(firstKey, String(nowSec), "EX", DELTA_TTL_SECONDS, "NX");
+    const firstAtSec = Number((await redis.get(firstKey)) || nowSec);
+
+    const hardDeadlineSec = firstAtSec + FLUSH_MAX_WAIT_SEC;
+    const flushAtSec = Math.min(debounceAtSec, hardDeadlineSec);
 
     const pipe = redis.pipeline();
     pipe.hincrby(deltaKey, "count", 1);
     pipe.zadd(FLUSH_ZSET, flushAtSec, safePostId);
     pipe.expire(deltaKey, DELTA_TTL_SECONDS);
+    pipe.expire(firstKey, DELTA_TTL_SECONDS);
     await pipe.exec();
 
     const pending = await redis.hget(deltaKey, "count");
@@ -272,7 +286,7 @@ export async function POST(req) {
 
     const postDoc = await postsCol.findOne(
       { post_id: safePostId },
-      { projection: { _id: 0, comment_count: 1 } }
+      { projection: { _id: 0, comment_count: 1 } },
     );
 
     return NextResponse.json(
@@ -280,20 +294,14 @@ export async function POST(req) {
         ...doc,
         comment_count: Number(postDoc?.comment_count || 0) + pendingCount,
       },
-      { status: 201 }
+      { status: 201 },
     );
 
-
-
-
-
-
-
-    return NextResponse.json(doc, { status: 201 });
+    // return NextResponse.json(doc, { status: 201 });
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to create comment", detail: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     if (client) {
@@ -308,7 +316,7 @@ export async function POST(req) {
 // Allows a user to delete their own comment
 export async function DELETE(req) {
   let client = null;
-  
+
   try {
     // Verify authentication and get authenticated user_id from JWT token
     let authenticatedUserId;
@@ -317,7 +325,7 @@ export async function DELETE(req) {
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -328,7 +336,7 @@ export async function DELETE(req) {
     if (!comment_id) {
       return NextResponse.json(
         { error: "Missing required parameter: comment_id" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -337,7 +345,7 @@ export async function DELETE(req) {
     if (!commentIdValidation.valid) {
       return NextResponse.json(
         { error: commentIdValidation.error },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const safeCommentId = commentIdValidation.value;
@@ -356,51 +364,59 @@ export async function DELETE(req) {
     const comment = await commentsCol.findOne({ comment_id: safeCommentId });
 
     if (!comment) {
-      return NextResponse.json(
-        { error: "Comment not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Comment not found" }, { status: 404 });
     }
 
     // Security check: ensure the authenticated user owns this comment
     if (comment.user_id !== authenticatedUserId) {
       return NextResponse.json(
         { error: "Forbidden: You can only delete your own comments" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     // Delete the comment
-    const deleteResult = await commentsCol.deleteOne({ comment_id: safeCommentId });
+    const deleteResult = await commentsCol.deleteOne({
+      comment_id: safeCommentId,
+    });
 
     if (deleteResult.deletedCount === 0) {
       // The comment was likely deleted by a concurrent request
       return NextResponse.json(
         { error: "Comment not found or already deleted" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
-   // Buffer comment_count delta in Redis (decrement) and debounce flush
+    // Buffer comment_count delta in Redis (decrement) and debounce flush
     const redis = getRedis();
     const deltaKey = `post:${comment.post_id}:comment_deltas`;
-    const flushAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
+    const firstKey = `post:${comment.post_id}:comment_first_at`;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const debounceAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
+
+    await redis.set(firstKey, String(nowSec), "EX", DELTA_TTL_SECONDS, "NX");
+    const firstAtSec = Number((await redis.get(firstKey)) || nowSec);
+
+    const hardDeadlineSec = firstAtSec + FLUSH_MAX_WAIT_SEC;
+    const flushAtSec = Math.min(debounceAtSec, hardDeadlineSec);
 
     const pipe = redis.pipeline();
     pipe.hincrby(deltaKey, "count", -1);
     pipe.zadd(FLUSH_ZSET, flushAtSec, comment.post_id);
     pipe.expire(deltaKey, DELTA_TTL_SECONDS);
+    pipe.expire(firstKey, DELTA_TTL_SECONDS);
     await pipe.exec();
-
 
     return NextResponse.json(
       { message: "Comment deleted successfully", comment_id: safeCommentId },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to delete comment", detail: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     if (client) {

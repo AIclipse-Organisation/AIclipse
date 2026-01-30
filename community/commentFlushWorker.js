@@ -20,12 +20,13 @@ async function flushOnce({ redis, posts }) {
     nowSec,
     "LIMIT",
     0,
-    300
+    300,
   );
   if (!duePostIds.length) return 0;
 
   for (const postId of duePostIds) {
     const deltaKey = `post:${postId}:comment_deltas`;
+    const firstKey = `post:${postId}:comment_first_at`;
 
     const lockKey = `lock:flush:comments:${postId}`;
     const gotLock = await redis.set(lockKey, "1", "NX", "EX", 30);
@@ -45,27 +46,25 @@ async function flushOnce({ redis, posts }) {
             {
               $inc: { comment_count: delta },
               $set: { updated_at: new Date() },
-            }
+            },
           );
         } else {
-          await posts.updateOne(
-            { post_id: postId },
-            [
-              {
-                $set: {
-                  comment_count: {
-                    $max: [0, { $add: ["$comment_count", delta] }],
-                  },
-                  updated_at: new Date(),
+          await posts.updateOne({ post_id: postId }, [
+            {
+              $set: {
+                comment_count: {
+                  $max: [0, { $add: ["$comment_count", delta] }],
                 },
+                updated_at: new Date(),
               },
-            ]
-          );
+            },
+          ]);
         }
       }
 
       const pipe = redis.pipeline();
       pipe.del(deltaKey);
+      pipe.del(firstKey);
       pipe.zrem(FLUSH_ZSET, postId);
       await pipe.exec();
     } finally {
