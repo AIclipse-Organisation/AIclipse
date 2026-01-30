@@ -4,7 +4,6 @@ export default function BottomNav() {
   const path =
     typeof window !== "undefined" ? window.location.pathname : "";
 
-  const linkClass = (href) => (path === href ? "active" : "");
 
   return (
     <nav className="navbar" id="bottom-nav" aria-label="Bottom navigation">
