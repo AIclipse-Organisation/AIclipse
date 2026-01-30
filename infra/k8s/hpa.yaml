@@ -7,8 +7,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: auth-depl
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 1
+  maxReplicas: 4
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300
@@ -122,7 +122,7 @@ spec:
     kind: Deployment
     name: gateway-depl
   minReplicas: 2
-  maxReplicas: 10
+  maxReplicas: 6
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300
