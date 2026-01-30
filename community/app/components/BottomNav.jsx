@@ -1,9 +1,6 @@
 "use client";
 
 export default function BottomNav() {
-  const path =
-    typeof window !== "undefined" ? window.location.pathname : "";
-
 
   return (
     <nav className="navbar" id="bottom-nav" aria-label="Bottom navigation">
