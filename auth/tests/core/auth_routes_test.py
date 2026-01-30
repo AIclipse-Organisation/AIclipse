@@ -1,10 +1,37 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+import bcrypt
+import jwt
 import pytest
+
+from app.core.keys import KEY_ID
 
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _bcrypt_hash(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def _make_user_jwt(auth_mod, user_id: str, email: str, *, is_admin: bool = False, plan: int = 0, user_name: str = "X") -> str:
+    now = _now_utc()
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "user_name": user_name,
+        "is_admin": bool(is_admin),
+        "plan": int(plan),
+        "iat": now,
+        "exp": now + timedelta(hours=1),
+    }
+    return jwt.encode(
+        payload,
+        auth_mod._test_keys.private_key,
+        algorithm="RS256",
+        headers={"kid": KEY_ID},
+    )
 
 
 @pytest.mark.asyncio
@@ -25,7 +52,7 @@ async def test_jwks(client):
 
 
 @pytest.mark.asyncio
-async def test_signup_success(client, auth_mod, users_coll):
+async def test_signup_success(client, users_coll):
     payload = {"user_name": " Alice  ", "email": "  Alice@Example.com ", "password": "secret123"}
     r = await client.post("/signup", json=payload)
     assert r.status_code == 201
@@ -43,23 +70,25 @@ async def test_signup_success(client, auth_mod, users_coll):
     assert stored["email"] == "alice@example.com"
     assert stored["user_name"] == "Alice"
     assert stored["password"] != payload["password"]
-    assert auth_mod.verify_password(payload["password"], stored["password"]) is True
+    assert bcrypt.checkpw(payload["password"].encode("utf-8"), stored["password"].encode("utf-8")) is True
 
 
 @pytest.mark.asyncio
-async def test_signup_conflict(client, users_coll, auth_mod):
+async def test_signup_conflict(client, users_coll):
     await users_coll.insert_one(
         {
             "user_id": "u1",
             "user_name": "X",
             "email": "x@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
 
@@ -78,13 +107,15 @@ async def test_login_success(client, users_coll, auth_mod):
             "user_id": "u_login",
             "user_name": "Bob",
             "email": "bob@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 1,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
 
@@ -95,10 +126,10 @@ async def test_login_success(client, users_coll, auth_mod):
     assert data["user"]["email"] == "bob@example.com"
     assert data["user"]["plan"] == 1
 
-    tu = auth_mod.decode_jwt_local(data["token"])
-    assert tu.user_id == "u_login"
-    assert tu.plan == 1
-    assert tu.is_admin is False
+    payload = jwt.decode(data["token"], key=auth_mod._test_keys.public_key, algorithms=["RS256"])
+    assert payload["sub"] == "u_login"
+    assert payload["plan"] == 1
+    assert payload["is_admin"] is False
 
 
 @pytest.mark.asyncio
@@ -109,19 +140,21 @@ async def test_login_invalid_user(client):
 
 
 @pytest.mark.asyncio
-async def test_login_invalid_password(client, users_coll, auth_mod):
+async def test_login_invalid_password(client, users_coll):
     await users_coll.insert_one(
         {
             "user_id": "u_login2",
             "user_name": "Bob",
             "email": "bob2@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
     r = await client.post("/login", json={"email": "bob2@example.com", "password": "wrong"})
@@ -143,19 +176,19 @@ async def test_get_me_ok(client, users_coll, auth_mod):
             "user_id": "u_me",
             "user_name": "Me",
             "email": "me@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": 25,
             "total_guesses": 3,
             "total_correct": 2,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
 
-    token = auth_mod.issue_jwt(
-        {"user_id": "u_me", "email": "me@example.com", "user_name": "Me", "is_admin": False, "plan": 0}
-    )
+    token = _make_user_jwt(auth_mod, "u_me", "me@example.com", is_admin=False, plan=0, user_name="Me")
     r = await client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     body = r.json()
@@ -173,18 +206,18 @@ async def test_update_me_no_changes_returns_current(client, users_coll, auth_mod
             "user_id": "u_me2",
             "user_name": "Me2",
             "email": "me2@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
-    token = auth_mod.issue_jwt(
-        {"user_id": "u_me2", "email": "me2@example.com", "user_name": "Me2", "is_admin": False, "plan": 0}
-    )
+    token = _make_user_jwt(auth_mod, "u_me2", "me2@example.com", is_admin=False, plan=0, user_name="Me2")
     r = await client.patch("/me", json={}, headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     assert r.json()["email"] == "me2@example.com"
@@ -197,18 +230,18 @@ async def test_update_me_updates_fields(client, users_coll, auth_mod):
             "user_id": "u_me3",
             "user_name": "Old",
             "email": "old@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
-    token = auth_mod.issue_jwt(
-        {"user_id": "u_me3", "email": "old@example.com", "user_name": "Old", "is_admin": False, "plan": 0}
-    )
+    token = _make_user_jwt(auth_mod, "u_me3", "old@example.com", is_admin=False, plan=0, user_name="Old")
 
     r = await client.patch(
         "/me",
@@ -228,18 +261,18 @@ async def test_update_me_password_changes_hash(client, users_coll, auth_mod):
             "user_id": "u_me4",
             "user_name": "X",
             "email": "x4@example.com",
-            "password": auth_mod.hash_password("oldpass"),
+            "password": _bcrypt_hash("oldpass"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
-    token = auth_mod.issue_jwt(
-        {"user_id": "u_me4", "email": "x4@example.com", "user_name": "X", "is_admin": False, "plan": 0}
-    )
+    token = _make_user_jwt(auth_mod, "u_me4", "x4@example.com", is_admin=False, plan=0, user_name="X")
 
     r = await client.patch(
         "/me",
@@ -250,8 +283,8 @@ async def test_update_me_password_changes_hash(client, users_coll, auth_mod):
 
     stored = await users_coll.find_one({"user_id": "u_me4"})
     assert stored is not None
-    assert auth_mod.verify_password("newpass123", stored["password"]) is True
-    assert auth_mod.verify_password("oldpass", stored["password"]) is False
+    assert bcrypt.checkpw("newpass123".encode("utf-8"), stored["password"].encode("utf-8")) is True
+    assert bcrypt.checkpw("oldpass".encode("utf-8"), stored["password"].encode("utf-8")) is False
 
 
 @pytest.mark.asyncio
@@ -261,18 +294,18 @@ async def test_delete_me_ok(client, users_coll, auth_mod):
             "user_id": "u_del",
             "user_name": "Del",
             "email": "del@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
-    token = auth_mod.issue_jwt(
-        {"user_id": "u_del", "email": "del@example.com", "user_name": "Del", "is_admin": False, "plan": 0}
-    )
+    token = _make_user_jwt(auth_mod, "u_del", "del@example.com", is_admin=False, plan=0, user_name="Del")
     r = await client.delete("/me", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     data = r.json()

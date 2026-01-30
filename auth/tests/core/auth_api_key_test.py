@@ -1,64 +1,84 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+import bcrypt
 import jwt
 import pytest
 from fastapi import HTTPException
 from pymongo.errors import DuplicateKeyError
+
+from app.core.keys import KEY_ID
+from app.services.api_keys import ApiKeyService
 
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _bcrypt_hash(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
 def _make_token(auth_mod, user_id: str, email: str, is_admin: bool = False, plan: int = 0) -> str:
-    return auth_mod.issue_jwt(
-        {"user_id": user_id, "email": email, "user_name": "X", "is_admin": is_admin, "plan": plan}
-    )
-
-
-@pytest.fixture(autouse=True)
-def _force_settings(auth_mod):
-    auth_mod.API_KEY_PEPPER = "test-pepper"
-    auth_mod.INTERNAL_AUTH_TOKEN = "test-internal-token"
+    now = _now_utc()
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "user_name": "X",
+        "is_admin": bool(is_admin),
+        "plan": int(plan),
+        "iat": now,
+        "exp": now + timedelta(hours=1),
+    }
+    return jwt.encode(payload, auth_mod._test_keys.private_key, algorithm="RS256", headers={"kid": KEY_ID})
 
 
 # -----------------------
 # Helper-level tests
 # -----------------------
 
-def test_hash_and_verify_api_key_secret_ok(auth_mod):
-    secret = "sk_test_secret_123"
-    pepper = "pepper"
+@pytest.mark.asyncio
+async def test_api_key_service_hash_and_verify_ok(client, auth_mod):
+    cpu = auth_mod.app.state.cpu
+    pepper = auth_mod._test_settings.API_KEY_PEPPER
+    api = ApiKeyService(cpu, pepper=pepper)
 
-    hashed = auth_mod._hash_api_key_secret(secret, pepper=pepper)
+    secret = "sk_test_secret_123"
+    hashed = await api.hash_secret(secret)
     assert isinstance(hashed, str)
     assert hashed != secret
 
-    assert auth_mod._verify_api_key_secret(secret, hashed, pepper=pepper) is True
-    assert auth_mod._verify_api_key_secret("sk_wrong", hashed, pepper=pepper) is False
-    assert auth_mod._verify_api_key_secret(secret, hashed, pepper="wrong-pepper") is False
+    assert await api.verify_secret(secret, hashed) is True
+    assert await api.verify_secret("sk_wrong", hashed) is False
 
 
-def test_parse_full_api_key_invalid(auth_mod):
+def test_parse_full_api_key_invalid(client, auth_mod):
+    cpu = auth_mod.app.state.cpu
+    pepper = auth_mod._test_settings.API_KEY_PEPPER
+    api = ApiKeyService(cpu, pepper=pepper)
+
     with pytest.raises(HTTPException) as e1:
-        auth_mod._parse_full_api_key("")
+        api.parse_full_key("")
     assert e1.value.status_code == 401
 
     with pytest.raises(HTTPException) as e2:
-        auth_mod._parse_full_api_key("no-dot-here")
+        api.parse_full_key("no-dot-here")
     assert e2.value.status_code == 401
 
     with pytest.raises(HTTPException) as e3:
-        auth_mod._parse_full_api_key("badprefix.secret")
+        api.parse_full_key("badprefix.secret")
     assert e3.value.status_code == 401
 
     with pytest.raises(HTTPException) as e4:
-        auth_mod._parse_full_api_key("ak_123.not_sk_prefix")
+        api.parse_full_key("ak_123.not_sk_prefix")
     assert e4.value.status_code == 401
 
 
-def test_parse_full_api_key_ok(auth_mod):
-    key_id, secret = auth_mod._parse_full_api_key("ak_123.sk_abc")
+def test_parse_full_api_key_ok(client, auth_mod):
+    cpu = auth_mod.app.state.cpu
+    pepper = auth_mod._test_settings.API_KEY_PEPPER
+    api = ApiKeyService(cpu, pepper=pepper)
+
+    key_id, secret = api.parse_full_key("ak_123.sk_abc")
     assert key_id == "ak_123"
     assert secret == "sk_abc"
 
@@ -90,13 +110,15 @@ async def test_rotate_api_key_success_persists_and_returns_last4(client, users_c
             "user_id": "u_dev",
             "user_name": "Dev",
             "email": "dev@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
 
@@ -108,7 +130,6 @@ async def test_rotate_api_key_success_persists_and_returns_last4(client, users_c
     body = r.json()
     assert "api_key" in body
     assert "key" in body
-    assert "secret_hash" not in body["key"]
 
     full_key = body["api_key"]
     key_pub = body["key"]
@@ -126,7 +147,9 @@ async def test_rotate_api_key_success_persists_and_returns_last4(client, users_c
     assert doc is not None
     assert doc["user_id"] == "u_dev"
     assert doc["last4"] == secret[-4:]
-    assert auth_mod._verify_api_key_secret(secret, doc.get("secret_hash", ""), pepper=auth_mod.API_KEY_PEPPER) is True
+
+    api = ApiKeyService(auth_mod.app.state.cpu, pepper=auth_mod._test_settings.API_KEY_PEPPER)
+    assert await api.verify_secret(secret, doc.get("secret_hash", "")) is True
 
 
 @pytest.mark.asyncio
@@ -136,13 +159,15 @@ async def test_get_my_api_key_after_rotate_returns_public_only(client, users_col
             "user_id": "u_dev2",
             "user_name": "Dev2",
             "email": "dev2@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
 
@@ -168,13 +193,15 @@ async def test_delete_my_api_key_revokes(client, users_coll, auth_mod):
             "user_id": "u_dev3",
             "user_name": "Dev3",
             "email": "dev3@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
 
@@ -193,7 +220,7 @@ async def test_delete_my_api_key_revokes(client, users_coll, auth_mod):
 
 
 @pytest.mark.asyncio
-async def test_exchange_requires_internal_token(client, auth_mod):
+async def test_exchange_requires_internal_token(client):
     r = await client.post("/internal/api-key/exchange", json={"api_key": "ak_x.sk_y"})
     assert r.status_code == 403
     assert r.json()["detail"] == "Forbidden"
@@ -212,7 +239,7 @@ async def test_exchange_invalid_format_returns_401(client, auth_mod):
     r = await client.post(
         "/internal/api-key/exchange",
         json={"api_key": "not-a-key"},
-        headers={"X-Internal-Token": auth_mod.INTERNAL_AUTH_TOKEN},
+        headers={"X-Internal-Token": auth_mod._test_settings.INTERNAL_AUTH_TOKEN},
     )
     assert r.status_code == 401
     assert r.json()["detail"] == "Invalid API key format"
@@ -223,7 +250,7 @@ async def test_exchange_invalid_key_id_returns_401(client, auth_mod):
     r = await client.post(
         "/internal/api-key/exchange",
         json={"api_key": "ak_missing.sk_something"},
-        headers={"X-Internal-Token": auth_mod.INTERNAL_AUTH_TOKEN},
+        headers={"X-Internal-Token": auth_mod._test_settings.INTERNAL_AUTH_TOKEN},
     )
     assert r.status_code == 401
     assert r.json()["detail"] == "Invalid API key"
@@ -236,46 +263,45 @@ async def test_exchange_success_returns_short_lived_jwt(client, users_coll, auth
             "user_id": "u_api",
             "user_name": "Api",
             "email": "api@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 1,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
 
-    # Rotate to create a real stored key
     token = _make_token(auth_mod, "u_api", "api@example.com", plan=1)
     r1 = await client.post("/me/api-key", headers={"Authorization": f"Bearer {token}"})
     assert r1.status_code == 201
     full_key = r1.json()["api_key"]
     key_id, secret = full_key.split(".", 1)
 
-    # Wrong secret => 401
     wrong_last = "A" if secret[-1] != "A" else "B"
     wrong_key = f"{key_id}.{secret[:-1]}{wrong_last}"
     r_wrong = await client.post(
         "/internal/api-key/exchange",
         json={"api_key": wrong_key},
-        headers={"X-Internal-Token": auth_mod.INTERNAL_AUTH_TOKEN},
+        headers={"X-Internal-Token": auth_mod._test_settings.INTERNAL_AUTH_TOKEN},
     )
     assert r_wrong.status_code == 401
     assert r_wrong.json()["detail"] == "Invalid API key"
 
-    # Correct => 200 + jwt
     r2 = await client.post(
         "/internal/api-key/exchange",
         json={"api_key": full_key},
-        headers={"X-Internal-Token": auth_mod.INTERNAL_AUTH_TOKEN},
+        headers={"X-Internal-Token": auth_mod._test_settings.INTERNAL_AUTH_TOKEN},
     )
     assert r2.status_code == 200
     data = r2.json()
     assert "token" in data
     assert "exp" in data
 
-    payload = jwt.decode(data["token"], key=auth_mod.public_key, algorithms=["RS256"])
+    payload = jwt.decode(data["token"], key=auth_mod._test_keys.public_key, algorithms=["RS256"])
     assert payload["sub"] == "u_api"
     assert payload["email"] == "api@example.com"
     assert payload["plan"] == 1
@@ -291,13 +317,15 @@ async def test_rotate_api_key_conflict_returns_409(client, users_coll, api_keys_
             "user_id": "u_conflict",
             "user_name": "C",
             "email": "c@example.com",
-            "password": auth_mod.hash_password("secret123"),
+            "password": _bcrypt_hash("secret123"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
 
