@@ -195,6 +195,57 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showComments, postId]);
 
+  /* =========================
+     ✅ ADDED: bar helpers + derived values
+     ========================= */
+
+  function toPercentNumber01(conf) {
+    const n = Number(conf);
+    if (!Number.isFinite(n)) return 0;
+    const clamped = Math.max(0, Math.min(1, n));
+    return clamped * 100; // float 0..100
+  }
+
+  function verdictTypeFrom(img) {
+    const v = String(img?.result?.verdict ?? img?.verdict ?? "").toLowerCase();
+    const l = String(img?.result?.label ?? img?.label ?? "").toLowerCase();
+
+    if (v.includes("real") || v === "safe" || l.includes("real")) return "safe";
+    if (v.includes("ai") || v.includes("fake") || v.includes("deepfake")) return "risk";
+    if (l.includes("ai") || l.includes("fake") || l.includes("deepfake")) return "risk";
+
+    return "risk";
+  }
+
+  function getVoteBucketFromPctReal(pctReal) {
+    if (pctReal >= 40 && pctReal <= 60) return { text: "Not sure", type: "neutral" };
+
+    if (pctReal > 60) {
+      if (pctReal >= 86) return { text: "Most Likely Real", type: "safe" };
+      return { text: "Likely Real", type: "safe" };
+    }
+
+    const pctAI = 100 - pctReal;
+    if (pctAI >= 86) return { text: "Most Likely AI", type: "risk" };
+    return { text: "Likely AI", type: "risk" };
+  }
+
+  const analysisConfidence = image?.result?.confidence ?? image?.confidence ?? 0;
+  const analysisPct = toPercentNumber01(analysisConfidence);
+  const analysisType = verdictTypeFrom(image); // safe | risk
+
+  const totalVotes = up + down;
+  const pctReal = totalVotes > 0 ? (up / totalVotes) * 100 : null; // 0..100
+  const voteBucket = pctReal === null ? null : getVoteBucketFromPctReal(pctReal);
+  const pctAI = pctReal === null ? null : 100 - pctReal;
+
+  const communityDisplayPct =
+    pctReal === null
+      ? null
+      : voteBucket?.type === "risk"
+        ? pctAI
+        : pctReal;
+
   return (
     <div className="comm_postBox">
       <div className="comm_topRow">
@@ -309,32 +360,6 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
       {/* BODY TEXT (description FIRST like YouTube) */}
       <div className="comm_body">
         <div className="comm_description">{description}</div>
-
-        {/* DEV INFO (kept, but subtle) */}
-        <div className="comm_metaBlock">
-          <div className="comm_poster">
-            <strong>Posted by:</strong> {posterName}
-          </div>
-
-          <div className="comm_score">
-            <strong>Score:</strong> {formatScore(image?.score)}
-          </div>
-
-          {(image?.result?.verdict || image?.result?.label) && (
-            <div className="comm_detection">
-              {image?.result?.verdict && (
-                <div>
-                  <strong>Verdict:</strong> {String(image.result.verdict)}
-                </div>
-              )}
-              {image?.result?.label && (
-                <div>
-                  <strong>Label:</strong> {String(image.result.label)}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* IMAGE */}
@@ -345,6 +370,69 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
           alt={image?.label || "Community image"}
           onClick={handleClick}
         />
+      </div>
+
+      {/* bars above image */}
+      <div className="comm_bars">
+        {/* Analysis / model bar */}
+        <div className="comm_barBlock" aria-label="Analysis result">
+          <div className={`comm_barLine ${analysisType === "safe" ? "is-safe" : "is-risk"}`}>
+            {image?.result?.label
+              ? String(image.result.label)
+              : `${analysisPct.toFixed(0)}% ${analysisType === "safe" ? "Likely Real" : "Likely AI"}`}
+          </div>
+
+          <div
+            className={`comm_barTrack ${analysisType === "risk" ? "is-risk" : ""}`}
+            role="img"
+            aria-label={`Confidence ${analysisPct.toFixed(0)}%`}
+          >
+            <div
+              className={`comm_barFill ${analysisType === "risk" ? "is-risk" : ""}`}
+              style={{ width: `${Math.max(0, Math.min(100, analysisPct))}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Community votes bar */}
+        <div className="comm_barBlock" aria-label="Community result">
+          {pctReal === null ? (
+            <>
+              <div className="comm_barLine is-neutral">No community votes</div>
+              <div className="comm_barTrack is-neutral" role="img" aria-label="No community votes">
+                <div className="comm_barFill is-neutral" style={{ width: "100%" }} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className={`comm_barLine ${voteBucket.type === "safe"
+                  ? "is-safe"
+                  : voteBucket.type === "risk"
+                    ? "is-risk"
+                    : "is-neutral"
+                  }`}
+              >
+                {`${communityDisplayPct.toFixed(0)}% ${voteBucket.text} (Community)`}
+              </div>
+
+              <div
+                className="comm_barTrack"
+                role="img"
+                aria-label={
+                  voteBucket.type === "risk"
+                    ? `Vote confidence ${pctAI.toFixed(0)}% AI`
+                    : `Vote confidence ${pctReal.toFixed(0)}% real`
+                }
+              >
+                <div
+                  className="comm_barFill"
+                  style={{ width: `${Math.max(0, Math.min(100, pctReal))}%` }}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ACTIONS (like/dislike/comment) */}

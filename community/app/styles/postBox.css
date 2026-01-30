@@ -56,8 +56,8 @@
 }
 
 .comm_avatar {
-  width: 34px;
-  height: 34px;
+  width: 45px;
+  height: 45px;
   border-radius: 999px;
   overflow: hidden;
   flex: 0 0 auto;
@@ -78,7 +78,7 @@
 
 .comm_avatarInitials {
   font-weight: 800;
-  font-size: 12px;
+  font-size: 15px;
   opacity: 0.9;
   color:#CFB87C;
 }
@@ -99,7 +99,7 @@
 }
 
 .comm_headerName {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.2px;
   white-space: nowrap;
@@ -158,8 +158,9 @@
 
 .comm_description {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.35;
+  font-weight: 600;
   opacity: 0.92;
   white-space: pre-wrap;
   word-break: break-word;
@@ -182,10 +183,7 @@
 }
 
 .comm_metaBlock {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 0; 
-  color:#fff;
+  display:none;
 }
 
 .comm_score,
@@ -501,6 +499,7 @@
   opacity: 0.6;
   font-size: 12px;
   padding-top: 8px;
+  color:#fff;
 }
 
 /* =========================
@@ -596,4 +595,75 @@
   inset: 0;
   z-index: 49;
   background: transparent; 
+}
+
+/* =========================
+   NEW: Analysis + Community bars (PostBox)
+   ========================= */
+
+.comm_bars {
+  padding: 0 12px 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.comm_barBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.comm_barLine {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.80);
+}
+
+.comm_barLine.is-safe {
+  color: #18c46c;
+}
+
+.comm_barLine.is-risk {
+  color: #e04646;
+}
+
+.comm_barLine.is-neutral {
+  color: rgba(255, 255, 255, 0.70);
+}
+
+/* Track = remainder */
+.comm_barTrack {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: #e04646; /* red remainder (AI) by default */
+  overflow: hidden;
+}
+
+/* If the analysis verdict is AI/risk, remainder becomes green (same as viewscan) */
+.comm_barTrack.is-risk {
+  background: #18c46c;
+}
+
+/* Neutral track for "no votes" */
+.comm_barTrack.is-neutral {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.comm_barFill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: #18c46c; /* green fill = "real" by default */
+}
+
+/* If analysis is AI/risk, fill becomes red */
+.comm_barFill.is-risk {
+  background: #e04646;
+}
+
+/* Neutral fill for "no votes" */
+.comm_barFill.is-neutral {
+  background: rgba(255, 255, 255, 0.22);
 }
