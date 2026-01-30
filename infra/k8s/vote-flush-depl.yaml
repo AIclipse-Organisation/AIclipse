@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: community-vote-worker-depl
+  name: vote-flush-depl
 spec:
   replicas: 1
   selector: { matchLabels: { app: community-vote-worker } }
