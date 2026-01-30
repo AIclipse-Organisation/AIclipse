@@ -14,7 +14,8 @@
   margin: 0 auto;
   padding: 12px 12px 90px;
 
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* =========================
@@ -29,6 +30,7 @@
   /* Only divider should be BELOW each post */
   border-bottom: 1px solid rgba(255,255,255,0.10);
   padding-bottom: 12px;
+  overflow-x: hidden;
 }
 
 /* =========================
@@ -311,6 +313,7 @@
   background: rgba(255,255,255,0.06);
   color: white;
   outline: none;
+  box-sizing: border-box;
 }
 
 .comm_commentInput::placeholder {
@@ -326,6 +329,7 @@
   color: rgba(255,255,255,0.92);
   font-weight: 800;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 .comm_commentButton:hover {
