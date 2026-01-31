@@ -1,0 +1,178 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #222222;
+}
+
+.page-header {
+  padding: 6px 0 18px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #CFB87C;
+}
+
+.page-underline {
+  margin-top: 12px;
+  height: 1px;
+  width: 100%;
+  background: #CFB87C;
+}
+
+
+/* App shell wrapper */
+.app {
+  background: #222222;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Phone-width container */
+.app .app-container {
+  position: relative;
+  min-height: 100vh;
+  background: #222222;
+
+  margin: 0 auto;
+  max-width: 480px;
+  border-left: 1px solid #2c2c2c;
+  border-right: 1px solid #2c2c2c;
+}
+
+/* Top bar */
+.app .topbar {
+  height: 56px;
+  background: #222222;
+  border-bottom: 1px solid #2c2c2c;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+/* Hamburger */
+.app .menu-button {
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app .hamburger-line {
+  width: 22px;
+  height: 2px;
+  background-color: #CFB87C;
+  border-radius: 2px;
+}
+
+/* Logo */
+.app .topbar-logo img {
+  width: 150px;
+  height: auto;
+  display: block;
+}
+
+/* Avatar */
+.app .topbar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 35px;
+  width: 35px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.app .topbar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Right-side user container */
+.app .topbar-user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.app #current-user-chip {
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: #CFB87C;
+}
+
+/* Screen content area (pad bottom so it doesn't hide under navbar) */
+.app .screen {
+  padding: 20px;
+  padding-bottom: 100px; /* space for bottom nav */
+}
+
+/* Bottom navbar */
+.app .navbar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+
+  width: 100%;
+  max-width: 480px;
+
+  background: #222222;
+  border-top: 1px solid #2c2c2c;
+
+  display: flex;
+  justify-content: space-around;
+  padding: 20px 0;
+
+  z-index: 1000;
+}
+
+.app .navbar a {
+  text-decoration: none;
+  color: #f3f3f3;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.app .navbar a:hover {
+  color: #CFB87C;
+}
+
+/* Works for NavLink (react-router) because it adds .active automatically */
+.app .navbar a.active {
+  color: #CFB87C;
+}
+
+.app .navbar a.active::after {
+  content: "";
+  display: block;
+  width: 20px;
+  height: 2px;
+  margin: 6px auto 0;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+/* Responsive: subtle contrast outside phone shell */
+@media (min-width: 768px) {
+  .app {
+    background: #f5f5f5;
+  }
+}

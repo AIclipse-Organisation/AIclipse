@@ -1,268 +1,669 @@
+/* =========================
+   COMMUNITY FEED LAYOUT
+   (YouTube-like: single column)
+   ========================= */
+
 .comm_grid {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-evenly;
-  align-items: center;
-  flex-direction: row-reverse;
-  overflow: auto;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 14px;
+
+  /* centered feed like YouTube */
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 12px 12px 90px;
+
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-/* ───────── Post Card ───────── */
+/* =========================
+   POST CARD (YouTube-like)
+   ========================= */
 
 .comm_postBox {
-  width: 160px;
-  background: #0f0f0f;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  color: white;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+
+  /* Only divider should be BELOW each post */
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  padding-bottom: 12px;
+  overflow-x: hidden;
 }
 
-.comm_postBox:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
-}
-
-/* ───────── Top Row ───────── */
+/* =========================
+   HEADER ROW
+   (avatar + name + time) + actions (report/delete)
+   ========================= */
 
 .comm_topRow {
   display: flex;
-  justify-content: flex-end;
-  padding: 6px;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.75),
-    rgba(0, 0, 0, 0)
-  );
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  padding: 12px 12px 10px;
+  background: transparent;
+}
+
+.comm_headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.comm_avatar {
+  width: 45px;
+  height: 45px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+
+  display: grid;
+  place-items: center;
+}
+
+.comm_avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.comm_avatarInitials {
+  font-weight: 800;
+  font-size: 15px;
+  opacity: 0.9;
+  color:#CFB87C;
+}
+
+/* meta: name on top, date below */
+.comm_headerMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.comm_headerNameLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.comm_headerName {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color:#CFB87C;
+}
+
+.comm_headerTime {
+  font-size: 12px;
+  opacity: 0.55;
+  white-space: nowrap;
+  color:#fff;
+}
+
+/* right side actions */
+.comm_headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .comm_topRow button {
-  background: none;
-  border: none;
-  color: #aaa;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.65);
   font-size: 12px;
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0.85;
+  padding: 6px 8px;
+  border-radius: 10px;
 }
 
 .comm_topRow button:hover {
+  background: rgba(255, 255, 255, 0.06);
   opacity: 1;
-  color: #ff6b6b;
 }
 
-/* ───────── Image ───────── */
+.comm_topRow button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_deleteButton {
+  color: rgba(255, 107, 107, 0.95);
+}
+
+/* =========================
+   BODY / TEXT
+   ========================= */
+
+.comm_body {
+  padding: 0 12px 10px;
+}
+
+.comm_description {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+  font-weight: 600;
+  opacity: 0.92;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color:#fff;
+}
+
+.comm_editButton {
+  margin-left: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: rgba(255,255,255,0.85);
+}
+
+.comm_editButton:hover {
+  background: rgba(255,255,255,0.10);
+}
+
+.comm_metaBlock {
+  display:none;
+}
+
+.comm_score,
+.comm_detection div,
+.comm_poster {
+  font-size: 12px;
+  opacity: 0.70;
+}
+
+/* =========================
+   IMAGE (YouTube-like big image)
+   ========================= */
+
+.comm_postImageWrap {
+  padding: 0 12px 10px;
+}
 
 .comm_postImage {
   width: 100%;
-  height: 160px;
+  height: auto;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
+
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
-/* ───────── Bottom Row ───────── */
+/* =========================
+   ACTION ROW (like/dislike/comment)
+   ========================= */
 
 .comm_bottomRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 8px;
-  background: #111;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
 
-/* ───────── Votes ───────── */
+  padding: 10px 12px;
+  background: transparent;
+
+  border-top: 0; /* was divider; removed */
+}
 
 .comm_votesCell {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+  color:#fff;
 }
 
-.comm_votesCell button {
-  background: #1a1a1a;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 6px;
-  font-size: 14px;
+.comm_votesCell button,
+.comm_CommentsCell button {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 16px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
+
+  color: rgba(255,255,255,0.85);
+  display:flex;
 }
 
-.comm_votesCell button:hover {
-  background: #2a2a2a;
-  transform: translateY(-1px);
+.comm_votesCell button:hover,
+.comm_CommentsCell button:hover {
+  background: rgba(255,255,255,0.06);
 }
 
-.comm_votesCell button:disabled {
-  opacity: 0.5;
+.comm_votesCell button:disabled,
+.comm_CommentsCell button:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
+/* counts next to icons */
+.comm_votesCell span {
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.9;
+  min-width: 14px;
+  text-align: left;
+}
+
 .voteActive {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline: 2px solid rgba(255, 255, 255, 0.18);
 }
 
 .comm_voteUp.active {
-  background-color: #4caf50;
-  color: white;
+  background-color: rgba(76, 175, 80, 0.20);
 }
 
 .comm_voteDown.active {
-  background-color: #f44336;
-  color: white;
+  background-color: rgba(244, 67, 54, 0.20);
 }
 
-.comm_voteBlock {
+.comm_iconBtn {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.comm_iconBtn:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.comm_iconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* icon image size */
+.comm_icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  object-fit: contain;
+}
+
+/* optional: slightly bigger on touch devices */
+@media (min-width: 420px) {
+  .comm_icon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* =========================
+   NEW: unified pill actions (icon + text inside same button)
+   ========================= */
+
+.comm_actionsRow {
   display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.comm_actionBtn {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+
+  color: rgba(255,255,255,0.92);
+  line-height: 1;
 }
 
-.comm_voteMeta {
+.comm_actionBtn:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.comm_actionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_actionText {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+
+.comm_actionsLeft {
   display: flex;
-  flex-direction: column;
-  line-height: 1.1;
+  align-items: center;
+  gap: 10px;
 }
 
-.comm_voteNumber {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.comm_voteLabel {
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-/* ───────── Comments Button ───────── */
-
-.comm_CommentsCell {
+.comm_actionsRight {
   display: flex;
   align-items: center;
 }
 
-.comm_CommentsCell button {
-  background: #1a1a1a;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-
-.comm_CommentsCell button:hover {
-  background: #2a2a2a;
-  transform: translateY(-1px);
-}
-
-/* ───────── Meta / Details ───────── */
-
-.comm_poster {
-  font-size: 12px;
-  opacity: 0.8;
-  padding-top: 8px;
-}
-
-.comm_detection div {
-  font-size: 12px;
-}
-
-.comm_detection div:first-child {
-  opacity: 0.85;
-}
-
-.comm_detection div:last-child {
-  opacity: 0.75;
-}
-
-.comm_description {
-  margin-top: 6px;
-}
-
-/* ───────── Comments Section ───────── */
+/* =========================
+   COMMENTS SECTION
+   ========================= */
 
 .comm_commentsWrapper {
-  padding-top: 10px;
+  padding: 12px;
+  border-top: 0; /* was divider; removed */
 }
 
 .comm_commentsHeader {
-  font-size: 12px;
-  opacity: 0.8;
-  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.85;
+  margin-bottom: 10px;
+  color:#fff;
 }
 
 .comm_commentInputWrapper {
   display: grid;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .comm_commentInput {
   width: 100%;
-  padding: 8px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  color: white;
+  outline: none;
+  box-sizing: border-box;
 }
 
-.comm_commentButton {
+.comm_commentInput::placeholder {
+  color: rgba(255,255,255,0.45);
+}
+
+/* .comm_commentButton {
   width: 100%;
-  padding: 10px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.92);
+  font-weight: 800;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.comm_commentButton:hover {
+  background: rgba(255,255,255,0.12);
+} */
+
+.comm_commentButton {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.comm_commentButton:hover {
+  background: var(--btn-hover-color);
+  color: #111;
 }
 
 .comm_commentsList {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .comm_comment {
-  padding: 10px;
+  padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
 }
 
 .comm_commentMeta {
   font-size: 12px;
   opacity: 0.7;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color:#fff;
 }
 
 .comm_commentText {
   white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  opacity: 0.92;
+  color:#fff;
+}
+
+.comm_deleteCommentButton {
+  margin-left: auto;
+  color: rgba(255, 107, 107, 0.95);
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.comm_deleteCommentButton:hover {
+  background: rgba(255,255,255,0.06);
 }
 
 .muted {
   opacity: 0.6;
+  font-size: 12px;
+  padding-top: 8px;
+  color:#fff;
 }
 
-/* ───────── Action Buttons ───────── */
+/* =========================
+   3-dot actions menu
+   ========================= */
 
-.comm_deleteButton {
-  margin-left: 8px;
-  color: #dc3545;
+.comm_menu {
+  position: relative;
+  flex: 0 0 auto;
 }
 
-.comm_editButton {
-  margin-left: 8px;
-  font-size: 0.85em;
+.comm_menuBtn {
+  background: transparent;
+  border: 0;
+  color: rgba(255,255,255,0.85);
   cursor: pointer;
-  background: none;
-  border: none;
-  padding: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 18px;
+  line-height: 1;
 }
 
-.comm_deleteCommentButton {
-  margin-left: 8px;
-  color: #dc3545;
-  font-size: 0.85em;
+.comm_menuBtn:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.comm_menuBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_topRow .comm_menuBtn {
+  font-size: 20px;   
+  padding: 8px 12px; 
+  line-height: 1;
+}
+
+.comm_menuPanel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 50;
+
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 12px;
+
+  background: rgba(20,20,20,0.98);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+}
+
+.comm_menuItem {
+  width: 100%;
+  text-align: left;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 10px;
+  border-radius: 10px;
+
+  background: transparent;
+  border: 0;
   cursor: pointer;
-  background: none;
-  border: none;
-  padding: 0;
+
+  color: rgba(255,255,255,0.92);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.comm_menuItem:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.comm_menuItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_menuItemDanger {
+  color: rgba(255, 107, 107, 0.95);
+}
+
+.comm_menuItemMuted {
+  color: rgba(255,255,255,0.60);
+  cursor: default;
+}
+
+.comm_menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: transparent; 
+}
+
+/* =========================
+   NEW: Analysis + Community bars (PostBox)
+   ========================= */
+
+.comm_bars {
+  padding: 0 12px 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.comm_barBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.comm_barLine {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.80);
+}
+
+.comm_barLine.is-safe {
+  color: #18c46c;
+}
+
+.comm_barLine.is-risk {
+  color: #e04646;
+}
+
+.comm_barLine.is-neutral {
+  color: rgba(255, 255, 255, 0.70);
+}
+
+/* Track = remainder */
+.comm_barTrack {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: #e04646; /* red remainder (AI) by default */
+  overflow: hidden;
+}
+
+/* If the analysis verdict is AI/risk, remainder becomes green (same as viewscan) */
+.comm_barTrack.is-risk {
+  background: #18c46c;
+}
+
+/* Neutral track for "no votes" */
+.comm_barTrack.is-neutral {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.comm_barFill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: #18c46c; /* green fill = "real" by default */
+}
+
+/* If analysis is AI/risk, fill becomes red */
+.comm_barFill.is-risk {
+  background: #e04646;
+}
+
+/* Neutral fill for "no votes" */
+.comm_barFill.is-neutral {
+  background: rgba(255, 255, 255, 0.22);
 }
