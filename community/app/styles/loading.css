@@ -8,8 +8,8 @@
 .comm_loadingSpinner {
   width: 42px;
   height: 42px;
-  border: 4px solid rgba(242, 0, 0, 0.15);
-  border-top-color: #d80606;
+  border: 4px solid rgb(116, 95, 57);
+  border-top-color: #CFB87C;
   border-radius: 50%;
   animation: comm_spin 0.9s linear infinite;
 }

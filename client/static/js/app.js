@@ -205,7 +205,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (res.ok && data.user) {
         setStatus(accountStatus, "success", "Logged in.");
         setCurrentUserChip(data.user);
-        window.location.href = "/home";
+        window.location.href = "/community";
 
 
       } else {
