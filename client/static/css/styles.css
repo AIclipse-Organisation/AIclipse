@@ -57,8 +57,8 @@ body.app .app-container {
 
   margin: 0 auto;
   max-width: 480px;
-  border-left: 1px solid #ddd;
-  border-right: 1px solid #ddd;
+  /* border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd; */
 }
 
 /* Top bar */
