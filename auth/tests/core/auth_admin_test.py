@@ -1,16 +1,32 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+import bcrypt
+import jwt
 import pytest
+
+from app.core.keys import KEY_ID
 
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _bcrypt_hash(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
 def _make_token(auth_mod, user_id: str, email: str, is_admin: bool, plan: int = 0) -> str:
-    return auth_mod.issue_jwt(
-        {"user_id": user_id, "email": email, "user_name": "X", "is_admin": is_admin, "plan": plan}
-    )
+    now = _now_utc()
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "user_name": "X",
+        "is_admin": bool(is_admin),
+        "plan": int(plan),
+        "iat": now,
+        "exp": now + timedelta(hours=1),
+    }
+    return jwt.encode(payload, auth_mod._test_keys.private_key, algorithm="RS256", headers={"kid": KEY_ID})
 
 
 @pytest.mark.asyncio
@@ -28,13 +44,15 @@ async def test_admin_list_users_filters_by_user_name(client, users_coll, auth_mo
             "user_id": "u_a",
             "user_name": "Alice",
             "email": "alice@example.com",
-            "password": auth_mod.hash_password("x"),
+            "password": _bcrypt_hash("x"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
     await users_coll.insert_one(
@@ -42,13 +60,15 @@ async def test_admin_list_users_filters_by_user_name(client, users_coll, auth_mo
             "user_id": "u_b",
             "user_name": "Bob",
             "email": "bob@example.com",
-            "password": auth_mod.hash_password("x"),
+            "password": _bcrypt_hash("x"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
 
@@ -76,13 +96,15 @@ async def test_admin_get_user_ok(client, users_coll, auth_mod):
             "user_id": "u_x",
             "user_name": "X",
             "email": "x@example.com",
-            "password": auth_mod.hash_password("x"),
+            "password": _bcrypt_hash("x"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": 30,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
     admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
@@ -99,13 +121,15 @@ async def test_admin_update_user_ok(client, users_coll, auth_mod):
             "user_id": "u_upd",
             "user_name": "Old",
             "email": "old@example.com",
-            "password": auth_mod.hash_password("oldpass"),
+            "password": _bcrypt_hash("oldpass"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
     admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
@@ -130,13 +154,15 @@ async def test_admin_delete_user_ok(client, users_coll, auth_mod):
             "user_id": "u_del2",
             "user_name": "Del",
             "email": "del2@example.com",
-            "password": auth_mod.hash_password("x"),
+            "password": _bcrypt_hash("x"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
             "age": None,
             "total_guesses": 0,
             "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
         }
     )
     admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)

@@ -3,6 +3,8 @@ import json
 import httpx
 import pytest
 
+from tests.conftest import make_auth_token
+
 
 @pytest.mark.asyncio
 async def test_auth_signup_proxies_json(client, patch_upstreams):
@@ -42,23 +44,17 @@ async def test_auth_me_requires_auth(client):
 
 
 @pytest.mark.asyncio
-async def test_auth_me_ok(client, patch_upstreams, auth_keypair, register_auth_jwks, gateway_mod):
-    token = gateway_mod.jwt.encode(
-        {
-            "sub": "u_me",
-            "email": "me@example.com",
-            "is_admin": False,
-            "plan": 1,
-            "iat": 1,
-            "exp": 10**10,
-        },
-        auth_keypair.private_key,
-        algorithm="RS256",
-        headers={"kid": auth_keypair.kid},
+async def test_auth_me_ok(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_me",
+        email="me@example.com",
+        is_admin=False,
+        plan=1,
+        ttl_seconds=10**9,
     )
 
-    def me_handler(req):
-        # gateway має прокинути Authorization
+    def me_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers.get("authorization", "").startswith("Bearer ")
         return httpx.Response(status_code=200, json={"user_id": "u_me", "email": "me@example.com"})
 

@@ -18,7 +18,7 @@ PNG_1X1_WHITE = base64.b64decode(
 
 
 @pytest.mark.asyncio
-async def test_checks_ok_returns_detection_token(client, patch_upstreams, auth_keypair, register_auth_jwks):
+async def test_checks_ok_returns_detection_token(client, patch_upstreams, auth_keypair):
     token = make_auth_token(
         keypair=auth_keypair,
         user_id="u_det",
@@ -58,7 +58,7 @@ async def test_checks_ok_returns_detection_token(client, patch_upstreams, auth_k
 
 
 @pytest.mark.asyncio
-async def test_checks_rejects_bad_content_type(client, auth_keypair, register_auth_jwks):
+async def test_checks_rejects_bad_content_type(client, auth_keypair):
     token = make_auth_token(
         keypair=auth_keypair,
         user_id="u_det2",
@@ -76,9 +76,7 @@ async def test_checks_rejects_bad_content_type(client, auth_keypair, register_au
 
 
 @pytest.mark.asyncio
-async def test_upload_image_validates_detection_token_and_returns_fallback(
-    client, patch_upstreams, auth_keypair, register_auth_jwks
-):
+async def test_upload_image_validates_detection_token_and_proxies_to_media(client, patch_upstreams, auth_keypair):
     token = make_auth_token(
         keypair=auth_keypair,
         user_id="u_up",
@@ -93,6 +91,20 @@ async def test_upload_image_validates_detection_token_and_returns_fallback(
         return httpx.Response(status_code=200, json={"verdict": "ok", "label": "clean", "confidence": 0.42})
 
     patch_upstreams.add(host="detector", method="POST", path="/v1.0.1/checks", handler=detector_handler)
+
+    def media_upload_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("content-type", "").startswith("multipart/form-data")
+        return httpx.Response(
+            status_code=201,
+            json={
+                "verdict": "ok",
+                "label": "clean",
+                "confidence": 0.42,
+                "image": {"user_id": "u_up", "url": "https://cdn.example/images/abc"},
+            },
+        )
+
+    patch_upstreams.add(host="media", method="POST", path="/upload/image", handler=media_upload_handler)
 
     r1 = await client.post(
         "/checks",
@@ -112,13 +124,13 @@ async def test_upload_image_validates_detection_token_and_returns_fallback(
     body = r2.json()
     assert body["verdict"] == "ok"
     assert body["label"] == "clean"
-    assert "image" in body
+    assert body["confidence"] == 0.42
     assert body["image"]["user_id"] == "u_up"
-    assert body["image"]["url"].startswith("https://example.invalid/images/")
+    assert body["image"]["url"].startswith("https://cdn.example/images/")
 
 
 @pytest.mark.asyncio
-async def test_upload_image_rejects_modified_bytes(client, patch_upstreams, auth_keypair, register_auth_jwks):
+async def test_upload_image_rejects_modified_bytes(client, patch_upstreams, auth_keypair):
     token = make_auth_token(
         keypair=auth_keypair,
         user_id="u_mismatch",

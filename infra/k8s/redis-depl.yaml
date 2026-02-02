@@ -76,8 +76,8 @@ spec:
             periodSeconds: 10
             failureThreshold: 3
           resources:
-            requests: { cpu: "50m", memory: "64Mi" }
-            limits:   { cpu: "250m", memory: "256Mi" }
+            requests: { cpu: "25m", memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
           volumeMounts:
             - name: data
               mountPath: /data

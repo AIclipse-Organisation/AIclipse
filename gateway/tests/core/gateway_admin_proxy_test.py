@@ -5,7 +5,7 @@ from tests.conftest import make_auth_token
 
 
 @pytest.mark.asyncio
-async def test_admin_users_requires_admin_flag(client, patch_upstreams, auth_keypair, register_auth_jwks):
+async def test_admin_users_requires_admin_flag(client, patch_upstreams, auth_keypair):
     token = make_auth_token(
         keypair=auth_keypair,
         user_id="u1",
@@ -20,7 +20,7 @@ async def test_admin_users_requires_admin_flag(client, patch_upstreams, auth_key
 
 
 @pytest.mark.asyncio
-async def test_admin_users_ok_proxies(client, patch_upstreams, auth_keypair, register_auth_jwks):
+async def test_admin_users_ok_proxies(client, patch_upstreams, auth_keypair):
     token = make_auth_token(
         keypair=auth_keypair,
         user_id="u_admin",
@@ -31,7 +31,6 @@ async def test_admin_users_ok_proxies(client, patch_upstreams, auth_keypair, reg
 
     def admin_users_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers.get("authorization", "").startswith("Bearer ")
-        # query param user_name має пройти як є
         assert req.url.params.get("user_name") == "ali"
         return httpx.Response(status_code=200, json={"items": [{"user_id": "u_a"}]})
 

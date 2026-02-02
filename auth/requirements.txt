@@ -6,3 +6,4 @@ motor
 bcrypt
 email-validator
 pymongo
+httpx

@@ -41,8 +41,9 @@ spec:
             periodSeconds: 1
             failureThreshold: 60 
           resources:
-            requests: { cpu: "50m", memory: "64Mi" }
-            limits: { cpu: "250m", memory: "256Mi" }
+            requests: { cpu: "200m",  memory: "256Mi" }
+            limits:   { cpu: "800m", memory: "768Mi" }
+
 ---
 apiVersion: v1
 kind: Service
