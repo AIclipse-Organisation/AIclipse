@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import { validateUserId, validatePostId } from "../validation.js";
-import { getRedis } from "../../../redis/redis.js"
+import { getRedis } from "../../../redis/redis.js";
 
 export const runtime = "nodejs";
 
@@ -10,11 +10,13 @@ const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
 const FLUSH_ZSET = "clicks:flush_at";
-const FLUSH_DEBOUNCE_MS = 30_000; 
+const FLUSH_DEBOUNCE_MS = 30_000;
+const FLUSH_MAX_WAIT_SEC = 60;
+
 const DELTA_TTL_SECONDS = 60 * 60; // safety TTL 1 hour
 
 // Rate limit: only count one click per user per post within this window
-const CLICK_COOLDOWN_SECONDS = 60; 
+const CLICK_COOLDOWN_SECONDS = 60;
 
 export async function POST(req) {
   let client = null;
@@ -30,7 +32,10 @@ export async function POST(req) {
 
     const postIdValidation = validatePostId(post_id);
     if (!postIdValidation.valid) {
-      return NextResponse.json({ error: postIdValidation.error }, { status: 400 });
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 },
+      );
     }
     const safePostId = postIdValidation.value;
 
@@ -38,7 +43,10 @@ export async function POST(req) {
     if (user_id) {
       const userIdValidation = validateUserId(user_id);
       if (!userIdValidation.valid) {
-        return NextResponse.json({ error: userIdValidation.error }, { status: 400 });
+        return NextResponse.json(
+          { error: userIdValidation.error },
+          { status: 400 },
+        );
       }
       safeUserId = userIdValidation.value;
     }
@@ -53,7 +61,7 @@ export async function POST(req) {
 
     const postDoc = await posts.findOne(
       { post_id: safePostId },
-      { projection: { _id: 0, post_id: 1, clicks_count: 1 } }
+      { projection: { _id: 0, post_id: 1, clicks_count: 1 } },
     );
     if (!postDoc) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
@@ -66,18 +74,35 @@ export async function POST(req) {
     if (safeUserId) {
       const rlKey = `click:cooldown:${safePostId}:${safeUserId}`;
       // SET key 1 NX EX 60 => only first click in window counts
-      const ok = await redis.set(rlKey, "1", "NX", "EX", CLICK_COOLDOWN_SECONDS);
+      const ok = await redis.set(
+        rlKey,
+        "1",
+        "NX",
+        "EX",
+        CLICK_COOLDOWN_SECONDS,
+      );
       if (!ok) counted = false;
     }
 
     const deltaKey = `post:${safePostId}:click_deltas`;
-    const flushAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
+    const firstKey = `post:${safePostId}:click_first_at`;
 
     if (counted) {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const debounceAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
+
+      // set burst start once
+      await redis.set(firstKey, String(nowSec), "EX", DELTA_TTL_SECONDS, "NX");
+      const firstAtSec = Number((await redis.get(firstKey)) || nowSec);
+
+      const hardDeadlineSec = firstAtSec + FLUSH_MAX_WAIT_SEC;
+      const flushAtSec = Math.min(debounceAtSec, hardDeadlineSec);
+
       const pipe = redis.pipeline();
       pipe.hincrby(deltaKey, "count", 1);
       pipe.zadd(FLUSH_ZSET, flushAtSec, safePostId);
       pipe.expire(deltaKey, DELTA_TTL_SECONDS);
+      pipe.expire(firstKey, DELTA_TTL_SECONDS);
       await pipe.exec();
     }
 
@@ -92,12 +117,12 @@ export async function POST(req) {
         clicks_count: base + pendingCount,
         counted,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to increment clicks", detail: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     if (client) {
