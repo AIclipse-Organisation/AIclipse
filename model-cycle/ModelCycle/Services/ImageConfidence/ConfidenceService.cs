@@ -1,39 +1,53 @@
 ﻿using System;
+using Microsoft.Extensions.Options;
 using ModelCycle.Domain;
+using ModelCycle.Models;
 
 namespace ModelCycle.Services.ImageConfidence;
 
-public class ConfidenceService: IConfidenceService
+public class ConfidenceService : IConfidenceService
 {
     private readonly IBetaDistribution _beta;
+    private readonly ModelCycleConfig _config;
 
-    public ConfidenceService(IBetaDistribution beta)
+    public ConfidenceService(IBetaDistribution beta, IOptions<ModelCycleConfig> config)
     {
         _beta = beta;
+        _config = config.Value;
     }
-    
-    public ConfidenceResult Evaluate(VoteData voteData)
+
+   public ConfidenceResult Evaluate(VoteData voteData, ModelWeights modelWeights)
     {
-        // TODO - Add these to the hosted variables
-        // User averages found in research - Added in
-        double userAccuracyAi  = 0.8; 
-        double userAccuracyReal = 0.8; 
+        double probabilityOfAi;
         
-        // TODO - Add these to the hosted variables
-        // Model accuracy - will get from model versioning history later
-        double modelAccuracyAi = 0.8;
-        double modelAccuracyReal = 0.8;
+        if (voteData.Label != null && voteData.Label.Equals("real", StringComparison.OrdinalIgnoreCase))
+        {
+            probabilityOfAi = 1.0 - voteData.ModelConfidence;
+        }
+        else
+        {
+            probabilityOfAi = voteData.ModelConfidence;
+        }
+        
+        double userAccuracyAi = _config.UserAccuracyAi;
+        double userAccuracyReal = _config.UserAccuracyReal;
+        
+        double modelAccuracyAi = modelWeights.GoldenTestPrecision;
+        double modelAccuracyReal = modelWeights.GoldenTestRecall;
+        
+        if (modelAccuracyAi <= 0.001) modelAccuracyAi = 0.70;
+        if (modelAccuracyReal <= 0.001) modelAccuracyReal = 0.70;
         
         double userAi = userAccuracyAi * voteData.UserAiVotes;
-        double userAiNot = (1 - userAccuracyReal)  * voteData.UserNotAiVotes;
+        double userAiNot = (1 - userAccuracyReal) * voteData.UserNotAiVotes;
         double userReal = userAccuracyReal * voteData.UserNotAiVotes;
-        double userRealNot = (1 - userAccuracyAi)  * voteData.UserAiVotes;
+        double userRealNot = (1 - userAccuracyAi) * voteData.UserAiVotes;
+        
+        double modelAi = probabilityOfAi * modelAccuracyAi;
+        double modelAiNot = (1 - probabilityOfAi) * (1 - modelAccuracyReal);
 
-        double modelAi = voteData.ModelConfidence * modelAccuracyAi;
-        double modelAiNot = (1 - voteData.ModelConfidence) * (1 - modelAccuracyReal);
-
-        double modelReal = (1 - voteData.ModelConfidence) * modelAccuracyReal;
-        double modelRealNot = voteData.ModelConfidence * (1 - modelAccuracyAi);
+        double modelReal = (1 - probabilityOfAi) * modelAccuracyReal;
+        double modelRealNot = probabilityOfAi * (1 - modelAccuracyAi);
         
         double alpha = 1 + userAi + userAiNot + modelAi + modelAiNot;
         double beta = 1 + userReal + userRealNot + modelReal + modelRealNot;
@@ -41,16 +55,15 @@ public class ConfidenceService: IConfidenceService
         double posteriorMean = alpha / (alpha + beta);
         
         string trainingLabel = posteriorMean >= 0.5 ? "ai" : "real";
-
-        //Get probability of chosen label and check against threshold
         double pReal = _beta.Cdf(0.5, alpha, beta);
-        double pAi   = 1.0 - pReal;
-
+        double pAi = 1.0 - pReal;
         double probability = trainingLabel == "ai" ? pAi : pReal;
-        Console.WriteLine("Votes: AI - " + voteData.UserAiVotes + ", NotAI - " + voteData.UserNotAiVotes);
-        Console.WriteLine("Probability: " + probability);
-        bool isReady = probability >= 0.8;
+        
+        Console.WriteLine($"[Confidence] Normalized P(AI): {probabilityOfAi:F3} (Original: {voteData.ModelConfidence} | {voteData.Label})");
+        Console.WriteLine($"[Confidence] Final Prob: {probability:P}");
 
+        bool isReady = probability >= _config.ConfidenceThreshold;
+        
         return new ConfidenceResult
         {
             IsReadyForTraining = isReady,

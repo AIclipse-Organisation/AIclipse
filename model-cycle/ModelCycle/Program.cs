@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using ModelCycle;
 using ModelCycle.Data;
+using ModelCycle.Repositories;
 using ModelCycle.Services.ImageConfidence;
 using ModelCycle.Services.Data;
 using ModelCycle.Services.Training;
@@ -113,6 +114,7 @@ builder.Services.AddHttpClient<IMediaService, MediaService>(client =>
 builder.Services.AddScoped<IDatasetService, DatasetService>();
 
 builder.Services.AddScoped<ITrainingWorkflowService, TrainingWorkflowService>();
+builder.Services.AddScoped<IModelWeightsRepository,ModelWeightsRepository>();
 
 builder.Services.AddSingleton<TrainingJobQueue>();
 

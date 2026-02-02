@@ -142,11 +142,6 @@ public class VoteReceiver : BackgroundService
         try 
         {
             var result = await workflow.ProcessVoteAsync(request);
-            
-            if (result.IsReadyForTraining)
-            {
-                _logger.LogInformation($"[Training Set] Image {post.PostId} added to training queue.");
-            }
         }
         catch (Exception ex)
         {

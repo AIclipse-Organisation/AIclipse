@@ -17,6 +17,8 @@ from pydantic.functional_serializers import PlainSerializer
 
 from fastapi import Request
 
+import httpx
+
 
 def sanitize_for_log(value: str | None) -> str:
     """
@@ -36,6 +38,8 @@ S3_ENDPOINT = os.getenv("S3_ENDPOINT")
 S3_PUBLIC_ENDPOINT = os.getenv("S3_PUBLIC_ENDPOINT")
 
 S3_BUCKET = "images"
+
+MODEL_CYCLE_URL = os.getenv("MODEL_CYCLE_URL", "http://model-cycle:3000")
 
 ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png"}
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -71,6 +75,23 @@ s3_public = boto3.client(
     region_name="us-east-1",
     config=_s3_cfg,
 )
+
+async def fetch_current_model_version() -> str:
+    """
+    Call the Model Cycle C# Microservice to get the currently deployed version.
+    """
+    url = f"{MODEL_CYCLE_URL}/api/models/current"
+    try:
+        async with httpx.AsyncClient() as client:
+            # fast timeout to prevent hanging uploads if model service is down
+            resp = await client.get(url, timeout=3.0) 
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("version", "unknown")
+    except Exception as e:
+        logging.error(f"Failed to fetch model version from {url}: {e}")
+        # Fallback to a default if the service is unreachable
+        return "v0.0.0-fallback"
 
 
 def ensure_bucket():
@@ -156,6 +177,7 @@ class ImageOut(BaseModel):
     verdict: str
     label: str
     confidence: float
+    model_version: Optional[str] = None
     is_public: bool
     uploaded_at: str
     is_reported: bool
@@ -177,7 +199,13 @@ async def upload_image(
     label: str = Form(...),
     confidence: float = Form(...),
     is_public: bool = Form(...),
+    model_version: Optional[str] = Form(None),
 ):
+    
+    final_model_version = model_version
+    if not final_model_version:
+        final_model_version = await fetch_current_model_version()
+        
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=415, detail="Unsupported Media Type")
 
@@ -208,6 +236,7 @@ async def upload_image(
         "verdict": verdict,
         "label": label,
         "confidence": float(confidence),
+        "model_version": final_model_version, 
         "is_public": bool(is_public),
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
         "is_reported": False,
@@ -216,7 +245,7 @@ async def upload_image(
     if images is not None:
         try:
             res = images.insert_one(doc)
-            doc["_id"] = res.inserted_id  # safe: Pydantic serializes it
+            doc["_id"] = res.inserted_id 
         except Exception:
             logging.exception("mongo insert failed")
 

@@ -114,4 +114,9 @@ portForward:
     namespace: default
     port: 9000
     localPort: 9000
+  - resourceType: service
+    resourceName: redis-srv   
+    namespace: default
+    port: 6379
+    localPort: 6379
     

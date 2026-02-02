@@ -4,6 +4,7 @@ using ModelCycle.Data;
 using ModelCycle.DTOs;
 using ModelCycle.Models;
 using ModelCycle.Services;
+using ModelCycle.Services.Training;
 
 namespace ModelCycle.Controllers;
 
@@ -13,11 +14,55 @@ public class ModelsController : ControllerBase
 {
     private readonly BlobStorageService _blobService;
     private readonly AppDbContext _dbContext;
+    private readonly TrainingJobQueue _jobQueue;
 
-    public ModelsController(BlobStorageService blobService, AppDbContext dbContext)
+    public ModelsController(BlobStorageService blobService, AppDbContext dbContext, TrainingJobQueue jobQueue)
     {
         _blobService = blobService;
         _dbContext = dbContext;
+        _jobQueue = jobQueue;
+    }
+    
+    [HttpPost("train")]
+    public async Task<IActionResult> TriggerManualTraining()
+    {
+        await _jobQueue.QueueJobAsync();
+
+        return Accepted(new { Message = "Training signal sent to background queue." });
+    }
+    
+    [HttpGet("/images")]
+    public async Task<IActionResult> GetModelImages()
+    {
+        var images = await _dbContext.TrainingImages
+            .OrderByDescending(i => i.UploadedAt) 
+            .ToListAsync();
+        
+        return Ok(images);
+    }
+    
+    [HttpGet("current")]
+    public async Task<IActionResult> GetCurrentModel()
+    {
+        var activeModel = await _dbContext.ModelWeights
+            .AsNoTracking()
+            .Where(m => m.IsDeployed)
+            .OrderByDescending(m => m.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (activeModel == null)
+        {
+            return NotFound("No deployed model found.");
+        }
+        
+        return Ok(new 
+        { 
+            Version = activeModel.Version,
+            Accuracy = activeModel.GoldenTestAccuracy,
+            Precision = activeModel.GoldenTestPrecision,
+            Recall = activeModel.GoldenTestRecall,
+            DeployedAt = activeModel.CreatedAt
+        });
     }
 
     [HttpPost("upload")]
@@ -26,6 +71,18 @@ public class ModelsController : ControllerBase
     {
         if (request.File == null || request.File.Length == 0)
             return BadRequest("No file provided.");
+        
+        var currentlyDeployed = await _dbContext.ModelWeights
+            .Where(m => m.IsDeployed)
+            .ToListAsync();
+
+        if (currentlyDeployed.Any())
+        {
+            foreach (var model in currentlyDeployed)
+            {
+                model.IsDeployed = false;
+            }
+        }
         
         var extension = Path.GetExtension(request.File.FileName);
         var fileName = $"{request.Version}{extension}"; 
@@ -90,8 +147,9 @@ public class ModelsController : ControllerBase
 
         return Ok(new 
         { 
-            Message = "Model uploaded with lineage data", 
+            Message = "Model uploaded, deployed, and lineage tracked.", 
             Id = modelWeight.Id, 
+            Version = modelWeight.Version,
             ImagesLinked = links.Count 
         });
     }
@@ -104,5 +162,44 @@ public class ModelsController : ControllerBase
             .ToListAsync();
             
         return Ok(models);
+    }
+    
+
+    [HttpDelete("{version}")]
+    public async Task<IActionResult> DeleteModel(string version)
+    {
+        if (!version.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+        {
+            version = $"v{version}";
+        }
+
+        var model = await _dbContext.ModelWeights
+            .FirstOrDefaultAsync(m => m.Version == version);
+
+        if (model == null)
+        {
+            return NotFound($"Model version '{version}' not found.");
+        }
+        
+        if (_blobService != null && !string.IsNullOrEmpty(model.MinioObjectPath))
+        {
+            try 
+            {
+                var fileName = Path.GetFileName(model.MinioObjectPath);
+                if (!string.IsNullOrEmpty(fileName))
+                {
+                    await _blobService.DeleteFileAsync("models", fileName);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Warning] Could not delete file from MinIO: {ex.Message}");
+            }
+        }
+
+        _dbContext.ModelWeights.Remove(model);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(new { Message = $"Model {version} deleted successfully." });
     }
 }
