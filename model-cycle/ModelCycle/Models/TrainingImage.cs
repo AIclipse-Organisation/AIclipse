@@ -24,12 +24,13 @@ public class TrainingImage
     public TrainingStatus Status { get; set; } = TrainingStatus.Pending; 
     
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+    
+    public string? ModelVersion { get; set; } =  null;
 }
 
 public enum TrainingStatus
 { 
     Pending,       
     Ready,      
-    UsedInTraining, 
-    Rejected     
+    UsedInTraining 
 }

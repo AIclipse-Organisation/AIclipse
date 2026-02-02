@@ -36,19 +36,20 @@ public class ModelTrainingService : IModelTrainingService
     public async Task<Guid?> RunTrainingCycleAsync()
     {
         var (newImages, replayImages) = await GetTrainingData();
-
+        
         if (newImages.Count < _config.BatchSizeThreshold)
         {
             _logger.LogWarning("Insufficient balanced data found. Aborting.");
             return null;
         }
-
+        
+        _logger.LogInformation("Sufficient data. Starting training");
         using var jobScope = _jobManager.CreateJobScope();
 
         try
         {
             _logger.LogInformation("Initializing training Job {Id}...", jobScope.JobId);
-
+            
             await _jobManager.StageImagesAsync(jobScope, newImages, replayImages);
             string baseModelPath = await _jobManager.PrepareBaseModelAsync(jobScope);
 
@@ -56,11 +57,14 @@ public class ModelTrainingService : IModelTrainingService
             var success = await _pythonExecutor.RunTrainingAsync(jobScope, baseModelPath);
 
             if (!success) return null;
-
+            
+            string nextVersion = await GetNextVersionStringAsync();
+            _logger.LogInformation("New model version will be: {Version}", nextVersion);
+            
             _logger.LogInformation("Uploading trained model...");
-            string s3ModelPath = await UploadModelToMinioAsync(jobScope);
-
-            return await ProcessTrainingResults(jobScope, newImages, replayImages, s3ModelPath);
+            string s3ModelPath = await UploadModelToMinioAsync(jobScope, nextVersion);
+            
+            return await ProcessTrainingResults(jobScope, newImages, replayImages, s3ModelPath, nextVersion);
         }
         catch (Exception ex)
         {
@@ -68,73 +72,106 @@ public class ModelTrainingService : IModelTrainingService
             return null;
         }
     }
+    
 
-    private async Task<(List<TrainingImage> New, List<TrainingImage> Replay)> GetTrainingData()
+    private async Task<(List<TrainingImage> NewImages, List<TrainingImage> ReplayImages)> GetTrainingData()
     {
-        int targetPerClass = _config.BatchSizeThreshold / 2;
+        var readyRealCount = await _context.TrainingImages
+            .CountAsync(t => t.Status == TrainingStatus.Ready && t.Label == "real");
 
-        var readyReal = await _context.TrainingImages
-            .Where(i => i.Status == TrainingStatus.Ready && i.Label == "Real")
-            .Take(targetPerClass)
-            .ToListAsync();
+        var readyAiCount = await _context.TrainingImages
+            .CountAsync(t => t.Status == TrainingStatus.Ready && t.Label == "ai");
 
-        var readyFake = await _context.TrainingImages
-            .Where(i => i.Status == TrainingStatus.Ready && i.Label == "Fake")
-            .Take(targetPerClass)
-            .ToListAsync();
+        var batchSizePerClass = Math.Min(readyRealCount, readyAiCount);
 
-        _logger.LogInformation(
-            "Training Data Check: Real: {RealCount}/{Target}, Fake: {FakeCount}/{Target}. (Threshold: {Total})",
-            readyReal.Count, targetPerClass, readyFake.Count, targetPerClass, _config.BatchSizeThreshold
-        );
-
-        if (readyReal.Count < targetPerClass || readyFake.Count < targetPerClass)
+        _logger.LogInformation("Balancing Dataset: Found {Real} Real, {Ai} AI. Limiting to {Limit} per class.", 
+            readyRealCount, readyAiCount, batchSizePerClass);
+        
+        if (batchSizePerClass < 1) 
         {
             return (new List<TrainingImage>(), new List<TrainingImage>());
         }
-
-        var newImages = readyReal.Concat(readyFake).ToList();
-
-        int replayTotal = (int)(_config.BatchSizeThreshold * _config.ReplayBufferRatio);
-        int replayHalf = replayTotal / 2;
-
-        var realReplay = await _context.TrainingImages
-            .Where(i => i.Status == TrainingStatus.UsedInTraining && i.Label == "Real")
-            .OrderBy(x => Guid.NewGuid())
-            .Take(replayHalf)
+        
+        var newReal = await _context.TrainingImages
+            .Where(t => t.Status == TrainingStatus.Ready && t.Label == "real")
+            .OrderBy(t => EF.Functions.Random()) 
+            .Take(batchSizePerClass)
             .ToListAsync();
 
-        var fakeReplay = await _context.TrainingImages
-            .Where(i => i.Status == TrainingStatus.UsedInTraining && i.Label == "Fake")
-            .OrderBy(x => Guid.NewGuid())
-            .Take(replayHalf)
+        var newAi = await _context.TrainingImages
+            .Where(t => t.Status == TrainingStatus.Ready && t.Label == "ai")
+            .OrderBy(t => EF.Functions.Random())
+            .Take(batchSizePerClass)
             .ToListAsync();
 
-        var replayImages = realReplay.Concat(fakeReplay).ToList();
+        var newImages = newReal.Concat(newAi).ToList();
+
+        int replayCount = 20; 
+        
+        var replayImages = await _context.TrainingImages
+            .Where(t => t.Status == TrainingStatus.UsedInTraining) 
+            .OrderBy(t => EF.Functions.Random())
+            .Take(replayCount)
+            .ToListAsync();
 
         return (newImages, replayImages);
     }
-
-    private async Task<string> UploadModelToMinioAsync(TrainingJobManager.JobScope scope)
+    
+    private async Task<string> UploadModelToMinioAsync(TrainingJobManager.JobScope scope, string version)
     {
-        if (!File.Exists(scope.OutputModelPath))
-            throw new FileNotFoundException("Python did not produce a model.safetensors file");
+        var expectedFile = "pytorch_model.bin"; 
+        var modelPath = Path.Combine(scope.OutputDir, expectedFile);
 
-        using var stream = new FileStream(scope.OutputModelPath, FileMode.Open, FileAccess.Read);
-
-        return await _blobStorage.UploadFileAsync(
-            stream,
-            $"models/{scope.JobId}",
-            "model.safetensors",
-            "application/octet-stream"
-        );
+        if (!File.Exists(modelPath))
+        {
+            var altPath = Path.Combine(scope.OutputDir, "model.safetensors");
+            if (File.Exists(altPath))
+            {
+                modelPath = altPath;
+                expectedFile = "model.safetensors";
+            }
+            else
+            {
+                _logger.LogError("Expected model file not found at {Path}", modelPath);
+                throw new FileNotFoundException($"Python did not produce a {expectedFile} file");
+            }
+        }
+        
+        var fileName = $"{version}.pt"; 
+        
+        _logger.LogInformation("Uploading {LocalFile} to MinIO as {RemoteFile}...", expectedFile, fileName);
+    
+        using var stream = File.OpenRead(modelPath);
+        return await _blobStorage.UploadFileAsync(stream, "models", fileName, "application/octet-stream");
     }
+    
+    private async Task<string> GetNextVersionStringAsync()
+    {
+        var allVersions = await _context.ModelWeights
+            .Select(m => m.Version)
+            .ToListAsync();
 
+        int maxVer = 0;
+        foreach (var v in allVersions)
+        {
+            if (!string.IsNullOrEmpty(v) && v.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(v.Substring(1), out int val))
+                {
+                    if (val > maxVer) maxVer = val;
+                }
+            }
+        }
+        
+        return $"v{maxVer + 1}";
+    }
+    
     private async Task<Guid> ProcessTrainingResults(
         TrainingJobManager.JobScope scope,
         List<TrainingImage> newImages,
         List<TrainingImage> replayImages,
-        string s3ModelPath)
+        string s3ModelPath,
+        string version) 
     {
         if (!File.Exists(scope.MetricsPath))
             throw new FileNotFoundException("Metrics file not found");
@@ -146,7 +183,7 @@ public class ModelTrainingService : IModelTrainingService
         var weights = new ModelWeights
         {
             Id = Guid.NewGuid(),
-            Version = $"v_{DateTime.UtcNow:yyyyMMdd}_{scope.JobId.ToString().Substring(0, 4)}",
+            Version = version, 
             CreatedAt = DateTime.UtcNow,
             MinioObjectPath = s3ModelPath,
 

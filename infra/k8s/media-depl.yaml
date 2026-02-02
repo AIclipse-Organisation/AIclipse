@@ -12,6 +12,8 @@ spec:
         - name: media
           image: aiclipse/media
           env:
+          - name: MODEL_CYCLE_URL
+            value: "http://model-cycle-srv:3000"
           - name: MONGO_URI
             valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
           - name: MONGO_DB

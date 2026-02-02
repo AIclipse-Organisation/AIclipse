@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ModelCycle.Data;
 using ModelCycle.Domain;
 using ModelCycle.Models;
+using ModelCycle.Repositories;
 using ModelCycle.Services.ImageConfidence;
 
 namespace ModelCycle.Services.Training;
@@ -14,6 +15,7 @@ public class TrainingWorkflowService : ITrainingWorkflowService
     private readonly IDatasetService _datasetService;
     private readonly ILogger<TrainingWorkflowService> _logger; 
     private readonly TrainingJobQueue _jobQueue;
+    private readonly IModelWeightsRepository _modelRepo;
 
     public TrainingWorkflowService(
         AppDbContext db,
@@ -21,7 +23,8 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         IMediaService mediaService,
         IDatasetService datasetService,
         TrainingJobQueue jobQueue,
-        ILogger<TrainingWorkflowService> logger)
+        ILogger<TrainingWorkflowService> logger,
+        IModelWeightsRepository modelRepo)
     {
         _db = db;
         _confidenceService = confidenceService;
@@ -29,14 +32,39 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         _datasetService = datasetService;
         _jobQueue = jobQueue;
         _logger = logger;
+        _modelRepo = modelRepo;
     }
 
-    public async Task<ConfidenceResult> ProcessVoteAsync(EvaluateImageRequest request)
+   public async Task<ConfidenceResult> ProcessVoteAsync(EvaluateImageRequest request)
     {
-        var (image, downloadUrl) = await GetOrCreateImageAsync(request);
+        var (image, downloadUrl,isNew) = await GetOrCreateImageAsync(request);
+        
+        ModelWeights? modelWeights = null;
+        
+        if (!string.IsNullOrEmpty(image.ModelVersion))
+        {
+            modelWeights = await _modelRepo.GetByVersionAsync(image.ModelVersion);
+        }
+        
+        if (modelWeights == null)
+        {
+            if (!string.IsNullOrEmpty(image.ModelVersion))
+            {
+                modelWeights = await _modelRepo.GetByVersionAsync(image.ModelVersion);
+            }
+            
+            if (modelWeights == null)
+            {
+                modelWeights = await _modelRepo.GetDeployedModelAsync();
+            }
+            
+            if (modelWeights == null)
+            {
+                throw new InvalidOperationException($"No ModelWeights found for version '{image.ModelVersion}' and no default deployed model exists.");
+            }
+        }
         
         var previousState = new PreviousImageState(image.Status, image.Label);
-        
         UpdateImageVotes(image, request);
         
         var result = _confidenceService.Evaluate(new VoteData
@@ -44,8 +72,9 @@ public class TrainingWorkflowService : ITrainingWorkflowService
             PostId = request.PostId,
             UserAiVotes = request.UserAiVotes,
             UserNotAiVotes = request.UserNotAiVotes,
-            ModelConfidence = request.ModelConfidence
-        });
+            ModelConfidence = request.ModelConfidence,
+            Label = image.Label
+        }, modelWeights); 
         
         image.CurrentProbability = result.Probability;
         
@@ -53,22 +82,35 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         
         await _db.SaveChangesAsync();
         
-        if (result.IsReadyForTraining && previousState.Status != TrainingStatus.Ready)
+        bool statusChangedToReady = result.IsReadyForTraining && previousState.Status != TrainingStatus.Ready;
+        bool isNewAndReady = isNew && result.IsReadyForTraining;
+
+        if (statusChangedToReady || isNewAndReady)
         {
             await _jobQueue.QueueJobAsync();
-            _logger.LogInformation("Image promoted to Ready. Training signal queued.");
+            _logger.LogInformation(
+                "Image {PostId} promoted to Ready (New: {IsNew}). Training signal queued.", 
+                request.PostId, isNew);
         }
-        
+        else if (result.IsReadyForTraining && previousState.Status == TrainingStatus.Ready)
+        {
+            _logger.LogInformation(
+                "Image {PostId} is already in the dataset (Status: Ready). Skipping training trigger.", 
+                request.PostId);
+        }
+    
         return result;
     }
 
-    private async Task<(TrainingImage Image, string? DownloadUrl)> GetOrCreateImageAsync(EvaluateImageRequest request)
+    private async Task<(TrainingImage Image, string? DownloadUrl, bool isNew)> GetOrCreateImageAsync(EvaluateImageRequest request)
     {
         var image = await _db.TrainingImages.FirstOrDefaultAsync(i => i.MediaImageId == request.MediaImageId);
+        var isNew = false;
         string? url = null;
 
         if (image == null)
         {
+            isNew = true;
             var mediaMetadata = await _mediaService.GetImageMetadataAsync(request.MediaImageId);
             if (mediaMetadata == null)
             {
@@ -84,13 +126,14 @@ public class TrainingWorkflowService : ITrainingWorkflowService
                 S3Key = mediaMetadata.S3Key,
                 Label = request.Label,
                 UploadedAt = DateTime.UtcNow,
-                Status = TrainingStatus.Pending
+                Status = TrainingStatus.Pending,
+                ModelVersion = mediaMetadata.ModelVersion,
             };
             _db.TrainingImages.Add(image);
             url = mediaMetadata.Url;
         }
 
-        return (image, url);
+        return (image, url,isNew);
     }
 
     private void UpdateImageVotes(TrainingImage image, EvaluateImageRequest request)
