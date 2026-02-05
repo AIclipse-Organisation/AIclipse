@@ -11,6 +11,7 @@ spec:
       containers:
         - name: gateway
           image: aiclipse/gateway
+          imagePullPolicy: IfNotPresent
           env:
             - name: JWT_KEY
               valueFrom: { secretKeyRef: { name: jwt-sec, key: JWT_KEY } }
