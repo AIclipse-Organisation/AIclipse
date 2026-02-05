@@ -16,6 +16,11 @@ spec:
           env:
             - name: GATEWAY_URI
               value: "http://gateway-srv:8080"
+            - name: CENTRAL_CONFIG_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-configmap
+                  key: CONFIG_URL
           ports:
             - { name: http, containerPort: 3000 }
           readinessProbe:

@@ -59,7 +59,7 @@ build:
             dest: .
     - image: aiclipse/client
       context: client
-      docker: { dockerfile: Dockerfile }
+      docker: { dockerfile: Dockerfile.dev }
       sync:
         manual:
           - src: "**/*.py"

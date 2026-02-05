@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ENV APP_ENV=prod
+ENV APP_ENV=dev
 
 CMD ["python", "main-client.py"]
 

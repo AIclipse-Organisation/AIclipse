@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from config import cfg
 
 import requests
 from flask import (
@@ -9,6 +10,7 @@ from flask import (
     request,
     jsonify,
     make_response,
+    render_template
 )
 from werkzeug.serving import WSGIRequestHandler
 
@@ -17,7 +19,12 @@ from werkzeug.serving import WSGIRequestHandler
 # - Is a BFF for the browser: accepts requests from the front, goes to the Gateway via GATEWAY_URI
 # - Stores JWT exclusively in HttpOnly cookie, the front does not see it
 
+
 app = Flask(__name__)
+
+current_env = os.getenv("APP_ENV", "dev")
+
+print(f"[*] Starting Client Service in {current_env} mode")
 
 GATEWAY_URI = os.getenv("GATEWAY_URI")
 
@@ -29,7 +36,10 @@ def healthz():
 
 @app.get("/")
 def index():
-    return send_from_directory("templates", "login.html")
+    toggles = cfg.get_client_config()
+    show_signup = toggles.get("sign-up", True)
+    app.logger.error(f"DEBUG: show_signup is {show_signup} (Type: {type(show_signup)})")
+    return render_template("login.html", show_signup=show_signup)
 
 
 @app.get("/imgProcessing")
@@ -136,6 +146,9 @@ def _call_gateway_json(
 
 @app.post("/auth/signup")
 def auth_signup():
+    toggles = cfg.get_client_config()
+    if not toggles.get("sign-up", True):
+        return jsonify({"detail": "Public registration is currently disabled"}), 403
     payload = request.get_json(force=True, silent=True) or {}
     return _call_gateway_json(
         "POST",

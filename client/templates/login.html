@@ -1,113 +1,148 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AICLIPSE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/login.css" />
+  </head>
 
-<head>
-  <meta charset="utf-8" />
-  <title>AICLIPSE</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/static/css/login.css" />
-</head>
-
-<body class="app">
-  <div class="app-container">
-    <main class="screen">
-
-      <div class="auth-shell">
-
-        <!-- Brand -->
-        <div class="brand-hero" aria-label="AICLIPSE branding">
-          <img class="brand-image" src="/static/images/aiclipse_logo.png" alt="AICLIPSE" />
-        </div>
-
-        <!-- Auth Card -->
-        <section class="auth-card">
-
-          <!-- Toggle -->
-          <div class="auth-toggle" role="tablist" aria-label="Auth mode">
-            <button type="button" class="auth-tab is-active" data-mode="login" role="tab" aria-selected="true">
-              Log in
-            </button>
-            <button type="button" class="auth-tab" data-mode="signup" role="tab" aria-selected="false">
-              Sign up
-            </button>
+  <body class="app">
+    <div class="app-container">
+      <main class="screen">
+        <div class="auth-shell">
+          <!-- Brand -->
+          <div class="brand-hero" aria-label="AICLIPSE branding">
+            <img
+              class="brand-image"
+              src="/static/images/aiclipse_logo.png"
+              alt="AICLIPSE"
+            />
           </div>
 
-          <!-- Panels -->
-          <div class="auth-panels" data-mode="login">
-
-            <!-- Signup -->
-            <div class="auth-panel" data-panel="signup">
-              <h2 class="legacy-heading">Create an Account</h2>
-
-              <label for="signup-username">Username</label>
-              <input id="signup-username" type="text" placeholder="Username" />
-
-              <label for="signup-email">Email</label>
-              <input id="signup-email" type="email" placeholder="Email" />
-
-              <label for="signup-password">Password</label>
-              <input id="signup-password" type="password" placeholder="Password" />
-
-              <button id="btn-signup">Sign up</button>
+          <!-- Auth Card -->
+          <section class="auth-card">
+            <!-- Toggle -->
+            <div class="auth-toggle" role="tablist" aria-label="Auth mode">
+              <button
+                type="button"
+                class="auth-tab is-active"
+                data-mode="login"
+                role="tab"
+                aria-selected="true"
+              >
+                Log in
+              </button>
+              {% if show_signup %}
+              <button type="button" class="auth-tab" data-mode="signup">
+                Sign up
+              </button>
+              {% endif %}
             </div>
 
-            <!-- Login -->
-            <div class="auth-panel" data-panel="login">
-              <h2 class="legacy-heading">Log in</h2>
+            <!-- Panels -->
+            <div class="auth-panels" data-mode="login">
+              <!-- Signup -->
+              {% if show_signup %}
+              <div class="auth-panel" data-panel="signup">
+                <h2 class="legacy-heading">Create an Account</h2>
 
-              <label for="login-email">Email</label>
-              <input id="login-email" type="email" placeholder="Email" />
+                <label for="signup-username">Username</label>
+                <input
+                  id="signup-username"
+                  type="text"
+                  placeholder="Username"
+                />
 
-              <label for="login-password">Password</label>
-              <input id="login-password" type="password" placeholder="Password" />
+                <label for="signup-email">Email</label>
+                <input id="signup-email" type="email" placeholder="Email" />
 
-              <button id="btn-login">Log in</button>
+                <label for="signup-password">Password</label>
+                <input
+                  id="signup-password"
+                  type="password"
+                  placeholder="Password"
+                />
+
+                <button id="btn-signup">Sign up</button>
+              </div>
+              {% endif %}
+
+              <!-- Login -->
+              <div class="auth-panel" data-panel="login">
+                <h2 class="legacy-heading">Log in</h2>
+
+                <label for="login-email">Email</label>
+                <input id="login-email" type="email" placeholder="Email" />
+
+                <label for="login-password">Password</label>
+                <input
+                  id="login-password"
+                  type="password"
+                  placeholder="Password"
+                />
+
+                <button id="btn-login">Log in</button>
+              </div>
+
+              <div id="account-status"></div>
+            </div>
+          </section>
+
+          <!-- Keep?? -->
+          <!-- Detection -->
+          <section class="card" style="display: none">
+            <h2>Detect</h2>
+
+            <label for="file-input">Image file (JPEG/PNG)</label>
+            <input id="file-input" type="file" accept="image/*" />
+
+            <div class="row">
+              <button id="btn-check" disabled>Analyze image</button>
+              <span id="check-state" class="muted"
+                >Select a file to enable detection.</span
+              >
             </div>
 
-            <div id="account-status"></div>
-          </div>
-        </section>
+            <div id="detect-status" class="status-bar"></div>
 
-        <!-- Keep?? -->
-        <!-- Detection -->
-        <section class="card" style="display: none">
-          <h2>Detect</h2>
+            <h3 class="subheading">Results</h3>
 
-          <label for="file-input">Image file (JPEG/PNG)</label>
-          <input id="file-input" type="file" accept="image/*" />
+            <div
+              id="detect-card"
+              class="detection-card"
+              aria-live="polite"
+              hidden
+            >
+              <div class="detection-row">
+                <div class="detection-main">
+                  <p id="detect-verdict" class="verdict-text label-neutral">
+                    —
+                  </p>
 
-          <div class="row">
-            <button id="btn-check" disabled>Analyze image</button>
-            <span id="check-state" class="muted">Select a file to enable detection.</span>
-          </div>
+                  <div
+                    class="progress-bar"
+                    aria-hidden="true"
+                    title="Real vs AI probability"
+                  >
+                    <div class="fill real-fill" style="width: 0%"></div>
+                    <div class="fill ai-fill" style="width: 0%"></div>
+                  </div>
 
-          <div id="detect-status" class="status-bar"></div>
-
-          <h3 class="subheading">Results</h3>
-
-          <div id="detect-card" class="detection-card" aria-live="polite" hidden>
-            <div class="detection-row">
-              <div class="detection-main">
-                <p id="detect-verdict" class="verdict-text label-neutral">—</p>
-
-                <div class="progress-bar" aria-hidden="true" title="Real vs AI probability">
-                  <div class="fill real-fill" style="width: 0%"></div>
-                  <div class="fill ai-fill" style="width: 0%"></div>
-                </div>
-
-                <div class="detection-meta">
-                  <small id="detect-confidence" class="muted">Confidence: —</small>
+                  <div class="detection-meta">
+                    <small id="detect-confidence" class="muted"
+                      >Confidence: —</small
+                    >
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
-      </div>
-    </main>
-  </div>
+          </section>
+        </div>
+      </main>
+    </div>
 
-  <script src="/static/js/include.js"></script>
-  <script src="/static/js/app.js"></script>
-</body>
-
+    <script src="/static/js/include.js"></script>
+    <script src="/static/js/app.js"></script>
+  </body>
 </html>
