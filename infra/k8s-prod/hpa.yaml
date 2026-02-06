@@ -201,34 +201,6 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: community-vote-worker-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: community-vote-worker-depl
-  minReplicas: 1
-  maxReplicas: 6
-  behavior:
-    scaleDown:
-      stabilizationWindowSeconds: 300
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
   name: detector-hpa
 spec:
   scaleTargetRef:
