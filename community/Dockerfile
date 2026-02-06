@@ -7,8 +7,9 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
 EXPOSE 3000
 
 CMD ["npx", "next", "start", "-H", "0.0.0.0", "-p", "3000"]
+    
