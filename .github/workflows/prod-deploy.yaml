@@ -272,6 +272,10 @@ jobs:
               "${name}=ghcr.io/${ORG}/${name}:${TAG}"
           done
 
+          kubectl -n "$NS" set image deploy/vote-flush-depl     worker="ghcr.io/${ORG}/community:${TAG}"
+          kubectl -n "$NS" set image deploy/comments-flush-depl worker="ghcr.io/${ORG}/community:${TAG}"
+          kubectl -n "$NS" set image deploy/click-flush-depl    worker="ghcr.io/${ORG}/community:${TAG}"s
+
       - name: Cleanup old ReplicaSets (keep newest)
         shell: bash
         run: |
