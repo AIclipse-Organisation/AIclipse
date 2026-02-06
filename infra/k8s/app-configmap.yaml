@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: app-configmap
-data: 
-  CONFIG_URL: "https://api.npoint.io/36632c8914527bc075a8"
