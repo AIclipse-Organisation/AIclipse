@@ -280,35 +280,47 @@ jobs:
         run: |
           set -euo pipefail
 
-          DEPLOYS=""
+          DEPLOYS=()
           for name in $IMAGES; do
-            DEPLOYS="$DEPLOYS ${name}-depl"
+            DEPLOYS+=("${name}-depl")
           done
-          DEPLOYS="$DEPLOYS vote-flush-depl comments-flush-depl click-flush-depl"
+          DEPLOYS+=(vote-flush-depl comments-flush-depl click-flush-depl)
 
-          for d in $DEPLOYS; do
+          for d in "${DEPLOYS[@]}"; do
             if ! kubectl -n "$NS" get deploy "$d" >/dev/null 2>&1; then
               echo "skip $d (deployment not found)"
               continue
             fi
 
-            RS_LIST=$(
-              kubectl -n "$NS" get rs --sort-by=.metadata.creationTimestamp \
-                -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.ownerReferences[0].kind}{"\t"}{.metadata.ownerReferences[0].name}{"\t"}{.spec.replicas}{"\n"}{end}' \
-              | awk -v d="$d" '$2=="Deployment" && $3==d {print $1 "\t" $4}'
+            # current deployment revision
+            REV=$(kubectl -n "$NS" get deploy "$d" -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}')
+            echo "== $d (rev=$REV)"
+
+            # list RS owned by this deployment: name, rsRevision, spec.replicas
+            mapfile -t RS_LINES < <(
+              kubectl -n "$NS" get rs -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.ownerReferences[0].kind}{"\t"}{.metadata.ownerReferences[0].name}{"\t"}{.metadata.annotations.deployment\.kubernetes\.io/revision}{"\t"}{.spec.replicas}{"\n"}{end}' \
+              | awk -v d="$d" '$2=="Deployment" && $3==d {print $1 "\t" $4 "\t" $5}'
             )
 
-            if [[ -z "${RS_LIST}" ]]; then
-              echo "no ReplicaSets for $d"
-              continue
-            fi
+            KEEP=()
+            DEL=()
 
-            KEEP=$(echo "$RS_LIST" | tail -n1 | cut -f1)
-            TODEL=$(echo "$RS_LIST" | awk -v keep="$KEEP" '$1!=keep && $2==0 {print $1}')
+            for line in "${RS_LINES[@]}"; do
+              RS_NAME=$(echo "$line" | cut -f1)
+              RS_REV=$(echo "$line" | cut -f2)
+              RS_REP=$(echo "$line" | cut -f3)
 
-            echo "keep $KEEP for $d"
-            if [[ -n "${TODEL}" ]]; then
-              echo "$TODEL" | xargs -r kubectl -n "$NS" delete rs --wait=false
+              if [[ "$RS_REV" == "$REV" ]]; then
+                KEEP+=("$RS_NAME")
+              elif [[ "$RS_REP" == "0" ]]; then
+                DEL+=("$RS_NAME")
+              fi
+            done
+
+            echo "keep: ${KEEP[*]:-none}"
+            if ((${#DEL[@]})); then
+              echo "delete: ${DEL[*]}"
+              kubectl -n "$NS" delete rs "${DEL[@]}" --wait=false
             fi
           done
 
