@@ -1,7 +1,7 @@
 name: prod-deploy
 on:
   push:
-    branches: [ftr/prod/65815/updateProductionWorkflow]
+    branches: [main]
   workflow_dispatch: {}
 
 concurrency:
