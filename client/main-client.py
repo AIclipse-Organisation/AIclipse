@@ -41,9 +41,10 @@ def healthz():
 
 @app.get("/")
 def index():
+    if _get_token_from_cookie():
+        return redirect("/home")
     toggles = cfg.get_client_config()
     show_signup = toggles.get("sign-up", True)
-    app.logger.error(f"DEBUG: show_signup is {show_signup} (Type: {type(show_signup)})")
     return render_template("login.html", show_signup=show_signup)
  
 
@@ -192,6 +193,24 @@ def inject_admin_status():
 
 
 # ---------- AUTH (BROWSER -> CLIENT -> GATEWAY) ----------
+
+@app.before_request
+def enforce_auth():
+    public_paths = ["/", "/healthz", "/auth/login", "/auth/signup"]
+    
+    if request.path.startswith("/static") or request.path in public_paths:
+        return None
+
+    token = _get_token_from_cookie()
+    
+    if not token:
+        host = request.headers.get("X-Forwarded-Host") or request.headers.get("Host", "aiclipse.local")
+        if "10.1." in host:
+            host = "aiclipse.local"
+            
+        return redirect(f"http://{host}/")
+    
+    return None
 
 
 @app.post("/auth/signup")
