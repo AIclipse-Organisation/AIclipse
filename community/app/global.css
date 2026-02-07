@@ -1,0 +1,103 @@
+@import "tailwindcss";
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: white;
+  min-height: 100vh;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+.topbar {
+  height: 56px;
+  background: #222222;
+  border-bottom: 1px solid #2c2c2c;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  width:100%;
+}
+
+/* Hamburger */
+.menu-button {
+  position: relative;
+  z-index: 10; 
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* The actual lines */
+ .hamburger-line {
+  width: 22px;           
+  height: 2px;           
+  background-color: #CFB87C; 
+  border-radius: 2px;
+}
+
+/* Logo */
+.topbar-logo img {
+  width: 150px;
+  height: auto;
+  display: block;
+}
+
+/* Avatar */
+.topbar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 35px;
+  width: 35px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.topbar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Right-side user container */
+.topbar-user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+ #current-user-chip {
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color:#CFB87C;
+}
+
+.menu-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5); 
+  z-index: 40; 
+  backdrop-filter: blur(2px); 
+}

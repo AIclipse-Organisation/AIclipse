@@ -4,7 +4,10 @@ body {
   margin: 0;
   padding: 0;
   background: #141414;
-  color: #222;
+  color: #222;;
+  padding: 0;
+  min-height: 100vh;
+  background: white;
 }
 
 header {
@@ -61,6 +64,17 @@ body.app .app-container {
 
 /* Top bar */
 body.app .topbar {
+  height: 56px;
+  background: #222222;
+  border-bottom: 1px solid #2c2c2c;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+body .topbar {
   height: 56px;
   background: #222222;
   border-bottom: 1px solid #2c2c2c;

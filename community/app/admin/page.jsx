@@ -1,85 +1,125 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Card, CardBody, Badge, User, Button, Spinner } from "@heroui/react";
+import { useState } from "react";
+import { 
+  Card, CardHeader, CardBody, 
+  Divider, Badge, Button 
+} from "@heroui/react";
 
+// --- SUB-COMPONENT: Model Management ---
+const ModelManagement = () => (
+  <div className="flex flex-col gap-6 h-full overflow-y-auto">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <Card className="border-none bg-white shadow-sm" radius="lg">
+        <CardBody className="gap-2"><p>Model Card 1</p></CardBody>
+      </Card>
+      <Card className="border-none bg-white shadow-sm" radius="lg">
+        <CardBody className="gap-2"><p>Model Card 2</p></CardBody>
+      </Card>
+      <Card className="border-none bg-white shadow-sm" radius="lg">
+        <CardBody className="gap-2"><p>Model Card 3</p></CardBody>
+      </Card>
+    </div>
+    <Card className="flex-1 min-h-0 border-none shadow-sm" radius="lg">
+      <CardHeader className="flex gap-3">
+        <div className="flex flex-col"><p className="text-md font-bold">Model Logs</p></div>
+      </CardHeader>
+      <Divider />
+      <CardBody className="bg-default-50/50 flex items-center justify-center italic text-default-400">
+         <p>No active tasks.</p>
+      </CardBody>
+    </Card>
+  </div>
+);
+
+// --- SUB-COMPONENT: Statistics ---
+const Statistics = () => (
+  <div className="flex flex-col gap-6 h-full overflow-y-auto">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <Card className="border-none bg-white shadow-sm" radius="lg">
+         <CardBody className="gap-2"><p>Stats Card 1</p></CardBody>
+      </Card>
+      <Card className="border-none bg-white shadow-sm" radius="lg">
+         <CardBody className="gap-2"><p>Stats Card 2</p></CardBody>
+      </Card>
+      <Card className="border-none bg-white shadow-sm" radius="lg">
+         <CardBody className="gap-2"><p>Stats Card 3</p></CardBody>
+      </Card>
+    </div>
+    <Card className="flex-1 min-h-0 border-none shadow-sm" radius="lg">
+      <Divider />
+      <CardBody className="bg-default-50/50 flex items-center justify-center italic text-default-400">
+         <p>No data available.</p>
+      </CardBody>
+    </Card>
+  </div>
+);
+
+// --- SUB-COMPONENT: User Management ---
+const UserManagement = () => (
+  <Card className="h-full border-none shadow-sm">
+    <CardHeader><h2 className="text-xl font-bold">User Management</h2></CardHeader>
+    <CardBody>
+       <p>User management table will go here.</p>
+    </CardBody>
+  </Card>
+);
+
+// --- MAIN COMPONENT --- 
 export default function AdminPage() {
-  const [items, setItems] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [activeView, setActiveView] = useState("statistics");
 
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        const res = await fetch("/community/posts");
-        const data = await res.json();
-        setItems(data.items || data || []);
-      } catch (error) {
-        console.error("Failed to fetch admin data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPosts();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <Spinner label="Loading ..." color="warning" />
-      </div>
-    );
-  }
+  const getLinkClass = (viewName) => 
+    `p-2 rounded cursor-pointer transition-colors text-left ${
+      activeView === viewName 
+        ? "bg-gray-100 text-black font-medium" 
+        : "hover:bg-gray-50 text-gray-600"
+    }`;
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Community Overview</h1>
+    <div className="flex h-full w-full gap-6">
+      
+      <aside className="w-64 bg-white border-r border-gray-200 p-6 hidden md:flex flex-col h-full rounded-2xl shadow-sm">
+        <h2 className="text-xl font-bold mb-8 text-gray-800">Admin</h2>
+        
+        <nav className="flex flex-col gap-2 flex-1">
+          {/* 1. STATISTICS */}
+          <button 
+            className={getLinkClass("statistics")}
+            onClick={() => setActiveView("statistics")}
+          >
+            Statistics
+          </button>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card shadow="sm">
-          <CardBody>
-            <p className="text-gray-500 text-sm">TOTAL POSTS</p>
-            <p className="text-2xl font-bold">{items.length}</p>
-          </CardBody>
-        </Card>
+          {/* 2. MODEL MANAGEMENT */}
+          <button 
+            className={getLinkClass("model_management")}
+            onClick={() => setActiveView("model_management")}
+          >
+            Model Management
+          </button>
 
-        <Card shadow="sm" className="bg-red-50">
-          <CardBody>
-            <p className="text-red-500 text-sm font-bold">FLAGGED</p>
-            <p className="text-2xl font-bold text-red-600">
-                {items.filter(i => (i.report_count || 0) > 0).length}
-            </p>
-          </CardBody>
-        </Card>
-      </div>
+          {/* 3. USER MANAGEMENT */}
+          <button 
+            className={getLinkClass("user_management")}
+            onClick={() => setActiveView("user_management")}
+          >
+            User Management
+          </button>
+        </nav>
 
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold mb-4">Post Moderation</h2>
-        <div className="grid grid-cols-1 gap-4">
-          {items.length === 0 ? (
-            <p className="text-gray-500 italic">No posts found.</p>
-          ) : (
-            items.map((item) => (
-              <Card key={item.post_id} className="p-4" isHoverable>
-                <div className="flex justify-between items-center">
-                  <User 
-                    name={item.user_name || "Unknown User"}
-                    description={item.timestamp}
-                    avatarProps={{ src: item.avatar_url }}
-                  />
-                  <div className="flex gap-2 items-center">
-                    {(item.report_count || 0) > 0 && (
-                      <Badge color="danger" variant="flat">
-                        {item.report_count} Reports
-                      </Badge>
-                    )}
-                    <Button size="sm" color="danger" variant="flat">Delete</Button>
-                  </div>
-                </div>
-              </Card>
-            ))
-          )}
+        <div className="mt-auto pt-4 border-t border-gray-100">
+           <a href="/" className="p-2 block hover:bg-gray-50 rounded text-gray-400 text-sm transition-colors">
+             Exit Admin
+           </a>
         </div>
-      </div>
+      </aside>
+
+      <main className="flex-1 min-w-0 h-full overflow-hidden">
+        {activeView === "statistics" && <Statistics />}
+        {activeView === "model_management" && <ModelManagement />}
+        {activeView === "user_management" && <UserManagement />}
+      </main>
+
     </div>
   );
 }

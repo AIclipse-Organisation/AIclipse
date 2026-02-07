@@ -42,7 +42,7 @@ def healthz():
 @app.get("/")
 def index():
     if _get_token_from_cookie():
-        return redirect("/home")
+        return redirect("/community")
     toggles = cfg.get_client_config()
     show_signup = toggles.get("sign-up", True)
     return render_template("login.html", show_signup=show_signup)
