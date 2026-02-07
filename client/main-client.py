@@ -170,16 +170,13 @@ def admin_route():
         resp = requests.get(url, headers=headers, timeout=5)
         if resp.status_code != 200:
             return redirect("/")
-        
-        user_data = resp.json()
+
         if not session["is_admin"]:
             return "Forbidden: Admin access required", 403
 
     except Exception:
         logging.exception("Gateway auth check failed for admin route")
         return "Service Temporarily Unavailable", 502
-
-    community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
     
     return redirect(f"/community/admin")
 
@@ -208,7 +205,7 @@ def enforce_auth():
         if "10.1." in host:
             host = "aiclipse.local"
             
-        return redirect(f"http://{host}/")
+        return redirect("/")
     
     return None
 
