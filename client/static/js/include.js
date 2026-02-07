@@ -65,3 +65,54 @@ function goToCommunity() {
   setMode("login");
 })();
 
+// --- Menu Logic ---
+
+function initNavDrawer() {
+  const toggle = document.getElementById('menu-toggle');
+  const drawer = document.getElementById('nav-drawer');
+  const overlay = document.getElementById('menu-overlay');
+  const close = document.getElementById('close-menu');
+  const logoutBtn = document.getElementById('drawer-logout');
+
+  if (!toggle || !drawer || !overlay) return false;
+
+  const toggleAction = (e) => {
+    if (e) e.preventDefault();
+    console.log("Menu Toggle Triggered");
+    const isActive = drawer.classList.toggle('active');
+    overlay.style.display = isActive ? 'block' : 'none';
+  };
+
+  toggle.onclick = toggleAction;
+  overlay.onclick = toggleAction;
+  if (close) close.onclick = toggleAction;
+
+  if (logoutBtn) {
+    logoutBtn.onclick = async () => {
+      const res = await fetch('/logout', { method: 'POST' });
+      if (res.ok) window.location.href = '/';
+    };
+  }
+
+  return true;
+}
+
+(function waitForPartials() {
+  const navReady = setActiveNavLink();
+  const drawerReady = initNavDrawer();
+
+  if (navReady && drawerReady) return;
+
+  const observer = new MutationObserver(() => {
+    const isNavNowReady = setActiveNavLink();
+    const isDrawerNowReady = initNavDrawer();
+    
+    if (isNavNowReady && isDrawerNowReady) {
+       console.log("All partials initialized and bound.");
+       observer.disconnect();
+    }
+  });
+
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+})();
+

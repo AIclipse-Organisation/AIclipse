@@ -2,6 +2,7 @@ import logging
 import os
 import re
 from config import cfg
+import sys
 
 import requests
 from flask import (
@@ -10,7 +11,9 @@ from flask import (
     request,
     jsonify,
     make_response,
-    render_template
+    render_template,
+    redirect,
+    session
 )
 from werkzeug.serving import WSGIRequestHandler
 
@@ -21,6 +24,8 @@ from werkzeug.serving import WSGIRequestHandler
 
 
 app = Flask(__name__)
+
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "a-very-secret-phrase")
 
 current_env = os.getenv("APP_ENV", "dev")
 
@@ -40,6 +45,7 @@ def index():
     show_signup = toggles.get("sign-up", True)
     app.logger.error(f"DEBUG: show_signup is {show_signup} (Type: {type(show_signup)})")
     return render_template("login.html", show_signup=show_signup)
+ 
 
 
 @app.get("/imgProcessing")
@@ -141,6 +147,50 @@ def _call_gateway_json(
     return resp.content, status_code, {"Content-Type": content_type}
 
 
+# ----------- Admin Proxy ---------
+
+@app.get("/admin")
+def admin_route():
+    """
+    Checks user role via Gateway. 
+    If admin, redirects to the Community Service's admin dashboard.
+    """
+    token = _get_token_from_cookie()
+    if not token:
+        return redirect("/")
+
+    url = f"{GATEWAY_URI}/auth/me"
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=5)
+        if resp.status_code != 200:
+            return redirect("/")
+        
+        user_data = resp.json()
+        if not session["is_admin"]:
+            return "Forbidden: Admin access required", 403
+
+    except Exception:
+        logging.exception("Gateway auth check failed for admin route")
+        return "Service Temporarily Unavailable", 502
+
+    community_url = os.getenv("COMMUNITY_URI", "http://community-srv:3000")
+    
+    return redirect(f"/community/admin")
+
+@app.context_processor
+def inject_admin_status():
+    """
+    Makes 'is_admin' available to all templates (including partials)
+    without passing it manually in every render_template() call.
+    """
+    return dict(is_admin=session.get("is_admin", False))
+
+
 # ---------- AUTH (BROWSER -> CLIENT -> GATEWAY) ----------
 
 
@@ -183,6 +233,8 @@ def auth_login():
 
     token = data.get("token")
     user = data.get("user")
+    session["is_admin"] = user.get("is_admin") 
+    
 
     if not token or not user:
         return jsonify({"detail": "Gateway login response missing token or user"}), 502
@@ -205,6 +257,7 @@ def auth_login():
 
 @app.post("/logout")
 def logout():
+    session.clear()
     response = make_response(jsonify({"detail": "Logged out"}), 200)
     response.set_cookie(
         "access_token",
@@ -228,9 +281,13 @@ def auth_me_get():
         "Accept": "application/json",
         "Authorization": f"Bearer {token}",
     }
-
     try:
         resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            session["is_admin"] = data.get("is_admin")
+            sys.stderr.write(f"\n>>> CRITICAL DEBUG: User Data Received: {data.get('is_admin')}\n")
+            return jsonify(data), 200
     except requests.RequestException:
         logging.exception("Gateway /auth/me request failed")
         return jsonify({"detail": "Gateway unreachable"}), 502
