@@ -11,6 +11,7 @@
     <div class="app-container">
       <main class="screen">
         <div class="auth-shell">
+          <!-- Brand -->
           <div class="brand-hero" aria-label="AICLIPSE branding">
             <img
               class="brand-image"
@@ -19,7 +20,9 @@
             />
           </div>
 
+          <!-- Auth Card -->
           <section class="auth-card">
+            <!-- Toggle -->
             <div class="auth-toggle" role="tablist" aria-label="Auth mode">
               <button
                 type="button"
@@ -37,7 +40,9 @@
               {% endif %}
             </div>
 
+            <!-- Panels -->
             <div class="auth-panels" data-mode="login">
+              <!-- Signup -->
               {% if show_signup %}
               <div class="auth-panel" data-panel="signup">
                 <h2 class="legacy-heading">Create an Account</h2>
@@ -63,33 +68,29 @@
               </div>
               {% endif %}
 
+              <!-- Login -->
               <div class="auth-panel" data-panel="login">
                 <h2 class="legacy-heading">Log in</h2>
 
-                <div id="login-content">
-                  <label for="login-email">Email</label>
-                  <input id="login-email" type="email" placeholder="Email" />
+                <label for="login-email">Email</label>
+                <input id="login-email" type="email" placeholder="Email" />
 
-                  <label for="login-password">Password</label>
-                  <input
-                    id="login-password"
-                    type="password"
-                    placeholder="Password"
-                  />
+                <label for="login-password">Password</label>
+                <input
+                  id="login-password"
+                  type="password"
+                  placeholder="Password"
+                />
 
-                  <button id="btn-login">Log in</button>
-                </div>
-
-                <div id="login-spinner-container" style="display: none">
-                  <div class="spinner"></div>
-                  <p>Logging in...</p>
-                </div>
+                <button id="btn-login">Log in</button>
               </div>
 
               <div id="account-status"></div>
             </div>
           </section>
 
+          <!-- Keep?? -->
+          <!-- Detection -->
           <section class="card" style="display: none">
             <h2>Detect</h2>
 

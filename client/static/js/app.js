@@ -168,73 +168,62 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // LOGIN
-  if (btnLogin) {
-    btnLogin.addEventListener("click", async () => {
-      console.log("logging in");
-      
-      const emailEl = document.getElementById("login-email");
-      const passwordEl = document.getElementById("login-password");
-      const accountStatus = document.getElementById("account-status");
-      
-      // Get the containers
-      const contentDiv = document.getElementById("login-content");
-      const spinnerDiv = document.getElementById("login-spinner-container");
+  btnLogin.addEventListener("click", async () => {
+    const email = document.getElementById("login-email").value.trim();
+    const password = document.getElementById("login-password").value;
 
-      const email = emailEl?.value.trim();
-      const password = passwordEl?.value;
+    if (!email || !password) {
+      setStatus(
+        accountStatus,
+        "error",
+        "Please fill email and password."
+      );
+      return;
+    }
 
-      if (!email || !password) {
-        setStatus(accountStatus, "error", "Please fill email and password.");
-        return;
-      }
+    btnLogin.disabled = true;
+    setStatus(accountStatus, "info", "Logging in...");
 
-      // 1. UI: SWITCH TO SPINNER
-      if (contentDiv) contentDiv.style.display = "none";
-      if (spinnerDiv) spinnerDiv.style.display = "block";
-      
-      setStatus(accountStatus, "info", ""); 
+    try {
+      const res = await fetch("/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      let shouldResetUI = true; 
-
+      let data = null;
       try {
-        const res = await fetch("/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-
-        let data = null;
-        try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
-        setDebug({ url: "/auth/login", status: res.status, body: data });
-
-        if (res.ok && data.user) {
-          // SUCCESS
-          setStatus(accountStatus, "success", "Success! Redirecting...");
-          setCurrentUserChip(data.user);
-          
-          // Keep spinner showing while redirect happens
-          shouldResetUI = false; 
-          
-          window.location.href = "/community";
-        } else {
-          // FAIL
-          setStatus(accountStatus, "error", data.detail || `Login failed (${res.status})`);
-          setCurrentUserChip(null);
-        }
-      } catch (err) {
-        console.error(err);
-        setStatus(accountStatus, "error", "Network error during login.");
-        setCurrentUserChip(null);
-      } finally {
-        // Only bring the form back if login FAILED
-        if (shouldResetUI) {
-            if (contentDiv) contentDiv.style.display = "block";
-            if (spinnerDiv) spinnerDiv.style.display = "none";
-            btnLogin.disabled = false;
-        }
+        data = await res.json();
+      } catch {
+        data = { detail: "Non-JSON response" };
       }
-    });
-  }
+      setDebug({ url: "/auth/login", status: res.status, body: data });
+
+      if (res.ok && data.user) {
+        setStatus(accountStatus, "success", "Logged in.");
+        setCurrentUserChip(data.user);
+        window.location.href = "/community";
+
+
+      } else {
+        setStatus(
+          accountStatus,
+          "error",
+          data.detail || `Login failed (${res.status})`
+        );
+        setCurrentUserChip(null);
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus(accountStatus, "error", "Network error during login.");
+      setCurrentUserChip(null);
+    } finally {
+      btnLogin.disabled = false;
+    }
+  });
 
   // LOGOUT
   btnLogout.addEventListener("click", async () => {
@@ -668,5 +657,4 @@ window.addEventListener('beforeunload', () => {
     }
   })();
 });
-
 

@@ -18,6 +18,7 @@ class Config:
         try:
             resp = requests.get(self.config_url, timeout=5)
             resp.raise_for_status()
+            # FIX: Assign to self._raw_config, not a local variable
             self._raw_config = resp.json() 
             
             logging.info(f"[*] Loaded {self.env} config from remote")

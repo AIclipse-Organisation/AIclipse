@@ -1,5 +1,6 @@
 <div class="topbar">
-  <button id="menu-toggle" class="menu-button" type="button" aria-label="Menu">
+  <!-- Left: hamburger -->
+  <button class="menu-button" type="button" aria-label="Menu">
       <span class="hamburger-line"></span>
       <span class="hamburger-line"></span>
       <span class="hamburger-line"></span>
@@ -16,28 +17,4 @@
     <div id="current-user-chip" class="badge muted">Not signed in</div>
   </div>
 </div>
-
-<div id="menu-overlay" class="menu-overlay"></div>
-<aside id="nav-drawer" class="nav-drawer">
-  <div class="drawer-header">
-    <div id="drawer-user-name">Menu</div>
-    <button id="close-menu" class="close-button">&times;</button>
-  </div>
-  
-  <nav class="drawer-links">
-    <a href="/community">Home</a>
-    <a href="/profile">Profile</a>
-    <a href="/plan">Subscription Plan</a>
-    
-    <div class="drawer-separator"></div>
-    
-    <a href="/dev">For Devs</a>
-    
-    {% if is_admin %}
-      <a href="/admin" class="admin-link" style="color: #ff4444 !important; font-weight: bold;">Admin Dashboard</a>
-    {% endif %}
-
-    <div class="drawer-separator"></div>
-    <button id="drawer-logout" class="logout-button" style="background:none; border:none; text-align:left; cursor:pointer;">Logout</button>
-  </nav>
-</aside>
+<!-- <div id="current-user-chip" class="badge muted">Not signed in</div> -->

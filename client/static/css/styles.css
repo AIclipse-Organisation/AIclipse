@@ -4,10 +4,7 @@ body {
   margin: 0;
   padding: 0;
   background: #141414;
-  color: #222;;
-  padding: 0;
-  min-height: 100vh;
-  background: white;
+  color: #222;
 }
 
 header {
@@ -54,12 +51,14 @@ body.app {
 
 /* Constrain everything to phone width */
 body.app .app-container {
-  position: relative; 
+  position: relative;
   min-height: 100vh;
   background: #222222;
+
   margin: 0 auto;
   max-width: 480px;
-  overflow: hidden; 
+  /* border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd; */
 }
 
 /* Top bar */
@@ -74,25 +73,13 @@ body.app .topbar {
   padding: 10px 12px;
 }
 
-body .topbar {
-  height: 56px;
-  background: #222222;
-  border-bottom: 1px solid #2c2c2c;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-}
-
 /* Hamburger */
 body.app .menu-button {
-  position: relative;
-  z-index: 10; 
   background: transparent;
   border: none;
   padding: 6px 8px;
   cursor: pointer;
+
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -233,87 +220,4 @@ body.app main {
   body.app {
     background: #f5f5f5; /* optional: subtle contrast outside phone shell */
   }
-}
-
-/* Overlay styles */
-.menu-overlay {
-  position: absolute; /* Changed from fixed to absolute */
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 2000;
-  display: none; 
-}
-
-/* Drawer styles */
-.nav-drawer {
-  position: absolute; /* Changed from fixed to absolute */
-  top: 0;
-  left: 0; 
-  width: 280px;
-  height: 100%;
-  background: #222222;
-  border-right: 1px solid #2c2c2c;
-  
-  /* Initial state: Hidden to the left of the container */
-  transform: translateX(-100%); 
-  
-  z-index: 2001; 
-  transition: transform 0.3s ease-in-out;
-  display: flex;
-  flex-direction: column;
-}
-
-/* When active, slide it in */
-.nav-drawer.active {
-  transform: translateX(0);
-  display: flex !important;
-}
-
-.drawer-header {
-  padding: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #2c2c2c;
-  color: #CFB87C;
-  font-weight: bold;
-}
-
-.drawer-links {
-  display: flex;
-  flex-direction: column;
-  padding: 20px 0;
-}
-
-.drawer-links a, .logout-button {
-  padding: 15px 25px;
-  text-decoration: none;
-  color: #f3f3f3;
-  font-size: 1rem;
-}
-
-.drawer-links a:hover {
-  background: #2c2c2c;
-  color: #CFB87C;
-}
-
-.admin-link {
-  color: #ff4444 !important;
-}
-
-.drawer-separator {
-  height: 1px;
-  background: #2c2c2c;
-  margin: 10px 25px;
-}
-
-.close-button {
-  background: none;
-  border: none;
-  color: #CFB87C;
-  font-size: 2rem;
-  cursor: pointer;
 }

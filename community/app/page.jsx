@@ -38,13 +38,11 @@ export default function Page() {
     async function load() {
       try {
         // Get signed-in user from cookie session
-       const meRes = await fetch("/auth/me", { credentials: "include", signal });
-        const contentType = meRes.headers.get("content-type");
-        if (contentType && contentType.includes("text/html")) {
-        window.location.href = "/"; 
-        return;
-    }
-       if (meRes.ok) {
+        const meRes = await fetch("/auth/me", {
+          credentials: "include",
+          signal,
+        });
+        if (meRes.ok) {
           const me = await meRes.json().catch(() => null);
           if (alive) {
             setCurrentUserId(me?.user_id || null);
