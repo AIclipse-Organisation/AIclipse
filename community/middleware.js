@@ -19,7 +19,7 @@ export async function middleware(request) {
 
 
   try {
-     const GATEWAY_URI = process.env.GATEWAY_URI
+     const GATEWAY_URI = process.env.GATEWAY_URI;
      const res = await fetch(`${GATEWAY_URI}/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
      });

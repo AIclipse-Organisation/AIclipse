@@ -1,10 +1,8 @@
 import httpx
 import logging
 import anyio
-from typing import Optional, List
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request, status, Response
-from fastapi.responses import JSONResponse
-
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Response
 from app.core.settings import require_setting
 from app.deps import get_current_admin 
 from app.models import UserContext
@@ -14,13 +12,6 @@ router = APIRouter()
 def get_cycle_url(request: Request) -> str:
     s = request.app.state.settings
     return require_setting("MODEL_CYCLE_URI", s.model_cycle_uri)
-
-async def async_file_generator(file_obj, chunk_size=65536):
-    while True:
-        chunk = file_obj.read(chunk_size)
-        if not chunk:
-            break
-        yield chunk
 
 # ---------------------------------------------------------
 # 1. TRIGGER TRAINING

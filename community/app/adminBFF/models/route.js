@@ -13,6 +13,12 @@ function cleanToken(val) {
   return val.replace("Bearer ", "").replace(/"/g, "").trim();
 }
 
+// Helper to sanitize values before logging to prevent log injection
+function sanitizeLogMessage(val) {
+  if (val === null || val === undefined) return "";
+  return String(val).replace(/[\r\n]/g, "");
+}
+
 export const config = {
   api: {
     bodyParser: {
@@ -114,7 +120,7 @@ export async function POST(req) {
       });
 
       proxyReq.on("error", (err) => {
-        console.error("🔥 [AdminAPI] Proxy Request Error:", err);
+        console.error("🔥 [AdminAPI] Proxy Request Error:", sanitizeLogMessage(err && err.message));
         resolve(NextResponse.json({ error: "Proxy Error", details: err.message }, { status: 502 }));
       });
 
