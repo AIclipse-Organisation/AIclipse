@@ -9,11 +9,11 @@
 
   <body class="app">
     <div class="app-container">
-      <div data-include="/static/partials/topbar.html"></div>
+      {% include 'partials/topbar.html' %}
 
       <main class="screen"></main>
 
-      <div data-include="/static/partials/navbar.html"></div>
+      {% include 'partials/navbar.html' %}
     </div>
 
     <script src="/static/js/include.js"></script>

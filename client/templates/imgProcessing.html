@@ -13,7 +13,7 @@
 
   <body class="app">
     <div class="app-container">
-      <div data-include="/static/partials/topbar.html"></div>
+      {% include 'partials/topbar.html' %}
       <main class="screen">
         <div class="grid">
           <section class="page-header" aria-label="Page title">
@@ -34,7 +34,7 @@
         </div>
       </main>
 
-      <div data-include="/static/partials/navbar.html"></div>
+      {% include 'partials/navbar.html' %}
     </div>
 
     <script src="/static/js/include.js"></script>
