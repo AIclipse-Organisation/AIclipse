@@ -10,33 +10,31 @@ public class ModelCycleConfig
 
     [JsonPropertyName("REPLAY_BUFFER_RATIO")]
     public double ReplayBufferRatio { get; set; }
-    
-    [JsonPropertyName("USER_ACCURACY_AI")]
-    public double UserAccuracyAi { get; set; }
 
-    [JsonPropertyName("USER_ACCURACY_REAL")]
-    public double UserAccuracyReal { get; set; }
+    [JsonPropertyName("confidence-scoring")]
+    public ConfidenceScoringConfig ConfidenceScoring { get; set; } = new();
 
-    [JsonPropertyName("MODEL_ACCURACY_AI")]
-    public double ModelAccuracyAi { get; set; }
-
-    [JsonPropertyName("MODEL_ACCURACY_REAL")]
-    public double ModelAccuracyReal { get; set; }
-
-    [JsonPropertyName("CONFIDENCE_THRESHOLD")]
-    public double ConfidenceThreshold { get; set; }
+    public double UserAccuracyAi => ConfidenceScoring.UserAccuracyAi;
+    public double UserAccuracyReal => ConfidenceScoring.UserAccuracyReal;
+    public double ConfidenceThreshold => ConfidenceScoring.ConfidenceThreshold;
 
     public static ModelCycleConfig LoadModelConfig(string filePath)
     {
-        string currentEnv = Environment.GetEnvironmentVariable("APP_ENV") ?? "dev";
-        Console.WriteLine($"[Config] Detected Environment: '{currentEnv}'");
-        
+#if DEBUG
+        string currentEnv = "dev";
+#else
+            string currentEnv = "prod";
+#endif
+
+        Console.WriteLine($"[Config] System Mode: {currentEnv}");
+
         if (!File.Exists(filePath))
         {
             Console.WriteLine($"[Config] CRITICAL ERROR: Config file not found at '{filePath}'");
             throw new FileNotFoundException($"Config file not found at {filePath}");
         }
-        try 
+
+        try
         {
             var jsonString = File.ReadAllText(filePath);
             using (JsonDocument doc = JsonDocument.Parse(jsonString))
@@ -46,9 +44,11 @@ public class ModelCycleConfig
                     if (envNode.TryGetProperty("model-cycle", out JsonElement cycleNode))
                     {
                         var config = cycleNode.Deserialize<ModelCycleConfig>()!;
+
                         Console.WriteLine($"[Config] Successfully loaded 'model-cycle' for '{currentEnv}'.");
-                        Console.WriteLine($"[Config] Batch Threshold: {config.BatchSizeThreshold}, Replay Ratio: {config.ReplayBufferRatio}");
-                        
+                        Console.WriteLine($"[Config] Batch: {config.BatchSizeThreshold}, Ratio: {config.ReplayBufferRatio}");
+                        Console.WriteLine($"[Config] Confidence Threshold: {config.ConfidenceThreshold}");
+
                         return config;
                     }
                     else
@@ -65,7 +65,19 @@ public class ModelCycleConfig
         catch (Exception ex)
         {
             Console.WriteLine($"[Config] ERROR parsing config: {ex.Message}");
-            throw; 
+            throw;
         }
     }
+}
+
+public class ConfidenceScoringConfig
+{
+    [JsonPropertyName("USER_ACCURACY_AI")]
+    public double UserAccuracyAi { get; set; }
+
+    [JsonPropertyName("USER_ACCURACY_REAL")]
+    public double UserAccuracyReal { get; set; }
+
+    [JsonPropertyName("CONFIDENCE_THRESHOLD")]
+    public double ConfidenceThreshold { get; set; }
 }

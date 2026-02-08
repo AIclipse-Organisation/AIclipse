@@ -42,7 +42,7 @@ build:
             dest: .
     - image: aiclipse/model-cycle
       context: model-cycle
-      docker: { dockerfile: Dockerfile }
+      docker: { dockerfile: Dockerfile.dev }
     - image: aiclipse/plans
       context: plans
       docker: { dockerfile: Dockerfile }
@@ -59,7 +59,7 @@ build:
             dest: .
     - image: aiclipse/client
       context: client
-      docker: { dockerfile: Dockerfile }
+      docker: { dockerfile: Dockerfile.dev }
       sync:
         manual:
           - src: "**/*.py"
@@ -93,6 +93,37 @@ profiles:
   - name: dev
     activation:
       - kubeContext: docker-desktop
+  - name: prod
+    build:
+        artifacts:
+        - image: aiclipse/auth
+          context: auth
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/gateway
+          context: gateway
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/media
+          context: media
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/detector
+          context: detector
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/model-cycle
+          context: model-cycle
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/plans
+          context: plans
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/billing
+          context: billing
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/client
+          context: client
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/community
+          context: community
+          docker: { dockerfile: Dockerfile }
+    
 portForward:
   - resourceType: service
     resourceName: gateway-srv   

@@ -24,7 +24,6 @@ on:
       extra_secrets_yaml: { type: string,  required: false, default: "" } # e.g. infra/k8s-dev/model-cycle-secrets.yaml
       extra_pvc_yaml:     { type: string,  required: false, default: "" } # e.g. infra/k8s/model-cycle-pvc.yaml
       extra_pvc_name:     { type: string,  required: false, default: "" } # e.g. model-cycle-pvc
-      extra_apply_yaml:   { type: string,  required: false, default: "" } # e.g. infra/k8s/app-configmap.yaml
 
       rollout_timeout:    { type: string,  required: false, default: "90s" }
       namespace:          { type: string,  required: false, default: "default" }
@@ -122,13 +121,6 @@ jobs:
         run: |
           set -euo pipefail
           kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_secrets_yaml }}"
-
-      - name: Apply extra manifests (optional)
-        if: ${{ inputs.extra_apply_yaml != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_apply_yaml }}"
 
       - name: Apply extra PVC (optional)
         if: ${{ inputs.extra_pvc_yaml != '' }}

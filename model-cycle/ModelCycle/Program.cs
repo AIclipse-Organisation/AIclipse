@@ -20,7 +20,7 @@ var mongoDbName = Environment.GetEnvironmentVariable("MONGO_DB") ?? "aiclipse";
 Console.WriteLine($"[Mongo] Connecting to {mongoDbName}...");
 
 builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoUri));
-builder.Services.AddScoped<IMongoDatabase>(sp => 
+builder.Services.AddScoped<IMongoDatabase>(sp =>
     sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDbName));
 
 var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST") ?? "localhost";
@@ -33,32 +33,40 @@ var configOptions = new ConfigurationOptions
 {
     EndPoints = { { redisHost, redisPort } },
     Password = string.IsNullOrEmpty(redisPassword) ? null : redisPassword,
-    AbortOnConnectFail = false, 
+    AbortOnConnectFail = false,
     ConnectRetry = 5,
     KeepAlive = 60
 };
 
 Console.WriteLine($"[Redis] Connecting to {redisHost}:{redisPort}...");
 
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp => 
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(configOptions));
 
 builder.Services.AddHostedService<VoteReceiver>();
 
-string configUrl = Environment.GetEnvironmentVariable("CENTRAL_CONFIG_URL") 
+string configUrl = Environment.GetEnvironmentVariable("CENTRAL_CONFIG_URL")
                    ?? throw new Exception("CENTRAL_CONFIG_URL env var is missing!");
 
-string currentEnv = Environment.GetEnvironmentVariable("APP_ENV") ?? "dev";
+string currentEnv = "dev";
+
+#if RELEASE
+    currentEnv = "prod";
+#elif DEBUG
+currentEnv = "dev";
+#endif
+
+Console.WriteLine($"[Mode] Running in {currentEnv} mode (Build: #if RELEASE ? Prod : Dev)");
 
 Console.WriteLine($"[Config] Fetching configuration from: {configUrl}");
 
-try 
+try
 {
     using var httpClient = new HttpClient();
     var jsonString = await httpClient.GetStringAsync(configUrl);
 
     using var doc = JsonDocument.Parse(jsonString);
-    if (doc.RootElement.TryGetProperty(currentEnv, out var envNode) && 
+    if (doc.RootElement.TryGetProperty(currentEnv, out var envNode) &&
         envNode.TryGetProperty("model-cycle", out var cycleNode))
     {
         var config = cycleNode.Deserialize<ModelCycleConfig>();
@@ -81,15 +89,15 @@ catch (Exception ex)
 builder.WebHost.UseUrls("http://0.0.0.0:3000");
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.Limits.MaxRequestBodySize = 524288000; 
+    options.Limits.MaxRequestBodySize = 524288000;
 });
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 524288000; 
+    options.MultipartBodyLengthLimit = 524288000;
 });
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy => 
+    options.AddPolicy("AllowAll", policy =>
         policy.AllowAnyOrigin()
             .AllowAnyMethod()
             .AllowAnyHeader());
@@ -114,13 +122,13 @@ builder.Services.AddHttpClient<IMediaService, MediaService>(client =>
 builder.Services.AddScoped<IDatasetService, DatasetService>();
 
 builder.Services.AddScoped<ITrainingWorkflowService, TrainingWorkflowService>();
-builder.Services.AddScoped<IModelWeightsRepository,ModelWeightsRepository>();
+builder.Services.AddScoped<IModelWeightsRepository, ModelWeightsRepository>();
 
 builder.Services.AddSingleton<TrainingJobQueue>();
 
 builder.Services.AddHostedService<QueuedTrainingWorker>();
 builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
-builder.Services.AddScoped<ITrainingJobManager, TrainingJobManager>(); 
+builder.Services.AddScoped<ITrainingJobManager, TrainingJobManager>();
 builder.Services.AddScoped<IPythonExecutor, PythonExecutor>();
 builder.Services.AddScoped<IModelTrainingService, ModelTrainingService>();
 
@@ -141,10 +149,10 @@ using (var scope = app.Services.CreateScope())
     try
     {
         Directory.CreateDirectory("/app/data");
-        
+
         var blobService = services.GetRequiredService<BlobStorageService>();
         await blobService.InitializeAsync();
-        
+
         var context = services.GetRequiredService<AppDbContext>();
         context.Database.EnsureCreated();
         Console.WriteLine("[SQLite] Database migrated successfully.");
