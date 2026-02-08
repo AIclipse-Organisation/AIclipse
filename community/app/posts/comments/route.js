@@ -10,6 +10,7 @@ import { getRedis } from "@/lib/redis/redis";
 
 export const runtime = "nodejs";
 
+
 const POSTS_COLLECTION = "community.posts";
 const COMMENTS_COLLECTION = "community.comments";
 

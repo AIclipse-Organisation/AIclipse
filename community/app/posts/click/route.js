@@ -1,9 +1,11 @@
+
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
 import { validateUserId, validatePostId } from "../validation.js";
 import { getRedis } from "@/lib/redis/redis";
 
 export const runtime = "nodejs";
+
 
 const POSTS_COLLECTION = "community.posts";
 

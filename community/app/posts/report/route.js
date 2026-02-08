@@ -4,6 +4,7 @@ import { validatePostId } from "../validation.js";
 
 export const runtime = "nodejs";
 
+
 const POSTS_COLLECTION = "community.posts";
 
 //  POST /community/posts/report

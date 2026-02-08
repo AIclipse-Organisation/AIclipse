@@ -6,5 +6,11 @@ module.exports = {
     incomingRequests: {
       ignore: [/^\/healthz$/, /^\/api\/healthz$/],
     },
-  }
+  },
+
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '1gb',
+    },
+  },
 };

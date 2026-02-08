@@ -5,6 +5,7 @@ import { validateUserId, validateImageId, validatePostId } from "./validation.js
 
 import { getRedis } from "@/lib/redis/redis";
 
+
 export const runtime = "nodejs"; // required for MongoDB driver
 
 const POSTS_COLLECTION = "community.posts";

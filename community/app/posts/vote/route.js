@@ -6,6 +6,7 @@ import { getRedis } from "@/lib/redis/redis";
 
 export const runtime = "nodejs";
 
+
 const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
 const USERS_COLLECTION = "auth.users";
