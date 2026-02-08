@@ -10,7 +10,9 @@ from flask import (
     request,
     jsonify,
     make_response,
-    render_template
+    render_template,
+    redirect,
+    session,
 )
 from werkzeug.serving import WSGIRequestHandler
 
@@ -177,11 +179,10 @@ def admin_route():
 
 @app.context_processor
 def inject_admin_status():
-    """
-    Makes 'is_admin' available to all templates (including partials)
-    without passing it manually in every render_template() call.
-    """
-    sys.stderr.write(f"\n>>> CRITICAL DEBUG: is admin {session.get('is_admin')}\n")
+    try:
+        app.logger.debug("is_admin=%s", session.get("is_admin"))
+    except Exception:
+        pass
     return dict(is_admin=session.get("is_admin", False))
 
 
