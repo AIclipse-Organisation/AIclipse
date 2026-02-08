@@ -1,7 +1,6 @@
-import { MongoClient } from "mongodb";
-import { getRedis } from "./redis/redis.js";
+import { getDb } from "./lib/mongo/mongo.js";
+import { getRedis } from "./lib/redis/redis.js";
 
-const MONGO_URI = process.env.MONGO_URI || "";
 const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
@@ -76,13 +75,9 @@ async function flushOnce({ redis, posts }) {
 }
 
 async function main() {
-  if (!MONGO_URI) throw new Error("MONGO_URI is not set");
-
   const redis = getRedis();
-  const mongo = new MongoClient(MONGO_URI);
-
-  await mongo.connect();
-  const db = mongo.db(MONGO_DB);
+  
+  const db = await getDb();
   const posts = db.collection(POSTS_COLLECTION);
 
   console.log("[commentFlushWorker] started");

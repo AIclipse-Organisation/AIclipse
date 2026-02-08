@@ -1,7 +1,6 @@
-import { MongoClient } from "mongodb";
-import { getRedis } from "./redis/redis.js"
+import { getDb } from "./lib/mongo/mongo.js";
+import { getRedis } from "./lib/redis/redis.js";
 
-const MONGO_URI = process.env.MONGO_URI || "";
 const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
@@ -23,23 +22,27 @@ async function flushOnce({ redis, posts }) {
     0,
     400
   );
+
   if (!duePostIds.length) return 0;
 
   for (const postId of duePostIds) {
     const deltaKey = `post:${postId}:click_deltas`;
-const firstKey = `post:${postId}:click_first_at`;
-
+    const firstKey = `post:${postId}:click_first_at`;
     const lockKey = `lock:flush:clicks:${postId}`;
+
+    // Acquire lock to prevent race conditions if multiple workers run
     const gotLock = await redis.set(lockKey, "1", "NX", "EX", 30);
     if (!gotLock) continue;
 
     try {
+      // Double-check score inside lock
       const score = await redis.zscore(FLUSH_ZSET, postId);
       if (!score || Number(score) > nowSec) continue;
 
       const raw = await redis.hget(deltaKey, "count");
       const delta = Number(raw || 0);
 
+      // Only hit Mongo if there is an actual change
       if (delta !== 0) {
         await posts.updateOne(
           { post_id: postId },
@@ -64,23 +67,23 @@ const firstKey = `post:${postId}:click_first_at`;
 }
 
 async function main() {
-  if (!MONGO_URI) throw new Error("MONGO_URI is not set");
-
   const redis = getRedis();
-  const mongo = new MongoClient(MONGO_URI);
 
-  await mongo.connect();
-  const db = mongo.db(MONGO_DB);
-  const posts = db.collection(POSTS_COLLECTION);
+  console.log("[clickFlushWorker] Connecting to MongoDB...");
+  
+    const db = await getDb();
+    const posts = db.collection(POSTS_COLLECTION);
 
   console.log("[clickFlushWorker] started");
 
   while (true) {
     try {
       const n = await flushOnce({ redis, posts });
+      // Adaptive sleep: run faster if we found work, slower if idle
       await sleep(n ? 250 : 1000);
     } catch (e) {
-      console.error("[clickFlushWorker] error:", e?.message || e);
+      console.error("[clickFlushWorker] Loop error:", e?.message || e);
+      // Prevent tight error loops
       await sleep(1000);
     }
   }

@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
+import { getDb } from "@/lib/mongo/mongo.js";
 import jwt from "jsonwebtoken";
 import { validateUserId, validateImageId, validatePostId } from "./validation.js";
 
-import { getRedis } from "../../redis/redis.js"
-
+import { getRedis } from "@/lib/redis/redis";
 
 export const runtime = "nodejs"; // required for MongoDB driver
 
-const MONGO_URI = process.env.MONGO_URI || "";
-const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
 // NEW: user collection to lookup poster name
@@ -146,8 +143,6 @@ function makePostId() {
 
 // Creates a new community post linked to an image.
 export async function POST(req) {
-  let client = null;
-  
   try {
     // Verify authentication and get authenticated user_id from JWT token
     let authenticatedUserId;
@@ -212,14 +207,7 @@ export async function POST(req) {
       );
     }
 
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
-
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const col = db.collection(POSTS_COLLECTION);
 
     // NEW: lookup user_name from auth.users so posts can display it without extra DB lookups later
@@ -278,16 +266,6 @@ export async function POST(req) {
       { error: "Failed to create post", detail: String(err) },
       { status: 500 }
     );
-  } finally {
-    // Always close connection, even if an error occurred
-    if (client) {
-      try {
-        await client.close();
-      } catch (closeErr) {
-        // Log but don't throw - we're already handling the main error
-        console.error("Error closing MongoDB connection:", closeErr);
-      }
-    }
   }
 }
 
@@ -295,8 +273,6 @@ export async function POST(req) {
 // PATCH /community/posts?post_id=xxx
 // Allows a user to update their own post's description
 export async function PATCH(req) {
-  let client = null;
-  
   try {
     // Verify authentication and get authenticated user_id from JWT token
     let authenticatedUserId;
@@ -350,14 +326,7 @@ export async function PATCH(req) {
       );
     }
 
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
-
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const col = db.collection(POSTS_COLLECTION);
 
     // First find the post to verify ownership
@@ -399,14 +368,6 @@ export async function PATCH(req) {
       { error: "Failed to update post", detail: String(err) },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch (closeErr) {
-        console.error("Error closing MongoDB connection:", closeErr);
-      }
-    }
   }
 }
 
@@ -414,8 +375,6 @@ export async function PATCH(req) {
 // DELETE /community/posts?post_id=xxx
 // Allows a user to delete their own post
 export async function DELETE(req) {
-  let client = null;
-  
   try {
     // Verify authentication and get authenticated user_id from JWT token
     let authenticatedUserId;
@@ -449,14 +408,7 @@ export async function DELETE(req) {
     }
     const safePostId = postIdValidation.value;
 
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
-
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const col = db.collection(POSTS_COLLECTION);
 
     // First, find the post to verify ownership
@@ -554,14 +506,6 @@ export async function DELETE(req) {
       { error: "Failed to delete post", detail: String(err) },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch (closeErr) {
-        console.error("Error closing MongoDB connection:", closeErr);
-      }
-    }
   }
 }
 
@@ -570,15 +514,8 @@ export async function DELETE(req) {
 // Returns the latest community posts (newest first) with actual vote counts from the database.
 // Only returns posts for images that are public (is_public = true).
 export async function GET() {
-  let client = null;
-
   try {
-    if (!MONGO_URI) throw new Error("MONGO_URI is not set");
-
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const col = db.collection(POSTS_COLLECTION);
 
     const IMAGES_COLLECTION = "images";
@@ -700,13 +637,5 @@ export async function GET() {
       { error: "Failed to list posts", detail: String(err) },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch (closeErr) {
-        console.error("Error closing MongoDB connection:", closeErr);
-      }
-    }
   }
 }
