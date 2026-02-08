@@ -24,7 +24,7 @@ from werkzeug.serving import WSGIRequestHandler
 
 app = Flask(__name__)
 
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "a-very-secret-phrase")
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 current_env = os.getenv("APP_ENV", "dev")
 
