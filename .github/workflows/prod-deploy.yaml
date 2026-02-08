@@ -178,6 +178,7 @@ jobs:
           DETECTION_TOKEN_SECRET:     ${{ secrets.DETECTION_TOKEN_SECRET }}
           API_KEY_PEPPER:             ${{ secrets.API_KEY_PEPPER }}
           CONFIG_URL:                 ${{ secrets.CONFIG_URL }}
+          FLASK_SECRET_KEY:           ${{ secrets.FLASK_SECRET_KEY }}
         run: |
           set -euo pipefail
           kubectl -n "$NS" create secret generic mongo-sec \
@@ -206,6 +207,10 @@ jobs:
             --from-literal=DETECTION_TOKEN_SECRET="$DETECTION_TOKEN_SECRET" \
             --from-literal=INTERNAL_AUTH_TOKEN="$INTERNAL_AUTH_TOKEN" \
             --from-literal=API_KEY_PEPPER="$API_KEY_PEPPER" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic flask-secret \
+            --from-literal=FLASK_SECRET_KEY="$FLASK_SECRET_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
 
           kubectl -n "$NS" create configmap app-configmap \
