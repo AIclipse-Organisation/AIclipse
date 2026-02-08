@@ -201,10 +201,6 @@ def enforce_auth():
     token = _get_token_from_cookie()
     
     if not token:
-        host = request.headers.get("X-Forwarded-Host") or request.headers.get("Host", "aiclipse.local")
-        if "10.1." in host:
-            host = "aiclipse.local"
-            
         return redirect("/")
     
     return None
