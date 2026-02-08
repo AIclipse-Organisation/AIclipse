@@ -1,16 +1,6 @@
-// Navbar and
-async function loadPartials() {
-  const nodes = document.querySelectorAll("[data-include]");
-  for (const el of nodes) {
-    const url = el.getAttribute("data-include");
-    const res = await fetch(url);
-    el.outerHTML = await res.text();
-  }
-}
-
 function setActiveNavLink() {
   const nav = document.getElementById("bottom-nav");
-  if (!nav) return false;
+  if (!nav) return;
 
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   const links = nav.querySelectorAll("a[href]");
@@ -22,35 +12,59 @@ function setActiveNavLink() {
     const isActive = href === path;
     a.classList.toggle("active", isActive);
   });
-
-  return true;
 }
 
-// Wait until the navbar partial is actually in the DOM
-(function waitForNavbarThenActivate() {
-  if (setActiveNavLink()) return;
+function initNavDrawer() {
+  const toggle = document.getElementById('menu-toggle');
+  const drawer = document.getElementById('nav-drawer');
+  const overlay = document.getElementById('menu-overlay');
+  const close = document.getElementById('close-menu');
+  const logoutBtn = document.getElementById('drawer-logout');
 
-  const observer = new MutationObserver(() => {
-    if (setActiveNavLink()) observer.disconnect();
-  });
+  // Critical check: Ensure core elements exist
+  if (!toggle || !drawer || !overlay) return;
 
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-})();
+  // Prevent double-binding if already initialized
+  if (toggle.dataset.bound === "true") return;
 
-document.addEventListener("DOMContentLoaded", loadPartials);
+  const toggleAction = (e) => {
+    if (e) e.preventDefault();
+    const isActive = drawer.classList.toggle('active');
+    overlay.style.display = isActive ? 'block' : 'none';
+  };
 
-function goToCommunity() {
-  window.location.href = "/community";
+  toggle.addEventListener('click', toggleAction);
+  overlay.addEventListener('click', toggleAction);
+  
+  if (close) {
+    close.addEventListener('click', toggleAction);
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async (e) => {
+      e.preventDefault(); // good practice to prevent default if it's a link/button
+      try {
+        const res = await fetch('/logout', { method: 'POST' });
+        if (res.ok) window.location.href = '/';
+      } catch (err) {
+        console.error("Logout failed", err);
+      }
+    });
+  }
+
+  toggle.dataset.bound = "true";
+  console.log("Nav Drawer initialized.");
 }
 
-(function () {
+// --- Auth Tab Logic (Login/Signup Toggles) ---
+function initAuthTabs() {
   const panels = document.querySelector(".auth-panels");
   const tabs = document.querySelectorAll(".auth-tab");
+  
   if (!panels || !tabs.length) return;
 
   function setMode(mode) {
     panels.setAttribute("data-mode", mode);
-
     tabs.forEach((t) => {
       const active = t.dataset.mode === mode;
       t.classList.toggle("is-active", active);
@@ -62,6 +76,20 @@ function goToCommunity() {
     btn.addEventListener("click", () => setMode(btn.dataset.mode));
   });
 
-  setMode("login");
-})();
+  // Default state check
+  const activeTab = document.querySelector(".auth-tab.is-active");
+  if (!activeTab) {
+      setMode("login"); 
+  }
+}
 
+function goToCommunity() {
+  window.location.href = "/community";
+}
+
+// Main Initialization
+document.addEventListener("DOMContentLoaded", () => {
+  setActiveNavLink();
+  initNavDrawer();
+  initAuthTabs();
+});

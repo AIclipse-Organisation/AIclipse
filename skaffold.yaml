@@ -80,6 +80,10 @@ build:
         manual:
           - src: "**/*.{js,jsx,ts,tsx,json,css,scss,html}"
             dest: .
+          - src: 'tailwind.config.js'  
+            dest: .
+          - src: 'postcss.config.js'   
+            dest: .
 
 manifests:
   kustomize:
