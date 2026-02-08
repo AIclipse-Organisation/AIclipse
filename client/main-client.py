@@ -7,7 +7,6 @@ import sys
 import requests
 from flask import (
     Flask,
-    send_from_directory,
     request,
     jsonify,
     make_response,
@@ -25,7 +24,7 @@ from werkzeug.serving import WSGIRequestHandler
 
 app = Flask(__name__)
 
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "a-very-secret-phrase")
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 current_env = os.getenv("APP_ENV", "dev")
 
@@ -51,50 +50,50 @@ def index():
 
 @app.get("/imgProcessing")
 def img_processing():
-    return send_from_directory("templates", "imgProcessing.html")
+    return render_template( "imgProcessing.html")
 
 
 @app.get("/scans")
 def scans():
-    return send_from_directory("templates", "scans.html")
+    return render_template( "scans.html")
 
 
 @app.get("/home")
 def upload():
-    return send_from_directory("templates", "home.html")
+    return render_template("home.html")
 
 
 @app.get("/notification")
 def notification():
-    return send_from_directory("templates", "notification.html")
+    return render_template("notification.html")
 
 
 @app.get("/plan")
 def plan():
-    return send_from_directory("templates", "plan.html")
+    return render_template("plan.html")
 
 
 @app.get("/profile")
 def profile():
-    return send_from_directory("templates", "profile.html")
+    return render_template( "profile.html")
 
 @app.get("/results")
 def results():
-    return send_from_directory("templates", "results.html")
+    return render_template( "results.html")
 
 @app.get("/viewscan")
 def viewscan():
-    return send_from_directory("templates", "viewscan.html")
+    return render_template( "viewscan.html")
 
 
 @app.get("/dev")
 def dev():
-    return send_from_directory("templates", "dev.html")
+    return render_template( "dev.html")
 
 
 @app.get("/docs")
 def docs():
-    return send_from_directory("templates", "docs.html")
+    return render_template( "docs.html")
 
 
 def _get_token_from_cookie() -> str | None:
@@ -186,6 +185,7 @@ def inject_admin_status():
     Makes 'is_admin' available to all templates (including partials)
     without passing it manually in every render_template() call.
     """
+    sys.stderr.write(f"\n>>> CRITICAL DEBUG: is admin {session.get('is_admin')}\n")
     return dict(is_admin=session.get("is_admin", False))
 
 
@@ -201,10 +201,6 @@ def enforce_auth():
     token = _get_token_from_cookie()
     
     if not token:
-        host = request.headers.get("X-Forwarded-Host") or request.headers.get("Host", "aiclipse.local")
-        if "10.1." in host:
-            host = "aiclipse.local"
-            
         return redirect("/")
     
     return None
@@ -302,7 +298,6 @@ def auth_me_get():
         if resp.status_code == 200:
             data = resp.json()
             session["is_admin"] = data.get("is_admin")
-            sys.stderr.write(f"\n>>> CRITICAL DEBUG: User Data Received: {data.get('is_admin')}\n")
             return jsonify(data), 200
     except requests.RequestException:
         logging.exception("Gateway /auth/me request failed")
