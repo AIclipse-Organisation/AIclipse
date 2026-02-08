@@ -15,13 +15,6 @@ def get_cycle_url(request: Request) -> str:
     s = request.app.state.settings
     return require_setting("MODEL_CYCLE_URI", s.model_cycle_uri)
 
-async def async_file_generator(file_obj, chunk_size=65536):
-    while True:
-        chunk = file_obj.read(chunk_size)
-        if not chunk:
-            break
-        yield chunk
-
 # ---------------------------------------------------------
 # 1. TRIGGER TRAINING
 # ---------------------------------------------------------
