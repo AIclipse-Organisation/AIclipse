@@ -1,7 +1,6 @@
 import httpx
 import logging
 import anyio
-from typing import Optional, List
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request, status, Response
 from fastapi.responses import JSONResponse
 
