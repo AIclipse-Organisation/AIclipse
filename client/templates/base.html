@@ -8,15 +8,15 @@
   <link rel="stylesheet" href="/static/css/styles.css" />
 </head>
 
-<body class="app">
-  <div class="app-container">
-    <div data-include="/static/partials/topbar.html"></div>
+  <body class="app">
+    <div class="app-container">
+      {% include 'partials/topbar.html' %}
 
     <main class="screen">
     </main>
 
-    <div data-include="/static/partials/navbar.html"></div>
-  </div>
+      {% include 'partials/navbar.html' %}
+    </div>
 
   <script src="/static/js/include.js"></script>
   <script src="/static/js/app.js"></script>

@@ -1,4 +1,3 @@
-// Simple helper: show text in status area with a type ("info" | "success" | "error")
 function setStatus(el, type, text) {
   if (!el) return;
   el.innerHTML = "";
@@ -18,14 +17,12 @@ function setStatus(el, type, text) {
   el.appendChild(span);
 }
 
-// Debug output
 function setDebug(data) {
   const pre = document.getElementById("debug-output");
   if (!pre) return;
   pre.textContent = JSON.stringify(data, null, 2);
 }
 
-// Update current user chip in header
 function setCurrentUserChip(user) {
   const chip = document.getElementById("current-user-chip");
   if (!chip) return;
@@ -36,14 +33,9 @@ function setCurrentUserChip(user) {
     return;
   }
 
-  // chip.textContent = `${user.user_name || user.email || "User"} · plan ${
-  //   user.plan ?? "?"
-  // }`;
-
   chip.textContent = `${user.user_name}`;
 }
 
-// Basic fetch wrapper for JSON endpoints
 async function jsonFetch(method, url, body) {
   const opts = {
     method,
@@ -57,7 +49,6 @@ async function jsonFetch(method, url, body) {
     opts.body = JSON.stringify(body);
   }
 
-  // same-origin cookies (HttpOnly) will be sent automatically
   const res = await fetch(url, opts);
   let data = null;
   try {
@@ -69,108 +60,132 @@ async function jsonFetch(method, url, body) {
   return { res, data };
 }
 
+function onEl(id, callback) {
+  const el = document.getElementById(id);
+  if (el) callback(el);
+}
+
 window.addEventListener("DOMContentLoaded", () => {
-  const btnSignup = document.getElementById("btn-signup");
-  const btnLogin = document.getElementById("btn-login");
-  const btnLogout = document.getElementById("btn-logout");
-  const btnMe = document.getElementById("btn-me");
-
-  const accountStatus = document.getElementById("account-status");
-
-  const btnCheck = document.getElementById("btn-check");
-  // const btnSave = document.getElementById("btn-save");
-  const fileInput = document.getElementById("file-input");
-  const detectStatus = document.getElementById("detect-status");
-  const detectResult = document.getElementById("detect-result");
-  const checkState = document.getElementById("check-state");
-  const checkboxPublic = document.getElementById("checkbox-public");
-
-  const btnMyImages = document.getElementById("btn-my-images");
-  const myImagesFilter = document.getElementById("my-images-filter");
-  const myImagesStatus = document.getElementById("my-images-status");
-  const myImagesList = document.getElementById("my-images-list");
-
-  const btnCommunityImages = document.getElementById("btn-community-images");
-  const communityImagesStatus = document.getElementById(
-    "community-images-status"
-  );
-  const communityImagesList = document.getElementById("community-images-list");
-
   let lastDetectionToken = null;
-  let lastFile = null; // File object to send the same bytes to /upload/image
+  let lastFile = null;
+  let _lastObjectUrl = null;
 
-  // Enable/disable buttons based on file selection
-  fileInput.addEventListener("change", () => {
-    const file = fileInput.files[0];
-    lastFile = file || null;
-    lastDetectionToken = null;
-    // btnSave.disabled = true;
+  const loginContent = document.getElementById("login-content");
+  const loginSpinner = document.getElementById("login-spinner-container");
+  const signupPanel = document.querySelector('[data-panel="signup"]');
+  const loginPanel = document.querySelector('[data-panel="login"]');
+  const accountStatus = document.getElementById("account-status");
+  const tabs = document.querySelectorAll(".auth-tab");
+  const authToggleContainer = document.querySelector(".auth-toggle");
 
-    if (file) {
-      btnCheck.disabled = false;
-      checkState.textContent = `Selected: ${file.name} (${Math.round(
-        file.size / 1024
-      )} KB)`;
-      detectResult.textContent = "No detection yet for this file.";
-    } else {
-      btnCheck.disabled = true;
-      checkState.textContent = "Select a file to enable detection.";
-      detectResult.textContent = "No detection yet.";
-    }
-  });
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const mode = tab.getAttribute("data-mode");
+      tabs.forEach((t) => t.classList.remove("is-active"));
+      tab.classList.add("is-active");
 
-  // SIGNUP
-  btnSignup.addEventListener("click", async () => {
-    const user_name = document
-      .getElementById("signup-username")
-      .value.trim();
-    const email = document.getElementById("signup-email").value.trim();
-    const password = document.getElementById("signup-password").value;
-
-    if (!user_name || !email || !password) {
-      setStatus(
-        accountStatus,
-        "error",
-        "Please fill username, email and password."
-      );
-      return;
-    }
-
-    btnSignup.disabled = true;
-    setStatus(accountStatus, "info", "Creating account...");
-
-    try {
-      const { res, data } = await jsonFetch("POST", "/auth/signup", {
-        user_name,
-        email,
-        password,
-      });
-
-      if (res.ok) {
-        setStatus(
-          accountStatus,
-          "success",
-          "Account created. You can now log in."
-        );
+      if (mode === "signup") {
+        if (signupPanel) signupPanel.style.display = "block";
+        if (loginPanel) loginPanel.style.display = "none";
       } else {
-        setStatus(
-          accountStatus,
-          "error",
-          data.detail || `Signup failed (${res.status})`
-        );
+        if (signupPanel) signupPanel.style.display = "none";
+        if (loginPanel) loginPanel.style.display = "block";
       }
-    } catch (err) {
-      console.error(err);
-      setStatus(accountStatus, "error", "Network error during signup.");
-    } finally {
-      btnSignup.disabled = false;
-    }
+      if (accountStatus) accountStatus.innerHTML = "";
+    });
   });
 
-  // LOGIN
-  btnLogin.addEventListener("click", async () => {
-    const email = document.getElementById("login-email").value.trim();
-    const password = document.getElementById("login-password").value;
+  onEl("file-input", (fileInput) => {
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      lastFile = file || null;
+      window.lastFile = lastFile;
+      lastDetectionToken = null;
+
+      const btnCheck = document.getElementById("btn-check");
+      const checkState = document.getElementById("check-state");
+      const detectResult = document.getElementById("detect-result");
+
+      if (file) {
+        if (btnCheck) btnCheck.disabled = false;
+        if (checkState) checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+        if (detectResult) detectResult.textContent = "No detection yet for this file.";
+      } else {
+        if (btnCheck) btnCheck.disabled = true;
+        if (checkState) checkState.textContent = "Select a file to enable detection.";
+        if (detectResult) detectResult.textContent = "No detection yet.";
+      }
+    });
+  });
+
+  onEl("btn-signup", (btnSignup) => {
+    btnSignup.addEventListener("click", async () => {
+      const user_name = document.getElementById("signup-username")?.value.trim();
+      const email = document.getElementById("signup-email")?.value.trim();
+      const password = document.getElementById("signup-password")?.value;
+      let loginSuccess = false; // Flag to stop UI reset if redirecting
+
+      if (!user_name || !email || !password) {
+        setStatus(accountStatus, "error", "Please fill username, email and password.");
+        return;
+      }
+
+      // Hide UI components
+      if (signupPanel) signupPanel.style.display = "none";
+      if (authToggleContainer) authToggleContainer.style.display = "none";
+      if (loginSpinner) loginSpinner.style.display = "block";
+      
+      btnSignup.disabled = true;
+      setStatus(accountStatus, "info", "Creating account...");
+
+      try {
+        const { res, data } = await jsonFetch("POST", "/auth/signup", { user_name, email, password });
+        
+        if (res.ok) {
+          // --- AUTO LOGIN START ---
+          setStatus(accountStatus, "info", "Account created. Logging in...");
+          
+          const loginRes = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+
+          let loginData = {};
+          try { loginData = await loginRes.json(); } catch {}
+
+          if (loginRes.ok && loginData.user) {
+            loginSuccess = true; // Success! Don't restore the signup form
+            setStatus(accountStatus, "success", "Logged in. Redirecting...");
+            setCurrentUserChip(loginData.user);
+            window.location.href = "/community";
+          } else {
+            setStatus(accountStatus, "error", "Account created, but auto-login failed. Please log in manually.");
+          }
+          // --- AUTO LOGIN END ---
+
+        } else {
+          setStatus(accountStatus, "error", data.detail || `Signup failed (${res.status})`);
+        }
+      } catch (err) {
+        console.error(err);
+        setStatus(accountStatus, "error", "Network error during signup.");
+      } finally {
+        // Only restore the signup form if we aren't successfully redirecting
+        if (!loginSuccess) {
+          btnSignup.disabled = false;
+          if (signupPanel) signupPanel.style.display = "block";
+          if (authToggleContainer) authToggleContainer.style.display = ""; 
+          if (loginSpinner) loginSpinner.style.display = "none";
+        }
+      }
+    });
+  });
+
+  onEl("btn-login", (btnLogin) => {
+    btnLogin.addEventListener("click", async () => {
+      const email = document.getElementById("login-email")?.value.trim();
+      const password = document.getElementById("login-password")?.value;
 
     if (!email || !password) {
       setStatus(
@@ -181,8 +196,10 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    btnLogin.disabled = true;
-    setStatus(accountStatus, "info", "Logging in...");
+      if (loginContent) loginContent.style.display = "none";
+      if (authToggleContainer) authToggleContainer.style.display = "none";
+      if (loginSpinner) loginSpinner.style.display = "block";
+      setStatus(accountStatus, "info", "");
 
     try {
       const res = await fetch("/auth/login", {
@@ -202,459 +219,142 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       setDebug({ url: "/auth/login", status: res.status, body: data });
 
-      if (res.ok && data.user) {
-        setStatus(accountStatus, "success", "Logged in.");
-        setCurrentUserChip(data.user);
-        window.location.href = "/community";
-
-
-      } else {
-        setStatus(
-          accountStatus,
-          "error",
-          data.detail || `Login failed (${res.status})`
-        );
-        setCurrentUserChip(null);
-      }
-    } catch (err) {
-      console.error(err);
-      setStatus(accountStatus, "error", "Network error during login.");
-      setCurrentUserChip(null);
-    } finally {
-      btnLogin.disabled = false;
-    }
-  });
-
-  // LOGOUT
-  btnLogout.addEventListener("click", async () => {
-    setStatus(accountStatus, "info", "Logging out...");
-
-    try {
-      const { res, data } = await jsonFetch("POST", "/logout", null);
-      if (res.ok) {
-        setStatus(accountStatus, "success", "Logged out.");
-      } else {
-        setStatus(
-          accountStatus,
-          "error",
-          data.detail || `Logout failed (${res.status})`
-        );
-      }
-    } catch (err) {
-      console.error(err);
-      setStatus(accountStatus, "error", "Network error during logout.");
-    } finally {
-      setCurrentUserChip(null);
-    }
-  });
-
-  // AUTH /me
-  btnMe.addEventListener("click", async () => {
-    setStatus(accountStatus, "info", "Fetching profile...");
-
-    try {
-      const { res, data } = await jsonFetch("GET", "/auth/me", null);
-      if (res.ok) {
-        setStatus(accountStatus, "success", "Profile loaded.");
-        setCurrentUserChip(data);
-      } else {
-        setStatus(
-          accountStatus,
-          "error",
-          data.detail || `Failed to load profile (${res.status})`
-        );
-        if (res.status === 401) {
+        if (res.ok && data.user) {
+          setStatus(accountStatus, "success", "Logged in.");
+          setCurrentUserChip(data.user);
+          window.location.href = "/community";
+        } else {
+          if (loginContent) loginContent.style.display = "block";
+          if (authToggleContainer) authToggleContainer.style.display = "";
+          if (loginSpinner) loginSpinner.style.display = "none";
+          setStatus(accountStatus, "error", data.detail || `Login failed (${res.status})`);
           setCurrentUserChip(null);
         }
+      } catch (err) {
+        console.error(err);
+        if (loginContent) loginContent.style.display = "block";
+        if (authToggleContainer) authToggleContainer.style.display = "";
+        if (loginSpinner) loginSpinner.style.display = "none";
+        setStatus(accountStatus, "error", "Network error during login.");
+        setCurrentUserChip(null);
+      } finally {
+        btnLogin.disabled = false;
       }
-    } catch (err) {
-      console.error(err);
-      setStatus(
-        accountStatus,
-        "error",
-        "Network error during /auth/me."
-      );
-    }
-  });
-
-  // CHECKS (analyze image)
-// CHECKS (analyze image) — REPLACEMENT
-btnCheck.addEventListener("click", async () => {
-  if (!lastFile) {
-    setStatus(detectStatus, "error", "No file selected.");
-    return;
-  }
-
-  btnCheck.disabled = true;
-  lastDetectionToken = null;
-  setStatus(detectStatus, "info", "Analyzing image...");
-
-  const formData = new FormData();
-  formData.append("file", lastFile);
-
-  try {
-    const res = await fetch("/checks", {
-      method: "POST",
-      body: formData,
     });
+  });
 
-    let data = null;
-    try {
-      data = await res.json();
-    } catch {
-      data = { detail: "Non-JSON response" };
-    }
+  onEl("btn-logout", (btnLogout) => {
+    btnLogout.addEventListener("click", async () => {
+      setStatus(accountStatus, "info", "Logging out...");
+      try {
+        const { res, data } = await jsonFetch("POST", "/logout", null);
+        if (res.ok) setStatus(accountStatus, "success", "Logged out.");
+        else setStatus(accountStatus, "error", data.detail || `Logout failed (${res.status})`);
+      } catch (err) {
+        console.error(err);
+        setStatus(accountStatus, "error", "Network error during logout.");
+      } finally {
+        setCurrentUserChip(null);
+      }
+    });
+  });
 
-    // visible debug
-    setDebug({ url: "/checks", status: res.status, body: data });
+  onEl("btn-check", (btnCheck) => {
+    btnCheck.addEventListener("click", async () => {
+      const detectStatus = document.getElementById("detect-status");
+      const detectResult = document.getElementById("detect-result");
 
-    if (res.ok) {
-      lastDetectionToken = data.detection_token || null;
-      // show the raw debug JSON in the existing hidden debug area (keeps your old behaviour)
-      detectResult.textContent = JSON.stringify(data, null, 2);
+      if (!lastFile) {
+        setStatus(detectStatus, "error", "No file selected.");
+        return;
+      }
 
-      // NEW: render a friendly detection card if the server returned result fields
-      renderDetection(data);
-
-      setStatus(
-        detectStatus,
-        "success",
-        "Detection completed. You can now save the image."
-      );
-      // btnSave.disabled = !lastDetectionToken;
-    } else {
+      btnCheck.disabled = true;
       lastDetectionToken = null;
-      detectResult.textContent = JSON.stringify(data, null, 2);
-      setStatus(
-        detectStatus,
-        "error",
-        data.detail || `Detection failed (${res.status})`
-      );
-    }
-  } catch (err) {
-    console.error(err);
-    setStatus(
-      detectStatus,
-      "error",
-      "Network error during detection."
-    );
-  } finally {
-    btnCheck.disabled = false;
-  }
-});
+      setStatus(detectStatus, "info", "Analyzing image...");
 
+      const formData = new FormData();
+      formData.append("file", lastFile);
 
-  // UPLOAD IMAGE (save result)
-  // btnSave.addEventListener("click", async () => {
-  //   if (!lastFile) {
-  //     setStatus(detectStatus, "error", "No file selected.");
-  //     return;
-  //   }
-  //   if (!lastDetectionToken) {
-  //     setStatus(
-  //       detectStatus,
-  //       "error",
-  //       "No detection_token. Run detection first."
-  //     );
-  //     return;
-  //   }
+      try {
+        const res = await fetch("/checks", { method: "POST", body: formData });
+        let data = null;
+        try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
 
-  //   btnSave.disabled = true;
-  //   setStatus(detectStatus, "info", "Saving image...");
+        setDebug({ url: "/checks", status: res.status, body: data });
 
-  //   const formData = new FormData();
-  //   formData.append("file", lastFile);
-  //   formData.append("detection_token", lastDetectionToken);
-  //   if (checkboxPublic.checked) {
-  //     formData.append("is_public", "true");
-  //   }
-
-  //   try {
-  //     const res = await fetch("/upload/image", {
-  //       method: "POST",
-  //       body: formData,
-  //     });
-
-  //     let data = null;
-  //     try {
-  //       data = await res.json();
-  //     } catch {
-  //       data = { detail: "Non-JSON response" };
-  //     }
-  //     setDebug({
-  //       url: "/upload/image",
-  //       status: res.status,
-  //       body: data,
-  //     });
-
-  //     if (res.ok || res.status === 201) {
-  //       setStatus(detectStatus, "success", "Image saved.");
-  //     } else {
-  //       setStatus(
-  //         detectStatus,
-  //         "error",
-  //         data.detail || `Failed to save image (${res.status})`
-  //       );
-  //     }
-  //   } catch (err) {
-  //     console.error(err);
-  //     setStatus(detectStatus, "error", "Network error during save.");
-  //   } finally {
-  //     btnSave.disabled = false;
-  //   }
-  // });
-
-  // MY IMAGES
-  btnMyImages.addEventListener("click", async () => {
-    setStatus(myImagesStatus, "info", "Loading images...");
-
-    const filter = myImagesFilter.value;
-    let url = "/images";
-    if (filter) {
-      url += `?is_public=${encodeURIComponent(filter)}`;
-    }
-
-    try {
-      const { res, data } = await jsonFetch("GET", url, null);
-      if (!res.ok) {
-        setStatus(
-          myImagesStatus,
-          "error",
-          data.detail || `Failed to load images (${res.status})`
-        );
-        myImagesList.innerHTML = "";
-        return;
-      }
-
-      const items = data.items || [];
-      setStatus(
-        myImagesStatus,
-        "success",
-        `Loaded ${items.length} image(s).`
-      );
-      renderImagesList(myImagesList, items);
-    } catch (err) {
-      console.error(err);
-      setStatus(myImagesStatus, "error", "Network error.");
-      myImagesList.innerHTML = "";
-    }
-  });
-
-  // COMMUNITY IMAGES
-  btnCommunityImages.addEventListener("click", async () => {
-    setStatus(
-      communityImagesStatus,
-      "info",
-      "Loading community images..."
-    );
-
-    try {
-      const { res, data } = await jsonFetch(
-        "GET",
-        "/community/images",
-        null
-      );
-      if (!res.ok) {
-        setStatus(
-          communityImagesStatus,
-          "error",
-          data.detail ||
-            `Failed to load community images (${res.status})`
-        );
-        communityImagesList.innerHTML = "";
-        return;
-      }
-
-      const items = data.items || [];
-      setStatus(
-        communityImagesStatus,
-        "success",
-        `Loaded ${items.length} image(s).`
-      );
-      renderImagesList(communityImagesList, items);
-    } catch (err) {
-      console.error(err);
-      setStatus(
-        communityImagesStatus,
-        "error",
-        "Network error."
-      );
-      communityImagesList.innerHTML = "";
-    }
-  });
-
-  function renderImagesList(container, items) {
-    container.innerHTML = "";
-    if (!items.length) {
-      const div = document.createElement("div");
-      div.className = "muted";
-      div.textContent = "No images.";
-      container.appendChild(div);
-      return;
-    }
-
-    for (const img of items) {
-      const div = document.createElement("div");
-      div.className = "image-item";
-
-      const title = document.createElement("div");
-      title.innerHTML = `<strong>${
-        img.image_id || "(no id)"
-      }</strong>`;
-
-      const meta = document.createElement("div");
-      meta.innerHTML = `
-        verdict: <strong>${img.verdict}</strong>,
-        label: <strong>${img.label}</strong>,
-        conf: ${
-          img.confidence != null ? img.confidence.toFixed(3) : "?"
+        if (res.ok) {
+          lastDetectionToken = data.detection_token || null;
+          if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
+          renderDetection(data);
+          setStatus(detectStatus, "success", "Detection completed.");
+        } else {
+          if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
+          setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
         }
-      `;
-
-      const flags = document.createElement("div");
-      flags.className = "muted";
-      flags.textContent = `public: ${
-        img.is_public ? "yes" : "no"
-      } · uploaded_at: ${img.uploaded_at || "n/a"}`;
-
-      div.appendChild(title);
-      div.appendChild(meta);
-      div.appendChild(flags);
-      container.appendChild(div);
-    }
-  }
-
-// ---------- detection renderer and action wiring (shows uploaded image first) ----------
-let _lastObjectUrl = null; // remember and revoke previous object URL
-
-function renderDetection(resp) {
-  const card = document.getElementById('detect-card');
-  const thumb = document.getElementById('detect-thumb');
-  const verdict = document.getElementById('detect-verdict');
-  const confLabel = document.getElementById('detect-confidence');
-  const rawPre = document.getElementById('detect-result');
-
-  if (!card || !verdict || !confLabel || !rawPre) {
-    if (rawPre) {
-      rawPre.style.display = '';
-      rawPre.textContent = JSON.stringify(resp, null, 2);
-    }
-    return;
-  }
-
-  if (!resp || typeof resp !== 'object') {
-    rawPre.style.display = '';
-    rawPre.textContent = JSON.stringify(resp, null, 2);
-    card.hidden = true;
-    return;
-  }
-
-  const label = (resp.label || resp.result || 'Unknown').toString();
-  const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
-  const filename = resp.filename || resp.file || null;
-
-  const labelLower = label.toLowerCase();
-  const isAi = labelLower.includes('ai');
-  const ai_prob = isAi ? confidence : (1 - confidence);
-  const real_prob = 1 - ai_prob;
-
-  let labelClass = 'label-neutral';
-  if (labelLower.includes('ai')) {
-    if (labelLower.includes('most likely')) labelClass = 'label-strong-ai';
-    else if (labelLower.includes('likely')) labelClass = 'label-medium-ai';
-    else labelClass = 'label-medium-ai';
-  } else if (labelLower.includes('real')) {
-    if (labelLower.includes('most likely')) labelClass = 'label-strong-real';
-    else if (labelLower.includes('likely')) labelClass = 'label-medium-real';
-    else labelClass = 'label-medium-real';
-  } else if (labelLower.includes('not sure')) {
-    labelClass = 'label-neutral';
-  } else {
-    labelClass = 'label-neutral';
-  }
-
-  // ---------- Image display preference ----------
-  // 1) If user just uploaded a file (lastFile), show that (local preview).
-  // 2) Else, if server returned a filename/URL, use it.
-  // 3) Else show empty alt.
-  if (window.lastFile) {
-    try {
-      // revoke previous object URL if any
-      if (_lastObjectUrl) {
-        URL.revokeObjectURL(_lastObjectUrl);
-        _lastObjectUrl = null;
+      } catch (err) {
+        console.error(err);
+        setStatus(detectStatus, "error", "Network error during detection.");
+      } finally {
+        btnCheck.disabled = false;
       }
+    });
+  });
+
+  function renderDetection(resp) {
+    const card = document.getElementById('detect-card');
+    const thumb = document.getElementById('detect-thumb');
+    const verdict = document.getElementById('detect-verdict');
+    const confLabel = document.getElementById('detect-confidence');
+    const rawPre = document.getElementById('detect-result');
+
+    if (!card || !verdict || !confLabel || !rawPre) return;
+
+    const label = (resp.label || resp.result || 'Unknown').toString();
+    const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
+    const labelLower = label.toLowerCase();
+    const isAi = labelLower.includes('ai');
+    const ai_prob = isAi ? confidence : (1 - confidence);
+    const real_prob = 1 - ai_prob;
+
+    let labelClass = 'label-neutral';
+    if (labelLower.includes('ai')) {
+      labelClass = labelLower.includes('most likely') ? 'label-strong-ai' : 'label-medium-ai';
+    } else if (labelLower.includes('real')) {
+      labelClass = labelLower.includes('most likely') ? 'label-strong-real' : 'label-medium-real';
+    }
+
+    if (window.lastFile) {
+      if (_lastObjectUrl) URL.revokeObjectURL(_lastObjectUrl);
       _lastObjectUrl = URL.createObjectURL(window.lastFile);
-      thumb.src = _lastObjectUrl;
-      thumb.alt = `Uploaded image preview (${window.lastFile.name})`;
-    } catch (e) {
-      if (filename) {
-        const src = (filename.startsWith('http') || filename.startsWith('/')) ? filename : (`/static/uploads/${filename}`);
-        thumb.src = src;
-        thumb.alt = `Scan of ${filename}`;
-      } else {
-        thumb.src = '';
-        thumb.alt = 'No image available';
-      }
+      if (thumb) thumb.src = _lastObjectUrl;
     }
-  } else if (filename) {
-    const src = (filename.startsWith('http') || filename.startsWith('/')) ? filename : (`/static/uploads/${filename}`);
-    thumb.src = src;
-    thumb.alt = `Scan of ${filename}`;
-  } else {
-    thumb.src = '';
-    thumb.alt = 'No image available';
+
+    verdict.textContent = label;
+    verdict.className = `verdict-text ${labelClass}`;
+    confLabel.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
+
+    const realFill = document.querySelector('.real-fill');
+    const aiFill = document.querySelector('.ai-fill');
+    if (realFill) realFill.style.width = `${(real_prob * 100).toFixed(2)}%`;
+    if (aiFill) aiFill.style.width = `${(ai_prob * 100).toFixed(2)}%`;
+
+    rawPre.style.display = 'none';
+    card.hidden = false;
   }
 
-  verdict.textContent = label;
-  verdict.className = `verdict-text ${labelClass}`;
+  window.addEventListener('beforeunload', () => {
+    if (_lastObjectUrl) URL.revokeObjectURL(_lastObjectUrl);
+  });
 
-  confLabel.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
-
-  const realFill = document.querySelector('.real-fill');
-  const aiFill = document.querySelector('.ai-fill');
-  if (realFill && aiFill) {
-    realFill.style.width = `${(real_prob * 100).toFixed(2)}%`;
-    aiFill.style.width = `${(ai_prob * 100).toFixed(2)}%`;
-  }
-
-  rawPre.style.display = 'none';
-  card.hidden = false;
-
-  card.latestResponse = resp;
-}
-
-
-
-window.addEventListener('beforeunload', () => {
-  if (_lastObjectUrl) {
-    try { URL.revokeObjectURL(_lastObjectUrl); } catch (e) {}
-  }
-});
-
-
-
-
-
-
-
-  // On first load, try to get /auth/me to sync header chip
   (async () => {
     try {
       const { res, data } = await jsonFetch("GET", "/auth/me", null);
       if (res.ok) {
         setCurrentUserChip(data);
-        setStatus(
-          accountStatus,
-          "info",
-          "Session restored from cookie."
-        );
       } else {
         setCurrentUserChip(null);
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   })();
 });
-
