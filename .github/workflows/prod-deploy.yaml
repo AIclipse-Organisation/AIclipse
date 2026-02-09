@@ -17,18 +17,18 @@ jobs:
 
     env:
       ORG: ${{ secrets.GHCR_USERNAME }}
-      TAG: ${{ github.sha }}
-      NS:  default
+      NS: default
       IMAGES: "auth gateway media detector plans billing client community model-cycle"
       KUBE_DNS_IP: 10.43.0.10
 
     steps:
-      - name: Check git-lfs on runner
+      - name: Verify git-lfs is available on runner
         run: |
           set -euo pipefail
-          if git lfs version >/dev/null 2>&1; then
-            echo "git-lfs already installed"
-          fi
+          git lfs version >/dev/null 2>&1 || {
+            echo "git-lfs is not installed on the runner. Install it manually on the runner host."
+            exit 1
+          }
           git lfs install --local
 
       - name: Checkout
@@ -37,6 +37,11 @@ jobs:
           lfs: true
           fetch-depth: 0
 
+      - name: Ensure LFS objects present
+        run: |
+          set -euo pipefail
+          git lfs pull
+
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -44,22 +49,39 @@ jobs:
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build & push images (skip if tag exists)
-        shell: bash
+      - name: Build & push images
         run: |
           set -euo pipefail
+
+          # Tag is used only to push to GHCR. Kubernetes will deploy by digest.
+          PUSH_TAG="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          rm -f digests.env
+          touch digests.env
+
           for name in $IMAGES; do
-            ref="ghcr.io/${ORG}/${name}:${TAG}"
-            if docker manifest inspect "${ref}" >/dev/null 2>&1; then
-              echo "SKIP build ${ref} (tag exists)"
-              continue
-            fi
+            ref="ghcr.io/${ORG}/${name}:${PUSH_TAG}"
             echo "BUILD ${ref}"
+
             docker buildx build \
               --platform linux/amd64 \
+              --pull \
+              --no-cache \
               --tag "${ref}" \
               --push \
               "./${name}"
+
+            # Get pushed manifest digest
+            digest="$(docker buildx imagetools inspect "${ref}" --format '{{.Digest}}' 2>/dev/null || true)"
+            if [[ -z "${digest}" ]]; then
+              digest="$(docker buildx imagetools inspect "${ref}" 2>/dev/null | awk '/^Digest:/ {print $2; exit}')"
+            fi
+            if [[ -z "${digest}" ]]; then
+              echo "Failed to resolve digest for ${ref}"
+              exit 1
+            fi
+
+            echo "${name}=${digest}" | tee -a digests.env
           done
 
       - name: Ensure k8s pull secret for GHCR
@@ -82,7 +104,6 @@ jobs:
           kubectl get sc
 
       - name: Ensure CoreDNS (idempotent)
-        shell: bash
         run: |
           set -euo pipefail
           kubectl -n kube-system get deploy coredns >/dev/null 2>&1 || \
@@ -98,7 +119,6 @@ jobs:
           kubectl -n kube-system get svc kube-dns
 
       - name: DNS smoke inside cluster
-        shell: bash
         run: |
           set -euo pipefail
           kubectl -n "$NS" delete job dns-smoke --ignore-not-found=true
@@ -138,7 +158,6 @@ jobs:
           kubectl -n "$NS" delete job dns-smoke --ignore-not-found=true
 
       - name: Ensure Ingress-NGINX controller (official)
-        shell: bash
         run: |
           set -euo pipefail
           # apply upstream manifest
@@ -148,7 +167,6 @@ jobs:
           kubectl -n ingress-nginx get svc ingress-nginx-controller
 
       - name: Expose ingress on NodePort for cloudflared
-        shell: bash
         run: |
           set -euo pipefail
           kubectl -n ingress-nginx patch svc ingress-nginx-controller -p '{
@@ -160,7 +178,6 @@ jobs:
           kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
 
       - name: Ingress smoke via NodePort
-        shell: bash
         run: |
           set -euo pipefail
           kubectl run curl --image=alpine:3.20 --restart=Never --command -- \
@@ -229,7 +246,6 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply data layer
-        shell: bash
         run: |
           set -euo pipefail
           filter_sc () {
@@ -280,19 +296,33 @@ jobs:
           set -euo pipefail
           kubectl -n "$NS" apply -f infra/k8s-prod/hpa.yaml
 
-      - name: Pin images to this commit
+      - name: Deploy images by digest
         run: |
           set -euo pipefail
-          for name in $IMAGES; do
+
+          while IFS='=' read -r name digest; do
             kubectl -n "$NS" set image "deploy/${name}-depl" \
-              "${name}=ghcr.io/${ORG}/${name}:${TAG}"
+              "${name}=ghcr.io/${ORG}/${name}@${digest}"
+          done < digests.env
+
+          community_digest="$(awk -F= '$1=="community"{print $2}' digests.env)"
+          kubectl -n "$NS" set image deploy/vote-flush-depl     worker="ghcr.io/${ORG}/community@${community_digest}"
+          kubectl -n "$NS" set image deploy/comments-flush-depl worker="ghcr.io/${ORG}/community@${community_digest}"
+          kubectl -n "$NS" set image deploy/click-flush-depl    worker="ghcr.io/${ORG}/community@${community_digest}"
+
+      - name: Wait app rollouts
+        run: |
+          set -euo pipefail
+
+          kubectl -n "$NS" rollout status deploy/vote-flush-depl     --timeout=300s
+          kubectl -n "$NS" rollout status deploy/comments-flush-depl --timeout=300s
+          kubectl -n "$NS" rollout status deploy/click-flush-depl    --timeout=300s
+
+          for name in $IMAGES; do
+            kubectl -n "$NS" rollout status "deploy/${name}-depl" --timeout=300s
           done
 
-          kubectl -n "$NS" set image deploy/vote-flush-depl     worker="ghcr.io/${ORG}/community:${TAG}"
-          kubectl -n "$NS" set image deploy/comments-flush-depl worker="ghcr.io/${ORG}/community:${TAG}"
-          kubectl -n "$NS" set image deploy/click-flush-depl    worker="ghcr.io/${ORG}/community:${TAG}"
-
-      - name: Cleanup old ReplicaSets (keep newest)
+      - name: Cleanup old ReplicaSets
         run: |
           set -euo pipefail
 
@@ -340,18 +370,6 @@ jobs:
             fi
           done
 
-      - name: Wait app rollouts
-        run: |
-          set -euo pipefail
-
-          kubectl -n "$NS" rollout status deploy/vote-flush-depl     --timeout=300s
-          kubectl -n "$NS" rollout status deploy/comments-flush-depl --timeout=300s
-          kubectl -n "$NS" rollout status deploy/click-flush-depl    --timeout=300s
-
-          for name in $IMAGES; do
-            kubectl -n "$NS" rollout status "deploy/${name}-depl" --timeout=300s
-          done
-
       - name: Apply prod ingress
         run: |
           set -euo pipefail
@@ -360,7 +378,6 @@ jobs:
           kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv-uploads.yaml
 
       - name: Garbage collection
-        shell: bash
         run: |
           set -euo pipefail
           # failed
@@ -370,7 +387,6 @@ jobs:
             kubectl -n "$ns" delete pod "$pod" --ignore-not-found || true
           done
           kubectl delete pod dns-smoke --ignore-not-found=true
-
 
       - name: Summary
         run: |
@@ -392,5 +408,4 @@ jobs:
           done
 
           echo "not ready after 60s"
-          exit 1 
-          
+          exit 1
