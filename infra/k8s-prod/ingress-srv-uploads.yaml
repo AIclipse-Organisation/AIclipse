@@ -13,8 +13,8 @@ spec:
     - host: aiclipse.online
       http:
         paths:
-          - path: /community/adminBFF/models
-            pathType: Prefix
+          - path: /community/adminBFF/models/?(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: community-srv

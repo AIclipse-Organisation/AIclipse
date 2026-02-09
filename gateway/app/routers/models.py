@@ -1,8 +1,8 @@
 import httpx
 import logging
 import anyio
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request, status, Response
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Response
+
 from app.core.settings import require_setting
 from app.deps import get_current_admin 
 from app.models import UserContext
@@ -105,7 +105,7 @@ async def gateway_upload_model(
     # 1. Grab the headers from the incoming request to preserve the boundary
     headers = {
         "Content-Type": request.headers.get("Content-Type"),
-        "Authorization": request.headers.get("Authorization"), # If the downstream needs it
+        "Authorization": request.headers.get("Authorization"),
     }
     
     # 2. Use a stream to pipe the request body directly

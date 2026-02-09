@@ -1,5 +1,5 @@
 "use client";
-import { Card, CardHeader, CardBody, Button, Input, Chip, Avatar, User } from "@heroui/react";
+import { Card,CardBody, Button, Input, Chip,User } from "@heroui/react";
 
 export default function UserManagement() {
   // Mock Data

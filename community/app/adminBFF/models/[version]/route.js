@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
-const GATEWAY_URL = process.env.GATEWAY_URI || "http://gateway-srv:8000";
+const GATEWAY_URL = process.env.GATEWAY_URI;
 
 export async function DELETE(req, { params }) {
   try {
