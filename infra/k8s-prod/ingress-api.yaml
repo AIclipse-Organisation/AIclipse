@@ -13,7 +13,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: aiclipse.local
+    - host: aiclipse.online
       http:
         paths:
           # /api -> / ; /api/v1/checks -> /v1/checks

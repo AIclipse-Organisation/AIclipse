@@ -1,4 +1,3 @@
-apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ingress-srv
@@ -30,4 +29,3 @@ spec:
         paths:
           - path: /
             pathType: Prefix
-            backend: { service: { name: s3-srv, port: { number: 9001 } } }

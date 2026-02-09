@@ -1,12 +1,12 @@
 name: prod-deploy
 on:
   push:
-    branches: [main]
+    branches: [ftr/prod/65815/updateProductionPipeline]
   workflow_dispatch: {}
 
 concurrency:
   group: prod-deploy
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -19,7 +19,7 @@ jobs:
       ORG: ${{ secrets.GHCR_USERNAME }}
       TAG: ${{ github.sha }}
       NS:  default
-      IMAGES: "auth gateway media jobs detector plans billing observer client"
+      IMAGES: "auth gateway media detector plans billing client community model-cycle"
       KUBE_DNS_IP: 10.43.0.10
 
     steps:
@@ -174,6 +174,11 @@ jobs:
           S3_ENDPOINT:                ${{ secrets.S3_ENDPOINT }}
           S3_PUBLIC_ENDPOINT:         ${{ secrets.S3_PUBLIC_ENDPOINT }}
           JWT_KEY:                    ${{ secrets.JWT_KEY }}
+          INTERNAL_AUTH_TOKEN:        ${{ secrets.INTERNAL_AUTH_TOKEN }}
+          DETECTION_TOKEN_SECRET:     ${{ secrets.DETECTION_TOKEN_SECRET }}
+          API_KEY_PEPPER:             ${{ secrets.API_KEY_PEPPER }}
+          CONFIG_URL:                 ${{ secrets.CONFIG_URL }}
+          FLASK_SECRET_KEY:           ${{ secrets.FLASK_SECRET_KEY }}
         run: |
           set -euo pipefail
           kubectl -n "$NS" create secret generic mongo-sec \
@@ -199,6 +204,17 @@ jobs:
 
           kubectl -n "$NS" create secret generic jwt-sec \
             --from-literal=JWT_KEY="$JWT_KEY" \
+            --from-literal=DETECTION_TOKEN_SECRET="$DETECTION_TOKEN_SECRET" \
+            --from-literal=INTERNAL_AUTH_TOKEN="$INTERNAL_AUTH_TOKEN" \
+            --from-literal=API_KEY_PEPPER="$API_KEY_PEPPER" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic flask-secret \
+            --from-literal=FLASK_SECRET_KEY="$FLASK_SECRET_KEY" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create configmap app-configmap \
+            --from-literal=CONFIG_URL="$CONFIG_URL" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply data layer
@@ -225,30 +241,33 @@ jobs:
 
       - name: Wait deps ready
         run: |
-          kubectl -n "$NS" rollout status statefulset/mongo  --timeout=300s
-          kubectl -n "$NS" rollout status statefulset/redis  --timeout=300s
-          kubectl -n "$NS" rollout status deploy/s3-depl     --timeout=300s
+          set -euo pipefail
+          kubectl -n "$NS" rollout status statefulset/mongo --timeout=300s
+          kubectl -n "$NS" rollout status statefulset/redis --timeout=300s
+          kubectl -n "$NS" rollout status statefulset/s3    --timeout=300s
 
       - name: Apply app deployments/services
         run: |
+          set -euo pipefail
+
           kubectl -n "$NS" apply -f infra/k8s/auth-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/gateway-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/media-depl.yaml
-          # kubectl -n "$NS" apply -f infra/k8s/jobs-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/detector-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/plans-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/billing-depl.yaml
-          # kubectl -n "$NS" apply -f infra/k8s/observer-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/client-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/vote-flush-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/comments-flush-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/click-flush-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/community-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/model-cycle-pvc.yaml
+          kubectl -n "$NS" apply -f infra/k8s/model-cycle-depl.yaml
 
-      - name: Ensure admin UIs (RedisInsight, Mongo Express)
+      - name: Apply HPA
         run: |
           set -euo pipefail
-          kubectl apply -f infra/k8s-prod/redisinsight.yaml
-          kubectl apply -f infra/k8s-prod/mongo-express.yaml
-          kubectl -n "$NS" rollout status deploy/redisinsight --timeout=180s
-          kubectl -n "$NS" rollout status deploy/mongo-express --timeout=180s
-          kubectl get ingress | grep -E 'redisui|mongoui|minio'
+          kubectl -n "$NS" apply -f infra/k8s-prod/hpa.yaml
 
       - name: Pin images to this commit
         run: |
@@ -258,29 +277,76 @@ jobs:
               "${name}=ghcr.io/${ORG}/${name}:${TAG}"
           done
 
+          kubectl -n "$NS" set image deploy/vote-flush-depl     worker="ghcr.io/${ORG}/community:${TAG}"
+          kubectl -n "$NS" set image deploy/comments-flush-depl worker="ghcr.io/${ORG}/community:${TAG}"
+          kubectl -n "$NS" set image deploy/click-flush-depl    worker="ghcr.io/${ORG}/community:${TAG}"
+
       - name: Cleanup old ReplicaSets (keep newest)
-        shell: bash
         run: |
           set -euo pipefail
-          for app in $IMAGES; do
-            LIST=$(kubectl -n "$NS" get rs -l app=$app \
-              -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}' \
-              | sort -k2)
-            KEEP=$(echo "$LIST" | tail -n1 | cut -f1)
-            TODEL=$(echo "$LIST" | head -n -1 | cut -f1 || true)
-            [ -n "${TODEL:-}" ] && kubectl -n "$NS" delete rs $TODEL || true
-            echo "keep $KEEP for $app"
+
+          DEPLOYS=()
+          for name in $IMAGES; do
+            DEPLOYS+=("${name}-depl")
+          done
+          DEPLOYS+=(vote-flush-depl comments-flush-depl click-flush-depl)
+
+          for d in "${DEPLOYS[@]}"; do
+            if ! kubectl -n "$NS" get deploy "$d" >/dev/null 2>&1; then
+              echo "skip $d (deployment not found)"
+              continue
+            fi
+
+            # current deployment revision
+            REV=$(kubectl -n "$NS" get deploy "$d" -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}')
+            echo "== $d (rev=$REV)"
+
+            # list RS owned by this deployment: name, rsRevision, spec.replicas
+            mapfile -t RS_LINES < <(
+              kubectl -n "$NS" get rs -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.ownerReferences[0].kind}{"\t"}{.metadata.ownerReferences[0].name}{"\t"}{.metadata.annotations.deployment\.kubernetes\.io/revision}{"\t"}{.spec.replicas}{"\n"}{end}' \
+              | awk -v d="$d" '$2=="Deployment" && $3==d {print $1 "\t" $4 "\t" $5}'
+            )
+
+            KEEP=()
+            DEL=()
+
+            for line in "${RS_LINES[@]}"; do
+              RS_NAME=$(echo "$line" | cut -f1)
+              RS_REV=$(echo "$line" | cut -f2)
+              RS_REP=$(echo "$line" | cut -f3)
+
+              if [[ "$RS_REV" == "$REV" ]]; then
+                KEEP+=("$RS_NAME")
+              elif [[ "$RS_REP" == "0" ]]; then
+                DEL+=("$RS_NAME")
+              fi
+            done
+
+            echo "keep: ${KEEP[*]:-none}"
+            if ((${#DEL[@]})); then
+              echo "delete: ${DEL[*]}"
+              kubectl -n "$NS" delete rs "${DEL[@]}" --wait=false
+            fi
           done
 
       - name: Wait app rollouts
         run: |
           set -euo pipefail
+
+          kubectl -n "$NS" rollout status deploy/vote-flush-depl     --timeout=300s
+          kubectl -n "$NS" rollout status deploy/comments-flush-depl --timeout=300s
+          kubectl -n "$NS" rollout status deploy/click-flush-depl    --timeout=300s
+
           for name in $IMAGES; do
             kubectl -n "$NS" rollout status "deploy/${name}-depl" --timeout=300s
           done
 
       - name: Apply prod ingress
-        run: kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv.yaml
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv.yaml
+          kubectl -n "$NS" apply -f infra/k8s-prod/ingress-api.yaml
+          kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv-uploads.yaml
 
       - name: Garbage collection
         shell: bash
@@ -294,11 +360,11 @@ jobs:
           done
           kubectl delete pod dns-smoke --ignore-not-found=true
 
-          
+
       - name: Summary
         run: |
-          kubectl -n "$NS" get pods,svc,deploy,rs,sts
-          
+          kubectl -n "$NS" get pods,svc,deploy,rs,sts,hpa
+
       - name: Smoke test
         run: |
           set -euo pipefail
@@ -316,3 +382,4 @@ jobs:
 
           echo "not ready after 60s"
           exit 1 
+          
