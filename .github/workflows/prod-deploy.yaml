@@ -23,18 +23,11 @@ jobs:
       KUBE_DNS_IP: 10.43.0.10
 
     steps:
-      - name: Install git-lfs on runner
+      - name: Check git-lfs on runner
         run: |
           set -euo pipefail
           if git lfs version >/dev/null 2>&1; then
             echo "git-lfs already installed"
-          elif command -v apt-get >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y git-lfs
-          else
-            echo "Cannot install git-lfs"
-            exit 1
-          fi
           git lfs install --local
 
       - name: Checkout
