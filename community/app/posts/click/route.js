@@ -1,12 +1,12 @@
+
 import { NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
+import { getDb } from "@/lib/mongo/mongo.js";
 import { validateUserId, validatePostId } from "../validation.js";
-import { getRedis } from "../../../redis/redis.js";
+import { getRedis } from "@/lib/redis/redis";
 
 export const runtime = "nodejs";
 
-const MONGO_URI = process.env.MONGO_URI || "";
-const MONGO_DB = process.env.MONGO_DB || "aiclipse";
+
 const POSTS_COLLECTION = "community.posts";
 
 const FLUSH_ZSET = "clicks:flush_at";
@@ -19,8 +19,6 @@ const DELTA_TTL_SECONDS = 60 * 60; // safety TTL 1 hour
 const CLICK_COOLDOWN_SECONDS = 60;
 
 export async function POST(req) {
-  let client = null;
-
   try {
     const body = await req.json().catch(() => null);
     const post_id = body?.post_id || null;
@@ -51,12 +49,8 @@ export async function POST(req) {
       safeUserId = userIdValidation.value;
     }
 
-    if (!MONGO_URI) throw new Error("MONGO_URI is not set");
-
     // Ensure post exists (Mongo source of truth)
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const posts = db.collection(POSTS_COLLECTION);
 
     const postDoc = await posts.findOne(
@@ -68,6 +62,8 @@ export async function POST(req) {
     }
 
     const redis = getRedis();
+    const deltaKey = `post:${safePostId}:click_deltas`;
+    const firstKey = `post:${safePostId}:click_first_at`;
 
     // Rate limit in Redis (only if user_id provided)
     let counted = true;
@@ -83,9 +79,6 @@ export async function POST(req) {
       );
       if (!ok) counted = false;
     }
-
-    const deltaKey = `post:${safePostId}:click_deltas`;
-    const firstKey = `post:${safePostId}:click_first_at`;
 
     if (counted) {
       const nowSec = Math.floor(Date.now() / 1000);
@@ -124,11 +117,5 @@ export async function POST(req) {
       { error: "Failed to increment clicks", detail: String(err) },
       { status: 500 },
     );
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch {}
-    }
   }
 }

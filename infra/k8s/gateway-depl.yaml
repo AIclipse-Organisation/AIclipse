@@ -30,6 +30,8 @@ spec:
               value: "http://billing-srv:3000"
             - name: DETECTOR_URI
               value: "http://detector-srv:3000"
+            - name: MOEDEL_CYCLE_URI
+              value: "http://model-cycle-srv:3000"
           ports: [{ name: http, containerPort: 8080 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 8080, scheme: HTTP }

@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
+import { getDb } from "@/lib/mongo/mongo.js";
 import { validatePostId } from "../validation.js";
 
 export const runtime = "nodejs";
 
-const MONGO_URI = process.env.MONGO_URI || "";
-const MONGO_DB = process.env.MONGO_DB || "aiclipse";
+
 const POSTS_COLLECTION = "community.posts";
 
 //  POST /community/posts/report
@@ -14,8 +13,6 @@ const POSTS_COLLECTION = "community.posts";
 //  reporting twice does nothing extra.
 
 export async function POST(req) {
-  let client = null;
-
   try {
     const body = await req.json().catch(() => null);
     const post_id = body?.post_id || null;
@@ -34,15 +31,7 @@ export async function POST(req) {
     }
     const safePostId = postIdValidation.value; // Use sanitized string value
 
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
-
-   
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const postsCol = db.collection(POSTS_COLLECTION);
 
     // mark as reported 
@@ -76,9 +65,5 @@ export async function POST(req) {
       { error: "Failed to report post", detail: String(err) },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      try { await client.close(); } catch {}
-    }
   }
 }

@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
+import { getDb } from "@/lib/mongo/mongo.js";
 import jwt from "jsonwebtoken";
 import {
   validateUserId,
   validatePostId,
   validateCommentId,
 } from "../validation.js";
-import { getRedis } from "../../../redis/redis.js";
+import { getRedis } from "@/lib/redis/redis";
 
 export const runtime = "nodejs";
 
-const MONGO_URI = process.env.MONGO_URI || "";
-const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 
 const POSTS_COLLECTION = "community.posts";
 const COMMENTS_COLLECTION = "community.comments";
@@ -100,8 +98,6 @@ function normalizeComment(raw) {
 // GET /community/posts/comments?post_id=...
 // Returns latest comments for a given post_id.
 export async function GET(req) {
-  let client = null;
-
   try {
     const { searchParams } = new URL(req.url);
     const post_id = searchParams.get("post_id");
@@ -121,15 +117,7 @@ export async function GET(req) {
     }
     const safePostId = postIdValidation.value; // Use sanitized string value
 
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
-
-    // connect to Mongo (local-dev: open/close per request)
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const commentsCol = db.collection(COMMENTS_COLLECTION);
 
     const items = await commentsCol
@@ -144,12 +132,6 @@ export async function GET(req) {
       { error: "Failed to list comments", detail: String(err) },
       { status: 500 },
     );
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch {}
-    }
   }
 }
 
@@ -158,8 +140,6 @@ export async function GET(req) {
 // Creates a new comment on a post.
 // Stores user_name so the UI can display it without extra lookups.
 export async function POST(req) {
-  let client = null;
-
   try {
     // Verify authentication and get authenticated user_id from JWT token
     let authenticatedUserId;
@@ -221,14 +201,7 @@ export async function POST(req) {
     }
     const safePostId = postIdValidation.value; // Use sanitized string value
 
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
-
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const postsCol = db.collection(POSTS_COLLECTION);
     const commentsCol = db.collection(COMMENTS_COLLECTION);
 
@@ -303,20 +276,12 @@ export async function POST(req) {
       { error: "Failed to create comment", detail: String(err) },
       { status: 500 },
     );
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch {}
-    }
   }
 }
 // DELETE COMMENT
 // DELETE /community/posts/comments?comment_id=xxx
 // Allows a user to delete their own comment
 export async function DELETE(req) {
-  let client = null;
-
   try {
     // Verify authentication and get authenticated user_id from JWT token
     let authenticatedUserId;
@@ -350,14 +315,7 @@ export async function DELETE(req) {
     }
     const safeCommentId = commentIdValidation.value;
 
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not set");
-    }
-
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const commentsCol = db.collection(COMMENTS_COLLECTION);
 
     // First, find the comment to verify ownership
@@ -418,13 +376,5 @@ export async function DELETE(req) {
       { error: "Failed to delete comment", detail: String(err) },
       { status: 500 },
     );
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch (closeErr) {
-        console.error("Error closing MongoDB connection:", closeErr);
-      }
-    }
   }
 }

@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
+import { getDb } from "@/lib/mongo/mongo.js";
 import jwt from "jsonwebtoken";
 import { validateUserId, validatePostId } from "../validation.js";
-import { getRedis } from "../../../redis/redis.js";
+import { getRedis } from "@/lib/redis/redis";
 
 export const runtime = "nodejs";
 
-const MONGO_URI = process.env.MONGO_URI || "";
-const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 
 const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
@@ -50,8 +48,6 @@ function getAuthenticatedUserId(req) {
 }
 
 export async function POST(req) {
-  let client = null;
-
   try {
     let authenticatedUserId;
     try {
@@ -103,12 +99,7 @@ export async function POST(req) {
       );
     }
 
-    if (!MONGO_URI) throw new Error("MONGO_URI is not set");
-
-    client = new MongoClient(MONGO_URI);
-    await client.connect();
-
-    const db = client.db(MONGO_DB);
+    const db = await getDb();
     const posts = db.collection(POSTS_COLLECTION);
     const votes = db.collection(VOTES_COLLECTION);
     const users = db.collection(USERS_COLLECTION);
@@ -250,11 +241,5 @@ export async function POST(req) {
       { error: "Failed to vote", detail: String(err) },
       { status: 500 },
     );
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch {}
-    }
   }
 }
