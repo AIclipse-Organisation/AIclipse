@@ -60,7 +60,7 @@ export default function Page() {
 
         // Fetch images + posts at the same time
         const [imgsRes, postsRes] = await Promise.all([
-          fetch("/images", { credentials: "include", signal }),
+          fetch("/community/images", { credentials: "include", signal }),
           fetch("/community/posts", { credentials: "include", signal }),
         ]);
 
