@@ -1,3 +1,59 @@
+function setStatus(el, type, text) {
+  if (!el) return;
+  el.innerHTML = "";
+  if (!text) return;
+  const span = document.createElement("span");
+  span.textContent = text;
+  span.classList.add(
+    type === "success" ? "status-success" :
+      type === "error" ? "status-error" :
+        "status-info"
+  );
+  el.appendChild(span);
+}
+
+function setDebug(data) {
+  const pre = document.getElementById("debug-output");
+  if (!pre) return;
+  pre.textContent = JSON.stringify(data, null, 2);
+}
+
+function setCurrentUserChip(user) {
+  const chip = document.getElementById("current-user-chip");
+  if (!chip) return;
+  if (!user) {
+    chip.textContent = "Not signed in";
+    chip.classList.remove("success");
+    return;
+  }
+  chip.textContent = `${user.user_name || user.email || "User"} · plan ${user.plan ?? "?"}`;
+  chip.classList.add("success");
+}
+
+// Helper to get cookie value 
+// function getCookie(name) {
+//   const value = `; ${document.cookie}`;
+//   const parts = value.split(`; ${name}=`);
+//   if (parts.length === 2) return parts.pop().split(';').shift();
+//   return null;
+// }
+
+
+async function jsonFetch(method, url, body) {
+  const opts = { method, headers: { Accept: "application/json" } };
+  if (body != null) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  opts.credentials = "include";
+
+  const res = await fetch(url, opts);
+  let data = null;
+  try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
+  setDebug({ url, status: res.status, body: data });
+  return { res, data };
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   const TOO_LARGE_MSG = "Image is too large. Max allowed size is 5 MB.";
@@ -5,6 +61,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const fileInput = document.getElementById("file-input");
   const btnCheck = document.getElementById("btn-check");
   const checkState = document.getElementById("check-state");
+  const detectStatus = document.getElementById("detect-status");
+  const detectResult = document.getElementById("detect-result");
+  const debugOutput = document.getElementById("debug-output");
   const previewImg = document.getElementById("preview-image");
   let lastPreviewUrl = null;
 
@@ -15,186 +74,252 @@ window.addEventListener("DOMContentLoaded", () => {
   const saveStatus = document.getElementById("save-status");
   const saveResult = document.getElementById("save-result");
 
+  // Description UI
   const publicDescWrap = document.getElementById("public-desc-wrap");
   const postDescriptionInput = document.getElementById("post-description");
   const postDescriptionHint = document.getElementById("post-description-hint");
 
+  // elements inside detect card
+  const detectCard = document.getElementById("detect-card");
+  const verdictEl = document.getElementById("detect-verdict");
+  const confidenceEl = document.getElementById("detect-confidence");
+  const realFill = document.querySelector(".real-fill");
+  const aiFill = document.querySelector(".ai-fill");
+
+  // PUBLIC IMAGES UI
+  // const publicImagesEl = document.getElementById("public-images");
+
   // state
   window.lastFile = null;
-  window.lastDetectionToken = window.lastDetectionToken || null;
+  let lastDetectionToken = null;
+
+
+
+  // store current user id
   window.currentUserId = null;
 
-  function setCheck(text, kind) {
-    if (!checkState) return;
-    checkState.textContent = text || "";
-    checkState.classList.remove("status-error", "status-success", "status-info");
-    if (kind === "error") checkState.classList.add("status-error");
-    else if (kind === "success") checkState.classList.add("status-success");
-    else if (kind === "info") checkState.classList.add("status-info");
+  function syncPublishUI() {
+    const isPublic = !!(savePublic && savePublic.checked);
+    if (publicDescWrap) publicDescWrap.hidden = !isPublic;
+    if (postDescriptionHint) postDescriptionHint.textContent = isPublic ? "Required when publishing." : "";
   }
+  if (savePublic) savePublic.addEventListener("change", syncPublishUI);
+  syncPublishUI();
 
-  function clearFileSelection(message, kind = "info") {
-    window.lastFile = null;
-    try { if (fileInput) fileInput.value = ""; } catch {}
-    if (btnCheck) btnCheck.disabled = true;
-
-    if (previewImg) {
-      if (lastPreviewUrl) URL.revokeObjectURL(lastPreviewUrl);
-      lastPreviewUrl = null;
-      previewImg.src = "";
-      previewImg.hidden = true;
-    }
-
-    setCheck(message || "Select an image to analyze.", kind);
-
-    // reset SAVE UI if present
-    if (btnSave) btnSave.disabled = true;
-    if (saveState) saveState.textContent = "Run detection first to enable saving.";
-    if (saveResult) saveResult.textContent = "";
-    if (typeof window.setStatus === "function") window.setStatus(saveStatus, "info", "");
-  }
-
-  // Upload page: file chosen
+  // file chosen -> enable check button
   if (fileInput) {
     fileInput.addEventListener("change", () => {
-      const file = fileInput.files?.[0] || null;
+      const file = fileInput.files[0];
 
-      // label selected style
-      const uploadLabel = document.querySelector("label.file-upload");
-      if (uploadLabel) uploadLabel.classList.toggle("is-selected", !!file);
+      if (file && file.size > MAX_IMAGE_BYTES) {
+        window.lastFile = null;
+        lastDetectionToken = null;
 
-      if (!file) {
-        clearFileSelection("Select an image to analyze.", "info");
+        try { fileInput.value = ""; } catch {}
+
+        const uploadLabel = document.querySelector("label.file-upload");
+        if (uploadLabel) uploadLabel.classList.remove("is-selected");
+
+        if (previewImg) {
+          if (lastPreviewUrl) {
+            URL.revokeObjectURL(lastPreviewUrl);
+            lastPreviewUrl = null;
+          }
+          previewImg.src = "";
+          previewImg.hidden = true;
+        }
+
+        // reset SAVE UI
+        if (btnSave) btnSave.disabled = true;
+        if (saveState) saveState.textContent = "Run detection first to enable saving.";
+        if (saveResult) saveResult.textContent = "";
+        if (saveStatus) setStatus(saveStatus, "info", "");
+
+        // disable detection
+        if (btnCheck) btnCheck.disabled = true;
+        if (checkState) checkState.textContent = TOO_LARGE_MSG;
+        if (detectResult) detectResult.textContent = "No detection yet.";
+
+        // ensure no second message elsewhere
+        if (detectStatus) setStatus(detectStatus, "info", "");
         return;
       }
 
-      if (file.size > MAX_IMAGE_BYTES) {
-        clearFileSelection(TOO_LARGE_MSG, "error");
-        return;
-      }
+      window.lastFile = file || null;
+      lastDetectionToken = null;
 
-      window.lastFile = file;
-      if (btnCheck) btnCheck.disabled = false;
+      const uploadLabel = document.querySelector('label.file-upload');
+
+      if (uploadLabel) {
+        uploadLabel.classList.toggle("is-selected", !!file);
+      }
 
 
       if (previewImg) {
-        if (lastPreviewUrl) URL.revokeObjectURL(lastPreviewUrl);
-        lastPreviewUrl = URL.createObjectURL(file);
-        previewImg.src = lastPreviewUrl;
-        previewImg.hidden = false;
+        // cleanup old blob url
+        if (lastPreviewUrl) {
+          URL.revokeObjectURL(lastPreviewUrl);
+          lastPreviewUrl = null;
+        }
+
+        if (file) {
+          lastPreviewUrl = URL.createObjectURL(file);
+          previewImg.src = lastPreviewUrl;
+          previewImg.hidden = false;
+        } else {
+          previewImg.src = "";
+          previewImg.hidden = true;
+        }
       }
 
       // reset SAVE UI
       if (btnSave) btnSave.disabled = true;
       if (saveState) saveState.textContent = "Run detection first to enable saving.";
       if (saveResult) saveResult.textContent = "";
-      if (typeof window.setStatus === "function") window.setStatus(saveStatus, "info", "");
+      if (saveStatus) setStatus(saveStatus, "info", "");
 
-      setCheck(`Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`, "info");
+      if (file) {
+        if (btnCheck) btnCheck.disabled = false;
+        if (checkState) checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+        if (detectResult) detectResult.textContent = "No detection yet for this file.";
+      } else {
+        if (btnCheck) btnCheck.disabled = true;
+        if (checkState) checkState.textContent = "Select a file to enable detection.";
+        if (detectResult) detectResult.textContent = "No detection yet.";
+      }
     });
   }
 
+  // btnCheck click -> POST /checks with file
   if (btnCheck) {
     btnCheck.addEventListener("click", async () => {
-      const file = window.lastFile;
-
-      if (!file) {
-        setCheck("No file selected.", "error");
+      if (!window.lastFile) {
+        setStatus(detectStatus, "error", "No file selected.");
         return;
       }
 
-      if (file.size > MAX_IMAGE_BYTES) {
-        clearFileSelection(TOO_LARGE_MSG, "error");
+      if (window.lastFile.size > MAX_IMAGE_BYTES) {
+        window.lastFile = null;
+        try { if (fileInput) fileInput.value = ""; } catch {}
+        btnCheck.disabled = true;
+        if (checkState) checkState.textContent = TOO_LARGE_MSG;
+        if (detectStatus) setStatus(detectStatus, "info", "");
         return;
       }
 
       btnCheck.disabled = true;
-      setCheck("Analyzing image...", "info");
+      lastDetectionToken = null;
 
       // disable SAVE until token arrives
       if (btnSave) btnSave.disabled = true;
       if (saveState) saveState.textContent = "Run detection first to enable saving.";
       if (saveResult) saveResult.textContent = "";
-      if (typeof window.setStatus === "function") window.setStatus(saveStatus, "info", "");
+      if (saveStatus) setStatus(saveStatus, "info", "");
+
+      setStatus(detectStatus, "info", "Analyzing image...");
 
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", window.lastFile);
 
       try {
         const res = await fetch("/checks", { method: "POST", body: formData, credentials: "include" });
-
         let data = null;
         try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
-        if (typeof window.setDebug === "function") window.setDebug({ url: "/checks", status: res.status, body: data });
+        setDebug({ url: "/checks", status: res.status, body: data });
 
-        if (!res.ok) {
-          if (res.status === 413) {
-            clearFileSelection(TOO_LARGE_MSG, "error");
-            return;
+        if (res.ok) {
+          lastDetectionToken = data.detection_token || null;
+          window.lastDetectionToken = lastDetectionToken;
+
+          // enable SAVE if we have a token
+          if (btnSave) btnSave.disabled = !lastDetectionToken;
+          if (saveState) {
+            saveState.textContent = lastDetectionToken
+              ? "Detection token ready. You can now save this image."
+              : "No detection token returned; cannot save.";
           }
-          setCheck(data.detail || `Detection failed (${res.status})`, "error");
-          return;
-        }
 
-        const token = data.detection_token || null;
-        window.lastDetectionToken = token;
+          // keep raw JSON for debugging (hidden by default)
+          if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
 
-        // store for results page
-        try { sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data)); } catch {}
-        try { sessionStorage.setItem("lastDetectionToken", token || ""); } catch {}
+          // render verdict/progress bar
+          // store results for results page
+          sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
+          sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
 
-        // store preview as dataURL for results page
-        try {
-          const reader = new FileReader();
-          reader.onload = () => {
-            try { sessionStorage.setItem("lastDetectionPreview", reader.result); } catch {}
+          // store preview image too (optional but nice)
+          // note: you already have window.lastFile
+          if (window.lastFile) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              sessionStorage.setItem("lastDetectionPreview", reader.result);
+              window.location.href = "/results";
+            };
+            reader.readAsDataURL(window.lastFile);
+          } else {
             window.location.href = "/results";
-          };
-          reader.onerror = () => window.location.href = "/results";
-          reader.readAsDataURL(file);
-        } catch {
-          window.location.href = "/results";
+          }
+          return; // stop running upload page UI code
+
+          setStatus(detectStatus, "success", "Detection completed.");
+        } else {
+          lastDetectionToken = null;
+          if (btnSave) btnSave.disabled = true;
+          if (saveState) saveState.textContent = "Run detection first to enable saving.";
+          if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
+
+          if (res.status === 413) {
+            if (checkState) checkState.textContent = TOO_LARGE_MSG;
+            if (detectStatus) setStatus(detectStatus, "info", "");
+          } else {
+            setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
+          }
         }
       } catch (err) {
         console.error(err);
-        setCheck("Network error during detection.", "error");
+        if (btnSave) btnSave.disabled = true;
+        if (saveState) saveState.textContent = "Run detection first to enable saving.";
+        setStatus(detectStatus, "error", "Network error during detection.");
       } finally {
         btnCheck.disabled = false;
       }
     });
   }
 
-  // Results page: Save Image
+  // SAVE button -> POST /upload/image with file + detection_token
   if (btnSave) {
     btnSave.addEventListener("click", async () => {
       if (!window.lastFile) {
-        if (typeof window.setStatus === "function") window.setStatus(saveStatus, "error", "No file selected.");
+        setStatus(saveStatus, "error", "No file selected.");
         return;
       }
       if (!window.lastDetectionToken) {
-        if (typeof window.setStatus === "function") window.setStatus(saveStatus, "error", "No detection token. Run detection first.");
+        setStatus(saveStatus, "error", "No detection token. Run detection first.");
         return;
       }
 
       const isPublic = !!(savePublic && savePublic.checked);
       const description = (postDescriptionInput && postDescriptionInput.value ? postDescriptionInput.value : "").trim();
 
-      // Publishing requirements
+      // Check authentication before attempting to save if publishing
       if (isPublic && !window.currentUserId) {
-        if (typeof window.setStatus === "function") window.setStatus(saveStatus, "error", "You must be signed in to publish to community.");
+        setStatus(saveStatus, "error", "You must be signed in to publish to community.");
         return;
       }
+
       if (isPublic && !description) {
-        if (typeof window.setStatus === "function") window.setStatus(saveStatus, "error", "Description is required when publishing.");
+        setStatus(saveStatus, "error", "Description is required when publishing.");
         return;
       }
+
+      // Validate description length 
       if (description.length > 1000) {
-        if (typeof window.setStatus === "function") window.setStatus(saveStatus, "error", `Description too long (${description.length}/1000 characters).`);
+        setStatus(saveStatus, "error", `Description too long (${description.length}/1000 characters).`);
         return;
       }
 
       btnSave.disabled = true;
-      if (typeof window.setStatus === "function") window.setStatus(saveStatus, "info", "Saving image...");
+      setStatus(saveStatus, "info", "Saving image...");
 
       const formData = new FormData();
       formData.append("file", window.lastFile);
@@ -203,26 +328,25 @@ window.addEventListener("DOMContentLoaded", () => {
 
       try {
         const res = await fetch("/upload/image", { method: "POST", body: formData, credentials: "include" });
-
         let data = null;
         try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
-        if (typeof window.setDebug === "function") window.setDebug({ url: "/upload/image", status: res.status, body: data });
+        setDebug({ url: "/upload/image", status: res.status, body: data });
 
         if (!res.ok) {
-          const msg = (res.status === 413) ? TOO_LARGE_MSG : (data.detail || `Save failed (${res.status})`);
-          if (typeof window.setStatus === "function") window.setStatus(saveStatus, "error", msg);
+          setStatus(saveStatus, "error", data.detail || `Save failed (${res.status})`);
           return;
         }
 
-        if (typeof window.setStatus === "function") window.setStatus(saveStatus, "success", "Saved image.");
+        setStatus(saveStatus, "success", "Saved image.");
+
 
         if (isPublic) {
-          if (typeof window.setStatus === "function") window.setStatus(saveStatus, "info", "Creating community post...");
+          setStatus(saveStatus, "info", "Creating community post...");
 
-          const uploadPayload =
-            (data && typeof data === "object" && data.body && typeof data.body === "object")
-              ? data.body
-              : data;
+          const uploadPayload = (data && typeof data === "object" && data.body && typeof data.body === "object")
+            ? data.body
+            : data;
+
 
           const resolvedImageId =
             (uploadPayload && uploadPayload.image_id) ||
@@ -231,7 +355,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
           if (!resolvedImageId) {
             console.error("Upload response missing image_id. Raw response:", data);
-            if (typeof window.setStatus === "function") window.setStatus(saveStatus, "error", "Saved image, but could not read image_id from server response.");
+            setStatus(saveStatus, "error", "Saved image, but could not read image_id from server response.");
             return;
           }
 
@@ -264,55 +388,116 @@ window.addEventListener("DOMContentLoaded", () => {
             },
           };
 
+
           const postRes = await fetch("/community/posts", {
             method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
             credentials: "include",
             body: JSON.stringify(postBody),
           });
 
           let postJson = null;
           try { postJson = await postRes.json(); } catch { postJson = { detail: "Non-JSON response" }; }
-          if (typeof window.setDebug === "function") window.setDebug({ url: "/community/posts", status: postRes.status, body: postJson });
+          setDebug({ url: "/community/posts", status: postRes.status, body: postJson });
 
           if (postRes.ok) {
-            if (typeof window.setStatus === "function") window.setStatus(saveStatus, "success", "Saved image + published post.");
-            setTimeout(() => { window.location.href = "/community"; }, 800);
+            setStatus(saveStatus, "success", "Saved image + published post.");
+            // Redirect to community after publishing
+            setTimeout(() => {
+              window.location.href = "/community";
+            }, 1000);
           } else {
-            if (typeof window.setStatus === "function") window.setStatus(saveStatus, "error", postJson.error || postJson.detail || `Post failed (${postRes.status})`);
+            setStatus(saveStatus, "error", postJson.error || postJson.detail || `Post failed (${postRes.status})`);
           }
         } else {
-          setTimeout(() => { window.location.href = "/scans"; }, 800);
+          // Private image - redirect to scans page
+          setTimeout(() => {
+            window.location.href = "/scans";
+          }, 1000);
         }
 
         if (saveResult) saveResult.textContent = "";
       } catch (err) {
         console.error(err);
-        if (typeof window.setStatus === "function") window.setStatus(saveStatus, "error", "Network error during save.");
+        setStatus(saveStatus, "error", "Network error during save.");
       } finally {
         btnSave.disabled = false;
       }
     });
   }
 
-  // Auth/me for chip + currentUserId (no check-state spam)
+  // renderDetection: updates the verdict text, confidence, and two-color bar
+  function renderDetection(resp) {
+    if (!resp || typeof resp !== "object") {
+      if (detectResult) { detectResult.style.display = ""; detectResult.textContent = JSON.stringify(resp, null, 2); }
+      if (detectCard) detectCard.hidden = true;
+      return;
+    }
+
+    const label = (resp.label || resp.result || "Unknown").toString();
+    const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
+
+    // compute ai vs real probabilities (mirror your server logic)
+    const labelLower = label.toLowerCase();
+    const isAi = labelLower.includes("ai");
+    const ai_prob = isAi ? confidence : (1 - confidence);
+    const real_prob = 1 - ai_prob;
+
+    // decide label class
+    let labelClass = "label-neutral";
+    if (labelLower.includes("ai")) {
+      if (labelLower.includes("most likely")) labelClass = "label-strong-ai";
+      else if (labelLower.includes("likely")) labelClass = "label-medium-ai";
+      else labelClass = "label-medium-ai";
+    } else if (labelLower.includes("real")) {
+      if (labelLower.includes("most likely")) labelClass = "label-strong-real";
+      else if (labelLower.includes("likely")) labelClass = "label-medium-real";
+      else labelClass = "label-medium-real";
+    } else if (labelLower.includes("not sure")) {
+      labelClass = "label-neutral";
+    } else {
+      labelClass = "label-neutral";
+    }
+
+    // update UI
+    if (verdictEl) {
+      verdictEl.textContent = label;
+      verdictEl.className = `verdict-text ${labelClass}`;
+    }
+    if (confidenceEl) confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
+
+    if (realFill && aiFill) {
+      realFill.style.width = `${(real_prob * 100).toFixed(2)}%`;
+      aiFill.style.width = `${(ai_prob * 100).toFixed(2)}%`;
+    }
+
+    if (detectResult) detectResult.style.display = "none";
+    if (detectCard) detectCard.hidden = false;
+
+    // keep the last response on the card for future actions (if needed)
+    if (detectCard) detectCard.latestResponse = resp;
+  }
+
+  // load public images on page load
+  // loadPublicImages();
+
+  // Initial auth/me to populate header user chip (silent if fails)
   (async () => {
     try {
-      const res = await fetch("/auth/me", { method: "GET", headers: { Accept: "application/json" }, credentials: "include" });
-      if (!res.ok) {
-        if (typeof window.setCurrentUserChip === "function") window.setCurrentUserChip(null);
+      const { res, data } = await jsonFetch("GET", "/auth/me", null);
+      if (res.ok) {
+        setCurrentUserChip(data);
+        window.currentUserId = data.user_id || null;
+        setStatus(document.getElementById("detect-status"), "info", "Session restored from cookie.");
+      } else {
+        setCurrentUserChip(null);
         window.currentUserId = null;
-        return;
       }
-      const data = await res.json().catch(() => null);
-      if (typeof window.setCurrentUserChip === "function") window.setCurrentUserChip(data);
-      window.currentUserId = data?.user_id || null;
-    } catch {
+    } catch (err) {
       // ignore
     }
   })();
-
-  window.addEventListener("beforeunload", () => {
-    if (lastPreviewUrl) URL.revokeObjectURL(lastPreviewUrl);
-  });
 });

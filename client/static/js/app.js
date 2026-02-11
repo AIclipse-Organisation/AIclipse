@@ -228,7 +228,11 @@ window.addEventListener("DOMContentLoaded", () => {
   (async () => {
     try {
       const { res, data } = await jsonFetch("GET", "/auth/me", null);
-      setCurrentUserChip(res.ok ? data : null);
+      if (res.ok) {
+        setCurrentUserChip(data);
+      } else {
+        setCurrentUserChip(null);
+      }
     } catch {}
   })();
 });
