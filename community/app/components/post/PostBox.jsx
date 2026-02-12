@@ -189,11 +189,11 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
       setCommentsBusy(false);
     }
   }
-
-  useEffect(() => {
-    if (showComments) loadComments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showComments, postId]);
+useEffect(() => {
+  if (postId) {
+    loadComments();
+  }
+}, [postId]);
 
   /* =========================
      ✅ ADDED: bar helpers + derived values
