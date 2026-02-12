@@ -514,13 +514,20 @@ export async function DELETE(req) {
 // GET /community/posts
 // Returns the latest community posts (newest first) with actual vote counts from the database.
 // Only returns posts for images that are public (is_public = true).
-export async function GET() {
+export async function GET(req) {
   try {
     const db = await getDb();
     const col = db.collection(POSTS_COLLECTION);
 
     const IMAGES_COLLECTION = "images";
     const imagesCol = db.collection(IMAGES_COLLECTION);
+
+    let currentUserId = null;
+    try {
+      currentUserId = getAuthenticatedUserId(req);
+    } catch (e) {
+      console.log("User not logged in :" + e)
+    }
 
     // 1) public image ids
     const publicImages = await imagesCol
@@ -538,6 +545,20 @@ export async function GET() {
 
     if (!posts.length) {
       return NextResponse.json({ items: [] }, { status: 200 });
+    }
+
+    let userVotesMap = {};
+    if (currentUserId && posts.length > 0) {
+      const votesCol = db.collection("community.votes");
+
+      const userVotes = await votesCol.find({
+        user_id: currentUserId,
+        post_id: { $in: posts.map(p => p.post_id) }
+      }).toArray();
+
+      userVotes.forEach(v => {
+        userVotesMap[v.post_id] = v.vote;
+      });
     }
 
     // 3) fetch pending deltas from Redis in one roundtrip
@@ -566,6 +587,7 @@ export async function GET() {
         ...post,
         up_vote_count: Number(post.up_vote_count || 0) + d.up,
         down_vote_count: Number(post.down_vote_count || 0) + d.down,
+        user_vote: userVotesMap[post.post_id] || null,
       };
     });
 

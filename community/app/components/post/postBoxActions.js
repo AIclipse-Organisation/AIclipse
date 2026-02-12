@@ -23,6 +23,7 @@ export async function voteOnPost(postId, userId, direction) {
   return {
     up_vote_count: Number(data.up_vote_count ?? 0),
     down_vote_count: Number(data.down_vote_count ?? 0),
+    user_vote: data.user_vote, 
   };
 }
 

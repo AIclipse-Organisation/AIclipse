@@ -16,6 +16,9 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   const [down, setDown] = useState(Number(image?.down_vote_count ?? 0));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  
+  const [userVote, setUserVote] = useState(image?.user_vote || null);
+  const userHasVoted = !!userVote;
 
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
@@ -53,6 +56,10 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
     setDown(Number(image?.down_vote_count ?? 0));
   }, [image?.up_vote_count, image?.down_vote_count]);
 
+  useEffect(() => {
+    setUserVote(image?.user_vote || null);
+  }, [image?.user_vote]);
+
   const posterName = image?.user_name || "Unknown";
 
   const timeText = useMemo(() => {
@@ -81,7 +88,7 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
       const result = await voteOnPost(postId, currentUserId, direction);
       setUp(result.up_vote_count);
       setDown(result.down_vote_count);
-
+      setUserVote(result.user_vote);
       if (onVoteUpdate) {
         onVoteUpdate(postId, result.up_vote_count, result.down_vote_count);
       }
@@ -373,65 +380,77 @@ useEffect(() => {
       </div>
 
       {/* bars above image */}
-      <div className="comm_bars">
-        {/* Analysis / model bar */}
-        <div className="comm_barBlock" aria-label="Analysis result">
-          <div className={`comm_barLine ${analysisType === "safe" ? "is-safe" : "is-risk"}`}>
-            {image?.result?.label
-              ? String(image.result.label)
-              : `${analysisPct.toFixed(0)}% ${analysisType === "safe" ? "Likely Real" : "Likely AI"}`}
+<div className="comm_bars_wrapper">
+        {/* The Prompt Overlay - Only visible if NOT voted */}
+        {!userHasVoted && (
+          <div className="comm_vote_prompt">
+            Vote to see results
           </div>
+        )}
 
-          <div
-            className={`comm_barTrack ${analysisType === "risk" ? "is-risk" : ""}`}
-            role="img"
-            aria-label={`Confidence ${analysisPct.toFixed(0)}%`}
-          >
+        {/* The Bars Container - This gets blurred/revealed */}
+        <div className={`comm_bars ${!userHasVoted ? "is-hidden" : "is-revealed"}`}>
+          
+          {/* Analysis / model bar */}
+          <div className="comm_barBlock" aria-label="Analysis result">
+            <div className={`comm_barLine ${analysisType === "safe" ? "is-safe" : "is-risk"}`}>
+              {image?.result?.label
+                ? String(image.result.label)
+                : `${analysisPct.toFixed(0)}% ${analysisType === "safe" ? "Likely Real" : "Likely AI"}`}
+            </div>
+
             <div
-              className={`comm_barFill ${analysisType === "risk" ? "is-risk" : ""}`}
-              style={{ width: `${Math.max(0, Math.min(100, analysisPct))}%` }}
-            />
+              className={`comm_barTrack ${analysisType === "risk" ? "is-risk" : ""}`}
+              role="img"
+              aria-label={`Confidence ${analysisPct.toFixed(0)}%`}
+            >
+              <div
+                className={`comm_barFill ${analysisType === "risk" ? "is-risk" : ""}`}
+                style={{ width: `${Math.max(0, Math.min(100, analysisPct))}%` }}
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Community votes bar */}
-        <div className="comm_barBlock" aria-label="Community result">
-          {pctReal === null ? (
-            <>
-              <div className="comm_barLine is-neutral">No community votes</div>
-              <div className="comm_barTrack is-neutral" role="img" aria-label="No community votes">
-                <div className="comm_barFill is-neutral" style={{ width: "100%" }} />
-              </div>
-            </>
-          ) : (
-            <>
-              <div
-                className={`comm_barLine ${voteBucket.type === "safe"
-                  ? "is-safe"
-                  : voteBucket.type === "risk"
-                    ? "is-risk"
-                    : "is-neutral"
-                  }`}
-              >
-                {`${communityDisplayPct.toFixed(0)}% ${voteBucket.text} (Community)`}
-              </div>
-
-              <div
-                className="comm_barTrack"
-                role="img"
-                aria-label={
-                  voteBucket.type === "risk"
-                    ? `Vote confidence ${pctAI.toFixed(0)}% AI`
-                    : `Vote confidence ${pctReal.toFixed(0)}% real`
-                }
-              >
+          {/* Community votes bar */}
+          <div className="comm_barBlock" aria-label="Community result">
+            {pctReal === null ? (
+              <>
+                <div className="comm_barLine is-neutral">No community votes</div>
+                <div className="comm_barTrack is-neutral" role="img" aria-label="No community votes">
+                  <div className="comm_barFill is-neutral" style={{ width: "100%" }} />
+                </div>
+              </>
+            ) : (
+              <>
                 <div
-                  className="comm_barFill"
-                  style={{ width: `${Math.max(0, Math.min(100, pctReal))}%` }}
-                />
-              </div>
-            </>
-          )}
+                  className={`comm_barLine ${
+                    voteBucket.type === "safe"
+                      ? "is-safe"
+                      : voteBucket.type === "risk"
+                      ? "is-risk"
+                      : "is-neutral"
+                  }`}
+                >
+                  {`${communityDisplayPct.toFixed(0)}% ${voteBucket.text} (Community)`}
+                </div>
+
+                <div
+                  className="comm_barTrack"
+                  role="img"
+                  aria-label={
+                    voteBucket.type === "risk"
+                      ? `Vote confidence ${pctAI.toFixed(0)}% AI`
+                      : `Vote confidence ${pctReal.toFixed(0)}% real`
+                  }
+                >
+                  <div
+                    className="comm_barFill"
+                    style={{ width: `${Math.max(0, Math.min(100, pctReal))}%` }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -448,7 +467,9 @@ useEffect(() => {
             className="comm_actionBtn comm_voteUp"
           >
             <img className="comm_icon" src="/static/images/upvote.png" alt="" aria-hidden="true" />
-            <span className="comm_actionText">Real ({up})</span>
+            <span className="comm_actionText">
+              Real {userHasVoted ? `(${up})` : ""}
+            </span>
           </button>
 
           <button
@@ -460,7 +481,9 @@ useEffect(() => {
             className="comm_actionBtn comm_voteDown"
           >
             <img className="comm_icon" src="/static/images/downvote.png" alt="" aria-hidden="true" />
-            <span className="comm_actionText">AI ({down})</span>
+            <span className="comm_actionText">
+              AI {userHasVoted ? `(${down})` : ""}
+            </span>
           </button>
         </div>
 
