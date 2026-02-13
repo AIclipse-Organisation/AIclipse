@@ -32,6 +32,10 @@ print(f"[*] Starting Client Service in {current_env} mode")
 
 GATEWAY_URI = os.getenv("GATEWAY_URI")
 
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = current_env in ("prod", "production")
+
 
 @app.get("/healthz")
 def healthz():
@@ -40,22 +44,33 @@ def healthz():
 
 @app.get("/")
 def index():
-    if _get_token_from_cookie():
-        return redirect("/community")
     toggles = cfg.get_client_config()
     show_signup = toggles.get("sign-up", True)
+
+    token = _get_token_from_cookie()
+    if token:
+        me, status = _fetch_me(token)
+        if status == 200 and isinstance(me, dict):
+            session["is_admin"] = bool(me.get("is_admin"))
+            return redirect("/community")
+
+        if status == 401:
+            resp = make_response(render_template("login.html", show_signup=show_signup))
+            session.clear()
+            _clear_access_cookie(resp)
+            return resp
+
     return render_template("login.html", show_signup=show_signup)
- 
 
 
 @app.get("/imgProcessing")
 def img_processing():
-    return render_template( "imgProcessing.html")
+    return render_template("imgProcessing.html")
 
 
 @app.get("/scans")
 def scans():
-    return render_template( "scans.html")
+    return render_template("scans.html")
 
 
 @app.get("/home")
@@ -75,25 +90,27 @@ def plan():
 
 @app.get("/profile")
 def profile():
-    return render_template( "profile.html")
+    return render_template("profile.html")
+
 
 @app.get("/results")
 def results():
-    return render_template( "results.html")
+    return render_template("results.html")
+
 
 @app.get("/viewscan")
 def viewscan():
-    return render_template( "viewscan.html")
+    return render_template("viewscan.html")
 
 
 @app.get("/dev")
 def dev():
-    return render_template( "dev.html")
+    return render_template("dev.html")
 
 
 @app.get("/docs")
 def docs():
-    return render_template( "docs.html")
+    return render_template("docs.html")
 
 
 def _get_token_from_cookie() -> str | None:
@@ -103,6 +120,87 @@ def _get_token_from_cookie() -> str | None:
 def _is_request_secure() -> bool:
     proto = request.headers.get("X-Forwarded-Proto", request.scheme)
     return proto.lower() == "https"
+
+
+def _is_api_request() -> bool:
+    if request.method == "OPTIONS":
+        return True
+
+    p = request.path or ""
+    api_prefixes = (
+        "/auth/",
+        "/checks",
+        "/upload/",
+        "/images",
+        "/image/",
+        "/community/",
+        "/logout",
+    )
+    if p.startswith(api_prefixes):
+        return True
+
+    accept = (request.headers.get("Accept") or "").lower()
+    if "application/json" in accept:
+        return True
+
+    xrw = (request.headers.get("X-Requested-With") or "").lower()
+    if xrw == "xmlhttprequest":
+        return True
+
+    return False
+
+
+def _unauthenticated_response():
+    if _is_api_request():
+        return jsonify({"detail": "Not authenticated"}), 401
+    return redirect("/")
+
+
+def _set_access_cookie(response, token: str):
+    response.set_cookie(
+        "access_token",
+        token,
+        httponly=True,
+        secure=_is_request_secure(),
+        samesite="Lax",
+        max_age=60 * 60 * 24 * 7,
+        path="/",
+    )
+
+
+def _clear_access_cookie(response):
+    response.set_cookie(
+        "access_token",
+        "",
+        max_age=0,
+        expires=0,
+        httponly=True,
+        secure=_is_request_secure(),
+        samesite="Lax",
+        path="/",
+    )
+
+
+def _fetch_me(token: str):
+    url = f"{GATEWAY_URI}/auth/me"
+    headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=5)
+    except requests.RequestException:
+        logging.exception("Gateway /auth/me request failed")
+        return None, 502
+
+    if resp.status_code == 200:
+        try:
+            return resp.json(), 200
+        except ValueError:
+            return None, 502
+
+    if resp.status_code == 401:
+        return None, 401
+
+    return None, resp.status_code
 
 
 def _call_gateway_json(
@@ -159,25 +257,23 @@ def admin_route():
     if not token:
         return redirect("/")
 
-    url = f"{GATEWAY_URI}/auth/me"
-    headers = {
-        "Accept": "application/json",
-        "Authorization": f"Bearer {token}",
-    }
+    me, status = _fetch_me(token)
+    if status == 401:
+        session.clear()
+        resp = redirect("/")
+        _clear_access_cookie(resp)
+        return resp
 
-    try:
-        resp = requests.get(url, headers=headers, timeout=5)
-        if resp.status_code != 200:
-            return redirect("/")
-
-        if not session["is_admin"]:
-            return "Forbidden: Admin access required", 403
-
-    except Exception:
-        logging.exception("Gateway auth check failed for admin route")
+    if status != 200 or not isinstance(me, dict):
         return "Service Temporarily Unavailable", 502
-    
-    return redirect(f"/community/admin")
+
+    session["is_admin"] = bool(me.get("is_admin"))
+
+    if not session.get("is_admin", False):
+        return "Forbidden: Admin access required", 403
+
+    return redirect("/community/admin")
+
 
 @app.context_processor
 def inject_admin_status():
@@ -193,16 +289,21 @@ def inject_admin_status():
 
 @app.before_request
 def enforce_auth():
-    public_paths = ["/", "/healthz", "/auth/login", "/auth/signup"]
-    
+    # IMPORTANT: /auth/me is public on purpose.
+    # It returns 200 with authenticated=false when user is not signed in,
+    # so the UI can probe auth state without console 401 noise.
+    public_paths = ["/", "/healthz", "/auth/login", "/auth/signup", "/auth/me", "/logout"]
+
+    if request.method == "OPTIONS":
+        return None
+
     if request.path.startswith("/static") or request.path in public_paths:
         return None
 
     token = _get_token_from_cookie()
-    
     if not token:
-        return redirect("/")
-    
+        return _unauthenticated_response()
+
     return None
 
 
@@ -245,25 +346,17 @@ def auth_login():
 
     token = data.get("token")
     user = data.get("user")
-    session["is_admin"] = user.get("is_admin") 
-    
 
-    if not token or not user:
+    if not token or not isinstance(user, dict):
         return jsonify({"detail": "Gateway login response missing token or user"}), 502
+
+    session["is_admin"] = bool(user.get("is_admin"))
 
     if isinstance(token, str) and token.lower().startswith("bearer "):
         token = token.split(" ", 1)[1].strip()
 
     response = make_response(jsonify({"user": user}), 200)
-    response.set_cookie(
-        "access_token",
-        token,
-        httponly=True,
-        secure=_is_request_secure(),
-        samesite="Lax",
-        max_age=60 * 60 * 24 * 7,
-    )
-
+    _set_access_cookie(response, token)
     return response
 
 
@@ -271,22 +364,18 @@ def auth_login():
 def logout():
     session.clear()
     response = make_response(jsonify({"detail": "Logged out"}), 200)
-    response.set_cookie(
-        "access_token",
-        "",
-        expires=0,
-        httponly=True,
-        secure=_is_request_secure(),
-        samesite="Lax",
-    )
+    _clear_access_cookie(response)
     return response
 
 
 @app.get("/auth/me")
 def auth_me_get():
+    # Public endpoint:
+    # - If no token (or token expired), return 200 authenticated=false (not 401),
+    #   so the UI can probe auth state without treating it as an error.
     token = _get_token_from_cookie()
     if not token:
-        return jsonify({"detail": "Not authenticated"}), 401
+        return jsonify({"authenticated": False}), 200
 
     url = f"{GATEWAY_URI}/auth/me"
     headers = {
@@ -295,24 +384,23 @@ def auth_me_get():
     }
     try:
         resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            session["is_admin"] = data.get("is_admin")
-            return jsonify(data), 200
     except requests.RequestException:
         logging.exception("Gateway /auth/me request failed")
         return jsonify({"detail": "Gateway unreachable"}), 502
 
+    if resp.status_code == 200:
+        try:
+            data = resp.json()
+        except ValueError:
+            return jsonify({"detail": "Invalid JSON from gateway on /auth/me"}), 502
+        session["is_admin"] = bool(data.get("is_admin"))
+        data["authenticated"] = True
+        return jsonify(data), 200
+
     if resp.status_code == 401:
-        response = make_response(jsonify({"detail": "Unauthorized"}), 401)
-        response.set_cookie(
-            "access_token",
-            "",
-            expires=0,
-            httponly=True,
-            secure=_is_request_secure(),
-            samesite="Lax",
-        )
+        session.clear()
+        response = make_response(jsonify({"authenticated": False}), 200)
+        _clear_access_cookie(response)
         return response
 
     try:
@@ -357,15 +445,9 @@ def auth_me_delete():
     except ValueError:
         data = {"detail": "Invalid JSON from gateway on delete"}
 
+    session.clear()
     response = make_response(jsonify(data), resp.status_code)
-    response.set_cookie(
-        "access_token",
-        "",
-        expires=0,
-        httponly=True,
-        secure=_is_request_secure(),
-        samesite="Lax",
-    )
+    _clear_access_cookie(response)
     return response
 
 
