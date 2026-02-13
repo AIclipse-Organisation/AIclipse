@@ -22,7 +22,10 @@ spec:
                   name: app-configmap
                   key: CONFIG_URL
             - name: FLASK_SECRET_KEY
-              valueFrom:  { secretKeyRef: { name: flask-secret, key: FLASK_SECRET_KEY } }
+              valueFrom:
+                secretKeyRef:
+                  name: flask-secret
+                  key: FLASK_SECRET_KEY
           ports:
             - { name: http, containerPort: 3000 }
           readinessProbe:

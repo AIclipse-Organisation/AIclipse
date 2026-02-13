@@ -5,7 +5,7 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
 spec:
   ingressClassName: nginx
@@ -13,21 +13,27 @@ spec:
     - host: aiclipse.online
       http:
         paths:
-          - path: /api
+          - path: /community
             pathType: Prefix
-            backend: { service: { name: gateway-srv, port: { number: 8080 } } }
+            backend:
+              service:
+                name: community-srv
+                port:
+                  number: 3000
           - path: /
             pathType: Prefix
-            backend: { service: { name: client-srv, port: { number: 3000 } } }
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
     - host: storage.aiclipse.online
       http:
         paths:
           - path: /
             pathType: Prefix
-            backend: { service: { name: s3-srv, port: { number: 9000 } } }
-    - host: minio.aiclipse.online
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend: { service: { name: s3-srv, port: { number: 9001 } } }
+            backend:
+              service:
+                name: s3-srv
+                port:
+                  number: 9000
