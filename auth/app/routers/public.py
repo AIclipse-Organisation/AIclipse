@@ -10,8 +10,6 @@ from pydantic import BaseModel, EmailStr, Field
 from pymongo import ReturnDocument
 
 from app.services.passwords import (
-    PASSWORD_POLICY_MESSAGE,
-    PASSWORD_POLICY_RULES,
     PasswordService,
     PasswordValidationError,
 )
