@@ -55,6 +55,9 @@ async function jsonFetch(method, url, body) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+  const TOO_LARGE_MSG = "Image is too large. Max allowed size is 5 MB.";
+
   const fileInput = document.getElementById("file-input");
   const btnCheck = document.getElementById("btn-check");
   const checkState = document.getElementById("check-state");
@@ -92,7 +95,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
 
 
-  // store current user id 
+  // store current user id
   window.currentUserId = null;
 
   function syncPublishUI() {
@@ -107,6 +110,41 @@ window.addEventListener("DOMContentLoaded", () => {
   if (fileInput) {
     fileInput.addEventListener("change", () => {
       const file = fileInput.files[0];
+
+      if (file && file.size > MAX_IMAGE_BYTES) {
+        window.lastFile = null;
+        lastDetectionToken = null;
+
+        try { fileInput.value = ""; } catch {}
+
+        const uploadLabel = document.querySelector("label.file-upload");
+        if (uploadLabel) uploadLabel.classList.remove("is-selected");
+
+        if (previewImg) {
+          if (lastPreviewUrl) {
+            URL.revokeObjectURL(lastPreviewUrl);
+            lastPreviewUrl = null;
+          }
+          previewImg.src = "";
+          previewImg.hidden = true;
+        }
+
+        // reset SAVE UI
+        if (btnSave) btnSave.disabled = true;
+        if (saveState) saveState.textContent = "Run detection first to enable saving.";
+        if (saveResult) saveResult.textContent = "";
+        if (saveStatus) setStatus(saveStatus, "info", "");
+
+        // disable detection
+        if (btnCheck) btnCheck.disabled = true;
+        if (checkState) checkState.textContent = TOO_LARGE_MSG;
+        if (detectResult) detectResult.textContent = "No detection yet.";
+
+        // ensure no second message elsewhere
+        if (detectStatus) setStatus(detectStatus, "info", "");
+        return;
+      }
+
       window.lastFile = file || null;
       lastDetectionToken = null;
 
@@ -157,6 +195,15 @@ window.addEventListener("DOMContentLoaded", () => {
     btnCheck.addEventListener("click", async () => {
       if (!window.lastFile) {
         setStatus(detectStatus, "error", "No file selected.");
+        return;
+      }
+
+      if (window.lastFile.size > MAX_IMAGE_BYTES) {
+        window.lastFile = null;
+        try { if (fileInput) fileInput.value = ""; } catch {}
+        btnCheck.disabled = true;
+        if (checkState) checkState.textContent = TOO_LARGE_MSG;
+        if (detectStatus) setStatus(detectStatus, "info", "");
         return;
       }
 
@@ -220,7 +267,13 @@ window.addEventListener("DOMContentLoaded", () => {
           if (btnSave) btnSave.disabled = true;
           if (saveState) saveState.textContent = "Run detection first to enable saving.";
           if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
-          setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
+
+          if (res.status === 413) {
+            if (checkState) checkState.textContent = TOO_LARGE_MSG;
+            if (detectStatus) setStatus(detectStatus, "info", "");
+          } else {
+            setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
+          }
         }
       } catch (err) {
         console.error(err);

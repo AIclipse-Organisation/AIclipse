@@ -42,6 +42,7 @@ async function jsonFetch(method, url, body) {
     headers: {
       Accept: "application/json",
     },
+    credentials: "include",
   };
 
   if (body != null) {
@@ -66,10 +67,6 @@ function onEl(id, callback) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  let lastDetectionToken = null;
-  let lastFile = null;
-  let _lastObjectUrl = null;
-
   const loginContent = document.getElementById("login-content");
   const loginSpinner = document.getElementById("login-spinner-container");
   const signupPanel = document.querySelector('[data-panel="signup"]');
@@ -95,29 +92,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  onEl("file-input", (fileInput) => {
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files[0];
-      lastFile = file || null;
-      window.lastFile = lastFile;
-      lastDetectionToken = null;
-
-      const btnCheck = document.getElementById("btn-check");
-      const checkState = document.getElementById("check-state");
-      const detectResult = document.getElementById("detect-result");
-
-      if (file) {
-        if (btnCheck) btnCheck.disabled = false;
-        if (checkState) checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
-        if (detectResult) detectResult.textContent = "No detection yet for this file.";
-      } else {
-        if (btnCheck) btnCheck.disabled = true;
-        if (checkState) checkState.textContent = "Select a file to enable detection.";
-        if (detectResult) detectResult.textContent = "No detection yet.";
-      }
-    });
-  });
-
   onEl("btn-signup", (btnSignup) => {
     btnSignup.addEventListener("click", async () => {
       const user_name = document.getElementById("signup-username")?.value.trim();
@@ -134,20 +108,21 @@ window.addEventListener("DOMContentLoaded", () => {
       if (signupPanel) signupPanel.style.display = "none";
       if (authToggleContainer) authToggleContainer.style.display = "none";
       if (loginSpinner) loginSpinner.style.display = "block";
-      
+
       btnSignup.disabled = true;
       setStatus(accountStatus, "info", "Creating account...");
 
       try {
         const { res, data } = await jsonFetch("POST", "/auth/signup", { user_name, email, password });
-        
+
         if (res.ok) {
           // --- AUTO LOGIN START ---
           setStatus(accountStatus, "info", "Account created. Logging in...");
-          
+
           const loginRes = await fetch("/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json", Accept: "application/json" },
+            credentials: "include",
             body: JSON.stringify({ email, password }),
           });
 
@@ -175,7 +150,7 @@ window.addEventListener("DOMContentLoaded", () => {
         if (!loginSuccess) {
           btnSignup.disabled = false;
           if (signupPanel) signupPanel.style.display = "block";
-          if (authToggleContainer) authToggleContainer.style.display = ""; 
+          if (authToggleContainer) authToggleContainer.style.display = "";
           if (loginSpinner) loginSpinner.style.display = "none";
         }
       }
@@ -201,6 +176,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const res = await fetch("/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "include",
           body: JSON.stringify({ email, password }),
         });
 
@@ -248,93 +224,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  onEl("btn-check", (btnCheck) => {
-    btnCheck.addEventListener("click", async () => {
-      const detectStatus = document.getElementById("detect-status");
-      const detectResult = document.getElementById("detect-result");
-
-      if (!lastFile) {
-        setStatus(detectStatus, "error", "No file selected.");
-        return;
-      }
-
-      btnCheck.disabled = true;
-      lastDetectionToken = null;
-      setStatus(detectStatus, "info", "Analyzing image...");
-
-      const formData = new FormData();
-      formData.append("file", lastFile);
-
-      try {
-        const res = await fetch("/checks", { method: "POST", body: formData });
-        let data = null;
-        try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
-
-        setDebug({ url: "/checks", status: res.status, body: data });
-
-        if (res.ok) {
-          lastDetectionToken = data.detection_token || null;
-          if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
-          renderDetection(data);
-          setStatus(detectStatus, "success", "Detection completed.");
-        } else {
-          if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
-          setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
-        }
-      } catch (err) {
-        console.error(err);
-        setStatus(detectStatus, "error", "Network error during detection.");
-      } finally {
-        btnCheck.disabled = false;
-      }
-    });
-  });
-
-  function renderDetection(resp) {
-    const card = document.getElementById('detect-card');
-    const thumb = document.getElementById('detect-thumb');
-    const verdict = document.getElementById('detect-verdict');
-    const confLabel = document.getElementById('detect-confidence');
-    const rawPre = document.getElementById('detect-result');
-
-    if (!card || !verdict || !confLabel || !rawPre) return;
-
-    const label = (resp.label || resp.result || 'Unknown').toString();
-    const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
-    const labelLower = label.toLowerCase();
-    const isAi = labelLower.includes('ai');
-    const ai_prob = isAi ? confidence : (1 - confidence);
-    const real_prob = 1 - ai_prob;
-
-    let labelClass = 'label-neutral';
-    if (labelLower.includes('ai')) {
-      labelClass = labelLower.includes('most likely') ? 'label-strong-ai' : 'label-medium-ai';
-    } else if (labelLower.includes('real')) {
-      labelClass = labelLower.includes('most likely') ? 'label-strong-real' : 'label-medium-real';
-    }
-
-    if (window.lastFile) {
-      if (_lastObjectUrl) URL.revokeObjectURL(_lastObjectUrl);
-      _lastObjectUrl = URL.createObjectURL(window.lastFile);
-      if (thumb) thumb.src = _lastObjectUrl;
-    }
-
-    verdict.textContent = label;
-    verdict.className = `verdict-text ${labelClass}`;
-    confLabel.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
-
-    const realFill = document.querySelector('.real-fill');
-    const aiFill = document.querySelector('.ai-fill');
-    if (realFill) realFill.style.width = `${(real_prob * 100).toFixed(2)}%`;
-    if (aiFill) aiFill.style.width = `${(ai_prob * 100).toFixed(2)}%`;
-
-    rawPre.style.display = 'none';
-    card.hidden = false;
-  }
-
-  window.addEventListener('beforeunload', () => {
-    if (_lastObjectUrl) URL.revokeObjectURL(_lastObjectUrl);
-  });
 
   (async () => {
     try {
