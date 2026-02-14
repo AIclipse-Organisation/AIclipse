@@ -158,7 +158,7 @@ window.addEventListener("DOMContentLoaded", () => {
             loginSuccess = true; // Success! Don't restore the signup form
             setStatus(accountStatus, "success", "Logged in. Redirecting...");
             setCurrentUserChip(loginData.user);
-            window.location.href = "/community";
+            window.location.href = "/imgProcessing";
           } else {
             setStatus(accountStatus, "error", "Account created, but auto-login failed. Please log in manually.");
           }
@@ -211,7 +211,7 @@ window.addEventListener("DOMContentLoaded", () => {
         if (res.ok && data.user) {
           setStatus(accountStatus, "success", "Logged in.");
           setCurrentUserChip(data.user);
-          window.location.href = "/community";
+          window.location.href = "/imgProcessing";
         } else {
           if (loginContent) loginContent.style.display = "block";
           if (authToggleContainer) authToggleContainer.style.display = "";
