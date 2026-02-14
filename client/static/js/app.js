@@ -24,6 +24,11 @@ function setDebug(data) {
 }
 
 function setCurrentUserChip(user) {
+  if (window.AuthUI && typeof window.AuthUI.setUser === "function") {
+    window.AuthUI.setUser(user);
+    return;
+  }
+
   const chip = document.getElementById("current-user-chip");
   if (!chip) return;
 
@@ -108,11 +113,16 @@ window.addEventListener("DOMContentLoaded", () => {
 
       if (file) {
         if (btnCheck) btnCheck.disabled = false;
-        if (checkState) checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
-        if (detectResult) detectResult.textContent = "No detection yet for this file.";
+        if (checkState)
+          checkState.textContent = `Selected: ${file.name} (${Math.round(
+            file.size / 1024
+          )} KB)`;
+        if (detectResult)
+          detectResult.textContent = "No detection yet for this file.";
       } else {
         if (btnCheck) btnCheck.disabled = true;
-        if (checkState) checkState.textContent = "Select a file to enable detection.";
+        if (checkState)
+          checkState.textContent = "Select a file to enable detection.";
         if (detectResult) detectResult.textContent = "No detection yet.";
       }
     });
@@ -120,62 +130,80 @@ window.addEventListener("DOMContentLoaded", () => {
 
   onEl("btn-signup", (btnSignup) => {
     btnSignup.addEventListener("click", async () => {
-      const user_name = document.getElementById("signup-username")?.value.trim();
+      const user_name = document
+        .getElementById("signup-username")
+        ?.value.trim();
       const email = document.getElementById("signup-email")?.value.trim();
       const password = document.getElementById("signup-password")?.value;
-      let loginSuccess = false; // Flag to stop UI reset if redirecting
+      let loginSuccess = false;
 
       if (!user_name || !email || !password) {
-        setStatus(accountStatus, "error", "Please fill username, email and password.");
+        setStatus(
+          accountStatus,
+          "error",
+          "Please fill username, email and password."
+        );
         return;
       }
 
-      // Hide UI components
       if (signupPanel) signupPanel.style.display = "none";
       if (authToggleContainer) authToggleContainer.style.display = "none";
       if (loginSpinner) loginSpinner.style.display = "block";
-      
+
       btnSignup.disabled = true;
       setStatus(accountStatus, "info", "Creating account...");
 
       try {
-        const { res, data } = await jsonFetch("POST", "/auth/signup", { user_name, email, password });
-        
+        const { res, data } = await jsonFetch("POST", "/auth/signup", {
+          user_name,
+          email,
+          password,
+        });
+
         if (res.ok) {
-          // --- AUTO LOGIN START ---
           setStatus(accountStatus, "info", "Account created. Logging in...");
-          
+
           const loginRes = await fetch("/auth/login", {
             method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
             body: JSON.stringify({ email, password }),
           });
 
           let loginData = {};
-          try { loginData = await loginRes.json(); } catch {}
+          try {
+            loginData = await loginRes.json();
+          } catch {}
 
           if (loginRes.ok && loginData.user) {
-            loginSuccess = true; // Success! Don't restore the signup form
+            loginSuccess = true;
             setStatus(accountStatus, "success", "Logged in. Redirecting...");
             setCurrentUserChip(loginData.user);
             window.location.href = "/community";
           } else {
-            setStatus(accountStatus, "error", "Account created, but auto-login failed. Please log in manually.");
+            setStatus(
+              accountStatus,
+              "error",
+              "Account created, but auto-login failed. Please log in manually."
+            );
           }
-          // --- AUTO LOGIN END ---
-
         } else {
-          setStatus(accountStatus, "error", data.detail || `Signup failed (${res.status})`);
+          setStatus(
+            accountStatus,
+            "error",
+            data.detail || `Signup failed (${res.status})`
+          );
         }
       } catch (err) {
         console.error(err);
         setStatus(accountStatus, "error", "Network error during signup.");
       } finally {
-        // Only restore the signup form if we aren't successfully redirecting
         if (!loginSuccess) {
           btnSignup.disabled = false;
           if (signupPanel) signupPanel.style.display = "block";
-          if (authToggleContainer) authToggleContainer.style.display = ""; 
+          if (authToggleContainer) authToggleContainer.style.display = "";
           if (loginSpinner) loginSpinner.style.display = "none";
         }
       }
@@ -200,12 +228,19 @@ window.addEventListener("DOMContentLoaded", () => {
       try {
         const res = await fetch("/auth/login", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
           body: JSON.stringify({ email, password }),
         });
 
         let data = null;
-        try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
+        try {
+          data = await res.json();
+        } catch {
+          data = { detail: "Non-JSON response" };
+        }
         setDebug({ url: "/auth/login", status: res.status, body: data });
 
         if (res.ok && data.user) {
@@ -216,7 +251,11 @@ window.addEventListener("DOMContentLoaded", () => {
           if (loginContent) loginContent.style.display = "block";
           if (authToggleContainer) authToggleContainer.style.display = "";
           if (loginSpinner) loginSpinner.style.display = "none";
-          setStatus(accountStatus, "error", data.detail || `Login failed (${res.status})`);
+          setStatus(
+            accountStatus,
+            "error",
+            data.detail || `Login failed (${res.status})`
+          );
           setCurrentUserChip(null);
         }
       } catch (err) {
@@ -228,22 +267,6 @@ window.addEventListener("DOMContentLoaded", () => {
         setCurrentUserChip(null);
       } finally {
         btnLogin.disabled = false;
-      }
-    });
-  });
-
-  onEl("btn-logout", (btnLogout) => {
-    btnLogout.addEventListener("click", async () => {
-      setStatus(accountStatus, "info", "Logging out...");
-      try {
-        const { res, data } = await jsonFetch("POST", "/logout", null);
-        if (res.ok) setStatus(accountStatus, "success", "Logged out.");
-        else setStatus(accountStatus, "error", data.detail || `Logout failed (${res.status})`);
-      } catch (err) {
-        console.error(err);
-        setStatus(accountStatus, "error", "Network error during logout.");
-      } finally {
-        setCurrentUserChip(null);
       }
     });
   });
@@ -268,7 +291,11 @@ window.addEventListener("DOMContentLoaded", () => {
       try {
         const res = await fetch("/checks", { method: "POST", body: formData });
         let data = null;
-        try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
+        try {
+          data = await res.json();
+        } catch {
+          data = { detail: "Non-JSON response" };
+        }
 
         setDebug({ url: "/checks", status: res.status, body: data });
 
@@ -279,7 +306,11 @@ window.addEventListener("DOMContentLoaded", () => {
           setStatus(detectStatus, "success", "Detection completed.");
         } else {
           if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
-          setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
+          setStatus(
+            detectStatus,
+            "error",
+            data.detail || `Detection failed (${res.status})`
+          );
         }
       } catch (err) {
         console.error(err);
@@ -291,26 +322,32 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   function renderDetection(resp) {
-    const card = document.getElementById('detect-card');
-    const thumb = document.getElementById('detect-thumb');
-    const verdict = document.getElementById('detect-verdict');
-    const confLabel = document.getElementById('detect-confidence');
-    const rawPre = document.getElementById('detect-result');
+    const card = document.getElementById("detect-card");
+    const thumb = document.getElementById("detect-thumb");
+    const verdict = document.getElementById("detect-verdict");
+    const confLabel = document.getElementById("detect-confidence");
+    const rawPre = document.getElementById("detect-result");
 
     if (!card || !verdict || !confLabel || !rawPre) return;
 
-    const label = (resp.label || resp.result || 'Unknown').toString();
-    const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
+    const label = (resp.label || resp.result || "Unknown").toString();
+    const confidence = Number.isFinite(resp.confidence)
+      ? resp.confidence
+      : resp.score || 0;
     const labelLower = label.toLowerCase();
-    const isAi = labelLower.includes('ai');
-    const ai_prob = isAi ? confidence : (1 - confidence);
+    const isAi = labelLower.includes("ai");
+    const ai_prob = isAi ? confidence : 1 - confidence;
     const real_prob = 1 - ai_prob;
 
-    let labelClass = 'label-neutral';
-    if (labelLower.includes('ai')) {
-      labelClass = labelLower.includes('most likely') ? 'label-strong-ai' : 'label-medium-ai';
-    } else if (labelLower.includes('real')) {
-      labelClass = labelLower.includes('most likely') ? 'label-strong-real' : 'label-medium-real';
+    let labelClass = "label-neutral";
+    if (labelLower.includes("ai")) {
+      labelClass = labelLower.includes("most likely")
+        ? "label-strong-ai"
+        : "label-medium-ai";
+    } else if (labelLower.includes("real")) {
+      labelClass = labelLower.includes("most likely")
+        ? "label-strong-real"
+        : "label-medium-real";
     }
 
     if (window.lastFile) {
@@ -323,27 +360,16 @@ window.addEventListener("DOMContentLoaded", () => {
     verdict.className = `verdict-text ${labelClass}`;
     confLabel.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
 
-    const realFill = document.querySelector('.real-fill');
-    const aiFill = document.querySelector('.ai-fill');
+    const realFill = document.querySelector(".real-fill");
+    const aiFill = document.querySelector(".ai-fill");
     if (realFill) realFill.style.width = `${(real_prob * 100).toFixed(2)}%`;
     if (aiFill) aiFill.style.width = `${(ai_prob * 100).toFixed(2)}%`;
 
-    rawPre.style.display = 'none';
+    rawPre.style.display = "none";
     card.hidden = false;
   }
 
-  window.addEventListener('beforeunload', () => {
+  window.addEventListener("beforeunload", () => {
     if (_lastObjectUrl) URL.revokeObjectURL(_lastObjectUrl);
   });
-
-  (async () => {
-    try {
-      const { res, data } = await jsonFetch("GET", "/auth/me", null);
-      if (res.ok) {
-        setCurrentUserChip(data);
-      } else {
-        setCurrentUserChip(null);
-      }
-    } catch {}
-  })();
 });

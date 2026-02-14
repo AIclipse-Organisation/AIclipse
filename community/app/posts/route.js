@@ -468,7 +468,7 @@ export async function DELETE(req) {
 
           if (token) {
             // Call gateway which will authenticate and forward to media service
-            const GATEWAY_URI = process.env.GATEWAY_URI || "http://gateway-srv:8080";
+            const GATEWAY_URI = process.env.GATEWAY_URI;
             const gatewayUrl = `${GATEWAY_URI}/image/${safeImageId}`;
             const gatewayResponse = await fetch(gatewayUrl, {
               method: 'DELETE',
