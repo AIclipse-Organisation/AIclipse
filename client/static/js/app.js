@@ -70,6 +70,85 @@ function onEl(id, callback) {
   if (el) callback(el);
 }
 
+function _bytesLenUtf8(s) {
+  try {
+    if (typeof TextEncoder !== "undefined") {
+      return new TextEncoder().encode(String(s || "")).length;
+    }
+  } catch {}
+  return String(s || "").length;
+}
+
+function evaluatePasswordPolicy(password) {
+  const p = String(password || "");
+  const len = _bytesLenUtf8(p);
+
+  return {
+    min_length: len >= 8,
+    max_length: len <= 72,
+    no_spaces: !/\s/.test(p),
+    has_lowercase: /[a-z]/.test(p),
+    has_uppercase: /[A-Z]/.test(p),
+    has_number: /\d/.test(p),
+    has_symbol: /[^A-Za-z0-9]/.test(p),
+  };
+}
+
+function isPasswordPolicyOk(checks) {
+  if (!checks || typeof checks !== "object") return false;
+  const keys = Object.keys(checks);
+  if (keys.length === 0) return false;
+  return keys.every((k) => checks[k] === true);
+}
+
+function applyPasswordPolicyUI(rootEl, password, checks) {
+  if (!rootEl) return;
+  const p = String(password || "");
+  const items = rootEl.querySelectorAll("li[data-rule]");
+
+  items.forEach((li) => {
+    const rule = li.getAttribute("data-rule");
+    const ok = !!(checks && checks[rule]);
+
+    li.classList.remove("is-neutral", "is-ok", "is-bad");
+
+    const icon = li.querySelector(".policy-icon");
+    if (!p) {
+      li.classList.add("is-neutral");
+      if (icon) icon.textContent = "•";
+      return;
+    }
+
+    if (ok) {
+      li.classList.add("is-ok");
+      if (icon) icon.textContent = "✓";
+      return;
+    }
+
+    li.classList.add("is-bad");
+    if (icon) icon.textContent = "✕";
+  });
+}
+
+function normalizeApiErrorDetail(data) {
+  const detail = data && data.detail;
+
+  if (typeof detail === "string") {
+    return { message: detail, checks: null };
+  }
+
+  if (detail && typeof detail === "object") {
+    return {
+      message: detail.message || detail.detail || "Request failed",
+      checks:
+        detail.checks && typeof detail.checks === "object" ? detail.checks : null,
+      code: detail.code || null,
+    };
+  }
+
+  return { message: (data && data.message) || "Request failed", checks: null };
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   let lastDetectionToken = null;
   let lastFile = null;
@@ -82,6 +161,33 @@ window.addEventListener("DOMContentLoaded", () => {
   const accountStatus = document.getElementById("account-status");
   const tabs = document.querySelectorAll(".auth-tab");
   const authToggleContainer = document.querySelector(".auth-toggle");
+
+  const signupPasswordInput = document.getElementById("signup-password");
+  const signupPolicyRoot = document.getElementById("signup-password-policy");
+
+  let policyActivated = false;
+
+  if (signupPolicyRoot) signupPolicyRoot.hidden = true;
+
+  function updateSignupPolicyUI() {
+    if (!policyActivated) return;
+    if (!signupPolicyRoot || !signupPasswordInput) return;
+
+    const p = signupPasswordInput.value || "";
+    applyPasswordPolicyUI(signupPolicyRoot, p, evaluatePasswordPolicy(p));
+  }
+
+  function activateSignupPolicyIfNeeded() {
+    if (policyActivated) return;
+    if (!signupPolicyRoot || !signupPasswordInput) return;
+
+    policyActivated = true;
+    signupPolicyRoot.hidden = false;
+
+    updateSignupPolicyUI();
+
+    signupPasswordInput.addEventListener("input", updateSignupPolicyUI);
+  }
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -137,13 +243,21 @@ window.addEventListener("DOMContentLoaded", () => {
       const password = document.getElementById("signup-password")?.value;
       let loginSuccess = false;
 
+      activateSignupPolicyIfNeeded();
+
       if (!user_name || !email || !password) {
-        setStatus(
-          accountStatus,
-          "error",
-          "Please fill username, email and password."
-        );
+        setStatus(accountStatus, "error", "Please fill username, email and password.");
+        updateSignupPolicyUI();
         return;
+      }
+
+      if (signupPolicyRoot) {
+        const checks = evaluatePasswordPolicy(password);
+        applyPasswordPolicyUI(signupPolicyRoot, password, checks);
+        if (!isPasswordPolicyOk(checks)) {
+          setStatus(accountStatus, "error", "Password does not meet requirements.");
+          return;
+        }
       }
 
       if (signupPanel) signupPanel.style.display = "none";
@@ -190,10 +304,18 @@ window.addEventListener("DOMContentLoaded", () => {
             );
           }
         } else {
+          const normalized = normalizeApiErrorDetail(data);
+
+          if (signupPolicyRoot && normalized.checks) {
+            applyPasswordPolicyUI(signupPolicyRoot, password, normalized.checks);
+          } else {
+            updateSignupPolicyUI();
+          }
+
           setStatus(
             accountStatus,
             "error",
-            data.detail || `Signup failed (${res.status})`
+            normalized.message || `Signup failed (${res.status})`
           );
         }
       } catch (err) {
@@ -251,10 +373,12 @@ window.addEventListener("DOMContentLoaded", () => {
           if (loginContent) loginContent.style.display = "block";
           if (authToggleContainer) authToggleContainer.style.display = "";
           if (loginSpinner) loginSpinner.style.display = "none";
+
+          const normalized = normalizeApiErrorDetail(data);
           setStatus(
             accountStatus,
             "error",
-            data.detail || `Login failed (${res.status})`
+            normalized.message || `Login failed (${res.status})`
           );
           setCurrentUserChip(null);
         }

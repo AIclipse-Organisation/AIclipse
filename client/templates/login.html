@@ -57,7 +57,49 @@
                   id="signup-password"
                   type="password"
                   placeholder="Password"
+                  autocomplete="new-password"
                 />
+
+                <!-- Must appear ONLY after user clicks the Sign up BUTTON -->
+                <div
+                  id="signup-password-policy"
+                  class="password-policy"
+                  role="group"
+                  aria-label="Password requirements"
+                  hidden
+                >
+                  <p class="password-policy-title">Password requirements</p>
+                  <ul class="password-policy-list">
+                    <li class="policy-item is-neutral" data-rule="min_length">
+                      <span class="policy-icon" aria-hidden="true">•</span>
+                      <span class="policy-text">At least 8 characters</span>
+                    </li>
+                    <li class="policy-item is-neutral" data-rule="max_length">
+                      <span class="policy-icon" aria-hidden="true">•</span>
+                      <span class="policy-text">At most 72 characters</span>
+                    </li>
+                    <li class="policy-item is-neutral" data-rule="no_spaces">
+                      <span class="policy-icon" aria-hidden="true">•</span>
+                      <span class="policy-text">No spaces</span>
+                    </li>
+                    <li class="policy-item is-neutral" data-rule="has_lowercase">
+                      <span class="policy-icon" aria-hidden="true">•</span>
+                      <span class="policy-text">At least one lowercase letter (a-z)</span>
+                    </li>
+                    <li class="policy-item is-neutral" data-rule="has_uppercase">
+                      <span class="policy-icon" aria-hidden="true">•</span>
+                      <span class="policy-text">At least one uppercase letter (A-Z)</span>
+                    </li>
+                    <li class="policy-item is-neutral" data-rule="has_number">
+                      <span class="policy-icon" aria-hidden="true">•</span>
+                      <span class="policy-text">At least one number (0-9)</span>
+                    </li>
+                    <li class="policy-item is-neutral" data-rule="has_symbol">
+                      <span class="policy-icon" aria-hidden="true">•</span>
+                      <span class="policy-text">At least one symbol (!@#$)</span>
+                    </li>
+                  </ul>
+                </div>
 
                 <button id="btn-signup">Sign up</button>
               </div>
