@@ -47,6 +47,7 @@ async function jsonFetch(method, url, body) {
     headers: {
       Accept: "application/json",
     },
+    credentials: "include",
   };
 
   if (body != null) {
@@ -150,10 +151,6 @@ function normalizeApiErrorDetail(data) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  let lastDetectionToken = null;
-  let lastFile = null;
-  let _lastObjectUrl = null;
-
   const loginContent = document.getElementById("login-content");
   const loginSpinner = document.getElementById("login-spinner-container");
   const signupPanel = document.querySelector('[data-panel="signup"]');
@@ -206,34 +203,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  onEl("file-input", (fileInput) => {
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files[0];
-      lastFile = file || null;
-      window.lastFile = lastFile;
-      lastDetectionToken = null;
-
-      const btnCheck = document.getElementById("btn-check");
-      const checkState = document.getElementById("check-state");
-      const detectResult = document.getElementById("detect-result");
-
-      if (file) {
-        if (btnCheck) btnCheck.disabled = false;
-        if (checkState)
-          checkState.textContent = `Selected: ${file.name} (${Math.round(
-            file.size / 1024
-          )} KB)`;
-        if (detectResult)
-          detectResult.textContent = "No detection yet for this file.";
-      } else {
-        if (btnCheck) btnCheck.disabled = true;
-        if (checkState)
-          checkState.textContent = "Select a file to enable detection.";
-        if (detectResult) detectResult.textContent = "No detection yet.";
-      }
-    });
-  });
-
   onEl("btn-signup", (btnSignup) => {
     btnSignup.addEventListener("click", async () => {
       const user_name = document
@@ -279,10 +248,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
           const loginRes = await fetch("/auth/login", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            credentials: "include",
             body: JSON.stringify({ email, password }),
           });
 
@@ -350,10 +317,8 @@ window.addEventListener("DOMContentLoaded", () => {
       try {
         const res = await fetch("/auth/login", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "include",
           body: JSON.stringify({ email, password }),
         });
 

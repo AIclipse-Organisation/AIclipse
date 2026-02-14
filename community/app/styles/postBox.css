@@ -28,7 +28,7 @@
   margin: 0;
 
   /* Only divider should be BELOW each post */
-  border-bottom: 1px solid rgba(255,255,255,0.10);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
   padding-bottom: 12px;
   overflow-x: hidden;
 }
@@ -80,7 +80,7 @@
   font-weight: 800;
   font-size: 15px;
   opacity: 0.9;
-  color:#CFB87C;
+  color: #CFB87C;
 }
 
 /* meta: name on top, date below */
@@ -105,14 +105,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color:#CFB87C;
+  color: #CFB87C;
 }
 
 .comm_headerTime {
   font-size: 12px;
   opacity: 0.55;
   white-space: nowrap;
-  color:#fff;
+  color: #fff;
 }
 
 /* right side actions */
@@ -164,26 +164,26 @@
   opacity: 0.92;
   white-space: pre-wrap;
   word-break: break-word;
-  color:#fff;
+  color: #fff;
 }
 
 .comm_editButton {
   margin-left: 6px;
   font-size: 12px;
   cursor: pointer;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 4px 8px;
   border-radius: 999px;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .comm_editButton:hover {
-  background: rgba(255,255,255,0.10);
+  background: rgba(255, 255, 255, 0.10);
 }
 
 .comm_metaBlock {
-  display:none;
+  display: none;
 }
 
 .comm_score,
@@ -211,7 +211,7 @@
   cursor: pointer;
 
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* =========================
@@ -233,7 +233,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color:#fff;
+  color: #fff;
 }
 
 .comm_votesCell button,
@@ -245,13 +245,13 @@
   font-size: 16px;
   cursor: pointer;
 
-  color: rgba(255,255,255,0.85);
-  display:flex;
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
 }
 
 .comm_votesCell button:hover,
 .comm_CommentsCell button:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .comm_votesCell button:disabled,
@@ -294,7 +294,7 @@
 }
 
 .comm_iconBtn:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .comm_iconBtn:disabled {
@@ -340,12 +340,12 @@
   align-items: center;
   gap: 8px;
 
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
   line-height: 1;
 }
 
 .comm_actionBtn:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .comm_actionBtn:disabled {
@@ -385,7 +385,7 @@
   font-weight: 700;
   opacity: 0.85;
   margin-bottom: 10px;
-  color:#fff;
+  color: #fff;
 }
 
 .comm_commentInputWrapper {
@@ -398,32 +398,16 @@
   width: 100%;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
   color: white;
   outline: none;
   box-sizing: border-box;
 }
 
 .comm_commentInput::placeholder {
-  color: rgba(255,255,255,0.45);
+  color: rgba(255, 255, 255, 0.45);
 }
-
-/* .comm_commentButton {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.92);
-  font-weight: 800;
-  cursor: pointer;
-  box-sizing: border-box;
-}
-
-.comm_commentButton:hover {
-  background: rgba(255,255,255,0.12);
-} */
 
 .comm_commentButton {
   --btn-outline-color: #CFB87C;
@@ -459,7 +443,7 @@
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .comm_commentMeta {
@@ -469,7 +453,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color:#fff;
+  color: #fff;
 }
 
 .comm_commentText {
@@ -477,7 +461,7 @@
   word-break: break-word;
   font-size: 13px;
   opacity: 0.92;
-  color:#fff;
+  color: #fff;
 }
 
 .comm_deleteCommentButton {
@@ -492,14 +476,14 @@
 }
 
 .comm_deleteCommentButton:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .muted {
   opacity: 0.6;
   font-size: 12px;
   padding-top: 8px;
-  color:#fff;
+  color: #fff;
 }
 
 /* =========================
@@ -514,7 +498,7 @@
 .comm_menuBtn {
   background: transparent;
   border: 0;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
   padding: 6px 10px;
   border-radius: 10px;
@@ -523,7 +507,7 @@
 }
 
 .comm_menuBtn:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .comm_menuBtn:disabled {
@@ -532,8 +516,8 @@
 }
 
 .comm_topRow .comm_menuBtn {
-  font-size: 20px;   
-  padding: 8px 12px; 
+  font-size: 20px;
+  padding: 8px 12px;
   line-height: 1;
 }
 
@@ -547,9 +531,9 @@
   padding: 6px;
   border-radius: 12px;
 
-  background: rgba(20,20,20,0.98);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+  background: rgba(20, 20, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
 }
 
 .comm_menuItem {
@@ -567,13 +551,13 @@
   border: 0;
   cursor: pointer;
 
-  color: rgba(255,255,255,0.92);
+  color: rgba(255, 255, 255, 0.92);
   font-size: 15px;
   font-weight: 700;
 }
 
 .comm_menuItem:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .comm_menuItem:disabled {
@@ -586,7 +570,7 @@
 }
 
 .comm_menuItemMuted {
-  color: rgba(255,255,255,0.60);
+  color: rgba(255, 255, 255, 0.60);
   cursor: default;
 }
 
@@ -594,17 +578,76 @@
   position: fixed;
   inset: 0;
   z-index: 49;
-  background: transparent; 
+  background: transparent;
 }
 
 /* =========================
    NEW: Analysis + Community bars (PostBox)
    ========================= */
 
-.comm_bars {
+/* Wrapper for positioning the prompt and holding spacing */
+.comm_bars_wrapper {
+  position: relative;
   padding: 0 12px 10px;
+}
+
+/* The prompt text that overlays the blurred bars */
+.comm_vote_prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* The actual bars container */
+.comm_bars {
   display: grid;
   gap: 10px;
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* HIDDEN STATE LOGIC (Obfuscation) */
+.comm_bars.is-hidden {
+  filter: grayscale(1) blur(4px); /* Kill color, slight blur */
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: none;
+}
+
+
+.comm_bars.is-hidden .comm_barFill {
+  width: 100% !important; 
+  background: #666 !important; 
+  transition: none; 
+}
+
+.comm_bars.is-hidden .comm_barTrack {
+  background: #444 !important; 
+}
+
+.comm_bars.is-hidden .comm_barLine {
+  color: transparent !important; 
+  text-shadow: 0 0 8px rgba(255,255,255,0.5); 
+}
+
+
+/* REVEALED STATE */
+.comm_bars.is-revealed {
+  filter: blur(0) saturate(1);
+  opacity: 1;
+  animation: revealBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .comm_barBlock {
@@ -632,21 +675,20 @@
   color: rgba(255, 255, 255, 0.70);
 }
 
-/* Track = remainder */
+/* Track = background of bar */
 .comm_barTrack {
   width: 100%;
   height: 14px;
   border-radius: 999px;
   background: #e04646; /* red remainder (AI) by default */
   overflow: hidden;
+  position: relative;
 }
 
-/* If the analysis verdict is AI/risk, remainder becomes green (same as viewscan) */
 .comm_barTrack.is-risk {
   background: #18c46c;
 }
 
-/* Neutral track for "no votes" */
 .comm_barTrack.is-neutral {
   background: rgba(255, 255, 255, 0.22);
 }
@@ -656,14 +698,25 @@
   width: 0%;
   border-radius: 999px;
   background: #18c46c; /* green fill = "real" by default */
+  transition: width 0.6s ease-out;
 }
 
-/* If analysis is AI/risk, fill becomes red */
 .comm_barFill.is-risk {
   background: #e04646;
 }
 
-/* Neutral fill for "no votes" */
 .comm_barFill.is-neutral {
   background: rgba(255, 255, 255, 0.22);
+}
+
+/* Reveal Animation Keyframes */
+@keyframes revealBounce {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  60% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Smooth fade for the text in buttons */
+.comm_actionText {
+  transition: opacity 0.3s ease;
 }
