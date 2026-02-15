@@ -15,14 +15,15 @@ function setStatus(el, type, text) {
   const span = document.createElement("span");
   span.textContent = text; // safe
   span.classList.add(
-    type === "success" ? "status-success"
-      : type === "error" ? "status-error"
-      : "status-info"
+    type === "success"
+      ? "status-success"
+      : type === "error"
+        ? "status-error"
+        : "status-info",
   );
 
   el.appendChild(span);
 }
-
 
 function setDebug(data) {
   const pre = document.getElementById("debug-output");
@@ -53,7 +54,11 @@ async function jsonFetch(method, url, body) {
 
   const res = await fetch(url, opts);
   let data = null;
-  try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
+  try {
+    data = await res.json();
+  } catch {
+    data = { detail: "Non-JSON response" };
+  }
   setDebug({ url, status: res.status, body: data });
   return { res, data };
 }
@@ -70,7 +75,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const detectResult = document.getElementById("detect-result");
 
   const previewImg = document.getElementById("preview-image");
-  const uploadFrame = document.getElementById("upload-frame");           
+  const uploadFrame = document.getElementById("upload-frame");
   const cropHint = document.getElementById("crop-hint");
   const cropResetBtn = document.getElementById("btn-crop-reset");
   const uploadPreviewWrap = document.getElementById("upload-preview-wrap");
@@ -97,7 +102,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const aiFill = document.querySelector(".ai-fill");
 
   // State
-  window.lastFile = null;              // IMPORTANT: will become the cropped file after user clicks View Results
+  window.lastFile = null; // IMPORTANT: will become the cropped file after user clicks View Results
   window.lastDetectionToken = null;
   window.currentUserId = null;
 
@@ -108,7 +113,10 @@ window.addEventListener("DOMContentLoaded", () => {
   function syncPublishUI() {
     const isPublic = !!(savePublic && savePublic.checked);
     if (publicDescWrap) publicDescWrap.hidden = !isPublic;
-    if (postDescriptionHint) postDescriptionHint.textContent = isPublic ? "Required when publishing." : "";
+    if (postDescriptionHint)
+      postDescriptionHint.textContent = isPublic
+        ? "Required when publishing."
+        : "";
   }
   if (savePublic) savePublic.addEventListener("change", syncPublishUI);
   syncPublishUI();
@@ -134,8 +142,10 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!uploadFrame || !previewImg) return;
 
     let dragging = false;
-    let startX = 0, startY = 0;
-    let startCropX = cropX, startCropY = cropY;
+    let startX = 0,
+      startY = 0;
+    let startCropX = cropX,
+      startCropY = cropY;
 
     uploadFrame.addEventListener("pointerdown", (e) => {
       if (!previewImg.src) return;
@@ -237,14 +247,31 @@ window.addEventListener("DOMContentLoaded", () => {
     ctx.drawImage(img, x, y, cropW, cropH, 0, 0, outW, outH);
 
     const blob = await new Promise((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.92)
+      canvas.toBlob(resolve, "image/jpeg", 0.92),
     );
 
     const baseName = originalFile.name.replace(/\.\w+$/, "");
-    const croppedFile = new File([blob], `${baseName}-cropped.jpg`, { type: "image/jpeg" });
+    const croppedFile = new File([blob], `${baseName}-cropped.jpg`, {
+      type: "image/jpeg",
+    });
     const previewDataUrl = canvas.toDataURL("image/jpeg", 0.92);
 
     return { croppedFile, previewDataUrl };
+  }
+
+  function setImageSrcSafe(imgEl, url) {
+    if (!imgEl) return;
+
+    // Only allow blob: or data: URLs (what we generate client-side)
+    if (
+      typeof url !== "string" ||
+      (!url.startsWith("blob:") && !url.startsWith("data:"))
+    ) {
+      imgEl.removeAttribute("src");
+      return;
+    }
+
+    imgEl.src = url;
   }
 
   // File chosen -> show preview frame + enable button
@@ -256,7 +283,9 @@ window.addEventListener("DOMContentLoaded", () => {
         window.lastFile = null;
         window.lastDetectionToken = null;
 
-        try { fileInput.value = ""; } catch {}
+        try {
+          fileInput.value = "";
+        } catch {}
 
         const uploadLabel = document.querySelector("label.file-upload");
         if (uploadLabel) uploadLabel.classList.remove("is-selected");
@@ -271,7 +300,8 @@ window.addEventListener("DOMContentLoaded", () => {
         if (uploadPreviewWrap) uploadPreviewWrap.hidden = true;
 
         if (btnSave) btnSave.disabled = true;
-        if (saveState) saveState.textContent = "Run detection first to enable saving.";
+        if (saveState)
+          saveState.textContent = "Run detection first to enable saving.";
         if (saveResult) saveResult.textContent = "";
         if (saveStatus) setStatus(saveStatus, "info", "");
 
@@ -300,12 +330,11 @@ window.addEventListener("DOMContentLoaded", () => {
           URL.revokeObjectURL(lastPreviewUrl);
           lastPreviewUrl = null;
         }
-
         if (file) {
           lastPreviewUrl = URL.createObjectURL(file);
-          previewImg.src = lastPreviewUrl;
+          setImageSrcSafe(previewImg, lastPreviewUrl);
         } else {
-          previewImg.src = "";
+          previewImg.removeAttribute("src");
         }
       }
 
@@ -313,14 +342,17 @@ window.addEventListener("DOMContentLoaded", () => {
 
       // Reset SAVE UI if present
       if (btnSave) btnSave.disabled = true;
-      if (saveState) saveState.textContent = "Run detection first to enable saving.";
+      if (saveState)
+        saveState.textContent = "Run detection first to enable saving.";
       if (saveResult) saveResult.textContent = "";
       if (saveStatus) setStatus(saveStatus, "info", "");
 
       if (file) {
         if (btnCheck) btnCheck.disabled = false;
-        if (checkState) checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
-        if (detectResult) detectResult.textContent = "No detection yet for this file.";
+        if (checkState)
+          checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+        if (detectResult)
+          detectResult.textContent = "No detection yet for this file.";
       } else {
         if (btnCheck) btnCheck.disabled = true;
         if (checkState) checkState.textContent = "Select an image to analyze.";
@@ -339,7 +371,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
       if (window.lastFile.size > MAX_IMAGE_BYTES) {
         window.lastFile = null;
-        try { if (fileInput) fileInput.value = ""; } catch {}
+        try {
+          if (fileInput) fileInput.value = "";
+        } catch {}
         btnCheck.disabled = true;
         if (checkState) checkState.textContent = TOO_LARGE_MSG;
         if (detectStatus) setStatus(detectStatus, "info", "");
@@ -351,7 +385,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
       // disable SAVE until token arrives (if present)
       if (btnSave) btnSave.disabled = true;
-      if (saveState) saveState.textContent = "Run detection first to enable saving.";
+      if (saveState)
+        saveState.textContent = "Run detection first to enable saving.";
       if (saveResult) saveResult.textContent = "";
       if (saveStatus) setStatus(saveStatus, "info", "");
 
@@ -361,7 +396,8 @@ window.addEventListener("DOMContentLoaded", () => {
         // IMPORTANT: create cropped file based on user's drag framing.
         // Must match your CSS aspect-ratio. If square: 1. If 4/5: 0.8, etc.
         const frameAspect = 1; // <-- change if you change the frame ratio in CSS
-        const { croppedFile, previewDataUrl } = await makeCroppedFileFromOriginal(window.lastFile, frameAspect);
+        const { croppedFile, previewDataUrl } =
+          await makeCroppedFileFromOriginal(window.lastFile, frameAspect);
 
         // Use CROPPED file from now on (for checks + later saving/publishing)
         window.lastFile = croppedFile;
@@ -372,22 +408,36 @@ window.addEventListener("DOMContentLoaded", () => {
         const formData = new FormData();
         formData.append("file", croppedFile);
 
-        const res = await fetch("/checks", { method: "POST", body: formData, credentials: "include" });
+        const res = await fetch("/checks", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
         let data = null;
-        try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
+        try {
+          data = await res.json();
+        } catch {
+          data = { detail: "Non-JSON response" };
+        }
         setDebug({ url: "/checks", status: res.status, body: data });
 
         if (!res.ok) {
           window.lastDetectionToken = null;
           if (btnSave) btnSave.disabled = true;
-          if (saveState) saveState.textContent = "Run detection first to enable saving.";
-          if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
+          if (saveState)
+            saveState.textContent = "Run detection first to enable saving.";
+          if (detectResult)
+            detectResult.textContent = JSON.stringify(data, null, 2);
 
           if (res.status === 413) {
             if (checkState) checkState.textContent = TOO_LARGE_MSG;
             if (detectStatus) setStatus(detectStatus, "info", "");
           } else {
-            setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
+            setStatus(
+              detectStatus,
+              "error",
+              data.detail || `Detection failed (${res.status})`,
+            );
           }
           return;
         }
@@ -413,7 +463,8 @@ window.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error(err);
         if (btnSave) btnSave.disabled = true;
-        if (saveState) saveState.textContent = "Run detection first to enable saving.";
+        if (saveState)
+          saveState.textContent = "Run detection first to enable saving.";
         setStatus(detectStatus, "error", "Network error during detection.");
       } finally {
         btnCheck.disabled = false;
@@ -429,23 +480,43 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
       if (!window.lastDetectionToken) {
-        setStatus(saveStatus, "error", "No detection token. Run detection first.");
+        setStatus(
+          saveStatus,
+          "error",
+          "No detection token. Run detection first.",
+        );
         return;
       }
 
       const isPublic = !!(savePublic && savePublic.checked);
-      const description = (postDescriptionInput && postDescriptionInput.value ? postDescriptionInput.value : "").trim();
+      const description = (
+        postDescriptionInput && postDescriptionInput.value
+          ? postDescriptionInput.value
+          : ""
+      ).trim();
 
       if (isPublic && !window.currentUserId) {
-        setStatus(saveStatus, "error", "You must be signed in to publish to community.");
+        setStatus(
+          saveStatus,
+          "error",
+          "You must be signed in to publish to community.",
+        );
         return;
       }
       if (isPublic && !description) {
-        setStatus(saveStatus, "error", "Description is required when publishing.");
+        setStatus(
+          saveStatus,
+          "error",
+          "Description is required when publishing.",
+        );
         return;
       }
       if (description.length > 1000) {
-        setStatus(saveStatus, "error", `Description too long (${description.length}/1000 characters).`);
+        setStatus(
+          saveStatus,
+          "error",
+          `Description too long (${description.length}/1000 characters).`,
+        );
         return;
       }
 
@@ -458,13 +529,25 @@ window.addEventListener("DOMContentLoaded", () => {
       formData.append("is_public", isPublic ? "true" : "false");
 
       try {
-        const res = await fetch("/upload/image", { method: "POST", body: formData, credentials: "include" });
+        const res = await fetch("/upload/image", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
         let data = null;
-        try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
+        try {
+          data = await res.json();
+        } catch {
+          data = { detail: "Non-JSON response" };
+        }
         setDebug({ url: "/upload/image", status: res.status, body: data });
 
         if (!res.ok) {
-          setStatus(saveStatus, "error", data.detail || `Save failed (${res.status})`);
+          setStatus(
+            saveStatus,
+            "error",
+            data.detail || `Save failed (${res.status})`,
+          );
           return;
         }
 
@@ -474,35 +557,57 @@ window.addEventListener("DOMContentLoaded", () => {
           setStatus(saveStatus, "info", "Creating community post...");
 
           const uploadPayload =
-            (data && typeof data === "object" && data.body && typeof data.body === "object")
+            data &&
+            typeof data === "object" &&
+            data.body &&
+            typeof data.body === "object"
               ? data.body
               : data;
 
           const resolvedImageId =
             (uploadPayload && uploadPayload.image_id) ||
-            (uploadPayload && uploadPayload.image && uploadPayload.image.image_id) ||
-            (data && data.image && data.image.image_id) || null;
+            (uploadPayload &&
+              uploadPayload.image &&
+              uploadPayload.image.image_id) ||
+            (data && data.image && data.image.image_id) ||
+            null;
 
           if (!resolvedImageId) {
-            console.error("Upload response missing image_id. Raw response:", data);
-            setStatus(saveStatus, "error", "Saved image, but could not read image_id from server response.");
+            console.error(
+              "Upload response missing image_id. Raw response:",
+              data,
+            );
+            setStatus(
+              saveStatus,
+              "error",
+              "Saved image, but could not read image_id from server response.",
+            );
             return;
           }
 
           const resolvedVerdict =
             (uploadPayload && uploadPayload.verdict) ||
-            (uploadPayload && uploadPayload.result && uploadPayload.result.verdict) ||
-            (data && data.verdict) || null;
+            (uploadPayload &&
+              uploadPayload.result &&
+              uploadPayload.result.verdict) ||
+            (data && data.verdict) ||
+            null;
 
           const resolvedLabel =
             (uploadPayload && uploadPayload.label) ||
-            (uploadPayload && uploadPayload.result && uploadPayload.result.label) ||
-            (data && data.label) || null;
+            (uploadPayload &&
+              uploadPayload.result &&
+              uploadPayload.result.label) ||
+            (data && data.label) ||
+            null;
 
           const resolvedConfidence =
             (uploadPayload && uploadPayload.confidence) ||
-            (uploadPayload && uploadPayload.result && uploadPayload.result.confidence) ||
-            (data && data.confidence) || null;
+            (uploadPayload &&
+              uploadPayload.result &&
+              uploadPayload.result.confidence) ||
+            (data && data.confidence) ||
+            null;
 
           const postBody = {
             user_id: window.currentUserId,
@@ -519,24 +624,42 @@ window.addEventListener("DOMContentLoaded", () => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Accept": "application/json"
+              Accept: "application/json",
             },
             credentials: "include",
             body: JSON.stringify(postBody),
           });
 
           let postJson = null;
-          try { postJson = await postRes.json(); } catch { postJson = { detail: "Non-JSON response" }; }
-          setDebug({ url: "/community/posts", status: postRes.status, body: postJson });
+          try {
+            postJson = await postRes.json();
+          } catch {
+            postJson = { detail: "Non-JSON response" };
+          }
+          setDebug({
+            url: "/community/posts",
+            status: postRes.status,
+            body: postJson,
+          });
 
           if (postRes.ok) {
             setStatus(saveStatus, "success", "Saved image + published post.");
-            setTimeout(() => { window.location.href = "/community"; }, 1000);
+            setTimeout(() => {
+              window.location.href = "/community";
+            }, 1000);
           } else {
-            setStatus(saveStatus, "error", postJson.error || postJson.detail || `Post failed (${postRes.status})`);
+            setStatus(
+              saveStatus,
+              "error",
+              postJson.error ||
+                postJson.detail ||
+                `Post failed (${postRes.status})`,
+            );
           }
         } else {
-          setTimeout(() => { window.location.href = "/scans"; }, 1000);
+          setTimeout(() => {
+            window.location.href = "/scans";
+          }, 1000);
         }
 
         if (saveResult) saveResult.textContent = "";
@@ -552,17 +675,22 @@ window.addEventListener("DOMContentLoaded", () => {
   // Optional renderDetection (used on results page if you call it)
   function renderDetection(resp) {
     if (!resp || typeof resp !== "object") {
-      if (detectResult) { detectResult.style.display = ""; detectResult.textContent = JSON.stringify(resp, null, 2); }
+      if (detectResult) {
+        detectResult.style.display = "";
+        detectResult.textContent = JSON.stringify(resp, null, 2);
+      }
       if (detectCard) detectCard.hidden = true;
       return;
     }
 
     const label = (resp.label || resp.result || "Unknown").toString();
-    const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
+    const confidence = Number.isFinite(resp.confidence)
+      ? resp.confidence
+      : resp.score || 0;
 
     const labelLower = label.toLowerCase();
     const isAi = labelLower.includes("ai");
-    const ai_prob = isAi ? confidence : (1 - confidence);
+    const ai_prob = isAi ? confidence : 1 - confidence;
     const real_prob = 1 - ai_prob;
 
     let labelClass = "label-neutral";
@@ -584,7 +712,8 @@ window.addEventListener("DOMContentLoaded", () => {
       verdictEl.textContent = label;
       verdictEl.className = `verdict-text ${labelClass}`;
     }
-    if (confidenceEl) confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
+    if (confidenceEl)
+      confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
 
     if (realFill && aiFill) {
       realFill.style.width = `${(real_prob * 100).toFixed(2)}%`;
