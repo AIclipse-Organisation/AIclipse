@@ -1,3 +1,10 @@
+/* imageProcessing.js
+   - Upload page: shows a fixed preview frame + lets user drag to reposition crop
+   - When clicking "View Results" (btn-check), it exports a CROPPED file via canvas
+     and sends that cropped file to /checks (and uses it for later save/publish too).
+   - Safe to load on other pages: everything is guarded by element existence.
+*/
+
 function setStatus(el, type, text) {
   if (!el) return;
   el.innerHTML = "";
@@ -6,8 +13,8 @@ function setStatus(el, type, text) {
   span.textContent = text;
   span.classList.add(
     type === "success" ? "status-success" :
-      type === "error" ? "status-error" :
-        "status-info"
+    type === "error" ? "status-error" :
+    "status-info"
   );
   el.appendChild(span);
 }
@@ -21,6 +28,7 @@ function setDebug(data) {
 function setCurrentUserChip(user) {
   const chip = document.getElementById("current-user-chip");
   if (!chip) return;
+
   if (!user) {
     chip.textContent = "Not signed in";
     chip.classList.remove("success");
@@ -29,15 +37,6 @@ function setCurrentUserChip(user) {
   chip.textContent = `${user.user_name || user.email || "User"} · plan ${user.plan ?? "?"}`;
   chip.classList.add("success");
 }
-
-// Helper to get cookie value 
-// function getCookie(name) {
-//   const value = `; ${document.cookie}`;
-//   const parts = value.split(`; ${name}=`);
-//   if (parts.length === 2) return parts.pop().split(';').shift();
-//   return null;
-// }
-
 
 async function jsonFetch(method, url, body) {
   const opts = { method, headers: { Accept: "application/json" } };
@@ -61,42 +60,45 @@ window.addEventListener("DOMContentLoaded", () => {
   const fileInput = document.getElementById("file-input");
   const btnCheck = document.getElementById("btn-check");
   const checkState = document.getElementById("check-state");
+
   const detectStatus = document.getElementById("detect-status");
   const detectResult = document.getElementById("detect-result");
-  const debugOutput = document.getElementById("debug-output");
+
   const previewImg = document.getElementById("preview-image");
+  const uploadFrame = document.getElementById("upload-frame");           
+  const cropHint = document.getElementById("crop-hint");
+  const cropResetBtn = document.getElementById("btn-crop-reset");
+  const uploadPreviewWrap = document.getElementById("upload-preview-wrap");
+
   let lastPreviewUrl = null;
 
-  // SAVE UI
+  // SAVE UI (only exists on results page; guarded)
   const btnSave = document.getElementById("btn-save");
   const savePublic = document.getElementById("save-public");
   const saveState = document.getElementById("save-state");
   const saveStatus = document.getElementById("save-status");
   const saveResult = document.getElementById("save-result");
 
-  // Description UI
+  // Description UI (results page)
   const publicDescWrap = document.getElementById("public-desc-wrap");
   const postDescriptionInput = document.getElementById("post-description");
   const postDescriptionHint = document.getElementById("post-description-hint");
 
-  // elements inside detect card
+  // Results card elements (results page)
   const detectCard = document.getElementById("detect-card");
   const verdictEl = document.getElementById("detect-verdict");
   const confidenceEl = document.getElementById("detect-confidence");
   const realFill = document.querySelector(".real-fill");
   const aiFill = document.querySelector(".ai-fill");
 
-  // PUBLIC IMAGES UI
-  // const publicImagesEl = document.getElementById("public-images");
-
-  // state
-  window.lastFile = null;
-  let lastDetectionToken = null;
-
-
-
-  // store current user id
+  // State
+  window.lastFile = null;              // IMPORTANT: will become the cropped file after user clicks View Results
+  window.lastDetectionToken = null;
   window.currentUserId = null;
+
+  // Crop state (object-position % values)
+  let cropX = 50; // 0..100
+  let cropY = 20; // 0..100 (top-biased helps keep heads)
 
   function syncPublishUI() {
     const isPublic = !!(savePublic && savePublic.checked);
@@ -106,14 +108,148 @@ window.addEventListener("DOMContentLoaded", () => {
   if (savePublic) savePublic.addEventListener("change", syncPublishUI);
   syncPublishUI();
 
-  // file chosen -> enable check button
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function applyCropPosition() {
+    if (!previewImg) return;
+    previewImg.style.objectPosition = `${cropX}% ${cropY}%`;
+  }
+
+  // Prevent browser native dragging (important for crop drag UX)
+  if (previewImg) {
+    previewImg.setAttribute("draggable", "false");
+    previewImg.addEventListener("dragstart", (e) => e.preventDefault());
+    applyCropPosition();
+  }
+
+  // Drag-to-reposition crop (Upload page)
+  (function setupUploadCropDrag() {
+    if (!uploadFrame || !previewImg) return;
+
+    let dragging = false;
+    let startX = 0, startY = 0;
+    let startCropX = cropX, startCropY = cropY;
+
+    uploadFrame.addEventListener("pointerdown", (e) => {
+      if (!previewImg.src) return;
+      e.preventDefault();
+      uploadFrame.setPointerCapture?.(e.pointerId);
+
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startCropX = cropX;
+      startCropY = cropY;
+
+      previewImg.style.cursor = "grabbing";
+      if (cropHint) cropHint.style.opacity = "0";
+    });
+
+    uploadFrame.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const rect = uploadFrame.getBoundingClientRect();
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      cropX = clamp(startCropX + (dx / rect.width) * 100, 0, 100);
+      cropY = clamp(startCropY + (dy / rect.height) * 100, 0, 100);
+      applyCropPosition();
+    });
+
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      previewImg.style.cursor = "grab";
+    }
+
+    uploadFrame.addEventListener("pointerup", endDrag);
+    uploadFrame.addEventListener("pointercancel", endDrag);
+
+    cropResetBtn?.addEventListener("click", () => {
+      cropX = 50;
+      cropY = 20;
+      applyCropPosition();
+      if (cropHint) cropHint.style.opacity = "0.9";
+    });
+  })();
+
+  async function makeCroppedFileFromOriginal(originalFile, frameAspect = 1) {
+    // Reads file -> image -> crops to match frame aspect using current cropX/cropY -> outputs JPEG file + data URL preview.
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(originalFile);
+    });
+
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = dataUrl;
+    });
+
+    const srcW = img.naturalWidth;
+    const srcH = img.naturalHeight;
+
+    // Crop rect sized to "cover" the output aspect (like object-fit: cover)
+    let cropW, cropH;
+    if (srcW / srcH > frameAspect) {
+      cropH = srcH;
+      cropW = Math.round(srcH * frameAspect);
+    } else {
+      cropW = srcW;
+      cropH = Math.round(srcW / frameAspect);
+    }
+
+    // Max pan range in pixels
+    const maxX = Math.max(0, srcW - cropW);
+    const maxY = Math.max(0, srcH - cropH);
+
+    // Map object-position % -> pixel offsets
+    const x = Math.round((cropX / 100) * maxX);
+    const y = Math.round((cropY / 100) * maxY);
+
+    // Output size: keep reasonable; match aspect.
+    const outLong = 1024;
+    let outW, outH;
+    if (frameAspect >= 1) {
+      outW = outLong;
+      outH = Math.round(outLong / frameAspect);
+    } else {
+      outH = outLong;
+      outW = Math.round(outLong * frameAspect);
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = outW;
+    canvas.height = outH;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, x, y, cropW, cropH, 0, 0, outW, outH);
+
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.92)
+    );
+
+    const baseName = originalFile.name.replace(/\.\w+$/, "");
+    const croppedFile = new File([blob], `${baseName}-cropped.jpg`, { type: "image/jpeg" });
+    const previewDataUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+    return { croppedFile, previewDataUrl };
+  }
+
+  // File chosen -> show preview frame + enable button
   if (fileInput) {
     fileInput.addEventListener("change", () => {
-      const file = fileInput.files[0];
+      const file = fileInput.files?.[0];
 
       if (file && file.size > MAX_IMAGE_BYTES) {
         window.lastFile = null;
-        lastDetectionToken = null;
+        window.lastDetectionToken = null;
 
         try { fileInput.value = ""; } catch {}
 
@@ -126,37 +262,35 @@ window.addEventListener("DOMContentLoaded", () => {
             lastPreviewUrl = null;
           }
           previewImg.src = "";
-          previewImg.hidden = true;
         }
+        if (uploadPreviewWrap) uploadPreviewWrap.hidden = true;
 
-        // reset SAVE UI
         if (btnSave) btnSave.disabled = true;
         if (saveState) saveState.textContent = "Run detection first to enable saving.";
         if (saveResult) saveResult.textContent = "";
         if (saveStatus) setStatus(saveStatus, "info", "");
 
-        // disable detection
         if (btnCheck) btnCheck.disabled = true;
         if (checkState) checkState.textContent = TOO_LARGE_MSG;
-        if (detectResult) detectResult.textContent = "No detection yet.";
 
-        // ensure no second message elsewhere
+        if (detectResult) detectResult.textContent = "No detection yet.";
         if (detectStatus) setStatus(detectStatus, "info", "");
         return;
       }
 
       window.lastFile = file || null;
-      lastDetectionToken = null;
+      window.lastDetectionToken = null;
 
-      const uploadLabel = document.querySelector('label.file-upload');
+      const uploadLabel = document.querySelector("label.file-upload");
+      if (uploadLabel) uploadLabel.classList.toggle("is-selected", !!file);
 
-      if (uploadLabel) {
-        uploadLabel.classList.toggle("is-selected", !!file);
-      }
-
+      // Reset crop position on new file (nice UX)
+      cropX = 50;
+      cropY = 20;
+      applyCropPosition();
+      if (cropHint) cropHint.style.opacity = "0.9";
 
       if (previewImg) {
-        // cleanup old blob url
         if (lastPreviewUrl) {
           URL.revokeObjectURL(lastPreviewUrl);
           lastPreviewUrl = null;
@@ -165,14 +299,14 @@ window.addEventListener("DOMContentLoaded", () => {
         if (file) {
           lastPreviewUrl = URL.createObjectURL(file);
           previewImg.src = lastPreviewUrl;
-          previewImg.hidden = false;
         } else {
           previewImg.src = "";
-          previewImg.hidden = true;
         }
       }
 
-      // reset SAVE UI
+      if (uploadPreviewWrap) uploadPreviewWrap.hidden = !file;
+
+      // Reset SAVE UI if present
       if (btnSave) btnSave.disabled = true;
       if (saveState) saveState.textContent = "Run detection first to enable saving.";
       if (saveResult) saveResult.textContent = "";
@@ -184,13 +318,13 @@ window.addEventListener("DOMContentLoaded", () => {
         if (detectResult) detectResult.textContent = "No detection yet for this file.";
       } else {
         if (btnCheck) btnCheck.disabled = true;
-        if (checkState) checkState.textContent = "Select a file to enable detection.";
+        if (checkState) checkState.textContent = "Select an image to analyze.";
         if (detectResult) detectResult.textContent = "No detection yet.";
       }
     });
   }
 
-  // btnCheck click -> POST /checks with file
+  // btnCheck click -> exports cropped file -> POST /checks with cropped file -> store preview+response -> /results
   if (btnCheck) {
     btnCheck.addEventListener("click", async () => {
       if (!window.lastFile) {
@@ -208,9 +342,9 @@ window.addEventListener("DOMContentLoaded", () => {
       }
 
       btnCheck.disabled = true;
-      lastDetectionToken = null;
+      window.lastDetectionToken = null;
 
-      // disable SAVE until token arrives
+      // disable SAVE until token arrives (if present)
       if (btnSave) btnSave.disabled = true;
       if (saveState) saveState.textContent = "Run detection first to enable saving.";
       if (saveResult) saveResult.textContent = "";
@@ -218,52 +352,28 @@ window.addEventListener("DOMContentLoaded", () => {
 
       setStatus(detectStatus, "info", "Analyzing image...");
 
-      const formData = new FormData();
-      formData.append("file", window.lastFile);
-
       try {
+        // IMPORTANT: create cropped file based on user's drag framing.
+        // Must match your CSS aspect-ratio. If square: 1. If 4/5: 0.8, etc.
+        const frameAspect = 1; // <-- change if you change the frame ratio in CSS
+        const { croppedFile, previewDataUrl } = await makeCroppedFileFromOriginal(window.lastFile, frameAspect);
+
+        // Use CROPPED file from now on (for checks + later saving/publishing)
+        window.lastFile = croppedFile;
+
+        // Store CROPPED preview for results page
+        sessionStorage.setItem("lastDetectionPreview", previewDataUrl);
+
+        const formData = new FormData();
+        formData.append("file", croppedFile);
+
         const res = await fetch("/checks", { method: "POST", body: formData, credentials: "include" });
         let data = null;
         try { data = await res.json(); } catch { data = { detail: "Non-JSON response" }; }
         setDebug({ url: "/checks", status: res.status, body: data });
 
-        if (res.ok) {
-          lastDetectionToken = data.detection_token || null;
-          window.lastDetectionToken = lastDetectionToken;
-
-          // enable SAVE if we have a token
-          if (btnSave) btnSave.disabled = !lastDetectionToken;
-          if (saveState) {
-            saveState.textContent = lastDetectionToken
-              ? "Detection token ready. You can now save this image."
-              : "No detection token returned; cannot save.";
-          }
-
-          // keep raw JSON for debugging (hidden by default)
-          if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
-
-          // render verdict/progress bar
-          // store results for results page
-          sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
-          sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
-
-          // store preview image too (optional but nice)
-          // note: you already have window.lastFile
-          if (window.lastFile) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              sessionStorage.setItem("lastDetectionPreview", reader.result);
-              window.location.href = "/results";
-            };
-            reader.readAsDataURL(window.lastFile);
-          } else {
-            window.location.href = "/results";
-          }
-          return; // stop running upload page UI code
-
-          setStatus(detectStatus, "success", "Detection completed.");
-        } else {
-          lastDetectionToken = null;
+        if (!res.ok) {
+          window.lastDetectionToken = null;
           if (btnSave) btnSave.disabled = true;
           if (saveState) saveState.textContent = "Run detection first to enable saving.";
           if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
@@ -274,7 +384,27 @@ window.addEventListener("DOMContentLoaded", () => {
           } else {
             setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
           }
+          return;
         }
+
+        const lastDetectionToken = data.detection_token || null;
+        window.lastDetectionToken = lastDetectionToken;
+        window.lastDetectionToken = lastDetectionToken;
+
+        // enable SAVE if we have a token (results page only)
+        if (btnSave) btnSave.disabled = !lastDetectionToken;
+        if (saveState) {
+          saveState.textContent = lastDetectionToken
+            ? "Detection token ready. You can now save this image."
+            : "No detection token returned; cannot save.";
+        }
+
+        // store results for results page
+        sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
+        sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
+
+        setStatus(detectStatus, "success", "Detection completed.");
+        window.location.href = "/results";
       } catch (err) {
         console.error(err);
         if (btnSave) btnSave.disabled = true;
@@ -286,7 +416,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // SAVE button -> POST /upload/image with file + detection_token
+  // SAVE button -> POST /upload/image with file + detection_token (uses CROPPED window.lastFile)
   if (btnSave) {
     btnSave.addEventListener("click", async () => {
       if (!window.lastFile) {
@@ -301,18 +431,14 @@ window.addEventListener("DOMContentLoaded", () => {
       const isPublic = !!(savePublic && savePublic.checked);
       const description = (postDescriptionInput && postDescriptionInput.value ? postDescriptionInput.value : "").trim();
 
-      // Check authentication before attempting to save if publishing
       if (isPublic && !window.currentUserId) {
         setStatus(saveStatus, "error", "You must be signed in to publish to community.");
         return;
       }
-
       if (isPublic && !description) {
         setStatus(saveStatus, "error", "Description is required when publishing.");
         return;
       }
-
-      // Validate description length 
       if (description.length > 1000) {
         setStatus(saveStatus, "error", `Description too long (${description.length}/1000 characters).`);
         return;
@@ -339,14 +465,13 @@ window.addEventListener("DOMContentLoaded", () => {
 
         setStatus(saveStatus, "success", "Saved image.");
 
-
         if (isPublic) {
           setStatus(saveStatus, "info", "Creating community post...");
 
-          const uploadPayload = (data && typeof data === "object" && data.body && typeof data.body === "object")
-            ? data.body
-            : data;
-
+          const uploadPayload =
+            (data && typeof data === "object" && data.body && typeof data.body === "object")
+              ? data.body
+              : data;
 
           const resolvedImageId =
             (uploadPayload && uploadPayload.image_id) ||
@@ -362,20 +487,17 @@ window.addEventListener("DOMContentLoaded", () => {
           const resolvedVerdict =
             (uploadPayload && uploadPayload.verdict) ||
             (uploadPayload && uploadPayload.result && uploadPayload.result.verdict) ||
-            (data && data.verdict) ||
-            null;
+            (data && data.verdict) || null;
 
           const resolvedLabel =
             (uploadPayload && uploadPayload.label) ||
             (uploadPayload && uploadPayload.result && uploadPayload.result.label) ||
-            (data && data.label) ||
-            null;
+            (data && data.label) || null;
 
           const resolvedConfidence =
             (uploadPayload && uploadPayload.confidence) ||
             (uploadPayload && uploadPayload.result && uploadPayload.result.confidence) ||
-            (data && data.confidence) ||
-            null;
+            (data && data.confidence) || null;
 
           const postBody = {
             user_id: window.currentUserId,
@@ -387,7 +509,6 @@ window.addEventListener("DOMContentLoaded", () => {
               confidence: resolvedConfidence,
             },
           };
-
 
           const postRes = await fetch("/community/posts", {
             method: "POST",
@@ -405,18 +526,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
           if (postRes.ok) {
             setStatus(saveStatus, "success", "Saved image + published post.");
-            // Redirect to community after publishing
-            setTimeout(() => {
-              window.location.href = "/community";
-            }, 1000);
+            setTimeout(() => { window.location.href = "/community"; }, 1000);
           } else {
             setStatus(saveStatus, "error", postJson.error || postJson.detail || `Post failed (${postRes.status})`);
           }
         } else {
-          // Private image - redirect to scans page
-          setTimeout(() => {
-            window.location.href = "/scans";
-          }, 1000);
+          setTimeout(() => { window.location.href = "/scans"; }, 1000);
         }
 
         if (saveResult) saveResult.textContent = "";
@@ -429,7 +544,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // renderDetection: updates the verdict text, confidence, and two-color bar
+  // Optional renderDetection (used on results page if you call it)
   function renderDetection(resp) {
     if (!resp || typeof resp !== "object") {
       if (detectResult) { detectResult.style.display = ""; detectResult.textContent = JSON.stringify(resp, null, 2); }
@@ -440,13 +555,11 @@ window.addEventListener("DOMContentLoaded", () => {
     const label = (resp.label || resp.result || "Unknown").toString();
     const confidence = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
 
-    // compute ai vs real probabilities (mirror your server logic)
     const labelLower = label.toLowerCase();
     const isAi = labelLower.includes("ai");
     const ai_prob = isAi ? confidence : (1 - confidence);
     const real_prob = 1 - ai_prob;
 
-    // decide label class
     let labelClass = "label-neutral";
     if (labelLower.includes("ai")) {
       if (labelLower.includes("most likely")) labelClass = "label-strong-ai";
@@ -462,7 +575,6 @@ window.addEventListener("DOMContentLoaded", () => {
       labelClass = "label-neutral";
     }
 
-    // update UI
     if (verdictEl) {
       verdictEl.textContent = label;
       verdictEl.className = `verdict-text ${labelClass}`;
@@ -477,12 +589,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (detectResult) detectResult.style.display = "none";
     if (detectCard) detectCard.hidden = false;
 
-    // keep the last response on the card for future actions (if needed)
     if (detectCard) detectCard.latestResponse = resp;
   }
-
-  // load public images on page load
-  // loadPublicImages();
 
   // Initial auth/me to populate header user chip (silent if fails)
   (async () => {
@@ -491,13 +599,15 @@ window.addEventListener("DOMContentLoaded", () => {
       if (res.ok) {
         setCurrentUserChip(data);
         window.currentUserId = data.user_id || null;
-        setStatus(document.getElementById("detect-status"), "info", "Session restored from cookie.");
       } else {
         setCurrentUserChip(null);
         window.currentUserId = null;
       }
-    } catch (err) {
+    } catch {
       // ignore
     }
   })();
+
+  // Expose renderDetection if you ever want to call it from results.js
+  window.renderDetection = renderDetection;
 });

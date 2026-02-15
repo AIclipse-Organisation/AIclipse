@@ -182,12 +182,83 @@ textarea {
   padding: 0;
 }
 
+.results-imageFrame {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+
+  position: relative;
+  user-select: none;
+  touch-action: none; /* important for mobile dragging */
+}
+
 #preview-image {
   width: 100%;
-  display: block;
-  object-fit: cover;
-  border-radius: 12px;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: 50% 20%;
+    cursor: grab;
+    -webkit-user-drag: none;
+    user-select: none;
 }
+
+#preview-image:active {
+  cursor: grabbing;
+}
+
+.crop-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 6px 10px;
+  border-radius: 999px;
+  backdrop-filter: blur(2px);
+
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.btn-crop-reset {
+  --btn-outline-color: rgba(255, 255, 255, 0.35);
+  --btn-hover-color: rgba(255, 255, 255, 0.85);
+
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  background: transparent;
+  border: 1px solid var(--btn-outline-color);
+  cursor: pointer;
+  text-align: center;
+
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.btn-crop-reset:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+
+
 
 .verdict-text {
   font-size: 18px;
@@ -492,4 +563,118 @@ textarea {
 .modal-actions .danger:hover {
   background: var(--btn-hover-color);
   color: #111;
+}
+
+
+
+
+
+
+.upload-previewWrap {
+  margin-top: 14px;
+}
+
+.results-imageFrame {
+  width: 100%;
+  aspect-ratio: 1 / 1;        
+  border-radius: 12px;
+  overflow: hidden;
+
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+#preview-image {
+  width: 100%;
+  height: 100%;                 
+  display: block;
+  object-fit: cover;          
+}
+
+
+#preview-image:active {
+  cursor: grabbing;
+}
+
+.crop-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 6px 10px;
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.btn-crop-reset {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  text-align: center;
+  transition: background 160ms ease, color 160ms ease;
+}
+.btn-crop-reset:hover {
+  background: rgba(255, 255, 255, 0.85);
+  color: #111;
+}
+
+/* Upload page layout inside the phone shell */
+.upload-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;          /* uses .screen area */
+  padding-bottom: 100px; /* extra safety above navbar */
+}
+
+/* Preview area takes remaining space */
+.upload-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Sticky action panel that sits ABOVE the bottom nav */
+.upload-actions {
+  position: sticky;
+  bottom: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  padding-top: 14px;
+  padding-bottom: 12px;
+
+  /* makes it feel like a dock */
+  background: linear-gradient(
+    to top,
+    rgba(34, 34, 34, 0.98),
+    rgba(34, 34, 34, 0.75),
+    rgba(34, 34, 34, 0)
+  );
+}
+
+/* Remove the huge margin you had */
+.file-upload {
+  margin: 0;
+}
+
+/* ensure button doesn't add extra margin */
+#btn-check {
+  margin: 0;
 }
