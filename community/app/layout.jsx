@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import ShellWrapper from "./components/ShellWrapper"; 
 import "./global.css"
 
+import "./styles/modal/modal.css"
+
 const GATEWAY_URI = process.env.GATEWAY_URI || "http://gateway-srv:3000";
 
 async function getUser() {
