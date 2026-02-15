@@ -9,7 +9,7 @@ export default function BottomNav() {
       <a href="/upload">Upload</a>
       <a href="/notification">Notification</a>
       <a href="/plan">Plan</a>
-      <a href="/dev">For Devs</a>
+      {/* <a href="/dev">For Devs</a> */}
     </nav>
   );
 }
