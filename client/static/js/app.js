@@ -155,6 +155,15 @@ window.lastDetectionToken = window.lastDetectionToken ?? null;
 window._lastObjectUrl = window._lastObjectUrl ?? null;
 
 window.addEventListener("DOMContentLoaded", () => {
+  const fileInputs = document.querySelectorAll('input[type="file"]');
+  fileInputs.forEach((input) => {
+    if (input.dataset.reselectBound === "1") return;
+    input.dataset.reselectBound = "1";
+    input.addEventListener("click", () => {
+      input.value = "";
+    });
+  });
+
   const loginContent = document.getElementById("login-content");
   const loginSpinner = document.getElementById("login-spinner-container");
   const signupPanel = document.querySelector('[data-panel="signup"]');
