@@ -42,6 +42,10 @@ export default async function RootLayout({ children }) {
 
   return (
     <html lang="en">
+    <head>
+      <title>AIclipse</title>
+    </head>
+
       <body>
         <ShellWrapper user={user}>
           {children}
