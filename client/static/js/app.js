@@ -150,6 +150,10 @@ function normalizeApiErrorDetail(data) {
   return { message: (data && data.message) || "Request failed", checks: null };
 }
 
+window.lastFile = window.lastFile ?? null;
+window.lastDetectionToken = window.lastDetectionToken ?? null;
+window._lastObjectUrl = window._lastObjectUrl ?? null;
+
 window.addEventListener("DOMContentLoaded", () => {
   const loginContent = document.getElementById("login-content");
   const loginSpinner = document.getElementById("login-spinner-container");
@@ -365,17 +369,17 @@ window.addEventListener("DOMContentLoaded", () => {
       const detectStatus = document.getElementById("detect-status");
       const detectResult = document.getElementById("detect-result");
 
-      if (!lastFile) {
+      if (!window.lastFile) {
         setStatus(detectStatus, "error", "No file selected.");
         return;
       }
 
       btnCheck.disabled = true;
-      lastDetectionToken = null;
+      window.lastDetectionToken = null;
       setStatus(detectStatus, "info", "Analyzing image...");
 
       const formData = new FormData();
-      formData.append("file", lastFile);
+      formData.append("file", window.lastFile);
 
       try {
         const res = await fetch("/checks", { method: "POST", body: formData });
@@ -389,7 +393,7 @@ window.addEventListener("DOMContentLoaded", () => {
         setDebug({ url: "/checks", status: res.status, body: data });
 
         if (res.ok) {
-          lastDetectionToken = data.detection_token || null;
+          window.lastDetectionToken = data.detection_token || null;
           if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
           renderDetection(data);
           setStatus(detectStatus, "success", "Detection completed.");
@@ -440,9 +444,9 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (window.lastFile) {
-      if (_lastObjectUrl) URL.revokeObjectURL(_lastObjectUrl);
-      _lastObjectUrl = URL.createObjectURL(window.lastFile);
-      if (thumb) thumb.src = _lastObjectUrl;
+      if (window._lastObjectUrl) URL.revokeObjectURL(window._lastObjectUrl);
+      window._lastObjectUrl = URL.createObjectURL(window.lastFile);
+      if (thumb) thumb.src = window._lastObjectUrl;
     }
 
     verdict.textContent = label;
@@ -459,6 +463,6 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   window.addEventListener("beforeunload", () => {
-    if (_lastObjectUrl) URL.revokeObjectURL(_lastObjectUrl);
+    if (window._lastObjectUrl) URL.revokeObjectURL(window._lastObjectUrl);
   });
 });
