@@ -262,11 +262,36 @@ window.addEventListener("DOMContentLoaded", () => {
   function setImageSrcSafe(imgEl, url) {
     if (!imgEl) return;
 
-    // Only allow blob: or data: URLs (what we generate client-side)
-    if (
-      typeof url !== "string" ||
-      (!url.startsWith("blob:") && !url.startsWith("data:"))
-    ) {
+    // Only allow safe blob: or data: URLs (what we generate client-side)
+    if (typeof url !== "string") {
+      imgEl.removeAttribute("src");
+      return;
+    }
+
+    const isBlobUrl = url.startsWith("blob:");
+    const isDataUrl = url.startsWith("data:");
+
+    // For blob: URLs, do a minimal structural check to ensure they look like
+    // ones produced via URL.createObjectURL (e.g., "blob:<origin>/<uuid>").
+    if (isBlobUrl) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== "blob:") {
+          imgEl.removeAttribute("src");
+          return;
+        }
+      } catch {
+        imgEl.removeAttribute("src");
+        return;
+      }
+    } else if (isDataUrl) {
+      // Only allow data URLs for image media types, e.g. data:image/png;base64,...
+      // This prevents arbitrary data: payloads from being used as active content.
+      if (!/^data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=]+$/.test(url)) {
+        imgEl.removeAttribute("src");
+        return;
+      }
+    } else {
       imgEl.removeAttribute("src");
       return;
     }
