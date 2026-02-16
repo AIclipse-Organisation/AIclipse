@@ -45,7 +45,7 @@ async def test_password_service_hash_and_verify():
     cpu = CpuPool.from_max_concurrency(4)
     pwd = PasswordService(cpu)
 
-    pw = "secret123"
+    pw = "Secret123!"
     hashed = await pwd.hash_password(pw)
     assert isinstance(hashed, str)
     assert hashed != pw

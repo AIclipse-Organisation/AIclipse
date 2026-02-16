@@ -53,7 +53,7 @@ async def test_jwks(client):
 
 @pytest.mark.asyncio
 async def test_signup_success(client, users_coll):
-    payload = {"user_name": " Alice  ", "email": "  Alice@Example.com ", "password": "secret123"}
+    payload = {"user_name": " Alice  ", "email": "  Alice@Example.com ", "password": "Secret123!"}
     r = await client.post("/signup", json=payload)
     assert r.status_code == 201
 
@@ -80,7 +80,7 @@ async def test_signup_conflict(client, users_coll):
             "user_id": "u1",
             "user_name": "X",
             "email": "x@example.com",
-            "password": _bcrypt_hash("secret123"),
+            "password": _bcrypt_hash("Secret123!"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
@@ -94,7 +94,7 @@ async def test_signup_conflict(client, users_coll):
 
     r = await client.post(
         "/signup",
-        json={"user_name": "Y", "email": "X@EXAMPLE.COM", "password": "secret123"},
+        json={"user_name": "Y", "email": "X@EXAMPLE.COM", "password": "Secret123!"},
     )
     assert r.status_code == 409
     assert r.json()["detail"] == "Email already registered"
@@ -107,7 +107,7 @@ async def test_login_success(client, users_coll, auth_mod):
             "user_id": "u_login",
             "user_name": "Bob",
             "email": "bob@example.com",
-            "password": _bcrypt_hash("secret123"),
+            "password": _bcrypt_hash("Secret123!"),
             "is_admin": False,
             "plan": 1,
             "created_at": _now_utc(),
@@ -119,7 +119,7 @@ async def test_login_success(client, users_coll, auth_mod):
         }
     )
 
-    r = await client.post("/login", json={"email": " bob@example.com ", "password": "secret123"})
+    r = await client.post("/login", json={"email": " bob@example.com ", "password": "Secret123!"})
     assert r.status_code == 200
     data = r.json()
     assert "token" in data
@@ -134,7 +134,7 @@ async def test_login_success(client, users_coll, auth_mod):
 
 @pytest.mark.asyncio
 async def test_login_invalid_user(client):
-    r = await client.post("/login", json={"email": "nope@example.com", "password": "secret123"})
+    r = await client.post("/login", json={"email": "nope@example.com", "password": "Secret123!"})
     assert r.status_code == 401
     assert r.json()["detail"] == "Invalid credentials"
 
@@ -146,7 +146,7 @@ async def test_login_invalid_password(client, users_coll):
             "user_id": "u_login2",
             "user_name": "Bob",
             "email": "bob2@example.com",
-            "password": _bcrypt_hash("secret123"),
+            "password": _bcrypt_hash("Secret123!"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
@@ -176,7 +176,7 @@ async def test_get_me_ok(client, users_coll, auth_mod):
             "user_id": "u_me",
             "user_name": "Me",
             "email": "me@example.com",
-            "password": _bcrypt_hash("secret123"),
+            "password": _bcrypt_hash("Secret123!"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
@@ -206,7 +206,7 @@ async def test_update_me_no_changes_returns_current(client, users_coll, auth_mod
             "user_id": "u_me2",
             "user_name": "Me2",
             "email": "me2@example.com",
-            "password": _bcrypt_hash("secret123"),
+            "password": _bcrypt_hash("Secret123!"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
@@ -230,7 +230,7 @@ async def test_update_me_updates_fields(client, users_coll, auth_mod):
             "user_id": "u_me3",
             "user_name": "Old",
             "email": "old@example.com",
-            "password": _bcrypt_hash("secret123"),
+            "password": _bcrypt_hash("Secret123!"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
@@ -261,7 +261,7 @@ async def test_update_me_password_changes_hash(client, users_coll, auth_mod):
             "user_id": "u_me4",
             "user_name": "X",
             "email": "x4@example.com",
-            "password": _bcrypt_hash("oldpass"),
+            "password": _bcrypt_hash("OldPass123!"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
@@ -276,15 +276,15 @@ async def test_update_me_password_changes_hash(client, users_coll, auth_mod):
 
     r = await client.patch(
         "/me",
-        json={"password": "newpass123"},
+        json={"password": "NewPass123!"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert r.status_code == 200
 
     stored = await users_coll.find_one({"user_id": "u_me4"})
     assert stored is not None
-    assert bcrypt.checkpw("newpass123".encode("utf-8"), stored["password"].encode("utf-8")) is True
-    assert bcrypt.checkpw("oldpass".encode("utf-8"), stored["password"].encode("utf-8")) is False
+    assert bcrypt.checkpw("NewPass123!".encode("utf-8"), stored["password"].encode("utf-8")) is True
+    assert bcrypt.checkpw("OldPass123!".encode("utf-8"), stored["password"].encode("utf-8")) is False
 
 
 @pytest.mark.asyncio
@@ -294,7 +294,7 @@ async def test_delete_me_ok(client, users_coll, auth_mod):
             "user_id": "u_del",
             "user_name": "Del",
             "email": "del@example.com",
-            "password": _bcrypt_hash("secret123"),
+            "password": _bcrypt_hash("Secret123!"),
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
