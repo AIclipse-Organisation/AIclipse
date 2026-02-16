@@ -199,6 +199,83 @@ input:focus {
 }
 
 /* =========================
+   PASSWORD POLICY (CHECKLIST)
+========================= */
+
+.password-policy {
+  margin-top: 2px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.25);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.password-policy-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  color: rgba(255,255,255,0.80);
+}
+
+.password-policy-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.policy-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.25;
+  color: rgba(255,255,255,0.86);
+}
+
+.policy-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.20);
+  font-weight: 800;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.policy-item.is-neutral .policy-icon {
+  color: rgba(255,255,255,0.60);
+  border-color: rgba(255,255,255,0.22);
+}
+
+.policy-item.is-ok .policy-icon {
+  color: rgb(61, 220, 132);
+  border-color: rgba(61, 220, 132, 0.65);
+}
+
+.policy-item.is-bad .policy-icon {
+  color: rgb(255, 90, 90);
+  border-color: rgba(255, 90, 90, 0.65);
+}
+
+.policy-item.is-ok {
+  color: rgba(255,255,255,0.95);
+}
+
+.policy-item.is-bad {
+  color: rgba(255,255,255,0.90);
+}
+
+/* =========================
    BUTTONS
 ========================= */
 

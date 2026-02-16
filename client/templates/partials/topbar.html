@@ -1,3 +1,6 @@
+{% set user_name = current_user.get('user_name') if current_user else '' %}
+{% set email = current_user.get('email') if current_user else '' %}
+{% set display_name = user_name or email %}
 <div class="topbar">
   <button id="menu-toggle" class="menu-button" type="button" aria-label="Menu">
       <span class="hamburger-line"></span>
@@ -13,14 +16,16 @@
     <a href="/profile" class="topbar-avatar">
       <img src="/static/images/profile.png" alt="Profile">
     </a>
-    <div id="current-user-chip" class="badge muted">Not signed in</div>
+    <div id="current-user-chip" class="badge {% if display_name %}success{% else %}muted{% endif %}" data-user-name="{{ display_name }}">
+      {% if display_name %}{{ display_name }}{% else %}Not signed in{% endif %}
+    </div>
   </div>
 </div>
 
 <div id="menu-overlay" class="menu-overlay"></div>
 <aside id="nav-drawer" class="nav-drawer">
   <div class="drawer-header">
-    <div id="drawer-user-name">Menu</div>
+    <div id="drawer-user-name" data-user-name="{{ display_name }}">{% if display_name %}{{ display_name }}{% else %}Menu{% endif %}</div>
     <button id="close-menu" class="close-button">&times;</button>
   </div>
   
@@ -41,3 +46,5 @@
     <button id="drawer-logout" class="logout-button" style="background:none; border:none; text-align:left; cursor:pointer;">Logout</button>
   </nav>
 </aside>
+
+<script src="/static/js/auth-ui.js" defer></script>
