@@ -1,0 +1,293 @@
+/* =========================================
+   MOBILE FIRST – FORCE STACKED LAYOUT
+========================================= */
+
+.screen .docs-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+/* =========================================
+   HERO SECTION
+========================================= */
+
+.docs-top-text{
+    color: rgba(255, 255, 255, 0.959);
+}
+
+.screen .docs-hero {
+  gap: 14px;
+}
+
+.screen .docs-hero-top {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.screen .docs-hero-actions {
+  margin-top: 4px;
+}
+
+.screen .docs-hero-actions .btn-secondary {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #CFB87C;
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+  font-weight: 600;
+  text-decoration: none;
+  transition: 0.15s ease;
+}
+
+.screen .docs-hero-actions .btn-secondary:hover {
+  background: #CFB87C;
+  color: #111;
+}
+
+/* =========================================
+   FIX INVISIBLE TEXT
+========================================= */
+
+.screen .docs-section p,
+.screen .docs-section li,
+.screen .docs-grid-value,
+.screen .docs-kv-value,
+.screen .table-like .cell {
+  color: rgba(255,255,255,0.88);
+}
+
+.screen .docs-kv-label,
+.screen .docs-grid-label,
+.screen .docs-toc-title {
+  color: rgba(255,255,255,0.55);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+/* =========================================
+   KEY VALUE STACK (MOBILE)
+========================================= */
+
+.screen .docs-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.screen .docs-kv-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* =========================================
+   TOC – MOBILE STYLE (NOT SIDEBAR)
+========================================= */
+
+.screen .docs-toc {
+  order: -1;
+}
+
+.screen .docs-toc .docs-toc-link {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+  transition: 0.15s ease;
+}
+
+.screen .docs-toc .docs-toc-link:hover {
+  background: rgba(255,255,255,0.06);
+  color: #CFB87C;
+}
+
+/* =========================================
+   SECTION CARDS
+========================================= */
+
+.screen .docs-section h3 {
+  font-size: 15px;
+  margin-bottom: 8px;
+  color: rgba(255,255,255,0.95);
+}
+
+/* =========================================
+   ENDPOINT GRID – STACK ON MOBILE
+========================================= */
+
+.screen .docs-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.screen .docs-grid-item {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* =========================================
+   TABLE STYLE
+========================================= */
+
+.screen .table-like {
+  margin-top: 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.screen .table-like .row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.screen .table-like .row:first-child {
+  border-top: none;
+}
+
+/* =========================================
+   CODE BLOCKS
+========================================= */
+
+.screen .code-block {
+  margin-top: 12px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.55);
+}
+
+.screen .code-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.screen .code-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+}
+
+.screen .copy-code {
+  font-size: 11px;
+  border-radius: 8px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.8);
+  cursor: pointer;
+}
+
+.screen .copy-code:hover {
+  background: #CFB87C;
+  color: #111;
+  border-color: #CFB87C;
+}
+
+.screen pre {
+  margin: 0;
+  padding: 14px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.92);
+}
+
+/* =========================================
+   CALLOUTS
+========================================= */
+
+.screen .docs-callout {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(207,184,124,0.08);
+  border: 1px solid rgba(207,184,124,0.35);
+}
+
+.screen .docs-callout-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #CFB87C;
+  margin-bottom: 4px;
+}
+
+/* =========================================
+   LINKS FIX
+========================================= */
+
+.screen a {
+  color: #CFB87C;
+}
+
+.screen a:hover {
+  opacity: 0.85;
+}
+
+/* =========================================
+   REMOVE SIDEBAR BEHAVIOR
+========================================= */
+
+.screen .docs-toc {
+  position: relative !important;
+  width: 100% !important;
+}
+
+
+/* =========================================
+   MUTED TEXTS
+========================================= */
+
+.muted{
+    color: rgba(255,255,255,0.8);
+}
+
+/* .mono{
+    color: #CFB87C;
+} */
+
+/* .btn-secondary {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus-visible {
+  background: var(--btn-hover-color);
+  color: #111;
+} */

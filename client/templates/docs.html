@@ -5,6 +5,7 @@
     <title>API Docs</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/docs.css" />
   </head>
 
   <body class="app">
@@ -12,10 +13,16 @@
       {% include 'partials/topbar.html' %}
 
       <main class="screen">
+
+        <section class="page-header" aria-label="Page title">
+          <h1 id="page-title" class="page-title">Documentation</h1>
+          <div class="page-underline" role="presentation"></div>
+        </section>
+
         <section class="card docs-hero">
           <div class="docs-hero-top">
-            <div>
-              <h2 style="margin-bottom: 6px">Developer API</h2>
+            <div class="docs-top-text">
+              <h2 style="margin-bottom: 18px">Developer API</h2>
               <p class="muted" style="margin: 0">
                 All requests go through
                 <span class="mono">aiclipse.online/api/&lt;route&gt;</span>.
