@@ -95,6 +95,10 @@ def dev():
 def docs():
     return render_template( "docs.html")
 
+@app.get("/contact")
+def contact():
+    return render_template( "contact.html")
+
 
 def _get_token_from_cookie() -> str | None:
     return request.cookies.get("access_token")
