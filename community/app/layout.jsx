@@ -5,7 +5,7 @@ import "./global.css"
 
 import "./styles/modal/modal.css"
 
-const GATEWAY_URI = process.env.GATEWAY_URI || "http://gateway-srv:3000";
+const GATEWAY_URI = process.env.GATEWAY_URI ;
 
 async function getUser() {
   const cookieStore = await cookies();
