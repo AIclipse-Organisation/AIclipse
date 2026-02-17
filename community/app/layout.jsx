@@ -1,12 +1,13 @@
 import "./styles/appShell.css";
 import "./global.css";
+import "./styles/modal/modal.css";
 
 import ShellWrapper from "./components/ShellWrapper";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getLoginUrlFromHeaders } from "../externalOrigin";
 
-const GATEWAY_URI = process.env.GATEWAY_URI;
+const GATEWAY_URI = process.env.GATEWAY_URI ;
 
 async function getUser(token) {
   if (!token) return null;
@@ -42,14 +43,11 @@ export default async function RootLayout({ children }) {
 
   return (
     <html lang="en">
-    <head>
-      <title>AIclipse</title>
-    </head>
-
+      <head>
+        <title>AIclipse</title>
+      </head>
       <body>
-        <ShellWrapper user={user}>
-          {children}
-        </ShellWrapper>
+        <ShellWrapper user={user}>{children}</ShellWrapper>
       </body>
     </html>
   );
