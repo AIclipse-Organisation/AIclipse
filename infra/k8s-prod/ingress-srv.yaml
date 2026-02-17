@@ -37,3 +37,31 @@ spec:
                 name: s3-srv
                 port:
                   number: 9000
+
+    - host: aiclipse.site
+      http:
+        paths:
+          - path: /community
+            pathType: Prefix
+            backend:
+              service:
+                name: community-srv
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
+    - host: storage.aiclipse.site
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: s3-srv
+                port:
+                  number: 9000
