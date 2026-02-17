@@ -28,7 +28,6 @@ function SkeletonPostBox() {
       {/* description */}
       <div className="comm_body">
         <div className="sk sk-line sk-desc-1" />
-        <div className="sk sk-line sk-desc-2" />
       </div>
 
       {/* image */}
