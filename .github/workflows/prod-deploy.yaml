@@ -49,6 +49,14 @@ jobs:
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
 
+      - name: Pre-build cleanup (free disk)
+        run: |
+          set -euo pipefail
+          docker buildx prune -af || true
+          docker builder prune -af || true
+          docker system prune -af --volumes || true
+          df -h
+
       - name: Build & push images
         run: |
           set -euo pipefail
@@ -409,3 +417,12 @@ jobs:
 
           echo "not ready after 60s"
           exit 1
+
+      - name: Post-build cleanup (always)
+        if: always()
+        run: |
+          set -euo pipefail
+          docker buildx prune -af || true
+          docker builder prune -af || true
+          docker system prune -af --volumes || true
+          df -h
