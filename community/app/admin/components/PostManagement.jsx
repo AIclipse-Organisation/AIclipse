@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useMemo } from "react";
-import { Card, CardBody, Button, Textarea, Select, SelectItem, Chip, Spinner } from "@heroui/react";
+import { Card, CardBody, Button, Textarea, Select, SelectItem, Spinner } from "@heroui/react";
 import { adminService } from "@/admin/admin.js";
 
 export default function PostManagement() {
