@@ -9,7 +9,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from pymongo import ReturnDocument
 
-from app.services.passwords import PasswordService
+from app.services.passwords import (
+    PasswordService,
+    PasswordValidationError,
+)
 from app.services.tokens import TokenService
 
 
@@ -37,7 +40,7 @@ class UserPublic(BaseModel):
 class SignupRequest(BaseModel):
     user_name: str = Field(..., min_length=1)
     email: EmailStr
-    password: str = Field(..., min_length=6)
+    password: str
 
 
 class LoginRequest(BaseModel):
@@ -124,11 +127,26 @@ async def signup(request: Request, payload: SignupRequest):
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
+    try:
+        hashed = await pwd.hash_password(payload.password)
+    except PasswordValidationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "weak_password",
+                "message": str(e),
+                "checks": e.checks,
+                "failed": e.failed,
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     user_doc = {
         "user_id": f"u_{uuid4()}",
         "user_name": payload.user_name.strip(),
         "email": email_norm,
-        "password": await pwd.hash_password(payload.password),
+        "password": hashed,
         "is_admin": False,
         "plan": 0,
         "created_at": _now_utc(),
@@ -186,7 +204,20 @@ async def update_me(request: Request, body: UpdateMeRequest, user: TokenUser = D
     if "email" in raw and raw["email"] is not None:
         update_doc["email"] = raw["email"].strip().lower()
     if "password" in raw and raw["password"]:
-        update_doc["password"] = await pwd.hash_password(raw["password"])
+        try:
+            update_doc["password"] = await pwd.hash_password(raw["password"])
+        except PasswordValidationError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "weak_password",
+                    "message": str(e),
+                    "checks": e.checks,
+                    "failed": e.failed,
+                },
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     if not update_doc:
         doc = await users.find_one({"user_id": user.user_id})
