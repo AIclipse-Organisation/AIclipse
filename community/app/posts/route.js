@@ -142,10 +142,9 @@ function makePostId() {
   return `post_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-// Creates a new community post linked to an image.
 export async function POST(req) {
   try {
-    // Verify authentication and get authenticated user_id from JWT token
+    // 1. Verify authentication and get authenticated user_id directly from JWT token
     let authenticatedUserId;
     try {
       authenticatedUserId = getAuthenticatedUserId(req);
@@ -158,6 +157,7 @@ export async function POST(req) {
 
     const body = await req.json().catch(() => null);
 
+    // 2. Extract content from body
     const image_id = body?.image_id || null;
     const description = (body?.description || "").trim();
     const result = body?.result ?? null;
@@ -166,9 +166,7 @@ export async function POST(req) {
     const ground_truth = body?.ground_truth || null; 
     const is_admin_post = body?.is_admin_post || false;
 
-    // basic validation
-    const userIdValidation = validateUserId(user_id);
-    if (!userIdValidation.valid) {
+    // 3. Basic validation
     if (!image_id || !description) {
       return NextResponse.json(
         { error: "Missing required fields: image_id or description" },
@@ -176,7 +174,7 @@ export async function POST(req) {
       );
     }
 
-    // validate image_id format
+    // 4. Validate image_id format
     const imageIdValidation = validateImageId(image_id);
     if (!imageIdValidation.valid) {
       return NextResponse.json(
@@ -184,9 +182,9 @@ export async function POST(req) {
         { status: 400 }
       );
     }
-    const safeImageId = imageIdValidation.value; // Use sanitized string value
+    const safeImageId = imageIdValidation.value;
 
-    // length validation to prevent storage/performance issues
+    // 5. Length validation for description
     const MAX_DESCRIPTION_LENGTH = 1000;
     if (description.length > MAX_DESCRIPTION_LENGTH) {
       return NextResponse.json(
@@ -196,9 +194,9 @@ export async function POST(req) {
     }
 
     const db = await getDb();
-    
-
     const usersCol = db.collection(USERS_COLLECTION);
+
+    // 6. Lookup user_name using the secure authenticatedUserId
     const userDoc = await usersCol.findOne(
       { user_id: authenticatedUserId },
       { projection: { _id: 0, user_name: 1, email: 1 } }
@@ -206,15 +204,16 @@ export async function POST(req) {
 
     const user_name = String(userDoc?.user_name || userDoc?.email || "Unknown");
 
+    // 7. Construct the final document
     const doc = {
       post_id: makePostId(),
-      user_id: authenticatedUserId,
+      user_id: authenticatedUserId, // Use the secure ID from the token
       user_name,
       image_id: safeImageId,
       description,
       result,
-      ground_truth,                 // Stored for user accuracy 
-      is_admin_post,                  // Identifies this as an Admin 
+      ground_truth,                 // Stored for user accuracy auditing
+      is_admin_post,                // Identifies this as an Admin benchmark
       clicks_count: 0,
       up_vote_count: 0,
       down_vote_count: 0,
@@ -229,7 +228,7 @@ export async function POST(req) {
 
     // 8. Mark the image as public via Gateway
     try {
-      const GATEWAY_URI = process.env.GATEWAY_URI;
+      const GATEWAY_URI = process.env.GATEWAY_URI
       const imageUpdateUrl = `${GATEWAY_URI}/image/${safeImageId}`;
       
       await fetch(imageUpdateUrl, {
