@@ -158,34 +158,21 @@ export async function POST(req) {
 
     const body = await req.json().catch(() => null);
 
-    const user_id = body?.user_id || null;
     const image_id = body?.image_id || null;
     const description = (body?.description || "").trim();
     const result = body?.result ?? null;
+    
+    // Admin specific fields
+    const ground_truth = body?.ground_truth || null; 
+    const is_admin_post = body?.is_admin_post || false;
 
     // basic validation
-    if (!user_id || !image_id || !description) {
-      return NextResponse.json(
-        { error: "Missing required fields: user_id, image_id, description" },
-        { status: 400 }
-      );
-    }
-
-    // validate user_id format
     const userIdValidation = validateUserId(user_id);
     if (!userIdValidation.valid) {
+    if (!image_id || !description) {
       return NextResponse.json(
-        { error: userIdValidation.error },
+        { error: "Missing required fields: image_id or description" },
         { status: 400 }
-      );
-    }
-    const safeUserId = userIdValidation.value; // Use sanitized string value
-
-    // Security check: ensure user_id in request matches authenticated user
-    if (safeUserId !== authenticatedUserId) {
-      return NextResponse.json(
-        { error: "Forbidden: Cannot create posts on behalf of other users" },
-        { status: 403 }
       );
     }
 
@@ -209,25 +196,25 @@ export async function POST(req) {
     }
 
     const db = await getDb();
-    const col = db.collection(POSTS_COLLECTION);
+    
 
-    // NEW: lookup user_name from auth.users so posts can display it without extra DB lookups later
     const usersCol = db.collection(USERS_COLLECTION);
     const userDoc = await usersCol.findOne(
-      { user_id: safeUserId },
+      { user_id: authenticatedUserId },
       { projection: { _id: 0, user_name: 1, email: 1 } }
     );
 
     const user_name = String(userDoc?.user_name || userDoc?.email || "Unknown");
 
-    
     const doc = {
       post_id: makePostId(),
-      user_id: safeUserId,
-      user_name,          // NEW: stored on post, like comments store user_name
+      user_id: authenticatedUserId,
+      user_name,
       image_id: safeImageId,
       description,
       result,
+      ground_truth,                 // Stored for user accuracy 
+      is_admin_post,                  // Identifies this as an Admin 
       clicks_count: 0,
       up_vote_count: 0,
       down_vote_count: 0,
@@ -237,13 +224,12 @@ export async function POST(req) {
       is_reported: false,
     };
 
-
+    const col = db.collection(POSTS_COLLECTION);
     await col.insertOne(doc);
 
-    // Mark the image as public so it appears in the community feed
-    // This ensures all community posts are visible to everyone
+    // 8. Mark the image as public via Gateway
     try {
-      const GATEWAY_URI = process.env.GATEWAY_URI || "http://localhost:8000";
+      const GATEWAY_URI = process.env.GATEWAY_URI;
       const imageUpdateUrl = `${GATEWAY_URI}/image/${safeImageId}`;
       
       await fetch(imageUpdateUrl, {
@@ -252,17 +238,18 @@ export async function POST(req) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          user_id: safeUserId,
+          user_id: authenticatedUserId,
           is_public: true
         })
       });
     } catch (imageUpdateErr) {
-      // Log but don't fail the post creation if image update fails
       console.error("Failed to mark image as public:", imageUpdateErr);
     }
 
     return NextResponse.json(doc, { status: 201 });
+
   } catch (err) {
+    console.error("ERROR IN POST ROUTE:", err);
     return NextResponse.json(
       { error: "Failed to create post", detail: String(err) },
       { status: 500 }

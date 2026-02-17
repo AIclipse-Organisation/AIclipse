@@ -20,6 +20,16 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   const [userVote, setUserVote] = useState(image?.user_vote || null);
   const userHasVoted = !!userVote;
 
+  const isOfficial = !!(image?.is_admin_post || image?.is_official);
+  const groundTruth = image?.ground_truth;
+
+  const isUserCorrect = useMemo(() => {
+    if (!userHasVoted || !groundTruth) return null;
+    const userGuessedReal = userVote === "up";
+    const truthIsReal = groundTruth === "Real";
+    return userGuessedReal === truthIsReal;
+  }, [userHasVoted, userVote, groundTruth]);
+
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentsBusy, setCommentsBusy] = useState(false);
@@ -78,6 +88,7 @@ export default function PostBox({ image, currentUserId, currentUserName, onVoteU
   async function vote(direction) {
     if (!postId) return setError("Missing post_id from feed.");
     if (!currentUserId) return setError("You must be signed in to vote.");
+    if (userHasVoted) return;
     if (direction !== "up" && direction !== "down") return;
     if (busy) return;
 
@@ -203,7 +214,7 @@ useEffect(() => {
 }, [postId]);
 
   /* =========================
-     ✅ ADDED: bar helpers + derived values
+      ✅ ADDED: bar helpers + derived values
      ========================= */
 
   function toPercentNumber01(conf) {
@@ -254,7 +265,7 @@ useEffect(() => {
         : pctReal;
 
   return (
-    <div className="comm_postBox">
+   <div className={`comm_postBox ${isOfficial && userHasVoted ? "is-revealed-benchmark" : ""}`}>
       <div className="comm_topRow">
         <div className="comm_headerLeft">
           <div className="comm_avatar" aria-hidden="true">
@@ -265,6 +276,9 @@ useEffect(() => {
           <div className="comm_headerMeta">
             <div className="comm_headerNameLine">
               <div className="comm_headerName">{posterName}</div>
+              {isOfficial && userHasVoted && (
+                <span className="comm_officialBadge">Official Post</span>
+              )}
             </div>
             {timeText && <div className="comm_headerTime">{timeText}</div>}
           </div>
@@ -377,10 +391,19 @@ useEffect(() => {
           alt={image?.label || "Community image"}
           onClick={handleClick}
         />
+        {isOfficial && userHasVoted && (
+          <div className={`comm_truthReveal ${isUserCorrect ? "is-correct" : "is-incorrect"}`}>
+            <div className="comm_truthIcon">{isUserCorrect ? "✅" : "❌"}</div>
+            <div className="comm_truthText">
+              <span className="comm_truthTitle">{isUserCorrect ? "Nice Work!" : "Nice Try!"}</span>
+              <span className="comm_truthSub">Truth: {groundTruth}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* bars above image */}
-<div className="comm_bars_wrapper">
+< div className="comm_bars_wrapper">
         {/* The Prompt Overlay - Only visible if NOT voted */}
         {!userHasVoted && (
           <div className="comm_vote_prompt">
@@ -402,7 +425,7 @@ useEffect(() => {
             <div
               className={`comm_barTrack ${analysisType === "risk" ? "is-risk" : ""}`}
               role="img"
-              aria-label={`Confidence ${analysisPct.toFixed(0)}%`}
+              aria-label={`Confidence ${analysisPct.toFixed(0)}% (Aiclipse Model)` }
             >
               <div
                 className={`comm_barFill ${analysisType === "risk" ? "is-risk" : ""}`}
@@ -452,7 +475,7 @@ useEffect(() => {
             )}
           </div>
         </div>
-      </div>
+      <div/>
 
       {/* ACTIONS (like/dislike/comment) */}
       <div className="comm_bottomRow">
@@ -461,7 +484,7 @@ useEffect(() => {
           <button
             type="button"
             onClick={() => vote("up")}
-            disabled={busy || !postId}
+            disabled={busy || !postId || userHasVoted}
             title="Vote Real"
             aria-label="Vote Real"
             className="comm_actionBtn comm_voteUp"
@@ -475,7 +498,7 @@ useEffect(() => {
           <button
             type="button"
             onClick={() => vote("down")}
-            disabled={busy || !postId}
+            disabled={busy || !postId || userHasVoted}
             title="Vote AI"
             aria-label="Vote AI"
             className="comm_actionBtn comm_voteDown"
@@ -565,6 +588,7 @@ useEffect(() => {
       )}
 
       {error && <div className="muted">{error}</div>}
+    </div>
     </div>
   );
 }
