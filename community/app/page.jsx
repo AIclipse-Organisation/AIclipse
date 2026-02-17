@@ -5,13 +5,13 @@ import PostBox from "./components/post/PostBox";
 import LoadingGrid from "./components/common/LoadingGrid";
 
 export default function Page() {
-  const [items, setItems] = useState([]); 
+  const [items, setItems] = useState([]);
 
   // session info (needed for voting/commenting inside PostBox)
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentUserName, setCurrentUserName] = useState(null);
 
-  const [error, setError] = useState(null);   // displayable error message
+  const [error, setError] = useState(null); // displayable error message
   const [loading, setLoading] = useState(true); // initial loading state
 
   // Callback to update vote counts when a post is voted on
@@ -19,15 +19,21 @@ export default function Page() {
     setItems((prevItems) =>
       prevItems.map((item) =>
         item.post_id === postId
-          ? { ...item, up_vote_count: upVoteCount, down_vote_count: downVoteCount }
-          : item
-      )
+          ? {
+              ...item,
+              up_vote_count: upVoteCount,
+              down_vote_count: downVoteCount,
+            }
+          : item,
+      ),
     );
   };
 
   // Callback to remove a post from the list when it's deleted
   const handlePostDelete = (postId) => {
-    setItems((prevItems) => prevItems.filter((item) => item.post_id !== postId));
+    setItems((prevItems) =>
+      prevItems.filter((item) => item.post_id !== postId),
+    );
   };
 
   useEffect(() => {
@@ -38,13 +44,16 @@ export default function Page() {
     async function load() {
       try {
         // Get signed-in user from cookie session
-       const meRes = await fetch("/auth/me", { credentials: "include", signal });
+        const meRes = await fetch("/auth/me", {
+          credentials: "include",
+          signal,
+        });
         const contentType = meRes.headers.get("content-type");
         if (contentType && contentType.includes("text/html")) {
-        window.location.href = "/"; 
-        return;
-    }
-       if (meRes.ok) {
+          window.location.href = "/";
+          return;
+        }
+        if (meRes.ok) {
           const me = await meRes.json().catch(() => null);
           if (alive) {
             setCurrentUserId(me?.user_id || null);
@@ -65,7 +74,13 @@ export default function Page() {
         ]);
 
         if (!imgsRes.ok || !postsRes.ok) {
-          throw new Error("Failed to load community data");
+          return (
+            <div className="empty-state">
+              <div className="empty-card">
+                <p className="empty-text">No community posts yet.</p>
+              </div>
+            </div>
+          );
         }
 
         const imgs = await imgsRes.json().catch(() => ({}));
@@ -102,10 +117,17 @@ export default function Page() {
     };
   }, []);
 
-  
   if (error) return <p>{error}</p>;
-  if (loading) return <LoadingGrid />;
-  if (!items.length) return <p>No community posts yet.</p>;
+  if (loading) return <LoadingGrid count={3} />;
+
+  if (!items.length)
+    return (
+      <div className="empty-state">
+        <div className="empty-card">
+          <p className="empty-text">No community posts yet.</p>
+        </div>
+      </div>
+    );
 
   return (
     <main>
@@ -113,7 +135,7 @@ export default function Page() {
         <div className="comm_grid">
           {items.map((img) => (
             <PostBox
-              key={img.post_id} 
+              key={img.post_id}
               image={img}
               currentUserId={currentUserId}
               currentUserName={currentUserName}

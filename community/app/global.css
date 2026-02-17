@@ -101,3 +101,36 @@ body {
   z-index: 40; 
   backdrop-filter: blur(2px); 
 }
+
+/* ---------- Empty State ---------- */
+
+.empty-state {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0 40px;
+}
+
+.empty-card {
+  width: 100%;
+  max-width: 360px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #2c2c2c;
+  border-radius: 14px;
+  padding: 28px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 28px;
+  margin-bottom: 14px;
+  opacity: 0.9;
+}
+
+.empty-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #CFB87C;
+  letter-spacing: 0.01em;
+}
+
