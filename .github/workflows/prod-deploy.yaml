@@ -426,3 +426,9 @@ jobs:
           docker builder prune -af || true
           docker system prune -af --volumes || true
           df -h
+
+      - name: Cleanup workspace (always)
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf "${GITHUB_WORKSPACE:?}"/*
