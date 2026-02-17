@@ -19,444 +19,446 @@
           <div class="page-underline" role="presentation"></div>
         </section>
 
-        <section class="card docs-hero">
-          <div class="docs-hero-top">
-            <div class="docs-top-text">
-              <h2 style="margin-bottom: 18px">Developer API</h2>
-              <p class="muted" style="margin: 0">
-                All requests go through
-                <span class="mono">aiclipse.online/api/&lt;route&gt;</span>.
-                Today, there is one endpoint:
-                <span class="mono">POST /v1/checks</span>.
-              </p>
-            </div>
-            <div class="docs-hero-actions">
-              <a class="btn-secondary" href="/dev">Manage API key</a>
-            </div>
-          </div>
-
-          <div class="docs-kv">
-            <div class="docs-kv-item">
-              <div class="docs-kv-label">Base URL</div>
-              <div class="docs-kv-value">
-                <span class="mono" data-copy="https://aiclipse.online/api"
-                  >https://aiclipse.online/api</span
-                >
+        <div class="docs-shell">
+          <section class="card docs-hero">
+            <div class="docs-hero-top">
+              <div class="docs-top-text">
+                <h2 style="margin-bottom: 18px">Developer API</h2>
+                <p class="muted" style="margin: 0">
+                  All requests go through
+                  <span class="mono">aiclipse.online/api/&lt;route&gt;</span>.
+                  Today, there is one endpoint:
+                  <span class="mono">POST /v1/checks</span>.
+                </p>
+              </div>
+              <div class="docs-hero-actions">
+                <a class="btn-secondary" href="/dev">Manage API key</a>
               </div>
             </div>
 
-            <div class="docs-kv-item">
-              <div class="docs-kv-label">Auth</div>
-              <div class="docs-kv-value">
-                <span class="mono">X-Api-Key: &lt;api_key&gt;</span>
+            <div class="docs-kv">
+              <div class="docs-kv-item">
+                <div class="docs-kv-label">Base URL</div>
+                <div class="docs-kv-value">
+                  <span class="mono" data-copy="https://aiclipse.online/api"
+                    >https://aiclipse.online/api</span
+                  >
+                </div>
+              </div>
+
+              <div class="docs-kv-item">
+                <div class="docs-kv-label">Auth</div>
+                <div class="docs-kv-value">
+                  <span class="mono">X-Api-Key: &lt;api_key&gt;</span>
+                </div>
+              </div>
+
+              <div class="docs-kv-item">
+                <div class="docs-kv-label">Content</div>
+                <div class="docs-kv-value">
+                  <span class="mono">multipart/form-data</span> with field
+                  <span class="mono">file</span>
+                </div>
               </div>
             </div>
 
-            <div class="docs-kv-item">
-              <div class="docs-kv-label">Content</div>
-              <div class="docs-kv-value">
-                <span class="mono">multipart/form-data</span> with field
-                <span class="mono">file</span>
-              </div>
-            </div>
-          </div>
-
-          <div
-            id="docs-status"
-            class="status-bar"
-            style="margin-top: 10px"
-          ></div>
-        </section>
-
-        <div class="docs-layout">
-          <aside class="docs-toc card">
-            <div class="docs-toc-title">On this page</div>
-            <a class="docs-toc-link" href="#quickstart">Quickstart</a>
-            <a class="docs-toc-link" href="#auth">Authentication</a>
-            <a class="docs-toc-link" href="#endpoint"
-              >Endpoint: POST /v1/checks</a
-            >
-            <a class="docs-toc-link" href="#request">Request</a>
-            <a class="docs-toc-link" href="#examples">Examples</a>
-            <a class="docs-toc-link" href="#response">Response</a>
-            <a class="docs-toc-link" href="#postman">Postman</a>
-            <a class="docs-toc-link" href="#errors">Errors</a>
-            <a class="docs-toc-link" href="#limits">Limits</a>
-          </aside>
-
-          <section class="docs-main">
-            <section class="card docs-section" id="quickstart">
-              <h3>Quickstart</h3>
-              <p class="muted">
-                Send an image as
-                <span class="mono">multipart/form-data</span> under the field
-                <span class="mono">file</span> and include your API key in
-                <span class="mono">X-Api-Key</span>.
-              </p>
-
-              <div class="docs-callout" style="margin-top: 10px">
-                <div class="docs-callout-title">Important</div>
-                <div class="muted">
-                  Do not set <span class="mono">Content-Type</span> manually.
-                  Your HTTP client will set the correct
-                  <span class="mono">multipart/form-data</span> boundary
-                  automatically.
-                </div>
-              </div>
-
-              <div class="code-block" style="margin-top: 12px">
-                <div class="code-top">
-                  <div class="code-label">cURL</div>
-                  <button
-                    class="copy-code"
-                    type="button"
-                    data-copy-target="#code-curl"
-                    aria-label="Copy cURL"
-                    title="Copy"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre
-                  class="mono"
-                  id="code-curl"
-                ><code>curl -X POST "https://aiclipse.online/api/v1/checks" \
-  -H "X-Api-Key: &lt;YOUR_API_KEY&gt;" \
-  -H "Accept: application/json" \
-  -F "file=@./image.jpg"</code></pre>
-              </div>
-            </section>
-
-            <section class="card docs-section" id="auth">
-              <h3>Authentication</h3>
-              <p class="muted">
-                Use an API key via request header
-                <span class="mono">X-Api-Key</span>. Each user has one active
-                key. Generating a new key invalidates the previous one
-                immediately.
-              </p>
-
-              <div class="code-block">
-                <div class="code-top">
-                  <div class="code-label">Header</div>
-                  <button
-                    class="copy-code"
-                    type="button"
-                    data-copy-target="#code-auth"
-                    aria-label="Copy header"
-                    title="Copy"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre
-                  class="mono"
-                  id="code-auth"
-                ><code>X-Api-Key: &lt;YOUR_API_KEY&gt;</code></pre>
-              </div>
-            </section>
-
-            <section class="card docs-section" id="endpoint">
-              <h3>Endpoint: POST /v1/checks</h3>
-              <p class="muted">
-                Runs AI detection for a single image and returns verdict,
-                confidence, and a short-lived
-                <span class="mono">detection_token</span>.
-              </p>
-
-              <div class="docs-grid">
-                <div class="docs-grid-item">
-                  <div class="docs-grid-label">Method</div>
-                  <div class="docs-grid-value mono">POST</div>
-                </div>
-                <div class="docs-grid-item">
-                  <div class="docs-grid-label">URL</div>
-                  <div class="docs-grid-value mono">/v1/checks</div>
-                </div>
-                <div class="docs-grid-item">
-                  <div class="docs-grid-label">Auth</div>
-                  <div class="docs-grid-value mono">X-Api-Key</div>
-                </div>
-                <div class="docs-grid-item">
-                  <div class="docs-grid-label">Body</div>
-                  <div class="docs-grid-value mono">multipart/form-data</div>
-                </div>
-                <div class="docs-grid-item">
-                  <div class="docs-grid-label">Success</div>
-                  <div class="docs-grid-value mono">200 OK</div>
-                </div>
-                <div class="docs-grid-item">
-                  <div class="docs-grid-label">Response</div>
-                  <div class="docs-grid-value mono">application/json</div>
-                </div>
-              </div>
-            </section>
-
-            <section class="card docs-section" id="request">
-              <h3>Request</h3>
-              <p class="muted">Body must include a single field:</p>
-
-              <div class="table-like">
-                <div class="row">
-                  <div class="cell mono">file</div>
-                  <div class="cell">Image file (JPEG or PNG)</div>
-                  <div class="cell mono">required</div>
-                </div>
-              </div>
-
-              <div class="code-block" style="margin-top: 12px">
-                <div class="code-top">
-                  <div class="code-label">Structure</div>
-                  <button
-                    class="copy-code"
-                    type="button"
-                    data-copy-target="#code-structure"
-                    aria-label="Copy request structure"
-                    title="Copy"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre
-                  class="mono"
-                  id="code-structure"
-                ><code>POST https://aiclipse.online/api/v1/checks
-Headers:
-  X-Api-Key: &lt;YOUR_API_KEY&gt;
-  Accept: application/json
-
-Body (multipart/form-data):
-  file: &lt;image file&gt;</code></pre>
-              </div>
-            </section>
-
-            <section class="card docs-section" id="examples">
-              <h3>Examples</h3>
-
-              <div class="code-block">
-                <div class="code-top">
-                  <div class="code-label">cURL</div>
-                  <button
-                    class="copy-code"
-                    type="button"
-                    data-copy-target="#code-example-curl"
-                    aria-label="Copy cURL example"
-                    title="Copy"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre
-                  class="mono"
-                  id="code-example-curl"
-                ><code>curl -X POST "https://aiclipse.online/api/v1/checks" \
-  -H "X-Api-Key: &lt;YOUR_API_KEY&gt;" \
-  -H "Accept: application/json" \
-  -F "file=@./image.jpg"</code></pre>
-              </div>
-
-              <div class="code-block" style="margin-top: 12px">
-                <div class="code-top">
-                  <div class="code-label">Python (requests)</div>
-                  <button
-                    class="copy-code"
-                    type="button"
-                    data-copy-target="#code-example-python"
-                    aria-label="Copy Python example"
-                    title="Copy"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre class="mono" id="code-example-python"><code>import requests
-
-url = "https://aiclipse.online/api/v1/checks"
-headers = {
-  "X-Api-Key": "&lt;YOUR_API_KEY&gt;",
-  "Accept": "application/json",
-}
-files = {
-  "file": ("image.jpg", open("image.jpg", "rb"), "image/jpeg")
-}
-
-res = requests.post(url, headers=headers, files=files, timeout=60)
-print(res.status_code, res.json())</code></pre>
-              </div>
-            </section>
-
-            <section class="card docs-section" id="response">
-              <h3>Response</h3>
-              <p class="muted">
-                Successful response returns JSON with status
-                <span class="mono">200</span>.
-              </p>
-
-              <div class="table-like">
-                <div class="row">
-                  <div class="cell mono">verdict</div>
-                  <div class="cell">Model verdict</div>
-                  <div class="cell mono">string</div>
-                </div>
-                <div class="row">
-                  <div class="cell mono">label</div>
-                  <div class="cell">Human-readable label</div>
-                  <div class="cell mono">string</div>
-                </div>
-                <div class="row">
-                  <div class="cell mono">confidence</div>
-                  <div class="cell">Confidence score</div>
-                  <div class="cell mono">number</div>
-                </div>
-                <div class="row">
-                  <div class="cell mono">detection_token</div>
-                  <div class="cell">Short-lived token bound to the image</div>
-                  <div class="cell mono">string</div>
-                </div>
-              </div>
-
-              <div class="code-block" style="margin-top: 12px">
-                <div class="code-top">
-                  <div class="code-label">Example JSON</div>
-                  <button
-                    class="copy-code"
-                    type="button"
-                    data-copy-target="#code-json"
-                    aria-label="Copy response"
-                    title="Copy"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre class="mono" id="code-json"><code>{
-  "verdict": "FAKE",
-  "label": "87.84% Most Likely AI",
-  "confidence": 0.8784302671920864,
-  "detection_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}</code></pre>
-              </div>
-            </section>
-
-            <section class="card docs-section" id="postman">
-              <h3>Postman</h3>
-
-              <div class="docs-callout" style="margin-top: 8px">
-                <div class="docs-callout-title">Recommended</div>
-                <div class="muted">
-                  Use Postman’s API Key auth. It still sends the key as a header
-                  — it’s just a cleaner UI for managing it.
-                </div>
-              </div>
-
-              <ol class="muted" style="margin-top: 10px">
-                <li>
-                  Set URL:
-                  <span class="mono"
-                    >https://aiclipse.online/api/v1/checks</span
-                  >
-                </li>
-                <li>
-                  Authorization → Type: <span class="mono">API Key</span><br />
-                  Key: <span class="mono">X-Api-Key</span><br />
-                  Value: <span class="mono">&lt;YOUR_API_KEY&gt;</span><br />
-                  Add to: <span class="mono">Header</span>
-                </li>
-                <li>
-                  Headers: <span class="mono">Accept</span> =
-                  <span class="mono">application/json</span>
-                </li>
-                <li>
-                  Body → <span class="mono">form-data</span> → key
-                  <span class="mono">file</span> (type
-                  <span class="mono">File</span>) → pick an image
-                </li>
-              </ol>
-
-              <div class="docs-callout" style="margin-top: 12px">
-                <div class="docs-callout-title">Important</div>
-                <div class="muted">
-                  Do not add <span class="mono">Content-Type</span> manually in
-                  Headers. Postman will set the correct boundary automatically.
-                </div>
-              </div>
-
-              <div class="docs-callout" style="margin-top: 12px">
-                <div class="docs-callout-title">Common mistake</div>
-                <div class="muted">
-                  If the field name is not exactly
-                  <span class="mono">file</span>, FastAPI returns
-                  <span class="mono">422</span> with “Field required”.
-                </div>
-              </div>
-            </section>
-
-            <section class="card docs-section" id="errors">
-              <h3>Errors</h3>
-
-              <div class="table-like">
-                <div class="row">
-                  <div class="cell mono">401</div>
-                  <div class="cell">Missing/invalid API key</div>
-                  <div class="cell mono">{"detail":"Invalid API key"}</div>
-                </div>
-                <div class="row">
-                  <div class="cell mono">422</div>
-                  <div class="cell">Missing form field</div>
-                  <div class="cell mono">{"detail":[...,"Field required"]}</div>
-                </div>
-                <div class="row">
-                  <div class="cell mono">413</div>
-                  <div class="cell">File too large</div>
-                  <div class="cell mono">{"detail":"Payload Too Large"}</div>
-                </div>
-                <div class="row">
-                  <div class="cell mono">415</div>
-                  <div class="cell">Unsupported/invalid image</div>
-                  <div class="cell mono">
-                    {"detail":"Unsupported image format"}
-                  </div>
-                </div>
-                <div class="row">
-                  <div class="cell mono">502</div>
-                  <div class="cell">Upstream unreachable/error</div>
-                  <div class="cell mono">
-                    {"detail":"Detector unreachable: ..."}
-                  </div>
-                </div>
-              </div>
-
-              <div class="code-block" style="margin-top: 12px">
-                <div class="code-top">
-                  <div class="code-label">Wrong example (missing file key)</div>
-                  <button
-                    class="copy-code"
-                    type="button"
-                    data-copy-target="#code-wrong"
-                    aria-label="Copy wrong example"
-                    title="Copy"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre
-                  class="mono"
-                  id="code-wrong"
-                ><code>curl -X POST "https://aiclipse.online/api/v1/checks" \
-  -H "X-Api-Key: &lt;YOUR_API_KEY&gt;" \
-  -H "Accept: application/json" \
-  -F "image=@./image.jpg"</code></pre>
-              </div>
-            </section>
-
-            <section class="card docs-section" id="limits">
-              <h3>Limits</h3>
-              <ul class="muted" style="margin-top: 8px">
-                <li>Formats: JPEG, PNG</li>
-                <li>Max file size: 5 MB</li>
-                <li>Max dimensions: 12000×12000</li>
-                <li>Max pixels: 40 MP</li>
-              </ul>
-            </section>
+            <!-- <div
+              id="docs-status"
+              class="status-bar"
+              style="margin-top: 10px"
+            ></div> -->
           </section>
+
+          <div class="docs-layout">
+            <aside class="docs-toc card">
+              <div class="docs-toc-title">On this page</div>
+              <a class="docs-toc-link" href="#quickstart">Quickstart</a>
+              <a class="docs-toc-link" href="#auth">Authentication</a>
+              <a class="docs-toc-link" href="#endpoint"
+                >Endpoint: POST /v1/checks</a
+              >
+              <a class="docs-toc-link" href="#request">Request</a>
+              <a class="docs-toc-link" href="#examples">Examples</a>
+              <a class="docs-toc-link" href="#response">Response</a>
+              <a class="docs-toc-link" href="#postman">Postman</a>
+              <a class="docs-toc-link" href="#errors">Errors</a>
+              <a class="docs-toc-link" href="#limits">Limits</a>
+            </aside>
+
+            <section class="docs-main">
+              <section class="card docs-section" id="quickstart">
+                <h3>Quickstart</h3>
+                <p class="muted">
+                  Send an image as
+                  <span class="mono">multipart/form-data</span> under the field
+                  <span class="mono">file</span> and include your API key in
+                  <span class="mono">X-Api-Key</span>.
+                </p>
+
+                <div class="docs-callout" style="margin-top: 10px">
+                  <div class="docs-callout-title">Important</div>
+                  <div class="muted">
+                    Do not set <span class="mono">Content-Type</span> manually.
+                    Your HTTP client will set the correct
+                    <span class="mono">multipart/form-data</span> boundary
+                    automatically.
+                  </div>
+                </div>
+
+                <div class="code-block" style="margin-top: 12px">
+                  <div class="code-top">
+                    <div class="code-label">cURL</div>
+                    <button
+                      class="copy-code"
+                      type="button"
+                      data-copy-target="#code-curl"
+                      aria-label="Copy cURL"
+                      title="Copy"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre
+                    class="mono"
+                    id="code-curl"
+                  ><code>curl -X POST "https://aiclipse.online/api/v1/checks" \
+    -H "X-Api-Key: &lt;YOUR_API_KEY&gt;" \
+    -H "Accept: application/json" \
+    -F "file=@./image.jpg"</code></pre>
+                </div>
+              </section>
+
+              <section class="card docs-section" id="auth">
+                <h3>Authentication</h3>
+                <p class="muted">
+                  Use an API key via request header
+                  <span class="mono">X-Api-Key</span>. Each user has one active
+                  key. Generating a new key invalidates the previous one
+                  immediately.
+                </p>
+
+                <div class="code-block">
+                  <div class="code-top">
+                    <div class="code-label">Header</div>
+                    <button
+                      class="copy-code"
+                      type="button"
+                      data-copy-target="#code-auth"
+                      aria-label="Copy header"
+                      title="Copy"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre
+                    class="mono"
+                    id="code-auth"
+                  ><code>X-Api-Key: &lt;YOUR_API_KEY&gt;</code></pre>
+                </div>
+              </section>
+
+              <section class="card docs-section" id="endpoint">
+                <h3>Endpoint: POST /v1/checks</h3>
+                <p class="muted">
+                  Runs AI detection for a single image and returns verdict,
+                  confidence, and a short-lived
+                  <span class="mono">detection_token</span>.
+                </p>
+
+                <div class="docs-grid">
+                  <div class="docs-grid-item">
+                    <div class="docs-grid-label">Method</div>
+                    <div class="docs-grid-value mono">POST</div>
+                  </div>
+                  <div class="docs-grid-item">
+                    <div class="docs-grid-label">URL</div>
+                    <div class="docs-grid-value mono">/v1/checks</div>
+                  </div>
+                  <div class="docs-grid-item">
+                    <div class="docs-grid-label">Auth</div>
+                    <div class="docs-grid-value mono">X-Api-Key</div>
+                  </div>
+                  <div class="docs-grid-item">
+                    <div class="docs-grid-label">Body</div>
+                    <div class="docs-grid-value mono">multipart/form-data</div>
+                  </div>
+                  <div class="docs-grid-item">
+                    <div class="docs-grid-label">Success</div>
+                    <div class="docs-grid-value mono">200 OK</div>
+                  </div>
+                  <div class="docs-grid-item">
+                    <div class="docs-grid-label">Response</div>
+                    <div class="docs-grid-value mono">application/json</div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="card docs-section" id="request">
+                <h3>Request</h3>
+                <p class="muted">Body must include a single field:</p>
+
+                <div class="table-like">
+                  <div class="row">
+                    <div class="cell mono">file</div>
+                    <div class="cell">Image file (JPEG or PNG)</div>
+                    <div class="cell mono">required</div>
+                  </div>
+                </div>
+
+                <div class="code-block" style="margin-top: 12px">
+                  <div class="code-top">
+                    <div class="code-label">Structure</div>
+                    <button
+                      class="copy-code"
+                      type="button"
+                      data-copy-target="#code-structure"
+                      aria-label="Copy request structure"
+                      title="Copy"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre
+                    class="mono"
+                    id="code-structure"
+                  ><code>POST https://aiclipse.online/api/v1/checks
+  Headers:
+    X-Api-Key: &lt;YOUR_API_KEY&gt;
+    Accept: application/json
+
+  Body (multipart/form-data):
+    file: &lt;image file&gt;</code></pre>
+                </div>
+              </section>
+
+              <section class="card docs-section" id="examples">
+                <h3>Examples</h3>
+
+                <div class="code-block">
+                  <div class="code-top">
+                    <div class="code-label">cURL</div>
+                    <button
+                      class="copy-code"
+                      type="button"
+                      data-copy-target="#code-example-curl"
+                      aria-label="Copy cURL example"
+                      title="Copy"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre
+                    class="mono"
+                    id="code-example-curl"
+                  ><code>curl -X POST "https://aiclipse.online/api/v1/checks" \
+    -H "X-Api-Key: &lt;YOUR_API_KEY&gt;" \
+    -H "Accept: application/json" \
+    -F "file=@./image.jpg"</code></pre>
+                </div>
+
+                <div class="code-block" style="margin-top: 12px">
+                  <div class="code-top">
+                    <div class="code-label">Python (requests)</div>
+                    <button
+                      class="copy-code"
+                      type="button"
+                      data-copy-target="#code-example-python"
+                      aria-label="Copy Python example"
+                      title="Copy"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre class="mono" id="code-example-python"><code>import requests
+
+  url = "https://aiclipse.online/api/v1/checks"
+  headers = {
+    "X-Api-Key": "&lt;YOUR_API_KEY&gt;",
+    "Accept": "application/json",
+  }
+  files = {
+    "file": ("image.jpg", open("image.jpg", "rb"), "image/jpeg")
+  }
+
+  res = requests.post(url, headers=headers, files=files, timeout=60)
+  print(res.status_code, res.json())</code></pre>
+                </div>
+              </section>
+
+              <section class="card docs-section" id="response">
+                <h3>Response</h3>
+                <p class="muted">
+                  Successful response returns JSON with status
+                  <span class="mono">200</span>.
+                </p>
+
+                <div class="table-like">
+                  <div class="row">
+                    <div class="cell mono">verdict</div>
+                    <div class="cell">Model verdict</div>
+                    <div class="cell mono">string</div>
+                  </div>
+                  <div class="row">
+                    <div class="cell mono">label</div>
+                    <div class="cell">Human-readable label</div>
+                    <div class="cell mono">string</div>
+                  </div>
+                  <div class="row">
+                    <div class="cell mono">confidence</div>
+                    <div class="cell">Confidence score</div>
+                    <div class="cell mono">number</div>
+                  </div>
+                  <div class="row">
+                    <div class="cell mono">detection_token</div>
+                    <div class="cell">Short-lived token bound to the image</div>
+                    <div class="cell mono">string</div>
+                  </div>
+                </div>
+
+                <div class="code-block" style="margin-top: 12px">
+                  <div class="code-top">
+                    <div class="code-label">Example JSON</div>
+                    <button
+                      class="copy-code"
+                      type="button"
+                      data-copy-target="#code-json"
+                      aria-label="Copy response"
+                      title="Copy"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre class="mono" id="code-json"><code>{
+    "verdict": "FAKE",
+    "label": "87.84% Most Likely AI",
+    "confidence": 0.8784302671920864,
+    "detection_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }</code></pre>
+                </div>
+              </section>
+
+              <section class="card docs-section" id="postman">
+                <h3>Postman</h3>
+
+                <div class="docs-callout" style="margin-top: 8px">
+                  <div class="docs-callout-title">Recommended</div>
+                  <div class="muted">
+                    Use Postman’s API Key auth. It still sends the key as a header
+                    — it’s just a cleaner UI for managing it.
+                  </div>
+                </div>
+
+                <ol class="muted" style="margin-top: 10px">
+                  <li>
+                    Set URL:
+                    <span class="mono"
+                      >https://aiclipse.online/api/v1/checks</span
+                    >
+                  </li>
+                  <li>
+                    Authorization → Type: <span class="mono">API Key</span><br />
+                    Key: <span class="mono">X-Api-Key</span><br />
+                    Value: <span class="mono">&lt;YOUR_API_KEY&gt;</span><br />
+                    Add to: <span class="mono">Header</span>
+                  </li>
+                  <li>
+                    Headers: <span class="mono">Accept</span> =
+                    <span class="mono">application/json</span>
+                  </li>
+                  <li>
+                    Body → <span class="mono">form-data</span> → key
+                    <span class="mono">file</span> (type
+                    <span class="mono">File</span>) → pick an image
+                  </li>
+                </ol>
+
+                <div class="docs-callout" style="margin-top: 12px">
+                  <div class="docs-callout-title">Important</div>
+                  <div class="muted">
+                    Do not add <span class="mono">Content-Type</span> manually in
+                    Headers. Postman will set the correct boundary automatically.
+                  </div>
+                </div>
+
+                <div class="docs-callout" style="margin-top: 12px">
+                  <div class="docs-callout-title">Common mistake</div>
+                  <div class="muted">
+                    If the field name is not exactly
+                    <span class="mono">file</span>, FastAPI returns
+                    <span class="mono">422</span> with “Field required”.
+                  </div>
+                </div>
+              </section>
+
+              <section class="card docs-section" id="errors">
+                <h3>Errors</h3>
+
+                <div class="table-like">
+                  <div class="row">
+                    <div class="cell mono">401</div>
+                    <div class="cell">Missing/invalid API key</div>
+                    <div class="cell mono">{"detail":"Invalid API key"}</div>
+                  </div>
+                  <div class="row">
+                    <div class="cell mono">422</div>
+                    <div class="cell">Missing form field</div>
+                    <div class="cell mono">{"detail":[...,"Field required"]}</div>
+                  </div>
+                  <div class="row">
+                    <div class="cell mono">413</div>
+                    <div class="cell">File too large</div>
+                    <div class="cell mono">{"detail":"Payload Too Large"}</div>
+                  </div>
+                  <div class="row">
+                    <div class="cell mono">415</div>
+                    <div class="cell">Unsupported/invalid image</div>
+                    <div class="cell mono">
+                      {"detail":"Unsupported image format"}
+                    </div>
+                  </div>
+                  <div class="row">
+                    <div class="cell mono">502</div>
+                    <div class="cell">Upstream unreachable/error</div>
+                    <div class="cell mono">
+                      {"detail":"Detector unreachable: ..."}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="code-block" style="margin-top: 12px">
+                  <div class="code-top">
+                    <div class="code-label">Wrong example (missing file key)</div>
+                    <button
+                      class="copy-code"
+                      type="button"
+                      data-copy-target="#code-wrong"
+                      aria-label="Copy wrong example"
+                      title="Copy"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre
+                    class="mono"
+                    id="code-wrong"
+                  ><code>curl -X POST "https://aiclipse.online/api/v1/checks" \
+    -H "X-Api-Key: &lt;YOUR_API_KEY&gt;" \
+    -H "Accept: application/json" \
+    -F "image=@./image.jpg"</code></pre>
+                </div>
+              </section>
+
+              <section class="card docs-section" id="limits">
+                <h3>Limits</h3>
+                <ul class="muted" style="margin-top: 8px">
+                  <li>Formats: JPEG, PNG</li>
+                  <li>Max file size: 5 MB</li>
+                  <li>Max dimensions: 12000×12000</li>
+                  <li>Max pixels: 40 MP</li>
+                </ul>
+              </section>
+            </section>
+          </div>
         </div>
       </main>
 
