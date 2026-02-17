@@ -450,7 +450,6 @@ export default function PostBox({
         )}
       </div>
 
-      <p className="comm_debugScore">Score: {Number(image.score).toFixed(4)}</p>
 
       {/* bars above image */}
       <div className="comm_bars_wrapper">
