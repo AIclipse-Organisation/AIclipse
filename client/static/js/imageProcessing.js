@@ -68,6 +68,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const TOO_LARGE_MSG = "Image is too large. Max allowed size is 5 MB.";
 
   const fileInput = document.getElementById("file-input");
+  const fileLabel = document.querySelector("label.file-upload");
+
   const btnCheck = document.getElementById("btn-check");
   const checkState = document.getElementById("check-state");
 
@@ -109,6 +111,12 @@ window.addEventListener("DOMContentLoaded", () => {
   // Crop state (object-position % values)
   let cropX = 50; // 0..100
   let cropY = 20; // 0..100 (top-biased helps keep heads)
+
+  function updateFileLabel(hasFile) {
+    if (!fileLabel) return;
+    fileLabel.classList.toggle("is-selected", !!hasFile);
+    fileLabel.textContent = hasFile ? "Change Image" : "Choose Image";
+  }
 
   function syncPublishUI() {
     const isPublic = !!(savePublic && savePublic.checked);
@@ -304,6 +312,8 @@ window.addEventListener("DOMContentLoaded", () => {
     fileInput.addEventListener("change", () => {
       const file = fileInput.files?.[0];
 
+      updateFileLabel(!!file);
+
       if (file && file.size > MAX_IMAGE_BYTES) {
         window.lastFile = null;
         window.lastDetectionToken = null;
@@ -312,8 +322,7 @@ window.addEventListener("DOMContentLoaded", () => {
           fileInput.value = "";
         } catch {}
 
-        const uploadLabel = document.querySelector("label.file-upload");
-        if (uploadLabel) uploadLabel.classList.remove("is-selected");
+        updateFileLabel(false);
 
         if (previewImg) {
           if (lastPreviewUrl) {
@@ -347,8 +356,8 @@ window.addEventListener("DOMContentLoaded", () => {
       window.lastFile = file || null;
       window.lastDetectionToken = null;
 
-      const uploadLabel = document.querySelector("label.file-upload");
-      if (uploadLabel) uploadLabel.classList.toggle("is-selected", !!file);
+      // ✅ CHANGE: remove the old duplicate uploadLabel toggling block
+      // (it was overriding / duplicating behavior)
 
       // Reset crop position on new file (nice UX)
       cropX = 50;
