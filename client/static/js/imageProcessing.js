@@ -330,11 +330,17 @@ window.addEventListener("DOMContentLoaded", () => {
         if (saveResult) saveResult.textContent = "";
         if (saveStatus) setStatus(saveStatus, "info", "");
 
-        if (btnCheck) btnCheck.disabled = true;
+        if (btnCheck) btnCheck.hidden = true;
         if (checkState) checkState.textContent = TOO_LARGE_MSG;
 
         if (detectResult) detectResult.textContent = "No detection yet.";
         if (detectStatus) setStatus(detectStatus, "info", "");
+
+        if (btnCheck) {
+          btnCheck.disabled = true;
+          btnCheck.hidden = true;
+        }
+
         return;
       }
 
@@ -373,13 +379,19 @@ window.addEventListener("DOMContentLoaded", () => {
       if (saveStatus) setStatus(saveStatus, "info", "");
 
       if (file) {
-        if (btnCheck) btnCheck.disabled = false;
+        if (btnCheck) {
+          btnCheck.hidden = false;
+          btnCheck.disabled = false;
+        }
         if (checkState)
           checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
         if (detectResult)
           detectResult.textContent = "No detection yet for this file.";
       } else {
-        if (btnCheck) btnCheck.disabled = true;
+        if (btnCheck) {
+          btnCheck.disabled = true;
+          btnCheck.hidden = true;
+        }
         if (checkState) checkState.textContent = "Select an image to analyze.";
         if (detectResult) detectResult.textContent = "No detection yet.";
       }
