@@ -196,6 +196,9 @@ window.addEventListener("DOMContentLoaded", () => {
       applyCropPosition();
       if (cropHint) cropHint.style.opacity = "0.9";
     });
+    cropResetBtn?.addEventListener("pointerdown", (e) => {
+  e.stopPropagation();
+});
   })();
 
   async function makeCroppedFileFromOriginal(originalFile, frameAspect = 1) {

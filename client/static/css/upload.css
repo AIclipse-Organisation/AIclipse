@@ -257,6 +257,33 @@ textarea {
   color: #111;
 }
 
+/* Reset crop button INSIDE the image frame */
+.btn-crop-reset.inside-frame {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 5;
+
+  width: auto;
+  min-width: 70%;
+  margin-top: 0;
+
+  padding: 10px 14px;
+  border-radius: 999px;
+
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(2px);
+}
+
+.btn-crop-reset.inside-frame:hover {
+  background: #CFB87C;
+  color: #111;
+}
+
+.crop-hint { bottom: 52px; }
 
 
 
