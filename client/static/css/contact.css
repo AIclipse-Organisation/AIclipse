@@ -116,8 +116,9 @@ Inspo:
 }
 
 /* =========================
-   Social Media
+   Social Media (ROW ICONS)
    ========================= */
+
 .social-title {
   margin: 24px 0 10px 0;
   text-align: left;
@@ -127,110 +128,115 @@ Inspo:
   color: rgba(255, 255, 255, 0.92);
 }
 
+.social-description {
+  margin: 0 0 18px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.70);
+  max-width: 420px;
+}
+
+
 .social-list {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 26px;
+
+  margin-top: 14px;
+  flex-wrap: nowrap;
 }
 
-.social-row {
-  --btn-outline-color: #CFB87C;
-  --btn-hover-color: #CFB87C;
-
+.social-item {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
   align-items: center;
-
-  padding: 12px 14px;
-  border-radius: 14px;
   text-decoration: none;
 
+  border: 0;
   background: transparent;
-  border: 1px solid var(--btn-outline-color);
-
-  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
-  box-sizing: border-box;
+  padding: 0;
 
   color: #fff;
+  transition: transform 160ms ease, opacity 160ms ease;
 }
 
-.social-row:active {
-  opacity: 0.92;
-}
-
-.social-row:hover {
-  background: var(--btn-hover-color);
-  color: #111;
+.social-item:active {
+  opacity: 0.85;
+  transform: scale(0.96);
 }
 
 .social-icon {
-  width: 34px;
-  height: 34px;
+  width: 54px;
+  height: 54px;
   border-radius: 999px;
 
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
 
   background: transparent;
-  border: 1px solid var(--btn-outline-color);
-  flex: 0 0 34px;
+  border: 2px solid #CFB87C;
 
   transition: background 160ms ease, border-color 160ms ease;
 }
 
-/* =========================
-   Social Media Animation
-   ========================= */
 .social-icon img {
-  width: 16px;
-  height: 16px;
+  width: 25px;
+  height: 25px;
   display: block;
-  filter: none;
+
   transition: transform 160ms ease;
 }
 
-.social-row:hover .social-icon {
-  background: #111;
-  border-color: #111;
+.social-item:hover .social-icon {
+  background: #CFB87C;
+  border-color: #CFB87C;
 }
 
-.social-row:hover .social-icon img {
-  transform: scale(1.2);
+.social-item:hover .social-icon img {
+  transform: scale(1.12);
+  filter: brightness(0);
 }
 
-.social-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.social-main {
-  font-size: 13.5px;
+.social-name {
+  margin-top: 10px;
+  font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
-}
-
-.social-row:hover .social-main {
-  color: #111;
-}
-
-.social-sub {
-  font-size: 12.5px;
-  line-height: 1.35;
-  color: rgba(255, 255, 255, 0.70);
-}
-
-.social-row:hover .social-sub {
-  color: rgba(17, 17, 17, 0.85);
+  text-align: center;
+  color: #CFB87C;
 }
 
 @media (max-width: 360px) {
+  .social-list {
+    gap: 18px;
+  }
+
+  .social-icon {
+    width: 58px;
+    height: 58px;
+  }
+
+  .social-icon img {
+    width: 26px;
+    height: 26px;
+  }
+
+  .social-name {
+    font-size: 12.5px;
+  }
+}
+
+
+.social-row:hover .social-main {
+  color: #CFB87C;
+}
+
+/* =========================
+   Responsive
+   ========================= */
+@media (max-width: 360px) {
   .pill-text {
     font-size: 13px;
-  }
-  .social-sub {
-    font-size: 12px;
   }
 }
