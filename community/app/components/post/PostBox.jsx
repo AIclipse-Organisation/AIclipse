@@ -312,7 +312,7 @@ export default function PostBox({
 
              {isTrending && (
         <div className="trend_div_container_body">
-          <span className="comm_trendingBadge">HOT</span>
+          <span className="comm_trendingBadge">POPULAR</span>
         </div>
       )}
           <div className="comm_menu">

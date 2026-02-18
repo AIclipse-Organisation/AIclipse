@@ -914,3 +914,25 @@
   padding: 0 12px;
   margin: 4px 0;
 }
+
+.comm_trendingBadge .fa-fire {
+  /* This allows the gradient to show through the icon shape */
+  background: linear-gradient(
+    110deg, 
+    #c9ba83 40%, 
+    #fff7d6 50%, 
+    #c9ba83 60%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine-sweep 3s linear infinite;
+}
+
+@keyframes shine-sweep {
+  to {
+    background-position: 200% center;
+  }
+}
+
+
