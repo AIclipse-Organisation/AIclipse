@@ -116,6 +116,17 @@ Inspo:
 }
 
 /* =========================
+   Section Divider
+   ========================= */
+
+.contact-divider {
+  margin: 28px 0 22px 0;
+  height: 1px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+/* =========================
    Social Media (ROW ICONS)
    ========================= */
 
