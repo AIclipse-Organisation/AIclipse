@@ -3,6 +3,8 @@ import { useState } from "react";
 import ModelManagement from "./components/ModelManagement";
 import Statistics from "./components/Statistics.jsx";
 import UserManagement from "./components/UserManagement"; 
+// 1. Import the new component
+import PostManagement from "./components/PostManagement";
 
 export default function AdminPage() {
   const [activeView, setActiveView] = useState("statistics");
@@ -29,6 +31,10 @@ export default function AdminPage() {
           <button className={getLinkClass("model_management")} onClick={() => setActiveView("model_management")}>
             Model Management
           </button>
+          {/* 2. Add the Navigation Button */}
+          <button className={getLinkClass("post_management")} onClick={() => setActiveView("post_management")}>
+            Post Management
+          </button>
           <button className={getLinkClass("user_management")} onClick={() => setActiveView("user_management")}>
             User Management
           </button>
@@ -41,10 +47,10 @@ export default function AdminPage() {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 min-w-0 h-full overflow-hidden">
         {activeView === "statistics" && <Statistics />}
         {activeView === "model_management" && <ModelManagement />}
+        {activeView === "post_management" && <PostManagement />}
         {activeView === "user_management" && <UserManagement />}
       </main>
 

@@ -30,6 +30,44 @@ export const adminService = {
   triggerTraining: async () => fetchLocal("/models/train", { method: "POST" }),
   deleteModel: async (version) => fetchLocal(`/models/${version}`, { method: "DELETE" }),
   getStatistics: async () => fetchLocal("/stats"),
+
+  scanImage: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/checks", { 
+      method: "POST", 
+      body: formData, 
+      credentials: "include" 
+    });
+    if (!res.ok) throw new Error("AI Scan failed");
+    return res.json();
+  },
+
+  saveImage: async (file, token) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("detection_token", token);
+    formData.append("is_public", "true");
+    
+    const res = await fetch("/upload/image", { 
+      method: "POST", 
+      body: formData, 
+      credentials: "include" 
+    });
+    if (!res.ok) throw new Error("Image save failed");
+    return res.json();
+  },
+
+  createOfficialPost: async (postBody) => {
+    const res = await fetch("/community/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(postBody),
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Community publish failed");
+    return res.json();
+  },
   
   uploadModel: async (formData) => {
     const res = await fetch(`/community/adminBFF/models`, {
