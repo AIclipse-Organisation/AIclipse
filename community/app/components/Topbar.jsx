@@ -59,6 +59,7 @@ export default function Topbar({ isAdmin, userName = "Not signed in" }) {
           <a href="/community" onClick={() => setIsOpen(false)}>Home</a>
           <a href="/profile" onClick={() => setIsOpen(false)}>Profile</a>
           <a href="/plan" onClick={() => setIsOpen(false)}>Subscription Plan</a>
+          <a href="/contact" onClick={() => setIsOpen(false)}>Contact Us</a>
 
           <div className="drawer-separator"></div>
 

@@ -296,7 +296,7 @@ window.addEventListener("DOMContentLoaded", () => {
             loginSuccess = true;
             setStatus(accountStatus, "success", "Logged in. Redirecting...");
             setCurrentUserChip(loginData.user);
-            window.location.href = "/community";
+            window.location.href = "/upload";
           } else {
             setStatus(
               accountStatus,
@@ -367,7 +367,7 @@ window.addEventListener("DOMContentLoaded", () => {
         if (res.ok && data.user) {
           setStatus(accountStatus, "success", "Logged in.");
           setCurrentUserChip(data.user);
-          window.location.href = "/community";
+          window.location.href = "/upload";
         } else {
           if (loginContent) loginContent.style.display = "block";
           if (authToggleContainer) authToggleContainer.style.display = "";
