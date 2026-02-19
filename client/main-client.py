@@ -77,9 +77,9 @@ def index():
     return render_template("login.html", show_signup=show_signup)
 
 
-@app.get("/imgProcessing")
-def img_processing():
-    return render_template("imgProcessing.html")
+@app.get("/upload")
+def upload():
+    return render_template( "upload.html")
 
 
 @app.get("/scans")
@@ -87,9 +87,9 @@ def scans():
     return render_template("scans.html")
 
 
-@app.get("/home")
-def upload():
-    return render_template("home.html")
+# @app.get("/home")
+# def upload():
+#     return render_template("home.html")
 
 
 @app.get("/notification")

@@ -55,6 +55,23 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   const statusEl = document.getElementById("docs-status");
 
+  function flashButtonCopied(btn, text = "Copied", duration = 1200) {
+    if (!btn) return;
+
+    if (!btn.dataset.originalHtml) {
+      btn.dataset.originalHtml = btn.innerHTML;
+    }
+
+    btn.innerHTML = text;
+    btn.classList.add("is-copied");
+
+    clearTimeout(btn._copiedTimer);
+    btn._copiedTimer = setTimeout(() => {
+      btn.innerHTML = btn.dataset.originalHtml;
+      btn.classList.remove("is-copied");
+    }, duration);
+  }
+
   // Copy code blocks (buttons with data-copy-target="#id")
   const codeButtons = document.querySelectorAll("[data-copy-target]");
   for (const btn of codeButtons) {
@@ -62,12 +79,13 @@ window.addEventListener("DOMContentLoaded", async () => {
       const sel = btn.getAttribute("data-copy-target");
       const el = sel ? document.querySelector(sel) : null;
 
-      // Prefer the inner <code> if present, otherwise fallback to textContent
       const codeEl = el ? el.querySelector("code") : null;
       const text = (codeEl || el)?.textContent || "";
 
       const ok = await copyToClipboard(text.trim());
       setStatus(statusEl, ok ? "success" : "error", ok ? "Copied." : "Copy failed.");
+
+      if (ok) flashButtonCopied(btn);
     });
   }
 
@@ -83,6 +101,8 @@ window.addEventListener("DOMContentLoaded", async () => {
       const text = el.getAttribute("data-copy") || el.textContent || "";
       const ok = await copyToClipboard(text.trim());
       setStatus(statusEl, ok ? "success" : "error", ok ? "Copied." : "Copy failed.");
+
+      if (ok) flashButtonCopied(el);
     };
 
     el.addEventListener("click", doCopy);
