@@ -127,6 +127,11 @@ def docs():
     return render_template("docs.html")
 
 
+@app.get("/contact")
+def contact():
+    return render_template( "contact.html")
+
+
 @app.post("/checks")
 def checks():
     token = get_access_token(request)
