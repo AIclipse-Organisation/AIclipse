@@ -197,8 +197,8 @@ window.addEventListener("DOMContentLoaded", () => {
       if (cropHint) cropHint.style.opacity = "0.9";
     });
     cropResetBtn?.addEventListener("pointerdown", (e) => {
-  e.stopPropagation();
-});
+      e.stopPropagation();
+    });
   })();
 
   async function makeCroppedFileFromOriginal(originalFile, frameAspect = 1) {
@@ -282,8 +282,6 @@ window.addEventListener("DOMContentLoaded", () => {
     const isBlobUrl = url.startsWith("blob:");
     const isDataUrl = url.startsWith("data:");
 
-    // For blob: URLs, do a minimal structural check to ensure they look like
-    // ones produced via URL.createObjectURL (e.g., "blob:<origin>/<uuid>").
     if (isBlobUrl) {
       try {
         const parsed = new URL(url);
@@ -296,8 +294,6 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
     } else if (isDataUrl) {
-      // Only allow data URLs for image media types, e.g. data:image/png;base64,...
-      // This prevents arbitrary data: payloads from being used as active content.
       if (!/^data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=]+$/.test(url)) {
         imgEl.removeAttribute("src");
         return;
@@ -359,10 +355,6 @@ window.addEventListener("DOMContentLoaded", () => {
       window.lastFile = file || null;
       window.lastDetectionToken = null;
 
-      // ✅ CHANGE: remove the old duplicate uploadLabel toggling block
-      // (it was overriding / duplicating behavior)
-
-      // Reset crop position on new file (nice UX)
       cropX = 50;
       cropY = 20;
       applyCropPosition();
@@ -442,16 +434,11 @@ window.addEventListener("DOMContentLoaded", () => {
       setStatus(detectStatus, "info", "Analyzing image...");
 
       try {
-        // IMPORTANT: create cropped file based on user's drag framing.
-        // Must match your CSS aspect-ratio. If square: 1. If 4/5: 0.8, etc.
-        const frameAspect = 1; // <-- change if you change the frame ratio in CSS
+        const frameAspect = 1;
         const { croppedFile, previewDataUrl } =
           await makeCroppedFileFromOriginal(window.lastFile, frameAspect);
 
-        // Use CROPPED file from now on (for checks + later saving/publishing)
         window.lastFile = croppedFile;
-
-        // Store CROPPED preview for results page
         sessionStorage.setItem("lastDetectionPreview", previewDataUrl);
 
         const formData = new FormData();
@@ -495,7 +482,6 @@ window.addEventListener("DOMContentLoaded", () => {
         window.lastDetectionToken = lastDetectionToken;
         window.lastDetectionToken = lastDetectionToken;
 
-        // enable SAVE if we have a token (results page only)
         if (btnSave) btnSave.disabled = !lastDetectionToken;
         if (saveState) {
           saveState.textContent = lastDetectionToken
@@ -503,7 +489,6 @@ window.addEventListener("DOMContentLoaded", () => {
             : "No detection token returned; cannot save.";
         }
 
-        // store results for results page
         sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
         sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
 
@@ -521,207 +506,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // SAVE button -> POST /upload/image with file + detection_token (uses CROPPED window.lastFile)
-  if (btnSave) {
-    btnSave.addEventListener("click", async () => {
-      if (!window.lastFile) {
-        setStatus(saveStatus, "error", "No file selected.");
-        return;
-      }
-      if (!window.lastDetectionToken) {
-        setStatus(
-          saveStatus,
-          "error",
-          "No detection token. Run detection first.",
-        );
-        return;
-      }
-
-      const isPublic = !!(savePublic && savePublic.checked);
-      const description = (
-        postDescriptionInput && postDescriptionInput.value
-          ? postDescriptionInput.value
-          : ""
-      ).trim();
-
-      if (isPublic && !window.currentUserId) {
-        setStatus(
-          saveStatus,
-          "error",
-          "You must be signed in to publish to community.",
-        );
-        return;
-      }
-      if (isPublic && !description) {
-        setStatus(
-          saveStatus,
-          "error",
-          "Description is required when publishing.",
-        );
-        return;
-      }
-      if (description.length > 1000) {
-        setStatus(
-          saveStatus,
-          "error",
-          `Description too long (${description.length}/1000 characters).`,
-        );
-        return;
-      }
-
-      btnSave.disabled = true;
-      setStatus(saveStatus, "info", "Saving image...");
-
-      const formData = new FormData();
-      formData.append("file", window.lastFile);
-      formData.append("detection_token", window.lastDetectionToken);
-      formData.append("is_public", isPublic ? "true" : "false");
-
-      try {
-        const res = await fetch("/upload/image", {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-        let data = null;
-        try {
-          data = await res.json();
-        } catch {
-          data = { detail: "Non-JSON response" };
-        }
-        setDebug({ url: "/upload/image", status: res.status, body: data });
-
-        if (!res.ok) {
-          setStatus(
-            saveStatus,
-            "error",
-            data.detail || `Save failed (${res.status})`,
-          );
-          return;
-        }
-
-        setStatus(saveStatus, "success", "Saved image.");
-
-        if (isPublic) {
-          setStatus(saveStatus, "info", "Creating community post...");
-
-          const uploadPayload =
-            data &&
-            typeof data === "object" &&
-            data.body &&
-            typeof data.body === "object"
-              ? data.body
-              : data;
-
-          const resolvedImageId =
-            (uploadPayload && uploadPayload.image_id) ||
-            (uploadPayload &&
-              uploadPayload.image &&
-              uploadPayload.image.image_id) ||
-            (data && data.image && data.image.image_id) ||
-            null;
-
-          if (!resolvedImageId) {
-            console.error(
-              "Upload response missing image_id. Raw response:",
-              data,
-            );
-            setStatus(
-              saveStatus,
-              "error",
-              "Saved image, but could not read image_id from server response.",
-            );
-            return;
-          }
-
-          const resolvedVerdict =
-            (uploadPayload && uploadPayload.verdict) ||
-            (uploadPayload &&
-              uploadPayload.result &&
-              uploadPayload.result.verdict) ||
-            (data && data.verdict) ||
-            null;
-
-          const resolvedLabel =
-            (uploadPayload && uploadPayload.label) ||
-            (uploadPayload &&
-              uploadPayload.result &&
-              uploadPayload.result.label) ||
-            (data && data.label) ||
-            null;
-
-          const resolvedConfidence =
-            (uploadPayload && uploadPayload.confidence) ||
-            (uploadPayload &&
-              uploadPayload.result &&
-              uploadPayload.result.confidence) ||
-            (data && data.confidence) ||
-            null;
-
-          const postBody = {
-            user_id: window.currentUserId,
-            image_id: resolvedImageId,
-            description,
-            result: {
-              verdict: resolvedVerdict,
-              label: resolvedLabel,
-              confidence: resolvedConfidence,
-            },
-          };
-
-          const postRes = await fetch("/community/posts", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            credentials: "include",
-            body: JSON.stringify(postBody),
-          });
-
-          let postJson = null;
-          try {
-            postJson = await postRes.json();
-          } catch {
-            postJson = { detail: "Non-JSON response" };
-          }
-          setDebug({
-            url: "/community/posts",
-            status: postRes.status,
-            body: postJson,
-          });
-
-          if (postRes.ok) {
-            setStatus(saveStatus, "success", "Saved image + published post.");
-            setTimeout(() => {
-              window.location.href = "/community";
-            }, 1000);
-          } else {
-            setStatus(
-              saveStatus,
-              "error",
-              postJson.error ||
-                postJson.detail ||
-                `Post failed (${postRes.status})`,
-            );
-          }
-        } else {
-          setTimeout(() => {
-            window.location.href = "/scans";
-          }, 1000);
-        }
-
-        if (saveResult) saveResult.textContent = "";
-      } catch (err) {
-        console.error(err);
-        setStatus(saveStatus, "error", "Network error during save.");
-      } finally {
-        btnSave.disabled = false;
-      }
-    });
-  }
-
-  // Optional renderDetection (used on results page if you call it)
+  // Expose renderDetection if you ever want to call it from results.js
   function renderDetection(resp) {
     if (!resp || typeof resp !== "object") {
       if (detectResult) {
@@ -791,6 +576,9 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   })();
 
-  // Expose renderDetection if you ever want to call it from results.js
-  window.renderDetection = renderDetection;
+  // Only export this renderDetection on the UPLOAD page.
+  // (On Results page, results.js owns renderDetection.)
+  if (document.getElementById("btn-check")) {
+    window.renderDetection = renderDetection;
+  }
 });

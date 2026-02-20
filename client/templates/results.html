@@ -29,24 +29,24 @@
           <div id="detect-card" class="detection-card" aria-live="polite">
             <div class="detection-row">
               <div class="detection-main">
-                <p id="detect-verdict" class="verdict-text label-neutral">—</p>
 
-                <div
-                  class="progress-bar"
-                  aria-hidden="true"
-                  title="Real vs AI probability"
-                >
-                  <div
-                    class="fill real-fill progress-fill"
-                    style="width: 0%"
-                  ></div>
-                  <div class="fill ai-fill" style="width: 0%"></div>
+                <div class="bar-head">
+                  <span class="bar-title">Aiclipse</span>
+                  <p id="detect-verdict" class="verdict-text label-neutral">—</p>
+                </div>
+
+                <div class="progress-panel" aria-hidden="true" title="Real probability">
+                  <div class="progress-bar">
+                    <div class="real-fill" style="--p:0;"></div>
+                    <div class="ai-fill" style="--p:0;"></div>
+                  </div>
+
+                  <span class="bar-percent" id="real-percent">0%</span>
                 </div>
 
                 <!-- Actions (no action-card wrapper) -->
                 <h3 class="results-actions-title">Would you like to…</h3>
 
-                <!-- Save image (green outline) -->
                 <button
                   id="btn-save"
                   disabled
@@ -56,12 +56,10 @@
                   Save Image
                 </button>
 
-                <!-- Delete scan (same as cancel outline) -->
                 <button id="btn-delete" class="btn-delete-scan" type="button">
                   Delete Scan
                 </button>
 
-                <!-- Publish (button toggle that drops down) -->
                 <button
                   id="btn-publish-toggle"
                   type="button"
@@ -70,7 +68,6 @@
                   Publish to Community
                 </button>
 
-                <!-- keep checkbox for compatibility (JS toggles it) -->
                 <input id="save-public" type="checkbox" hidden />
 
                 <div id="public-desc-wrap" class="publish-extra" hidden>
