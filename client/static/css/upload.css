@@ -330,11 +330,14 @@ textarea {
 }
 
 /* =========================
-   Progress panel + pill track that CONTAINS fill
+   Progress panel (contained)
    ========================= */
 
 .progress-panel {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
   padding: 10px 12px 12px;
   margin: 0 0 12px;
 
@@ -342,27 +345,36 @@ textarea {
   border-top: 0;
   border-radius: 0 0 12px 12px;
   background: rgba(0, 0, 0, 0.12);
+
+  overflow: hidden; 
 }
 
 .progress-panel .progress-bar {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
   height: 18px;
   border-radius: 999px;
 
   background: #000;
   border: 1px solid rgba(255, 255, 255, 0.10);
 
-  overflow: hidden; /* clips both fill and percent */
+  overflow: hidden;      
+  padding-right: 64px;   
 }
 
 .progress-panel .real-fill {
-  height: 100%;
-  width: 100%;
+  position: absolute;
+  inset: 0;
   background: rgba(207, 184, 124, 0.95);
 
   transform-origin: left center;
   transform: scaleX(calc(var(--p) / 100));
   transition: transform 300ms ease;
+
+  z-index: 1;
 }
 
 .progress-panel .ai-fill {
@@ -379,12 +391,9 @@ textarea {
   font-weight: 800;
   color: rgba(255, 255, 255, 0.92);
   pointer-events: none;
-  z-index: 5;
 
+  z-index: 3; 
   white-space: nowrap;
-  max-width: calc(100% - 20px);
-  text-align: right;
-
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
 }
 
