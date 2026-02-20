@@ -13,7 +13,9 @@ function clamp(n, min, max) {
 function setFillPercent(fillEl, percent) {
   if (!fillEl) return;
   const p = clamp(percent, 0, 100);
-  fillEl.style.setProperty("--p", p);
+
+  fillEl.style.width = p === 0 ? "0px" : `calc(${p}% - 0px)`;
+  fillEl.dataset.p = String(p);
 }
 
 function renderDetection(resp) {
