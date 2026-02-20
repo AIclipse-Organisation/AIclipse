@@ -334,9 +334,7 @@ textarea {
    ========================= */
 
 .progress-panel {
-  position: relative;
   width: 100%;
-
   padding: 10px 12px 12px;
   margin: 0 0 12px;
 
@@ -346,7 +344,6 @@ textarea {
   background: rgba(0, 0, 0, 0.12);
 }
 
-/* This is the black pill track and the clipping mask */
 .progress-panel .progress-bar {
   position: relative;
   height: 18px;
@@ -355,10 +352,9 @@ textarea {
   background: #000;
   border: 1px solid rgba(255, 255, 255, 0.10);
 
-  overflow: hidden;
+  overflow: hidden; /* clips both fill and percent */
 }
 
-/* Gold fill uses scaleX so it can never overflow */
 .progress-panel .real-fill {
   height: 100%;
   width: 100%;
@@ -369,23 +365,25 @@ textarea {
   transition: transform 300ms ease;
 }
 
-/* Keep ai-fill for compatibility, hidden */
 .progress-panel .ai-fill {
   display: none;
 }
 
-/* percent text stays pushed right */
-.progress-panel .bar-percent {
+.progress-panel .progress-bar .bar-percent {
   position: absolute;
-  right: 18px;
-  top: 19px;
+  right: 12px;
+  top: 50%;
   transform: translateY(-50%);
 
   font-size: 12px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.92);
   pointer-events: none;
-  z-index: 10;
+  z-index: 5;
+
+  white-space: nowrap;
+  max-width: calc(100% - 20px);
+  text-align: right;
 
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
 }
