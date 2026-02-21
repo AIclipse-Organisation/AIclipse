@@ -334,13 +334,12 @@ async def _proxy_json(
     if safe_path.endswith("/") and not normalized_path.endswith("/"):
         normalized_path = f"{normalized_path}/"
 
-    base_prefix = f"{parsed_base.scheme}://{parsed_base.netloc}{parsed_base.path.rstrip('/')}"
-    url = f"{base_prefix}{normalized_path}"
+    # --- FIX: do not build a full URL string; lock host/scheme with base_url ---
     try:
-        async with httpx.AsyncClient(timeout=timeout_s) as client:
+        async with httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=timeout_s) as client:
             resp = await client.request(
                 method=method,
-                url=url,
+                url=normalized_path,  # relative to base_url
                 json=json_body,
                 headers=headers,
                 params=params,
@@ -1466,7 +1465,7 @@ async def gateway_delete_image(
     user: UserContext = Depends(get_current_user),
 ):
     """
-    Delete an image. Only the owner can delete their own image.
+    Delete an image. Only the owner can delete their own images.
     Gateway authenticates the user and forwards the request to media service.
     """
     # Match GET behavior

@@ -214,8 +214,6 @@ async def create_checkout_session(request: CheckoutRequest):
         request.email,
     )
 
-    logger.info("create-checkout-session called plan_id=%s", safe_plan_id)
-
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Stripe not configured")
 
@@ -228,9 +226,14 @@ async def create_checkout_session(request: CheckoutRequest):
     }
 
     if safe_plan_id not in plan_prices:
+        # optional: log a constant message without the tainted value
+        logger.info("create-checkout-session called with invalid plan_id")
         raise HTTPException(status_code=400, detail="Invalid plan ID")
 
     plan = plan_prices[safe_plan_id]
+
+    # ✅ allowlisted / constant-ish value, not user-controlled
+    logger.info("create-checkout-session called plan=%s", plan["name"])
 
     try:
         # Reuse Stripe customer id from latest plan record if any
