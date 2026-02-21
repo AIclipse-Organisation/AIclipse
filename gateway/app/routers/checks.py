@@ -13,6 +13,16 @@ from app.models import UserContext
 router = APIRouter()
 
 
+def _detail_from_detector(resp: httpx.Response) -> str:
+    try:
+        j = resp.json()
+        if isinstance(j, dict) and "detail" in j:
+            return str(j["detail"])
+    except Exception:
+        pass
+    return resp.text or ""
+
+
 async def _checks_impl(request: Request, file: UploadFile, user: UserContext) -> JSONResponse:
     s = request.app.state.settings
     detector_uri = require_setting("DETECTOR_URI", s.detector_uri)
@@ -31,41 +41,32 @@ async def _checks_impl(request: Request, file: UploadFile, user: UserContext) ->
     client: httpx.AsyncClient = request.app.state.http
     try:
         resp = await client.post(url, content=data, headers=headers, timeout=60.0)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="timeout")
     except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Detector unreachable: {exc}",
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Detector unreachable: {exc}")
 
-    if resp.status_code == 400:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=resp.text,
-        )
+    if resp.status_code in (503, 504):
+        # Forward busy/timeout as-is to client (client shows generic message)
+        raise HTTPException(status_code=resp.status_code, detail=_detail_from_detector(resp))
+
+    if 400 <= resp.status_code < 500:
+        raise HTTPException(status_code=resp.status_code, detail=_detail_from_detector(resp))
 
     if resp.status_code >= 500:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Detector service error",
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Detector service error")
 
     try:
         detector_payload = resp.json()
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Detector returned invalid JSON",
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Detector returned invalid JSON")
 
     verdict = detector_payload.get("verdict")
     label = detector_payload.get("label")
     confidence = detector_payload.get("confidence")
 
     if verdict is None or label is None or confidence is None:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Detector response missing required fields",
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Detector response missing required fields")
 
     detection_token = await create_detection_token(
         request=request,
