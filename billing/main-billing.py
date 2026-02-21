@@ -1,11 +1,12 @@
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 import stripe
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
-from pymongo import MongoClient, ReturnDocument
+from pymongo import MongoClient
 
 app = FastAPI()
 
@@ -15,9 +16,9 @@ app = FastAPI()
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB = os.getenv("MONGO_DB")
 
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 
 CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5000")
 
@@ -36,21 +37,6 @@ logger.info("CLIENT_URL=%s", CLIENT_URL)
 logger.info("MONGO_URI set=%s", bool(MONGO_URI))
 logger.info("MONGO_DB=%s", MONGO_DB)
 
-# Safe prefixes only
-if STRIPE_SECRET_KEY:
-    logger.info("STRIPE_SECRET_KEY prefix=%s", STRIPE_SECRET_KEY[:8])
-else:
-    logger.warning("STRIPE_SECRET_KEY is NOT set")
-
-if STRIPE_WEBHOOK_SECRET:
-    logger.info("STRIPE_WEBHOOK_SECRET prefix=%s", STRIPE_WEBHOOK_SECRET[:8])
-else:
-    logger.warning("STRIPE_WEBHOOK_SECRET is NOT set")
-
-if STRIPE_PUBLISHABLE_KEY:
-    logger.info("STRIPE_PUBLISHABLE_KEY prefix=%s", STRIPE_PUBLISHABLE_KEY[:8])
-else:
-    logger.warning("STRIPE_PUBLISHABLE_KEY is NOT set")
 
 # Collections
 usage = None
@@ -131,6 +117,38 @@ class CheckoutRequest(BaseModel):
 class PortalRequest(BaseModel):
     customer_id: str
 
+
+class RequestLogSanitizer:
+    _CONTROL_CHARS = re.compile(r"[\r\n\t\x00-\x1f\x7f]")
+
+    @classmethod
+    def _clean_text(cls, value, max_len: int = 128) -> str:
+        text = "" if value is None else str(value)
+        text = cls._CONTROL_CHARS.sub(" ", text).strip()
+        if len(text) > max_len:
+            return f"{text[:max_len]}..."
+        return text
+
+    @classmethod
+    def user_id(cls, value) -> str:
+        return cls._clean_text(value, max_len=64)
+
+    @classmethod
+    def plan_id(cls, value) -> int:
+        try:
+            return int(value)
+        except Exception:
+            return -1
+
+    @classmethod
+    def email(cls, value) -> str:
+        cleaned = cls._clean_text(value, max_len=120)
+        if "@" not in cleaned:
+            return cleaned
+        local, domain = cleaned.split("@", 1)
+        masked_local = local[:1] + "***" if local else "***"
+        return f"{masked_local}@{domain}"
+
 # -------------------------
 # HEALTH
 # -------------------------
@@ -175,8 +193,12 @@ def record_usage(payload: dict):
 # -------------------------
 @app.post("/create-checkout-session")
 async def create_checkout_session(request: CheckoutRequest):
+    safe_user_id = RequestLogSanitizer.user_id(request.user_id)
+    safe_plan_id = RequestLogSanitizer.plan_id(request.plan_id)
+    safe_email = RequestLogSanitizer.email(request.email)
+
     logger.info("create-checkout-session called user_id=%s plan_id=%s email=%s",
-                request.user_id, request.plan_id, request.email)
+                safe_user_id, safe_plan_id, safe_email)
 
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Stripe not configured")

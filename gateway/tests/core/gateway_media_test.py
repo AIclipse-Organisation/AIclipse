@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from tests.conftest import make_auth_token
+from gateway.tests.conftest import make_auth_token
 
 
 @pytest.mark.asyncio

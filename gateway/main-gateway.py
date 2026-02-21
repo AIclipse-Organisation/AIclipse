@@ -60,6 +60,7 @@ logging.basicConfig(level=logging.INFO)
 
 _IMAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _MEDIA_PATH_RE = re.compile(r"^[A-Za-z0-9_/-]{1,256}$")
+_USER_ID_SEGMENT_PATTERN = re.compile(r"^[A-Za-z0-9._@:-]{1,128}$")
 
 # Image safety limits
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -186,8 +187,22 @@ def _sanitize_image_id(image_id: str) -> str:
     # Return the matched string (breaks taint chain for CodeQL)
     return match.group(0)
 
+
+def _sanitize_user_id_segment(user_id: str) -> str:
+    if not isinstance(user_id, str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user id",
+        )
+    match = _USER_ID_SEGMENT_PATTERN.fullmatch(user_id)
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user id",
+        )
+    return match.group(0)
+
 DETECTOR_URI = os.getenv("DETECTOR_URI")
-HOSTNAME = os.getenv("HOSTNAME")
 
 # Internal secret for detection_token
 DETECTION_TOKEN_SECRET = os.getenv("DETECTION_TOKEN_SECRET")
@@ -779,13 +794,13 @@ async def create_checkout_session(body: dict):
     billing_uri = _require_setting("BILLING_URI", BILLING_URI)
     target_url = billing_uri.rstrip("/") + "/create-checkout-session"
 
-    logger.info(f"Creating checkout session - target URL: {target_url}, body: {body}")
+    logger.info("Creating checkout session proxy request")
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(target_url, json=body)
 
-            logger.info(f"Billing response: status={resp.status_code}, content={resp.text[:500]}")
+            logger.info("Billing checkout proxy response status=%s", resp.status_code)
 
             if resp.status_code != 200:
                 raise HTTPException(
@@ -829,11 +844,15 @@ async def get_billing_config():
 async def admin_upgrade_plan(user_id: str, plan_id: int):
     """Admin endpoint to manually upgrade user plan (for testing without webhooks)"""
     billing_uri = _require_setting("BILLING_URI", BILLING_URI)
-    target_url = billing_uri.rstrip("/") + f"/admin/upgrade-plan?user_id={user_id}&plan_id={plan_id}"
+    target_url = billing_uri.rstrip("/") + "/admin/upgrade-plan"
+    safe_user_id = _sanitize_user_id_segment(user_id)
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(target_url)
+            resp = await client.post(
+                target_url,
+                params={"user_id": safe_user_id, "plan_id": int(plan_id)},
+            )
 
             if resp.status_code != 200:
                 raise HTTPException(
@@ -973,10 +992,11 @@ async def gateway_admin_get_user(
     admin: UserContext = Depends(get_current_admin),
 ):
     auth_uri = _require_setting("AUTH_URI", AUTH_URI)
+    safe_user_id = _sanitize_user_id_segment(user_id)
     return await _proxy_json(
         "GET",
         auth_uri,
-        f"/admin/user/{user_id}",
+        f"/admin/user/{safe_user_id}",
         headers={"Authorization": f"Bearer {admin.token}"},
     )
 
@@ -988,10 +1008,11 @@ async def gateway_admin_update_user(
     admin: UserContext = Depends(get_current_admin),
 ):
     auth_uri = _require_setting("AUTH_URI", AUTH_URI)
+    safe_user_id = _sanitize_user_id_segment(user_id)
     return await _proxy_json(
         "PATCH",
         auth_uri,
-        f"/admin/user/{user_id}",
+        f"/admin/user/{safe_user_id}",
         json_body=payload,
         headers={"Authorization": f"Bearer {admin.token}"},
     )
@@ -1003,10 +1024,11 @@ async def gateway_admin_delete_user(
     admin: UserContext = Depends(get_current_admin),
 ):
     auth_uri = _require_setting("AUTH_URI", AUTH_URI)
+    safe_user_id = _sanitize_user_id_segment(user_id)
     return await _proxy_json(
         "DELETE",
         auth_uri,
-        f"/admin/user/{user_id}",
+        f"/admin/user/{safe_user_id}",
         headers={"Authorization": f"Bearer {admin.token}"},
     )
 

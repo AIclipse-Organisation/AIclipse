@@ -5,7 +5,7 @@ import httpx
 import jwt
 import pytest
 
-from tests.conftest import make_auth_token
+from gateway.tests.conftest import make_auth_token
 
 
 # Small, valid 1x1 PNGs so the gateway's image sniffing passes.
