@@ -65,6 +65,80 @@ function isPrivateScan(img) {
   return true; // default to private if missing
 }
 
+function getPostId(img) {
+  if (!img) return null;
+
+  // Most common
+  if (img.post_id) return img.post_id;
+
+  // Common variations across branches / APIs
+  if (img.postId) return img.postId;
+  if (img.community_post_id) return img.community_post_id;
+
+  // Nested shapes (just in case)
+  if (img.post && (img.post.post_id || img.post.id)) return img.post.post_id || img.post.id;
+
+  return null;
+}
+
+async function fetchPostByImageId(imageId) {
+  if (!imageId) return null;
+
+  // Try a couple likely endpoints (only GETs). We gracefully ignore failures.
+  const urls = [
+    `/community/posts?image_id=${encodeURIComponent(imageId)}`,
+    `/community/posts/by_image?image_id=${encodeURIComponent(imageId)}`,
+    `/community/posts/by_image_id?image_id=${encodeURIComponent(imageId)}`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      });
+
+      if (!res.ok) continue;
+
+      const data = await res.json().catch(() => null);
+      if (!data) continue;
+
+      // Handle common shapes:
+      // { item: {...} }
+      if (data.item && (data.item.post_id || data.item.postId || data.item.id)) return data.item;
+
+      // { items: [...] }
+      if (Array.isArray(data.items) && data.items[0]) return data.items[0];
+
+      // direct object {...}
+      if (data.post_id || data.postId || data.id) return data;
+    } catch (_) {
+      // ignore and try next
+    }
+  }
+
+  return null;
+}
+
+async function ensurePostIdForPublicScan(img) {
+  // Only for public scans missing post id
+  if (!img || isPrivateScan(img)) return false;
+  if (getPostId(img)) return true;
+  if (!img.image_id) return false;
+
+  const post = await fetchPostByImageId(img.image_id);
+  if (!post) return false;
+
+  // Normalize onto currentScan so the rest of your code works unchanged
+  img.post_id = post.post_id || post.postId || post.id || null;
+
+  // If the post has a description and scan doesn't, use it
+  if (!img.description && post.description) img.description = post.description;
+
+  return !!img.post_id;
+}
+
 // -------------------------
 // Button selection helpers
 // - Selected state is driven by whether the dropdown is open
@@ -386,6 +460,16 @@ function renderScan(img, title) {
   const imageEl = document.getElementById("viewscan-image");
   const titleEl = document.getElementById("viewscan-title");
 
+    ensurePostIdForPublicScan(img).then((ok) => {
+    if (!ok) return;
+
+    renderMeta(currentScan);
+
+    setupEditDescriptionInline(currentScan);
+    setupShowComments(currentScan);
+    setupDeletePost(currentScan);
+  });
+
   if (!card || !imageEl || !titleEl) return;
 
   if (!img) {
@@ -454,11 +538,13 @@ function setupEditDescriptionInline(img) {
   const cancelBtn = document.getElementById("edit-description-cancel");
 
   if (!section || !openBtn || !form || !input || !statusEl || !saveBtn || !cancelBtn) {
-    if (section) section.style.display = img && img.post_id ? "block" : "none";
+    if (section) section.style.display = img && getPostId(img) ? "block" : "none";
     return;
   }
 
-  const shouldShow = !!(img && img.post_id);
+  // ✅ updated: tolerate different post id keys
+  const postId = getPostId(img);
+  const shouldShow = !!postId;
   section.style.display = shouldShow ? "block" : "none";
 
   if (!shouldShow) {
@@ -564,7 +650,8 @@ function setupEditDescriptionInline(img) {
   if (!saveBtn.dataset.bound) {
     saveBtn.dataset.bound = "1";
     saveBtn.addEventListener("click", async () => {
-      if (!currentScan || !currentScan.post_id) return;
+      const postIdNow = getPostId(currentScan);
+      if (!currentScan || !postIdNow) return;
       if (saveBtn.disabled) return;
 
       const description = input.value.trim();
@@ -583,7 +670,7 @@ function setupEditDescriptionInline(img) {
       setFormStatus("Saving...", null);
 
       try {
-        await patchPostDescription(currentScan.post_id, description);
+        await patchPostDescription(postIdNow, description);
 
         // Update local + rerender meta so Details -> Description updates immediately
         currentScan.description = description;
@@ -642,8 +729,10 @@ function setupShowComments(img) {
     return;
   }
 
+  const postId = getPostId(img);
+
   // Show only for public posts with post_id
-  const shouldShow = !!(img && img.post_id && !isPrivateScan(img));
+  const shouldShow = !!(postId && !isPrivateScan(img));
   section.style.display = shouldShow ? "block" : "none";
 
   if (!shouldShow) {
@@ -703,7 +792,13 @@ function setupShowComments(img) {
       clearEl(listEl);
 
       try {
-        const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(currentScan.post_id)}`, {
+        const postIdNow = getPostId(currentScan);
+        if (!postIdNow) {
+          setStatus("Missing post id for this scan.", true);
+          return;
+        }
+
+        const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(postIdNow)}`, {
           method: "GET",
           headers: { Accept: "application/json" },
           credentials: "include",
@@ -748,8 +843,11 @@ function setupDeletePost(img) {
     return;
   }
 
+  // ✅ updated: tolerate different post id keys
+  const postId = getPostId(img);
+
   // Show only for public posts with post_id
-  const shouldShow = !!(img && img.post_id && !isPrivateScan(img));
+  const shouldShow = !!(postId && !isPrivateScan(img));
   section.style.display = shouldShow ? "block" : "none";
 
   if (!shouldShow) {
@@ -780,7 +878,8 @@ function setupDeletePost(img) {
   if (!deleteBtn.dataset.bound) {
     deleteBtn.dataset.bound = "1";
     deleteBtn.addEventListener("click", () => {
-      if (!currentScan || !currentScan.post_id) return;
+      const postIdNow = getPostId(currentScan);
+      if (!currentScan || !postIdNow) return;
       showModal();
     });
   }
@@ -793,7 +892,8 @@ function setupDeletePost(img) {
   if (modalConfirm && !modalConfirm.dataset.bound) {
     modalConfirm.dataset.bound = "1";
     modalConfirm.addEventListener("click", async () => {
-      if (!currentScan || !currentScan.post_id) return;
+      const postIdNow = getPostId(currentScan);
+      if (!currentScan || !postIdNow) return;
 
       hideModal();
       deleteBtn.disabled = true;
@@ -801,7 +901,7 @@ function setupDeletePost(img) {
       setStatus("Deleting post...", null);
 
       try {
-        const res = await fetch(`/community/posts?post_id=${encodeURIComponent(currentScan.post_id)}`, {
+        const res = await fetch(`/community/posts?post_id=${encodeURIComponent(postIdNow)}`, {
           method: "DELETE",
           credentials: "include",
           headers: { Accept: "application/json" },
