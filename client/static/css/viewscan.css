@@ -194,21 +194,20 @@
 /* Fill */
 .meter-fill {
   position: absolute;
-  inset: 4px;                 
+  top: 4px;
+  left: 4px;
+  bottom: 4px;
   border-radius: 999px;
 
-  width: auto !important;     
-  height: auto;
-
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 300ms ease;
+  width: 0%;
+  max-width: calc(100% - 8px);
+  transition: width 300ms ease;
   z-index: 1;
 }
 
-/* .meter-fill[data-p]:not([data-p="0"]) {
+.meter-fill:not([style*="width: 0"]) {
   min-width: 14px;
-} */
+}
 
 .meter-fill--gold {
   background: rgba(207, 184, 124, 0.95);

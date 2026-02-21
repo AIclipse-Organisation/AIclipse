@@ -146,6 +146,7 @@
   bottom: 4px;
 
   width: 0%;
+  max-width: calc(100% - 8px);
   border-radius: 999px;
   background: rgba(207,184,124,0.95);
 
@@ -178,7 +179,7 @@
 }
 
 .error {
-  color: var(--error-color, #e04646);
+  color: var(--error-color, #dc3545);
 }
 
 /* =========================

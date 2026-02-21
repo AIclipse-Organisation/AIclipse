@@ -56,7 +56,7 @@ function clamp(n, min, max) {
 function setFillPercent(fillEl, percent) {
   if (!fillEl) return;
   const p = clamp(percent, 0, 100);
-  fillEl.style.transform = `scaleX(${p / 100})`;
+  fillEl.style.width = `${p}%`;
   fillEl.dataset.p = String(p);
 }
 
@@ -94,8 +94,40 @@ function getPostId(img) {
   return null;
 }
 
+function normalizeId(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function getImageId(post) {
+  if (!post) return null;
+  if (post.image_id) return post.image_id;
+  if (post.imageId) return post.imageId;
+  if (post.image && (post.image.image_id || post.image.id)) return post.image.image_id || post.image.id;
+  return null;
+}
+
+function findMatchingPost(payload, matcher) {
+  if (!payload || typeof matcher !== "function") return null;
+
+  const fromItem = payload.item;
+  if (fromItem && matcher(fromItem)) return fromItem;
+
+  if (Array.isArray(payload.items)) {
+    const found = payload.items.find((post) => matcher(post));
+    if (found) return found;
+  }
+
+  if (matcher(payload)) return payload;
+
+  return null;
+}
+
 async function fetchPostByImageId(imageId) {
   if (!imageId) return null;
+
+  const requestedImageId = normalizeId(imageId);
+  const matchesImageId = (post) => normalizeId(getImageId(post)) === requestedImageId;
 
   // Try a couple likely endpoints (only GETs). We gracefully ignore failures.
   const urls = [
@@ -117,15 +149,8 @@ async function fetchPostByImageId(imageId) {
       const data = await res.json().catch(() => null);
       if (!data) continue;
 
-      // Handle common shapes:
-      // { item: {...} }
-      if (data.item && (data.item.post_id || data.item.postId || data.item.id)) return data.item;
-
-      // { items: [...] }
-      if (Array.isArray(data.items) && data.items[0]) return data.items[0];
-
-      // direct object {...}
-      if (data.post_id || data.postId || data.id) return data;
+      const matched = findMatchingPost(data, matchesImageId);
+      if (matched) return matched;
     } catch (_) {
       // ignore and try next
     }
@@ -160,6 +185,9 @@ async function ensurePostIdForPublicScan(img) {
 async function fetchPostByPostId(postId) {
   if (!postId) return null;
 
+  const requestedPostId = normalizeId(postId);
+  const matchesPostId = (post) => normalizeId(getPostId(post)) === requestedPostId;
+
   const urls = [
     `/community/posts?post_id=${encodeURIComponent(postId)}`,
     `/community/posts/by_id?post_id=${encodeURIComponent(postId)}`,
@@ -179,9 +207,8 @@ async function fetchPostByPostId(postId) {
       const data = await res.json().catch(() => null);
       if (!data) continue;
 
-      if (data.item) return data.item;
-      if (Array.isArray(data.items) && data.items[0]) return data.items[0];
-      if (data.post_id || data.postId || data.id) return data;
+      const matched = findMatchingPost(data, matchesPostId);
+      if (matched) return matched;
     } catch (_) {}
   }
 
