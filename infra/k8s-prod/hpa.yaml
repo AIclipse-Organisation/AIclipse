@@ -208,7 +208,7 @@ spec:
     kind: Deployment
     name: detector-depl
   minReplicas: 1
-  maxReplicas: 10
+  maxReplicas: 4
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300
