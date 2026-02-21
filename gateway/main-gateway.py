@@ -61,6 +61,7 @@ logging.basicConfig(level=logging.INFO)
 _IMAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _MEDIA_PATH_RE = re.compile(r"^[A-Za-z0-9_/-]{1,256}$")
 _USER_ID_SEGMENT_PATTERN = re.compile(r"^[A-Za-z0-9._@:-]{1,128}$")
+_PROXY_PATH_PATTERN = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@/%-]{1,1024}$")
 
 # Image safety limits
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -302,7 +303,39 @@ async def _proxy_json(
     params: Optional[dict] = None,
     timeout_s: float = 10.0,
 ) -> Response:
-    url = base_url.rstrip("/") + path
+    parsed_base = urlparse(base_url)
+    if parsed_base.scheme not in {"http", "https"} or not parsed_base.netloc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid upstream base URL",
+        )
+
+    match = _PROXY_PATH_PATTERN.fullmatch(path or "")
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid upstream path",
+        )
+
+    safe_path = match.group(0)
+    if safe_path.startswith("//") or "\\" in safe_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid upstream path",
+        )
+
+    normalized_path = posixpath.normpath(safe_path)
+    if not normalized_path.startswith("/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid upstream path",
+        )
+
+    if safe_path.endswith("/") and not normalized_path.endswith("/"):
+        normalized_path = f"{normalized_path}/"
+
+    base_prefix = f"{parsed_base.scheme}://{parsed_base.netloc}{parsed_base.path.rstrip('/')}"
+    url = f"{base_prefix}{normalized_path}"
     try:
         async with httpx.AsyncClient(timeout=timeout_s) as client:
             resp = await client.request(

@@ -5,7 +5,10 @@ import httpx
 import jwt
 import pytest
 
-from gateway.tests.conftest import make_auth_token
+try:
+    from tests.conftest import make_auth_token
+except ModuleNotFoundError:
+    from gateway.tests.conftest import make_auth_token
 
 
 # Small, valid 1x1 PNGs so the gateway's image sniffing passes.

@@ -149,6 +149,21 @@ class RequestLogSanitizer:
         masked_local = local[:1] + "***" if local else "***"
         return f"{masked_local}@{domain}"
 
+    @classmethod
+    def sanitize_checkout_input(cls, user_id, plan_id, email):
+        cleaned_user_id = cls.user_id(user_id)
+        cleaned_plan_id = cls.plan_id(plan_id)
+        cleaned_email = cls.email(email)
+
+        if not cleaned_user_id:
+            raise HTTPException(status_code=400, detail="Invalid user_id")
+        if cleaned_plan_id < 0:
+            raise HTTPException(status_code=400, detail="Invalid plan_id")
+        if not cleaned_email or "@" not in cleaned_email:
+            raise HTTPException(status_code=400, detail="Invalid email")
+
+        return cleaned_user_id, cleaned_plan_id, cleaned_email
+
 # -------------------------
 # HEALTH
 # -------------------------
@@ -193,12 +208,13 @@ def record_usage(payload: dict):
 # -------------------------
 @app.post("/create-checkout-session")
 async def create_checkout_session(request: CheckoutRequest):
-    safe_user_id = RequestLogSanitizer.user_id(request.user_id)
-    safe_plan_id = RequestLogSanitizer.plan_id(request.plan_id)
-    safe_email = RequestLogSanitizer.email(request.email)
+    safe_user_id, safe_plan_id, safe_email = RequestLogSanitizer.sanitize_checkout_input(
+        request.user_id,
+        request.plan_id,
+        request.email,
+    )
 
-    logger.info("create-checkout-session called user_id=%s plan_id=%s email=%s",
-                safe_user_id, safe_plan_id, safe_email)
+    logger.info("create-checkout-session called plan_id=%s", safe_plan_id)
 
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Stripe not configured")
@@ -211,16 +227,16 @@ async def create_checkout_session(request: CheckoutRequest):
         2: {"name": "Premium Plan", "amount": 1999},
     }
 
-    if request.plan_id not in plan_prices:
+    if safe_plan_id not in plan_prices:
         raise HTTPException(status_code=400, detail="Invalid plan ID")
 
-    plan = plan_prices[request.plan_id]
+    plan = plan_prices[safe_plan_id]
 
     try:
         # Reuse Stripe customer id from latest plan record if any
         customer_id = None
         last_plan = plan_coll.find_one(
-            {"user_id": request.user_id, "stripe_customer_id": {"$exists": True, "$ne": None}},
+            {"user_id": safe_user_id, "stripe_customer_id": {"$exists": True, "$ne": None}},
             sort=[("timestamp", -1)],
         )
         if last_plan:
@@ -230,15 +246,15 @@ async def create_checkout_session(request: CheckoutRequest):
             try:
                 stripe.Customer.modify(
                     customer_id,
-                    email=request.email,
-                    metadata={"user_id": request.user_id},
+                    email=safe_email,
+                    metadata={"user_id": safe_user_id},
                 )
             except Exception as e:
                 logger.warning("stripe.Customer.modify failed: %s", e)
         else:
             customer = stripe.Customer.create(
-                email=request.email,
-                metadata={"user_id": request.user_id},
+                email=safe_email,
+                metadata={"user_id": safe_user_id},
             )
             customer_id = customer.id
 
@@ -263,8 +279,8 @@ async def create_checkout_session(request: CheckoutRequest):
             success_url=f"{CLIENT_URL}/plan?success=true",
             cancel_url=f"{CLIENT_URL}/plan?canceled=true",
             metadata={
-                "user_id": request.user_id,
-                "plan_id": str(request.plan_id),
+                "user_id": safe_user_id,
+                "plan_id": str(safe_plan_id),
                 "amount_paid": _cents_to_eur_str(plan["amount"]),
                 "stripe_customer_id": customer_id,
             },
