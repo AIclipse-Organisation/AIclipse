@@ -18,7 +18,8 @@ def _detail_from_detector(resp: httpx.Response) -> str:
         j = resp.json()
         if isinstance(j, dict) and "detail" in j:
             return str(j["detail"])
-    except Exception:
+    except (ValueError, TypeError, httpx.HTTPError):
+        # Best-effort detail extraction only; fall back to raw response text on parse errors.
         pass
     return resp.text or ""
 
