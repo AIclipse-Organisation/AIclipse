@@ -62,6 +62,10 @@ _IMAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _MEDIA_PATH_RE = re.compile(r"^[A-Za-z0-9_/-]{1,256}$")
 _USER_ID_SEGMENT_PATTERN = re.compile(r"^[A-Za-z0-9._@:-]{1,128}$")
 _PROXY_PATH_PATTERN = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@/%-]{1,1024}$")
+_ALLOWED_PROXY_PATH_PATTERNS = (
+    re.compile(r"^/(signup|login|me|admin/users|me/api-key|usage/check|usage/increment)$"),
+    re.compile(r"^/admin/user/[A-Za-z0-9._-]{1,128}$"),
+)
 
 # Image safety limits
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -293,23 +297,7 @@ class UserContext(BaseModel):
     token: str
 
 
-async def _proxy_json(
-    method: str,
-    base_url: str,
-    path: str,
-    *,
-    json_body: Optional[dict] = None,
-    headers: Optional[dict] = None,
-    params: Optional[dict] = None,
-    timeout_s: float = 10.0,
-) -> Response:
-    parsed_base = urlparse(base_url)
-    if parsed_base.scheme not in {"http", "https"} or not parsed_base.netloc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Invalid upstream base URL",
-        )
-
+def _sanitize_proxy_path(path: str) -> str:
     match = _PROXY_PATH_PATTERN.fullmatch(path or "")
     if not match:
         raise HTTPException(
@@ -334,14 +322,35 @@ async def _proxy_json(
     if safe_path.endswith("/") and not normalized_path.endswith("/"):
         normalized_path = f"{normalized_path}/"
 
-    # ✅ IMPORTANT: re-validate normalized path and use match.group(0) to break taint
-    norm_match = _PROXY_PATH_PATTERN.fullmatch(normalized_path)
-    if not norm_match:
+    for pattern in _ALLOWED_PROXY_PATH_PATTERNS:
+        allowed_match = pattern.fullmatch(normalized_path)
+        if allowed_match:
+            return allowed_match.group(0)
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid upstream path",
+    )
+
+
+async def _proxy_json(
+    method: str,
+    base_url: str,
+    path: str,
+    *,
+    json_body: Optional[dict] = None,
+    headers: Optional[dict] = None,
+    params: Optional[dict] = None,
+    timeout_s: float = 10.0,
+) -> Response:
+    parsed_base = urlparse(base_url)
+    if parsed_base.scheme not in {"http", "https"} or not parsed_base.netloc:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid upstream path",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid upstream base URL",
         )
-    safe_normalized_path = norm_match.group(0)
+
+    safe_normalized_path = _sanitize_proxy_path(path)
 
     try:
         async with httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=timeout_s) as client:
