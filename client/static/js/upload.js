@@ -1,4 +1,6 @@
-/* imageProcessing.js
+// upload.js
+
+/* upload.js 
    - Upload page: shows a fixed preview frame + lets user drag to reposition crop
    - When clicking "View Results" (btn-check), it exports a CROPPED file via canvas
      and sends that cropped file to /checks (and uses it for later save/publish too).
@@ -103,10 +105,13 @@ window.addEventListener("DOMContentLoaded", () => {
   const realFill = document.querySelector(".real-fill");
   const aiFill = document.querySelector(".ai-fill");
 
+  // =========================
   // State
-  window.lastFile = null; // IMPORTANT: will become the cropped file after user clicks View Results
-  window.lastDetectionToken = null;
-  window.currentUserId = null;
+  // =========================
+  // [ADDED] Don't clobber results.js values on /results
+  if (!("lastFile" in window)) window.lastFile = null;
+  if (!("lastDetectionToken" in window)) window.lastDetectionToken = null;
+  if (!("currentUserId" in window)) window.currentUserId = null;
 
   // Crop state (object-position % values)
   let cropX = 50; // 0..100
@@ -480,7 +485,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const lastDetectionToken = data.detection_token || null;
         window.lastDetectionToken = lastDetectionToken;
-        window.lastDetectionToken = lastDetectionToken;
 
         if (btnSave) btnSave.disabled = !lastDetectionToken;
         if (saveState) {
@@ -502,6 +506,177 @@ window.addEventListener("DOMContentLoaded", () => {
         setStatus(detectStatus, "error", "Network error during detection.");
       } finally {
         btnCheck.disabled = false;
+      }
+    });
+  }
+
+  if (btnSave && !btnSave.dataset.bound) {
+    btnSave.dataset.bound = "1";
+
+    btnSave.addEventListener("click", async () => {
+      if (!window.lastFile) {
+        setStatus(saveStatus, "error", "No file selected.");
+        return;
+      }
+      if (!window.lastDetectionToken) {
+        setStatus(saveStatus, "error", "No detection token. Run detection first.");
+        return;
+      }
+
+      const isPublic = !!(savePublic && savePublic.checked);
+      const description = (
+        postDescriptionInput && postDescriptionInput.value
+          ? postDescriptionInput.value
+          : ""
+      ).trim();
+
+      if (isPublic && !window.currentUserId) {
+        setStatus(saveStatus, "error", "You must be signed in to publish to community.");
+        return;
+      }
+      if (isPublic && !description) {
+        setStatus(saveStatus, "error", "Description is required when publishing.");
+        return;
+      }
+      if (description.length > 1000) {
+        setStatus(
+          saveStatus,
+          "error",
+          `Description too long (${description.length}/1000 characters).`,
+        );
+        return;
+      }
+
+      btnSave.disabled = true;
+      setStatus(saveStatus, "info", isPublic ? "Saving + publishing..." : "Saving image...");
+
+      const formData = new FormData();
+      formData.append("file", window.lastFile);
+      formData.append("detection_token", window.lastDetectionToken);
+      formData.append("is_public", isPublic ? "true" : "false");
+
+      try {
+        const res = await fetch("/upload/image", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+
+        let data = null;
+        try {
+          data = await res.json();
+        } catch {
+          data = { detail: "Non-JSON response" };
+        }
+        setDebug({ url: "/upload/image", status: res.status, body: data });
+
+        if (!res.ok) {
+          setStatus(saveStatus, "error", data.detail || `Save failed (${res.status})`);
+          return;
+        }
+
+        if (!isPublic) {
+          setStatus(saveStatus, "success", "Saved image.");
+          setTimeout(() => {
+            window.location.href = "/scans";
+          }, 900);
+          return;
+        }
+
+        setStatus(saveStatus, "info", "Creating community post...");
+
+        const uploadPayload =
+          data &&
+          typeof data === "object" &&
+          data.body &&
+          typeof data.body === "object"
+            ? data.body
+            : data;
+
+        const resolvedImageId =
+          (uploadPayload && uploadPayload.image_id) ||
+          (uploadPayload && uploadPayload.image && uploadPayload.image.image_id) ||
+          (data && data.image && data.image.image_id) ||
+          null;
+
+        if (!resolvedImageId) {
+          console.error("Upload response missing image_id. Raw response:", data);
+          setStatus(
+            saveStatus,
+            "error",
+            "Saved image, but could not read image_id from server response.",
+          );
+          return;
+        }
+
+        const resolvedVerdict =
+          (uploadPayload && uploadPayload.verdict) ||
+          (uploadPayload && uploadPayload.result && uploadPayload.result.verdict) ||
+          (data && data.verdict) ||
+          null;
+
+        const resolvedLabel =
+          (uploadPayload && uploadPayload.label) ||
+          (uploadPayload && uploadPayload.result && uploadPayload.result.label) ||
+          (data && data.label) ||
+          null;
+
+        const resolvedConfidence =
+          (uploadPayload && uploadPayload.confidence) ||
+          (uploadPayload && uploadPayload.result && uploadPayload.result.confidence) ||
+          (data && data.confidence) ||
+          null;
+
+        const postBody = {
+          user_id: window.currentUserId,
+          image_id: resolvedImageId,
+          description,
+          result: {
+            verdict: resolvedVerdict,
+            label: resolvedLabel,
+            confidence: resolvedConfidence,
+          },
+        };
+
+        const postRes = await fetch("/community/posts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(postBody),
+        });
+
+        let postJson = null;
+        try {
+          postJson = await postRes.json();
+        } catch {
+          postJson = { detail: "Non-JSON response" };
+        }
+        setDebug({ url: "/community/posts", status: postRes.status, body: postJson });
+
+        if (postRes.ok) {
+          setStatus(saveStatus, "success", "Saved image + published post.");
+          setTimeout(() => {
+            window.location.href = "/community";
+          }, 900);
+        } else {
+          setStatus(
+            saveStatus,
+            "error",
+            postJson.error ||
+              postJson.detail ||
+              `Post failed (${postRes.status})`,
+          );
+        }
+
+        if (saveResult) saveResult.textContent = "";
+      } catch (err) {
+        console.error(err);
+        setStatus(saveStatus, "error", "Network error during save.");
+      } finally {
+        btnSave.disabled = false;
       }
     });
   }
