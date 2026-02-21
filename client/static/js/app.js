@@ -373,8 +373,12 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  onEl("btn-check", (btnCheck) => {
-    btnCheck.addEventListener("click", async () => {
+  const path = (window.location && window.location.pathname) || "";
+  const isAuthPage = path === "/" || path === "/login";
+
+  if (isAuthPage) {
+    onEl("btn-check", (btnCheck) => {
+      btnCheck.addEventListener("click", async () => {
       const detectStatus = document.getElementById("detect-status");
       const detectResult = document.getElementById("detect-result");
 
@@ -420,8 +424,9 @@ window.addEventListener("DOMContentLoaded", () => {
       } finally {
         btnCheck.disabled = false;
       }
+      });
     });
-  });
+  }
 
   function renderDetection(resp) {
     const card = document.getElementById("detect-card");

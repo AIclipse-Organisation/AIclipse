@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -35,6 +35,12 @@ class UserPublic(BaseModel):
     total_correct: Optional[int] = 0
     acc_guessing_ai: Optional[int] = 0
     acc_guessing_real: Optional[int] = 0
+    monthly_usage_count: Optional[int] = 0
+    usage_reset_date: Optional[datetime] = None
+    stripe_customer_id: Optional[str] = None
+
+
+FREE_TIER_LIMIT = 10
 
 
 class SignupRequest(BaseModel):
@@ -79,7 +85,22 @@ def build_user_public(doc: dict) -> UserPublic:
         total_correct=doc.get("total_correct", 0),
         acc_guessing_ai=doc.get("acc_guessing_ai", 0),
         acc_guessing_real=doc.get("acc_guessing_real", 0),
+        monthly_usage_count=doc.get("monthly_usage_count", 0),
+        usage_reset_date=doc.get("usage_reset_date"),
+        stripe_customer_id=doc.get("stripe_customer_id"),
     )
+
+
+def _normalize_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if not isinstance(dt, datetime):
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _next_month_start(now: datetime) -> datetime:
+    return (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=32)).replace(day=1)
 
 
 def _parse_bearer_token(authorization: Optional[str]) -> str:
@@ -155,6 +176,9 @@ async def signup(request: Request, payload: SignupRequest):
         "total_correct": 0,
         "acc_guessing_ai": 0,
         "acc_guessing_real": 0,
+        "monthly_usage_count": 0,
+        "usage_reset_date": None,
+        "stripe_customer_id": None,
     }
 
     await users.insert_one(user_doc)
@@ -246,4 +270,79 @@ async def delete_me(request: Request, user: TokenUser = Depends(get_current_user
         "deleted": True,
         "user_id": result["user_id"],
         "message": "Your account has been permanently deleted",
+    }
+
+
+@router.post("/usage/check")
+async def check_usage(request: Request, user: TokenUser = Depends(get_current_user)):
+    users = request.app.state.user_repo.users
+
+    doc = await users.find_one({"user_id": user.user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    plan = int(doc.get("plan", 0))
+    monthly_usage = int(doc.get("monthly_usage_count", 0))
+    usage_reset_date = _normalize_utc(doc.get("usage_reset_date"))
+    now = _now_utc()
+
+    if usage_reset_date is None or now >= usage_reset_date:
+        next_reset = _next_month_start(now)
+        await users.update_one(
+            {"user_id": user.user_id},
+            {"$set": {"monthly_usage_count": 0, "usage_reset_date": next_reset}},
+        )
+        monthly_usage = 0
+        usage_reset_date = next_reset
+
+    if plan != 0:
+        return {
+            "allowed": True,
+            "plan": plan,
+            "unlimited": True,
+            "monthly_usage": monthly_usage,
+            "limit": FREE_TIER_LIMIT,
+            "remaining": None,
+            "usage_reset_date": usage_reset_date,
+        }
+
+    remaining = FREE_TIER_LIMIT - monthly_usage
+    return {
+        "allowed": monthly_usage < FREE_TIER_LIMIT,
+        "plan": plan,
+        "unlimited": False,
+        "monthly_usage": monthly_usage,
+        "limit": FREE_TIER_LIMIT,
+        "remaining": max(0, remaining),
+        "usage_reset_date": usage_reset_date,
+    }
+
+
+@router.post("/usage/increment")
+async def increment_usage(request: Request, user: TokenUser = Depends(get_current_user)):
+    users = request.app.state.user_repo.users
+
+    doc = await users.find_one({"user_id": user.user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    plan = int(doc.get("plan", 0))
+
+    usage_reset_date = _normalize_utc(doc.get("usage_reset_date"))
+    now = _now_utc()
+
+    if usage_reset_date is None or now >= usage_reset_date:
+        next_reset = _next_month_start(now)
+        await users.update_one(
+            {"user_id": user.user_id},
+            {"$set": {"monthly_usage_count": 0, "usage_reset_date": next_reset}},
+        )
+
+    await users.update_one({"user_id": user.user_id}, {"$inc": {"monthly_usage_count": 1}})
+    updated = await users.find_one({"user_id": user.user_id})
+    return {
+        "incremented": True,
+        "plan": plan,
+        "unlimited": plan != 0,
+        "monthly_usage": int((updated or {}).get("monthly_usage_count", 0)),
     }
