@@ -334,12 +334,20 @@ async def _proxy_json(
     if safe_path.endswith("/") and not normalized_path.endswith("/"):
         normalized_path = f"{normalized_path}/"
 
-    # --- FIX: do not build a full URL string; lock host/scheme with base_url ---
+    # ✅ IMPORTANT: re-validate normalized path and use match.group(0) to break taint
+    norm_match = _PROXY_PATH_PATTERN.fullmatch(normalized_path)
+    if not norm_match:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid upstream path",
+        )
+    safe_normalized_path = norm_match.group(0)
+
     try:
         async with httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=timeout_s) as client:
             resp = await client.request(
                 method=method,
-                url=normalized_path,  # relative to base_url
+                url=safe_normalized_path,  # relative to base_url
                 json=json_body,
                 headers=headers,
                 params=params,
