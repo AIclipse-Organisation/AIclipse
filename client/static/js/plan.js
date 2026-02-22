@@ -131,15 +131,12 @@ function updateUsageUI(usageData) {
   }
 }
 
-async function handleUpgrade(planId, userEmail) {
-  console.log("handleUpgrade called with planId:", planId);
+async function handleUpgrade(planId) {
   try {
     showMessage("info", "Redirecting to checkout...");
 
     // Get user data
-    console.log("Fetching user data from /auth/me...");
     const { res: meRes, data: userData } = await jsonFetch("GET", "/auth/me");
-    console.log("User data response:", { ok: meRes.ok, status: meRes.status, data: userData });
     
     if (!meRes.ok) {
       showMessage("error", "Failed to load user information");
@@ -147,14 +144,11 @@ async function handleUpgrade(planId, userEmail) {
     }
 
     // Create checkout session
-    console.log("Creating checkout session...", { user_id: userData.user_id, plan_id: planId, email: userData.email });
     const { res, data } = await jsonFetch("POST", "/api/billing/create-checkout-session", {
       user_id: userData.user_id,
       plan_id: planId,
       email: userData.email,
     });
-
-    console.log("Checkout session response:", { ok: res.ok, status: res.status, data });
 
     if (!res.ok) {
       showMessage("error", data.detail || "Failed to create checkout session");
@@ -163,10 +157,9 @@ async function handleUpgrade(planId, userEmail) {
 
     // Redirect to Stripe Checkout
     if (data.checkout_url) {
-      console.log("Redirecting to:", data.checkout_url);
       window.location.href = data.checkout_url;
     } else {
-      console.error("No checkout_url in response:", data);
+      console.error("No checkout URL returned by billing service");
       showMessage("error", "No checkout URL returned");
     }
   } catch (err) {
@@ -202,15 +195,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Set up upgrade button handlers
-  console.log("Setting up button handlers...");
   const btnPlan1 = document.getElementById("btn-plan-1");
-  console.log("btn-plan-1 element:", btnPlan1);
   
   if (btnPlan1) {
     btnPlan1.addEventListener("click", () => {
-      console.log("Plus button clicked! userData:", userData);
       if (userData) {
-        handleUpgrade(1, userData.email);
+        handleUpgrade(1);
       } else {
         console.error("No user data - user not logged in");
         alert("Please sign in to upgrade your plan. Redirecting to login page...");
@@ -221,13 +211,11 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   // Set up Premium (plan 2) button handler
   const btnPlan2 = document.getElementById("btn-plan-2");
-  console.log("btn-plan-2 element:", btnPlan2);
   
   if (btnPlan2) {
     btnPlan2.addEventListener("click", () => {
-      console.log("Premium button clicked! userData:", userData);
       if (userData) {
-        handleUpgrade(2, userData.email);
+        handleUpgrade(2);
       } else {
         console.error("No user data - user not logged in");
         alert("Please sign in to upgrade your plan. Redirecting to login page...");
