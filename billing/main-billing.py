@@ -19,8 +19,7 @@ MONGO_DB = os.getenv("MONGO_DB")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
-
-CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5000")
+CLIENT_URL = os.getenv("CLIENT_URL")
 
 # Stripe setup
 if STRIPE_SECRET_KEY:

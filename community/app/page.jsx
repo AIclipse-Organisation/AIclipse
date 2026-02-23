@@ -77,6 +77,11 @@ export default function Page() {
           return (
             <div className="empty-state">
               <div className="empty-card">
+                <img
+                  className="empty-icon-image"
+                  src="/static/images/community_icon.png"
+                  alt="Community"
+                />
                 <p className="empty-text">No community posts yet.</p>
               </div>
             </div>
@@ -124,6 +129,11 @@ export default function Page() {
     return (
       <div className="empty-state">
         <div className="empty-card">
+          <img
+            className="empty-icon-image"
+            src="/static/images/community_icon.png"
+            alt="Community"
+          />
           <p className="empty-text">No community posts yet.</p>
         </div>
       </div>
