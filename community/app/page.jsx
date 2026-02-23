@@ -104,7 +104,21 @@ export default function Page() {
           return { ...img, ...post }; // Post fields override image fields
         });
 
-        if (alive) setItems(merged);
+        // --- SORTING & TRENDING LOGIC ---
+        // 1. Sort by score descending 
+        const sorted = merged.sort(
+          (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0),
+        );
+
+        // 2. Identify trending items (top 15%)
+        const trendingCount = Math.floor(sorted.length * 0.15);
+
+        const finalItems = sorted.map((item, index) => ({
+          ...item,
+          isTrending: trendingCount > 0 && index < trendingCount,
+        }));
+
+        if (alive) setItems(finalItems);
       } catch (e) {
         // Don't set error state if request was aborted due to unmount
         if (e.name === "AbortError") return;

@@ -44,6 +44,16 @@ jobs:
       K3S_IMAGE: ${{ inputs.k3s_image }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Ensure Git LFS objects are present
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs install --local
+          git lfs pull
+          git lfs status || true
 
       - uses: docker/setup-buildx-action@v3
 

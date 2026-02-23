@@ -10,13 +10,11 @@ from detector_modules.config.settings import (
 
 
 def load_v1_model():
-    processor = ViTImageProcessor.from_pretrained(str(MODEL_DIR_V1))
-
     config = ViTConfig.from_pretrained(str(MODEL_DIR_V1))
     model = ViTForImageClassification(config)
     model.to(DEVICE)
 
-    checkpoint = torch.load(CHECKPOINT_PATH_V1, map_location=DEVICE)
+    checkpoint = torch.load(CHECKPOINT_PATH_V1, map_location=DEVICE, weights_only=True)
     model.load_state_dict(checkpoint["model_state"], strict=False)
     model.eval()
 
