@@ -475,6 +475,7 @@ window.addEventListener("DOMContentLoaded", () => {
     rawPre.style.display = "none";
     card.hidden = false;
   }
+  
 
   window.addEventListener("beforeunload", () => {
     if (window._lastObjectUrl) URL.revokeObjectURL(window._lastObjectUrl);
