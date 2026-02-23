@@ -16,50 +16,65 @@ public class ConfidenceService : IConfidenceService
         _config = config.Value;
     }
 
-    public ConfidenceResult Evaluate(VoteData voteData, ModelWeights modelWeights)
+    public ConfidenceResult Evaluate(WeightedVoteData voteData, ModelWeights modelWeights)
     {
-        double probabilityOfAi;
+        // 1. Normalize Model Probability
+        double probabilityOfAi = voteData.Label.Equals("real", StringComparison.OrdinalIgnoreCase)
+            ? 1.0 - voteData.ModelConfidence
+            : voteData.ModelConfidence;
 
-        if (voteData.Label != null && voteData.Label.Equals("real", StringComparison.OrdinalIgnoreCase))
+        double userAi = 0, userAiNot = 0, userReal = 0, userRealNot = 0;
+
+        Console.WriteLine($"\n[Confidence] --- New Evaluation for Post: {voteData.PostId} ---");
+        Console.WriteLine($"[Confidence] Initial Model Confidence (P-AI): {probabilityOfAi:F3} | Label: {voteData.Label}");
+
+        // 2. Process and Log Individual Votes
+        foreach (var vote in voteData.Votes)
         {
-            probabilityOfAi = 1.0 - voteData.ModelConfidence;
-        }
-        else
-        {
-            probabilityOfAi = voteData.ModelConfidence;
+            double reliability = vote.GetCurrentReliability();
+            string voteType = vote.IsAiVote ? "AI" : "REAL";
+
+            if (vote.IsAiVote)
+            {
+                userAi += reliability;
+                userRealNot += (1 - reliability);
+            }
+            else
+            {
+                userReal += reliability;
+                userAiNot += (1 - reliability);
+            }
+
+            Console.WriteLine($"[Vote] User: {vote.UserId[..Math.Min(8, vote.UserId.Length)]}... | Vote: {voteType} | Reliability: {reliability:P1}");
         }
 
-        double userAccuracyAi = _config.UserAccuracyAi;
-        double userAccuracyReal = _config.UserAccuracyReal;
-
+        // 3. Calculate Model Influence
         double modelAccuracyAi = modelWeights.GoldenTestPrecision;
         double modelAccuracyReal = modelWeights.GoldenTestRecall;
 
-        double userAi = userAccuracyAi * voteData.UserAiVotes;
-        double userAiNot = (1 - userAccuracyReal) * voteData.UserNotAiVotes;
-        double userReal = userAccuracyReal * voteData.UserNotAiVotes;
-        double userRealNot = (1 - userAccuracyAi) * voteData.UserAiVotes;
-
         double modelAi = probabilityOfAi * modelAccuracyAi;
         double modelAiNot = (1 - probabilityOfAi) * (1 - modelAccuracyReal);
-
         double modelReal = (1 - probabilityOfAi) * modelAccuracyReal;
         double modelRealNot = probabilityOfAi * (1 - modelAccuracyAi);
 
+        // 4. Bayesian Parameters
         double alpha = 1 + userAi + userAiNot + modelAi + modelAiNot;
         double beta = 1 + userReal + userRealNot + modelReal + modelRealNot;
 
         double posteriorMean = alpha / (alpha + beta);
-
         string trainingLabel = posteriorMean >= 0.5 ? "ai" : "real";
+
         double pReal = _beta.Cdf(0.5, alpha, beta);
         double pAi = 1.0 - pReal;
         double probability = trainingLabel == "ai" ? pAi : pReal;
 
-        Console.WriteLine($"[Confidence] Normalized P(AI): {probabilityOfAi:F3} (Original: {voteData.ModelConfidence} | {voteData.Label})");
-        Console.WriteLine($"[Confidence] Final Prob: {probability:P}");
-
         bool isReady = probability >= _config.ConfidenceThreshold;
+
+        // 5. Final Result Summary
+        Console.WriteLine($"[Stats] Alpha (AI Evidence): {alpha:F2} | Beta (Real Evidence): {beta:F2}");
+        Console.WriteLine($"[Stats] Posterior Mean: {posteriorMean:F3} | Result Label: {trainingLabel.ToUpper()}");
+        Console.WriteLine($"[Result] Final Probability: {probability:P2} | Ready for Training: {isReady}");
+        Console.WriteLine("[Confidence] ---------------------------------------------\n");
 
         return new ConfidenceResult
         {

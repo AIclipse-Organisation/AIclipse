@@ -183,29 +183,29 @@ export async function POST(req) {
     // Buffer deltas in Redis with debounce + hard max-wait
     const redis = getRedis();
     const deltaKey = `post:${safePostId}:vote_deltas`;
+    const choicesKey = `post:${safePostId}:voter_choices`; //  Key for individual user choices
     const firstKey = `post:${safePostId}:vote_first_at`;
 
     if (deltaUp !== 0 || deltaDown !== 0) {
       const nowSec = Math.floor(Date.now() / 1000);
       const debounceAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
 
-      // 1) set burst start once (first pending delta time)
       await redis.set(firstKey, String(nowSec), "EX", DELTA_TTL_SECONDS, "NX");
 
-      // 2) read burst start
       const firstAtSec = Number((await redis.get(firstKey)) || nowSec);
-
-      // 3) schedule flush = min(debounce, hard deadline)
       const hardDeadlineSec = firstAtSec + FLUSH_MAX_WAIT_SEC;
       const flushAtSec = Math.min(debounceAtSec, hardDeadlineSec);
 
       const pipe = redis.pipeline();
+      
       if (deltaUp !== 0) pipe.hincrby(deltaKey, "up", deltaUp);
       if (deltaDown !== 0) pipe.hincrby(deltaKey, "down", deltaDown);
 
+      pipe.hset(choicesKey, safeUserId, vote === "up" ? "1" : "0");
+
       pipe.zadd(FLUSH_ZSET, flushAtSec, safePostId);
       pipe.expire(deltaKey, DELTA_TTL_SECONDS);
-      // optional but nice: keep firstKey alive if delta burst is long-lived
+      pipe.expire(choicesKey, DELTA_TTL_SECONDS); 
       pipe.expire(firstKey, DELTA_TTL_SECONDS);
 
       await pipe.exec();
