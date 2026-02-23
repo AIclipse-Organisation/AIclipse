@@ -12,7 +12,7 @@ public class VoteReceiver : BackgroundService
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<VoteReceiver> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
-    
+
     private const string StreamKey = "events:model_cycle";
     private const string ConsumerGroup = "model_service_group";
     private const string ConsumerName = "dotnet_worker_1";
@@ -91,6 +91,7 @@ public class VoteReceiver : BackgroundService
         }
     }
 
+
     private async Task ProcessMessageAsync(StreamEntry entry, IServiceProvider services)
     {
         string? postIdStr = entry.Values.FirstOrDefault(f => f.Name == "post_id").Value;
@@ -98,8 +99,6 @@ public class VoteReceiver : BackgroundService
 
         var mongoDb = services.GetRequiredService<IMongoDatabase>();
         var workflow = services.GetRequiredService<ITrainingWorkflowService>();
-        var imagesCollection = mongoDb.GetCollection<MongoImage>("images");
-        
 
         var postsCol = mongoDb.GetCollection<MongoPost>("community.posts");
         var imagesCol = mongoDb.GetCollection<MongoImage>("images");
