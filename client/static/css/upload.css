@@ -494,8 +494,8 @@ textarea {
 }
 
 .modal {
-  width: 90%;
-  max-width: 360px;
+  width: 92%;
+  max-width: 420px;
   background: #111;
   border-radius: 14px;
   padding: 18px 16px;
@@ -505,14 +505,14 @@ textarea {
 
 .modal-title {
   margin: 0 0 8px;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
-  color: #fff;
+  color: #ffffff;
 }
 
 .modal-text {
-  font-size: 14px;
-  color: #ccc;
+  font-size: 18px;
+  color: #ffffff;
   margin-bottom: 18px;
 }
 

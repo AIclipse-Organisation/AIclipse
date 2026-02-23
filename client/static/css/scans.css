@@ -57,7 +57,7 @@
   justify-content: center;
   background: rgba(255,255,255,0.06);
   color: rgba(255,255,255,0.45);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* right side */
@@ -70,7 +70,7 @@
 
 /* verdict line */
 .scan-verdict-line {
-  font-size: 12px;
+  font-size: 14px;
   margin-bottom: 8px;
   color: rgba(255,255,255,0.80);
 }
@@ -118,7 +118,7 @@
 
 .scan-meta {
   margin-top: 10px;
-  font-size: 11px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.753);
 }
 
@@ -198,7 +198,7 @@
   display: inline-block;
   margin-top: 6px;
 
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   text-decoration: none;
 
@@ -207,4 +207,60 @@
 
 .scan-details-link:hover {
   text-decoration: underline;
+}
+
+.scans-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 22px 12px;
+  text-align: center;
+}
+
+.scans-empty-box {
+  width: 100%;
+  max-width: 340px;
+  min-height: 112px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.scans-empty-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.scans-empty-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--accent, #CFB87C);
+  font-weight: 600;
+}
+
+.scans-empty-btn {
+  all: unset;
+  box-sizing: border-box;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--accent, #c9a64b);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.scans-empty-btn:hover {
+  background: var(--accent, #c9a64b);
+  color: #111;
 }

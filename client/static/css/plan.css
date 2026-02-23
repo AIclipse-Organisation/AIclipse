@@ -1,63 +1,73 @@
 
     .plans-container {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 2rem;
-      padding: 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 0;
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      align-items: stretch;
     }
 
     .plan-card {
       background: #2a2a2a;
-      border: 2px solid #444;
+      border: 1px solid #444;
       border-radius: 12px;
-      padding: 2rem;
-      text-align: center;
+      padding: 14px 12px;
+      text-align: left;
       transition: transform 0.2s, border-color 0.2s;
+      display: flex;
+      flex-direction: column;
     }
 
     .plan-card:hover {
       transform: translateY(-5px);
-      border-color: #4CAF50;
+      border-color: #CFB87C;
     }
 
     .plan-card.current {
-      border-color: #4CAF50;
-      background: #1e3a1e;
+      border-color: #CFB87C;
+      background: #2f2a1d;
     }
 
 
     .plan-name {
-      font-size: 1.8rem;
+      font-size: 2rem;
       font-weight: bold;
-      margin-bottom: 0.5rem;
+      margin-bottom: 6px;
       color: #fff;
+      line-height: 1.1;
     }
 
     .plan-price {
-      font-size: 2.5rem;
+      font-size: 2.25rem;
       font-weight: bold;
-      color: #4CAF50;
-      margin: 1rem 0;
+      color: #CFB87C;
+      margin: 2px 0 10px;
+      line-height: 1;
     }
 
     .plan-price span {
-      font-size: 1rem;
+      font-size: 0.78rem;
       color: #aaa;
+      margin-left: 4px;
     }
 
     .plan-features {
       list-style: none;
       padding: 0;
-      margin: 1.5rem 0;
+      margin: 0 0 12px;
       text-align: left;
+      flex: 1;
     }
 
     .plan-features li {
-      padding: 0.5rem 0;
+      padding: 6px 0;
       border-bottom: 1px solid #444;
       color: #ddd;
+      font-size: 0.95rem;
+      line-height: 1.25;
     }
 
     .plan-features li:last-child {
@@ -65,21 +75,24 @@
     }
 
     .plan-button {
-      display: inline-block;
-      padding: 12px 30px;
-      background: #4CAF50;
-      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 10px 12px;
+      background: #CFB87C;
+      color: #111;
       text-decoration: none;
-      border-radius: 6px;
+      border-radius: 999px;
       font-weight: bold;
       cursor: pointer;
       border: none;
-      font-size: 1rem;
+      font-size: 0.95rem;
       transition: background 0.2s;
     }
 
     .plan-button:hover {
-      background: #45a049;
+      background: #bda669;
     }
 
     .plan-button:disabled {
@@ -89,12 +102,20 @@
 
     .usage-info {
       background: #2a2a2a;
-      border: 2px solid #444;
+      border: 1px solid #444;
       border-radius: 12px;
-      padding: 1.5rem;
-      margin: 2rem auto;
-      max-width: 600px;
+      padding: 1rem;
+      margin: 1rem 0;
+      max-width: none;
       text-align: center;
+    }
+
+    .usage-info h2 {
+      margin: 0 0 6px;
+    }
+
+    .usage-info p {
+      margin: 0;
     }
 
     .usage-bar {
@@ -118,7 +139,7 @@
     }
 
     .usage-fill {
-      background: linear-gradient(90deg, #4CAF50, #45a049);
+      background: linear-gradient(90deg, #CFB87C, #bda669);
       height: 100%;
       transition: width 0.3s;
       display: flex;
@@ -143,5 +164,23 @@
     .status-error {
       background: #f8d7da;
       color: #721c24;
+    }
+
+    @media (max-width: 460px) {
+      .plan-name {
+        font-size: 1.8rem;
+      }
+
+      .plan-price {
+        font-size: 2rem;
+      }
+
+      .plan-features li {
+        font-size: 0.88rem;
+      }
+
+      .plan-button {
+        font-size: 0.9rem;
+      }
     }
     

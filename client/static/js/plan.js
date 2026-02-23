@@ -28,6 +28,12 @@ function showMessage(type, message) {
   }, 5000);
 }
 
+function hideLoaderSafely() {
+  if (window.AppLoader && typeof window.AppLoader.hide === "function") {
+    window.AppLoader.hide();
+  }
+}
+
 async function loadUserData() {
   try {
     const { res, data } = await jsonFetch("GET", "/auth/me");
@@ -126,19 +132,27 @@ function updateUsageUI(usageData) {
     } else if (percentage >= 70) {
       usageFill.style.background = "linear-gradient(90deg, #ff9800, #f57c00)";
     } else {
-      usageFill.style.background = "linear-gradient(90deg, #4CAF50, #45a049)";
+      usageFill.style.background = "linear-gradient(90deg, #CFB87C, #bda669)";
     }
   }
 }
 
 async function handleUpgrade(planId) {
+  let loaderShown = false;
   try {
     showMessage("info", "Redirecting to checkout...");
+    if (window.AppLoader && typeof window.AppLoader.show === "function") {
+      window.AppLoader.show("Redirecting , please wait...");
+      loaderShown = true;
+    }
 
     // Get user data
     const { res: meRes, data: userData } = await jsonFetch("GET", "/auth/me");
     
     if (!meRes.ok) {
+      if (loaderShown && window.AppLoader && typeof window.AppLoader.hide === "function") {
+        window.AppLoader.hide();
+      }
       showMessage("error", "Failed to load user information");
       return;
     }
@@ -151,6 +165,9 @@ async function handleUpgrade(planId) {
     });
 
     if (!res.ok) {
+      if (loaderShown && window.AppLoader && typeof window.AppLoader.hide === "function") {
+        window.AppLoader.hide();
+      }
       showMessage("error", data.detail || "Failed to create checkout session");
       return;
     }
@@ -159,10 +176,16 @@ async function handleUpgrade(planId) {
     if (data.checkout_url) {
       window.location.href = data.checkout_url;
     } else {
+      if (loaderShown && window.AppLoader && typeof window.AppLoader.hide === "function") {
+        window.AppLoader.hide();
+      }
       console.error("No checkout URL returned by billing service");
       showMessage("error", "No checkout URL returned");
     }
   } catch (err) {
+    if (loaderShown && window.AppLoader && typeof window.AppLoader.hide === "function") {
+      window.AppLoader.hide();
+    }
     console.error("Upgrade error:", err);
     showMessage("error", "An error occurred. Please try again.");
   }
@@ -170,6 +193,8 @@ async function handleUpgrade(planId) {
 
 // Initialize page
 window.addEventListener("DOMContentLoaded", async () => {
+  hideLoaderSafely();
+
   // Check for success/cancel query params
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("success") === "true") {
@@ -223,4 +248,8 @@ window.addEventListener("DOMContentLoaded", async () => {
       }
     });
   }
+});
+
+window.addEventListener("pageshow", () => {
+  hideLoaderSafely();
 });

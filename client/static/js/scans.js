@@ -94,6 +94,40 @@ function makeEl(tag, className, text) {
   return el;
 }
 
+function createEmptyStateForActiveTab() {
+  const wrapper = makeEl("div", "scans-empty-state");
+
+  const iconSrc =
+    activeFilter === "public"
+      ? "/static/images/community_icon.png"
+      : "/static/images/upload_icon.png";
+  const iconAlt = activeFilter === "public" ? "Published icon" : "Upload icon";
+
+  const message =
+    activeFilter === "public"
+      ? "No published scans yet."
+      : "No uploads done yet.";
+
+  const box = makeEl("div", "scans-empty-box");
+  const iconEl = document.createElement("img");
+  iconEl.className = "scans-empty-icon";
+  iconEl.src = iconSrc;
+  iconEl.alt = iconAlt;
+  const text = makeEl("p", "scans-empty-text", message);
+  box.appendChild(iconEl);
+  box.appendChild(text);
+  wrapper.appendChild(box);
+
+  const button = makeEl("button", "scans-empty-btn", "Go to Upload");
+  button.type = "button";
+  button.addEventListener("click", () => {
+    window.location.href = "/upload";
+  });
+  wrapper.appendChild(button);
+
+  return wrapper;
+}
+
 function createScanCard(img, index) {
   const scanNumber = index + 1;
   const pct = toPercent(img.confidence);
@@ -207,8 +241,7 @@ function renderScans() {
   const items = getFilteredScans();
 
   if (items.length === 0) {
-    const msg = makeEl("div", "status-message", `No ${activeFilter} scans found.`);
-    containerEl.appendChild(msg);
+    containerEl.appendChild(createEmptyStateForActiveTab());
     return;
   }
 
@@ -283,12 +316,6 @@ async function loadScans() {
 
     statusEl.classList.remove("loading");
     statusEl.textContent = "";
-
-    if (allScans.length === 0) {
-      const msg = makeEl("div", "status-message", "No scans found. Upload and analyze some images first!");
-      containerEl.appendChild(msg);
-      return;
-    }
 
     renderScans();
   } catch (error) {
