@@ -66,7 +66,7 @@ def index():
             session["current_user"] = me
             session["is_admin"] = bool(me.get("is_admin"))
             session["auth_checked_at"] = int(time.time())
-            return redirect("/community")
+            return redirect("/upload")
 
         if status == 401:
             session.clear()
