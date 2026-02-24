@@ -46,8 +46,6 @@ jobs:
       K3S_IMAGE: ${{ inputs.k3s_image }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Cache Git LFS objects
         if: ${{ inputs.lfs_weights_enabled }}
