@@ -7,7 +7,6 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-body-size: "20m"
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
-
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
@@ -16,7 +15,16 @@ spec:
     - host: aiclipse.online
       http:
         paths:
-          # /api -> / ; /api/v1/checks -> /v1/checks
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: gateway-srv
+                port:
+                  number: 8080
+    - host: aiclipse.site
+      http:
+        paths:
           - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
