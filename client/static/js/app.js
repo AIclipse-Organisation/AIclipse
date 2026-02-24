@@ -174,10 +174,24 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const signupPasswordInput = document.getElementById("signup-password");
   const signupPolicyRoot = document.getElementById("signup-password-policy");
-
+  
+  const signupTerms = document.getElementById("signup-terms");
+  const btnSignup = document.getElementById("btn-signup");
+  
   let policyActivated = false;
 
   if (signupPolicyRoot) signupPolicyRoot.hidden = true;
+
+  function syncSignupButtonState() {
+    if (!btnSignup) return;
+    // If checkbox doesn't exist (e.g., signup disabled), don't block.
+    btnSignup.disabled = signupTerms ? !signupTerms.checked : false;
+  }
+
+  if (signupTerms) {
+    signupTerms.addEventListener("change", syncSignupButtonState);
+    syncSignupButtonState(); // initialize on load
+  }
 
   function updateSignupPolicyUI() {
     if (!policyActivated) return;
@@ -223,6 +237,13 @@ window.addEventListener("DOMContentLoaded", () => {
         ?.value.trim();
       const email = document.getElementById("signup-email")?.value.trim();
       const password = document.getElementById("signup-password")?.value;
+
+      const termsAccepted = document.getElementById("signup-terms")?.checked;
+      if (!termsAccepted) {
+        setStatus(accountStatus, "error", "You must accept the Terms & Conditions to sign up.");
+        return;
+      }
+
       let loginSuccess = false;
 
       activateSignupPolicyIfNeeded();

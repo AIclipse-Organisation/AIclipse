@@ -1,4 +1,6 @@
-/* imageProcessing.js
+// upload.js
+
+/* upload.js 
    - Upload page: shows a fixed preview frame + lets user drag to reposition crop
    - When clicking "View Results" (btn-check), it exports a CROPPED file via canvas
      and sends that cropped file to /checks (and uses it for later save/publish too).
@@ -68,6 +70,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const TOO_LARGE_MSG = "Image is too large. Max allowed size is 5 MB.";
 
   const fileInput = document.getElementById("file-input");
+  const fileLabel = document.querySelector("label.file-upload");
+
   const btnCheck = document.getElementById("btn-check");
   const checkState = document.getElementById("check-state");
 
@@ -101,14 +105,23 @@ window.addEventListener("DOMContentLoaded", () => {
   const realFill = document.querySelector(".real-fill");
   const aiFill = document.querySelector(".ai-fill");
 
+  // =========================
   // State
-  window.lastFile = null; // IMPORTANT: will become the cropped file after user clicks View Results
-  window.lastDetectionToken = null;
-  window.currentUserId = null;
+  // =========================
+  // [ADDED] Don't clobber results.js values on /results
+  if (!("lastFile" in window)) window.lastFile = null;
+  if (!("lastDetectionToken" in window)) window.lastDetectionToken = null;
+  if (!("currentUserId" in window)) window.currentUserId = null;
 
   // Crop state (object-position % values)
   let cropX = 50; // 0..100
   let cropY = 20; // 0..100 (top-biased helps keep heads)
+
+  function updateFileLabel(hasFile) {
+    if (!fileLabel) return;
+    fileLabel.classList.toggle("is-selected", !!hasFile);
+    fileLabel.textContent = hasFile ? "Change Image" : "Choose Image";
+  }
 
   function syncPublishUI() {
     const isPublic = !!(savePublic && savePublic.checked);
@@ -187,6 +200,9 @@ window.addEventListener("DOMContentLoaded", () => {
       cropY = 20;
       applyCropPosition();
       if (cropHint) cropHint.style.opacity = "0.9";
+    });
+    cropResetBtn?.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
     });
   })();
 
@@ -271,8 +287,6 @@ window.addEventListener("DOMContentLoaded", () => {
     const isBlobUrl = url.startsWith("blob:");
     const isDataUrl = url.startsWith("data:");
 
-    // For blob: URLs, do a minimal structural check to ensure they look like
-    // ones produced via URL.createObjectURL (e.g., "blob:<origin>/<uuid>").
     if (isBlobUrl) {
       try {
         const parsed = new URL(url);
@@ -285,8 +299,6 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
     } else if (isDataUrl) {
-      // Only allow data URLs for image media types, e.g. data:image/png;base64,...
-      // This prevents arbitrary data: payloads from being used as active content.
       if (!/^data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=]+$/.test(url)) {
         imgEl.removeAttribute("src");
         return;
@@ -304,6 +316,8 @@ window.addEventListener("DOMContentLoaded", () => {
     fileInput.addEventListener("change", () => {
       const file = fileInput.files?.[0];
 
+      updateFileLabel(!!file);
+
       if (file && file.size > MAX_IMAGE_BYTES) {
         window.lastFile = null;
         window.lastDetectionToken = null;
@@ -312,8 +326,7 @@ window.addEventListener("DOMContentLoaded", () => {
           fileInput.value = "";
         } catch {}
 
-        const uploadLabel = document.querySelector("label.file-upload");
-        if (uploadLabel) uploadLabel.classList.remove("is-selected");
+        updateFileLabel(false);
 
         if (previewImg) {
           if (lastPreviewUrl) {
@@ -330,21 +343,23 @@ window.addEventListener("DOMContentLoaded", () => {
         if (saveResult) saveResult.textContent = "";
         if (saveStatus) setStatus(saveStatus, "info", "");
 
-        if (btnCheck) btnCheck.disabled = true;
+        if (btnCheck) btnCheck.hidden = true;
         if (checkState) checkState.textContent = TOO_LARGE_MSG;
 
         if (detectResult) detectResult.textContent = "No detection yet.";
         if (detectStatus) setStatus(detectStatus, "info", "");
+
+        if (btnCheck) {
+          btnCheck.disabled = true;
+          btnCheck.hidden = true;
+        }
+
         return;
       }
 
       window.lastFile = file || null;
       window.lastDetectionToken = null;
 
-      const uploadLabel = document.querySelector("label.file-upload");
-      if (uploadLabel) uploadLabel.classList.toggle("is-selected", !!file);
-
-      // Reset crop position on new file (nice UX)
       cropX = 50;
       cropY = 20;
       applyCropPosition();
@@ -373,13 +388,19 @@ window.addEventListener("DOMContentLoaded", () => {
       if (saveStatus) setStatus(saveStatus, "info", "");
 
       if (file) {
-        if (btnCheck) btnCheck.disabled = false;
+        if (btnCheck) {
+          btnCheck.hidden = false;
+          btnCheck.disabled = false;
+        }
         if (checkState)
           checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
         if (detectResult)
           detectResult.textContent = "No detection yet for this file.";
       } else {
-        if (btnCheck) btnCheck.disabled = true;
+        if (btnCheck) {
+          btnCheck.disabled = true;
+          btnCheck.hidden = true;
+        }
         if (checkState) checkState.textContent = "Select an image to analyze.";
         if (detectResult) detectResult.textContent = "No detection yet.";
       }
@@ -418,16 +439,11 @@ window.addEventListener("DOMContentLoaded", () => {
       setStatus(detectStatus, "info", "Analyzing image...");
 
       try {
-        // IMPORTANT: create cropped file based on user's drag framing.
-        // Must match your CSS aspect-ratio. If square: 1. If 4/5: 0.8, etc.
-        const frameAspect = 1; // <-- change if you change the frame ratio in CSS
+        const frameAspect = 1;
         const { croppedFile, previewDataUrl } =
           await makeCroppedFileFromOriginal(window.lastFile, frameAspect);
 
-        // Use CROPPED file from now on (for checks + later saving/publishing)
         window.lastFile = croppedFile;
-
-        // Store CROPPED preview for results page
         sessionStorage.setItem("lastDetectionPreview", previewDataUrl);
 
         const formData = new FormData();
@@ -469,9 +485,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const lastDetectionToken = data.detection_token || null;
         window.lastDetectionToken = lastDetectionToken;
-        window.lastDetectionToken = lastDetectionToken;
 
-        // enable SAVE if we have a token (results page only)
         if (btnSave) btnSave.disabled = !lastDetectionToken;
         if (saveState) {
           saveState.textContent = lastDetectionToken
@@ -479,7 +493,6 @@ window.addEventListener("DOMContentLoaded", () => {
             : "No detection token returned; cannot save.";
         }
 
-        // store results for results page
         sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
         sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
 
@@ -497,19 +510,16 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // SAVE button -> POST /upload/image with file + detection_token (uses CROPPED window.lastFile)
-  if (btnSave) {
+  if (btnSave && !btnSave.dataset.bound) {
+    btnSave.dataset.bound = "1";
+
     btnSave.addEventListener("click", async () => {
       if (!window.lastFile) {
         setStatus(saveStatus, "error", "No file selected.");
         return;
       }
       if (!window.lastDetectionToken) {
-        setStatus(
-          saveStatus,
-          "error",
-          "No detection token. Run detection first.",
-        );
+        setStatus(saveStatus, "error", "No detection token. Run detection first.");
         return;
       }
 
@@ -521,19 +531,11 @@ window.addEventListener("DOMContentLoaded", () => {
       ).trim();
 
       if (isPublic && !window.currentUserId) {
-        setStatus(
-          saveStatus,
-          "error",
-          "You must be signed in to publish to community.",
-        );
+        setStatus(saveStatus, "error", "You must be signed in to publish to community.");
         return;
       }
       if (isPublic && !description) {
-        setStatus(
-          saveStatus,
-          "error",
-          "Description is required when publishing.",
-        );
+        setStatus(saveStatus, "error", "Description is required when publishing.");
         return;
       }
       if (description.length > 1000) {
@@ -546,7 +548,7 @@ window.addEventListener("DOMContentLoaded", () => {
       }
 
       btnSave.disabled = true;
-      setStatus(saveStatus, "info", "Saving image...");
+      setStatus(saveStatus, "info", isPublic ? "Saving + publishing..." : "Saving image...");
 
       const formData = new FormData();
       formData.append("file", window.lastFile);
@@ -559,6 +561,7 @@ window.addEventListener("DOMContentLoaded", () => {
           body: formData,
           credentials: "include",
         });
+
         let data = null;
         try {
           data = await res.json();
@@ -568,123 +571,104 @@ window.addEventListener("DOMContentLoaded", () => {
         setDebug({ url: "/upload/image", status: res.status, body: data });
 
         if (!res.ok) {
+          setStatus(saveStatus, "error", data.detail || `Save failed (${res.status})`);
+          return;
+        }
+
+        if (!isPublic) {
+          setStatus(saveStatus, "success", "Saved image.");
+          setTimeout(() => {
+            window.location.href = "/scans";
+          }, 900);
+          return;
+        }
+
+        setStatus(saveStatus, "info", "Creating community post...");
+
+        const uploadPayload =
+          data &&
+          typeof data === "object" &&
+          data.body &&
+          typeof data.body === "object"
+            ? data.body
+            : data;
+
+        const resolvedImageId =
+          (uploadPayload && uploadPayload.image_id) ||
+          (uploadPayload && uploadPayload.image && uploadPayload.image.image_id) ||
+          (data && data.image && data.image.image_id) ||
+          null;
+
+        if (!resolvedImageId) {
+          console.error("Upload response missing image_id. Raw response:", data);
           setStatus(
             saveStatus,
             "error",
-            data.detail || `Save failed (${res.status})`,
+            "Saved image, but could not read image_id from server response.",
           );
           return;
         }
 
-        setStatus(saveStatus, "success", "Saved image.");
+        const resolvedVerdict =
+          (uploadPayload && uploadPayload.verdict) ||
+          (uploadPayload && uploadPayload.result && uploadPayload.result.verdict) ||
+          (data && data.verdict) ||
+          null;
 
-        if (isPublic) {
-          setStatus(saveStatus, "info", "Creating community post...");
+        const resolvedLabel =
+          (uploadPayload && uploadPayload.label) ||
+          (uploadPayload && uploadPayload.result && uploadPayload.result.label) ||
+          (data && data.label) ||
+          null;
 
-          const uploadPayload =
-            data &&
-            typeof data === "object" &&
-            data.body &&
-            typeof data.body === "object"
-              ? data.body
-              : data;
+        const resolvedConfidence =
+          (uploadPayload && uploadPayload.confidence) ||
+          (uploadPayload && uploadPayload.result && uploadPayload.result.confidence) ||
+          (data && data.confidence) ||
+          null;
 
-          const resolvedImageId =
-            (uploadPayload && uploadPayload.image_id) ||
-            (uploadPayload &&
-              uploadPayload.image &&
-              uploadPayload.image.image_id) ||
-            (data && data.image && data.image.image_id) ||
-            null;
+        const postBody = {
+          user_id: window.currentUserId,
+          image_id: resolvedImageId,
+          description,
+          result: {
+            verdict: resolvedVerdict,
+            label: resolvedLabel,
+            confidence: resolvedConfidence,
+          },
+        };
 
-          if (!resolvedImageId) {
-            console.error(
-              "Upload response missing image_id. Raw response:",
-              data,
-            );
-            setStatus(
-              saveStatus,
-              "error",
-              "Saved image, but could not read image_id from server response.",
-            );
-            return;
-          }
+        const postRes = await fetch("/community/posts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(postBody),
+        });
 
-          const resolvedVerdict =
-            (uploadPayload && uploadPayload.verdict) ||
-            (uploadPayload &&
-              uploadPayload.result &&
-              uploadPayload.result.verdict) ||
-            (data && data.verdict) ||
-            null;
+        let postJson = null;
+        try {
+          postJson = await postRes.json();
+        } catch {
+          postJson = { detail: "Non-JSON response" };
+        }
+        setDebug({ url: "/community/posts", status: postRes.status, body: postJson });
 
-          const resolvedLabel =
-            (uploadPayload && uploadPayload.label) ||
-            (uploadPayload &&
-              uploadPayload.result &&
-              uploadPayload.result.label) ||
-            (data && data.label) ||
-            null;
-
-          const resolvedConfidence =
-            (uploadPayload && uploadPayload.confidence) ||
-            (uploadPayload &&
-              uploadPayload.result &&
-              uploadPayload.result.confidence) ||
-            (data && data.confidence) ||
-            null;
-
-          const postBody = {
-            user_id: window.currentUserId,
-            image_id: resolvedImageId,
-            description,
-            result: {
-              verdict: resolvedVerdict,
-              label: resolvedLabel,
-              confidence: resolvedConfidence,
-            },
-          };
-
-          const postRes = await fetch("/community/posts", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            credentials: "include",
-            body: JSON.stringify(postBody),
-          });
-
-          let postJson = null;
-          try {
-            postJson = await postRes.json();
-          } catch {
-            postJson = { detail: "Non-JSON response" };
-          }
-          setDebug({
-            url: "/community/posts",
-            status: postRes.status,
-            body: postJson,
-          });
-
-          if (postRes.ok) {
-            setStatus(saveStatus, "success", "Saved image + published post.");
-            setTimeout(() => {
-              window.location.href = "/community";
-            }, 1000);
-          } else {
-            setStatus(
-              saveStatus,
-              "error",
-              postJson.error ||
-                postJson.detail ||
-                `Post failed (${postRes.status})`,
-            );
-          }
-        } else {
+        if (postRes.ok) {
+          setStatus(saveStatus, "success", "Saved image + published post.");
           setTimeout(() => {
-            window.location.href = "/scans";
-          }, 1000);
+            window.location.href = "/community";
+          }, 900);
+        } else {
+          setStatus(
+            saveStatus,
+            "error",
+            postJson.error ||
+              postJson.detail ||
+              `Post failed (${postRes.status})`,
+          );
         }
 
         if (saveResult) saveResult.textContent = "";
@@ -697,7 +681,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Optional renderDetection (used on results page if you call it)
+  // Expose renderDetection if you ever want to call it from results.js
   function renderDetection(resp) {
     if (!resp || typeof resp !== "object") {
       if (detectResult) {
@@ -767,6 +751,9 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   })();
 
-  // Expose renderDetection if you ever want to call it from results.js
-  window.renderDetection = renderDetection;
+  // Only export this renderDetection on the UPLOAD page.
+  // (On Results page, results.js owns renderDetection.)
+  if (document.getElementById("btn-check")) {
+    window.renderDetection = renderDetection;
+  }
 });
