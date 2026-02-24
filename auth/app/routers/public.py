@@ -22,6 +22,9 @@ router = APIRouter()
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
+class UserAccuracyRequest(BaseModel):
+    user_ids: List[str]
+
 
 class UserPublic(BaseModel):
     user_id: str
@@ -41,6 +44,13 @@ class UserPublic(BaseModel):
 
 
 FREE_TIER_LIMIT = 10
+    
+class UserAccuracy(BaseModel):
+    user_id: str
+    admin_fake_correct: Optional[int] = 0
+    admin_fake_total: Optional[int] = 0
+    admin_real_correct: Optional[int] = 0
+    admin_real_total: Optional[int] = 0
 
 
 class SignupRequest(BaseModel):

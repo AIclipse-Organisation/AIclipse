@@ -64,6 +64,8 @@ spec:
               valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_USER } } 
             - name: AWS_SECRET_ACCESS_KEY 
               valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD } }
+            - name: AUTH_URI
+              value: "http://auth-srv:3000"
             - name: MINIO_BUCKET_NAME
               value: "model-cycle-storage"
           readinessProbe:

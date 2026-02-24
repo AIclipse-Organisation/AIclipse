@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr
 from pymongo import ReturnDocument
 
 from app.deps.authz import get_current_admin
-from app.routers.public import UserPublic, build_user_public, TokenUser
+from app.routers.public import UserPublic, build_user_public, TokenUser, UserAccuracy, UserAccuracyRequest
 from app.services.passwords import PasswordService
 
 
@@ -41,6 +41,34 @@ async def admin_list_users(
         items.append(build_user_public(doc))
 
     return {"items": items}
+
+
+# Called from model-cycle so removed the admin requirement.
+@router.post("/users/accuracy", response_model=List[UserAccuracy])
+async def admin_get_users_accuracy(
+    request: Request,
+    body: UserAccuracyRequest
+):
+    users_col = request.app.state.user_repo.users
+
+    # Fetch only the users in the provided list
+    cursor = users_col.find(
+        {"user_id": {"$in": body.user_ids}},
+        {
+            "user_id": 1,
+            "admin_fake_correct": 1,
+            "admin_fake_total": 1,
+            "admin_real_correct": 1,
+            "admin_real_total": 1,
+            "_id": 0
+        }
+    )
+
+    results = []
+    async for doc in cursor:
+        results.append(UserAccuracy(**doc))
+
+    return results
 
 
 @router.get("/user/{user_id}", response_model=UserPublic)
