@@ -335,6 +335,7 @@ window.addEventListener("DOMContentLoaded", () => {
     return { croppedFile, previewDataUrl };
   }
 
+  
 function setImageSrcSafe(imgEl, url) {
   if (!imgEl) return;
 
@@ -366,12 +367,9 @@ function setImageSrcSafe(imgEl, url) {
       return;
     }
   } else {
-    // If your app only uses blobs/data, discard anything else
     imgEl.removeAttribute("src");
     return;
   }
-
-  // Final assignment: SAST tools prefer explicit assignment after validation
   imgEl.setAttribute("src", url);
 }
 const previewWrap = document.getElementById('upload-preview-wrap');
