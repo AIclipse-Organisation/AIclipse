@@ -42,7 +42,7 @@ public class TrainingWorkflowService : ITrainingWorkflowService
     public async Task<ConfidenceResult> ProcessVoteAsync(EvaluateImageRequest request)
     {
 
-        var (image, downloadUrl, isNew) = await GetOrCreateImageAsync(request);
+        var (image, _, isNew) = await GetOrCreateImageAsync(request);
 
         ModelWeights? modelWeights = null;
 
