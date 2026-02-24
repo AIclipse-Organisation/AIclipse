@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/static/css/styles.css" />
     <link rel="stylesheet" href="/static/css/upload.css" />
+    <link rel="stylesheet" href="/static/css/loader.css" />
   </head>
 
   <body class="app">
@@ -72,14 +73,25 @@
         </div>
 
         <div id="quota-modal" class="modal-overlay" hidden>
-          <div class="modal" role="dialog" aria-modal="true" aria-labelledby="quota-modal-title">
-            <h3 id="quota-modal-title" class="modal-title">Free quota reached</h3>
+          <div
+            class="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quota-modal-title"
+          >
+            <h3 id="quota-modal-title" class="modal-title">
+              Free quota reached
+            </h3>
             <p id="quota-modal-text" class="modal-text">
               You've reached your free quota of 10 uploads this month.
             </p>
             <div class="modal-actions">
-              <button id="quota-modal-close" class="secondary" type="button">Close</button>
-              <button id="quota-modal-plan" class="danger" type="button">Go to Plan</button>
+              <button id="quota-modal-close" class="secondary" type="button">
+                Close
+              </button>
+              <button id="quota-modal-plan" class="danger" type="button">
+                Go to Plan
+              </button>
             </div>
           </div>
         </div>
@@ -87,7 +99,7 @@
 
       {% include 'partials/navbar.html' %}
     </div>
-
+    <script src="/static/js/loader.js"></script>
     <script src="/static/js/include.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/upload.js"></script>

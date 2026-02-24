@@ -1,3 +1,43 @@
+const { fetch: originalFetch } = window;
+
+window.fetch = async (...args) => {
+  const isApiCall = args[0].includes('/api/') || args[0].includes('/scan');
+  if (isApiCall) window.AppLoader.show("Analyzing Image...");
+
+  try {
+    const response = await originalFetch(...args);
+    return response;
+  } finally {
+    if (isApiCall) window.AppLoader.hide();
+  }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  // 1. Show loader on all standard form submissions (e.g., Upload/Scan)
+  document.querySelectorAll("form").forEach(form => {
+    form.addEventListener("submit", () => {
+      window.AppLoader.show("Processing...");
+    });
+  });
+
+  document.querySelectorAll("a").forEach(link => {
+    link.addEventListener("click", (e) => {
+      const href = link.getAttribute("href");
+      if (href && !href.startsWith("#") && !link.target) {
+        window.AppLoader.show("Loading...");
+      }
+    });
+  });
+});
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    window.AppLoader.hide();
+  }
+});
+
+
+
 function setStatus(el, type, text) {
   if (!el) return;
   el.innerHTML = "";

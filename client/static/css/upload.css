@@ -573,8 +573,8 @@ textarea {
 }
 
 .modal {
-  width: 92%;
-  max-width: 420px;
+  width: 90%;
+  max-width: 360px;
   background: #111;
   border-radius: 14px;
   padding: 18px 16px;
@@ -584,14 +584,14 @@ textarea {
 
 .modal-title {
   margin: 0 0 8px;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
-  color: #ffffff;
+  color: #fff;
 }
 
 .modal-text {
-  font-size: 18px;
-  color: #ffffff;
+  font-size: 14px;
+  color: #ccc;
   margin-bottom: 18px;
 }
 
@@ -688,13 +688,15 @@ textarea {
    Visibility Toggle (Segmented Control)
    ========================= */
 
- .action-row {
-    display: flex;
-    align-items: stretch; 
-    gap: 10px;
-    margin-top: 12px;
-    width: 100%;
+.action-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
+
 .visibility-selector {
     display: flex;
     gap: 0;
@@ -752,20 +754,21 @@ textarea {
    Primary Action Button (Confirm & Save)
    ========================= */
 .btn-save-final {
-  flex:1;
-  margin: 0!important;
+  display: block;
+  flex: 1!important; 
+  width: 0;
+  min-width: 0; 
+  margin: 0 !important;
   all: unset;
   box-sizing: border-box;
-  display: block;
   padding: 18px;
-  background: #CFB87C; /* AIclipse Gold */
+  background: #CFB87C; 
   color: #111;
   border-radius: 999px;
   font-weight: 800;
   text-align: center;
   font-size: 16px;
   cursor: pointer;
-  margin-top: 12px;
   transition: transform 100ms ease, opacity 160ms ease;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }

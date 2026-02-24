@@ -7,6 +7,7 @@
 
     <link rel="stylesheet" href="/static/css/styles.css" />
     <link rel="stylesheet" href="/static/css/viewscan.css" />
+    <link rel="stylesheet" href="/static/css/loader.css" />
   </head>
 
   <body class="app">
@@ -41,19 +42,27 @@
             aria-label="Scan result"
           >
             <!-- AICLIPSE (gold) -->
-            <section id="aiclipse-card" class="meter-card meter-card--gold" hidden>
+            <section
+              id="aiclipse-card"
+              class="meter-card meter-card--gold"
+              hidden
+            >
               <div class="meter-head">
                 <span class="meter-title">Aiclipse</span>
                 <p id="aiclipse-verdict" class="meter-verdict">—</p>
               </div>
 
-              <div class="meter-panel" aria-hidden="true" title="Real probability">
+              <div
+                class="meter-panel"
+                aria-hidden="true"
+                title="Real probability"
+              >
                 <div class="meter-bar">
                   <div
                     id="aiclipse-fill"
                     class="meter-fill meter-fill--gold"
                     data-p="0"
-                    style="width:0px;"
+                    style="width: 0px"
                   ></div>
                   <span class="meter-percent" id="aiclipse-percent">0.00%</span>
                 </div>
@@ -61,16 +70,34 @@
             </section>
 
             <!-- COMMUNITY (purple) -->
-            <section id="community-card" class="meter-card meter-card--purple" hidden>
+            <section
+              id="community-card"
+              class="meter-card meter-card--purple"
+              hidden
+            >
               <div class="meter-head meter-head--purple">
                 <span class="meter-title meter-title--purple">Community</span>
-                <p id="community-verdict" class="meter-verdict meter-verdict--purple">—</p>
+                <p
+                  id="community-verdict"
+                  class="meter-verdict meter-verdict--purple"
+                >
+                  —
+                </p>
               </div>
 
-              <div class="meter-panel meter-panel--purple" aria-hidden="true" title="Community real share">
+              <div
+                class="meter-panel meter-panel--purple"
+                aria-hidden="true"
+                title="Community real share"
+              >
                 <div class="meter-bar">
-                  <div id="community-fill" class="meter-fill meter-fill--purple"></div>
-                  <span class="meter-percent" id="community-percent">0.00%</span>
+                  <div
+                    id="community-fill"
+                    class="meter-fill meter-fill--purple"
+                  ></div>
+                  <span class="meter-percent" id="community-percent"
+                    >0.00%</span
+                  >
                 </div>
               </div>
             </section>
@@ -295,5 +322,6 @@
     <script src="/static/js/app.js"></script>
     <script src="/static/js/main.js"></script>
     <script src="/static/js/viewscan.js"></script>
+    <script src="/static/js/loader.js"></script>
   </body>
 </html>

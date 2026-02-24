@@ -49,3 +49,16 @@
 
   window.AppLoader = { show, hide };
 })();
+
+window.addEventListener("beforeunload", () => {
+  if (window.AppLoader) {
+    window.AppLoader.show("Loading next page...");
+  }
+});
+
+// This ensures the loader is hidden if the user hits the "Back" button
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted && window.AppLoader) {
+    window.AppLoader.hide();
+  }
+});
