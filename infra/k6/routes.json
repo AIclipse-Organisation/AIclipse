@@ -1,0 +1,57 @@
+{
+  "pages": [
+    "/",
+    "/upload",
+    "/scans",
+    "/notification",
+    "/plan",
+    "/profile",
+    "/results",
+    "/viewscan",
+    "/dev",
+    "/docs",
+    "/contact",
+    "/healthz"
+  ],
+  "static": [
+    "/favicon.ico",
+    "/robots.txt",
+    "/sitemap.xml"
+  ],
+  "apiPublic": [
+    "/openapi.json",
+    "/docs"
+  ],
+  "communityPublic": [
+    "/posts",
+    "/posts?limit=20"
+  ],
+  "apiAuthMe": [
+    "/auth/me"
+  ],
+  "apiLogin": [
+    "/auth/login"
+  ],
+  "apiChecks": [
+    "/v1/checks",
+    "/checks"
+  ],
+  "apiUpload": [
+    "/upload/image"
+  ],
+  "apiImageGet": [
+    "/image/"
+  ],
+  "clientLogin": [
+    "/auth/login"
+  ],
+  "clientMe": [
+    "/auth/me"
+  ],
+  "clientChecks": [
+    "/checks"
+  ],
+  "clientUpload": [
+    "/upload/image"
+  ]
+}
