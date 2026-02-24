@@ -7,29 +7,31 @@ name: k3d-smoke-template
 on:
   workflow_call:
     inputs:
-      svc_name:           { type: string,  required: true }  # used to name the cluster
-      context:            { type: string,  required: true }  # Docker build context
-      dockerfile:         { type: string,  required: true }
-      image_name:         { type: string,  required: true }  # repo without tag
-      deployment_yaml:    { type: string,  required: true }  # service manifest to patch with CI tag
-      deployment_name:    { type: string,  required: true }  # k8s Deployment name
-      container_name:     { type: string,  required: true }
-      service_name:       { type: string,  required: true }  # ClusterIP svc used for curl from a pod
-      service_port:       { type: number,  required: true }
-      health_path:        { type: string,  required: true }  # e.g. /healthz
-      secrets_yaml:       { type: string,  required: true }  # dev secrets for deps + service
-      readiness_selector: { type: string,  required: true }  # reserved, not used here
+      svc_name:            { type: string,  required: true }  # used to name the cluster
+      context:             { type: string,  required: true }  # Docker build context
+      dockerfile:          { type: string,  required: true }
+      image_name:          { type: string,  required: true }  # repo without tag
+      deployment_yaml:     { type: string,  required: true }  # service manifest to patch with CI tag
+      deployment_name:     { type: string,  required: true }  # k8s Deployment name
+      container_name:      { type: string,  required: true }
+      service_name:        { type: string,  required: true }  # ClusterIP svc used for curl from a pod
+      service_port:        { type: number,  required: true }
+      health_path:         { type: string,  required: true }  # e.g. /healthz
+      secrets_yaml:        { type: string,  required: true }  # dev secrets for deps + service
+      readiness_selector:  { type: string,  required: true }  # reserved, not used here
 
       # NEW: optional extra resources (service-specific)
-      extra_secrets_yaml: { type: string,  required: false, default: "" } # e.g. infra/k8s-dev/model-cycle-secrets.yaml
-      extra_pvc_yaml:     { type: string,  required: false, default: "" } # e.g. infra/k8s/model-cycle-pvc.yaml
-      extra_pvc_name:     { type: string,  required: false, default: "" } # e.g. model-cycle-pvc
+      extra_secrets_yaml:  { type: string,  required: false, default: "" } # e.g. infra/k8s-dev/model-cycle-secrets.yaml
+      extra_pvc_yaml:      { type: string,  required: false, default: "" } # e.g. infra/k8s/model-cycle-pvc.yaml
+      extra_pvc_name:      { type: string,  required: false, default: "" } # e.g. model-cycle-pvc
 
-      rollout_timeout:    { type: string,  required: false, default: "90s" }
-      namespace:          { type: string,  required: false, default: "default" }
-      k3d_version:        { type: string,  required: false, default: "v5.7.4" }   # pinned for reproducibility
-      k3s_image:          { type: string,  required: false, default: "rancher/k3s:v1.32.2-k3s1" }  # pinned k3s
-      kubectl_version:    { type: string,  required: false, default: "v1.32.2" }  # kubectl matches k8s minor
+      rollout_timeout:     { type: string,  required: false, default: "90s" }
+      namespace:           { type: string,  required: false, default: "default" }
+      k3d_version:         { type: string,  required: false, default: "v5.7.4" }   # pinned for reproducibility
+      k3s_image:           { type: string,  required: false, default: "rancher/k3s:v1.32.2-k3s1" }  # pinned k3s
+      kubectl_version:     { type: string,  required: false, default: "v1.32.2" }  # kubectl matches k8s minor
+      lfs_weights_enabled: { type: boolean, required: false, default: false }
+      lfs_weights_path:    { type: string, required: false, default: "" }
 
 jobs:
   smoke:
@@ -47,12 +49,30 @@ jobs:
         with:
           lfs: true
 
-      - name: Ensure Git LFS objects are present
+      - name: Cache Git LFS objects
+        if: ${{ inputs.lfs_weights_enabled }}
+        uses: actions/cache@v4
+        with:
+          path: .git/lfs/objects
+          key: lfs-${{ runner.os }}-${{ hashFiles(inputs.lfs_weights_path) }}
+          restore-keys: |
+            lfs-${{ runner.os }}-
+
+      - name: Ensure weights (Git LFS)
+        if: ${{ inputs.lfs_weights_enabled }}
         shell: bash
         run: |
           set -euo pipefail
+          cd "$(git rev-parse --show-toplevel)"
+
+          FILE='${{ inputs.lfs_weights_path }}'
+          if [[ -z "$FILE" ]]; then
+            echo "ERROR: lfs_weights_path is empty while lfs_weights_enabled=true" >&2
+            exit 1
+          fi
+
           git lfs install --local
-          git lfs pull
+          git lfs pull --include="$FILE" --exclude="*"
           git lfs status || true
 
       - uses: docker/setup-buildx-action@v3
