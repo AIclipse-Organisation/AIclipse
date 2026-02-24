@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 
 import httpx
-from fastapi import Cookie, Depends, Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 
 from app.core.jwks import decode_jwt_rs256
 from app.core.settings import require_setting
@@ -77,24 +77,9 @@ async def _exchange_api_key_for_jwt(request: Request, api_key: str) -> Tuple[str
 async def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(None),
-    token: Optional[str] = Cookie(None),
-    access_token: Optional[str] = Cookie(None),
 ) -> UserContext:
-    jwt_token: Optional[str] = None
-    if authorization:
-        jwt_token = _parse_bearer_token(authorization)
-    elif token:
-        jwt_token = token
-    elif access_token:
-        jwt_token = access_token
-
-    if not jwt_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing auth token (Authorization Bearer or auth cookie)",
-        )
-
-    payload = await decode_jwt_rs256(request, jwt_token)
+    token = _parse_bearer_token(authorization)
+    payload = await decode_jwt_rs256(request, token)
 
     user_id = payload.get("sub") or payload.get("user_id")
     if not user_id:
@@ -108,15 +93,13 @@ async def get_current_user(
         email=payload.get("email"),
         is_admin=bool(payload.get("is_admin", False)),
         plan=payload.get("plan"),
-        token=jwt_token,
+        token=token,
     )
 
 
 async def get_current_user_any(
     request: Request,
     authorization: Optional[str] = Header(None),
-    token: Optional[str] = Cookie(None),
-    access_token: Optional[str] = Cookie(None),
     x_api_key: Optional[str] = Header(None, alias="X-Api-Key"),
 ) -> UserContext:
     """
@@ -146,12 +129,7 @@ async def get_current_user_any(
             token=jwt_token,
         )
 
-    return await get_current_user(
-        request,
-        authorization=authorization,
-        token=token,
-        access_token=access_token,
-    )
+    return await get_current_user(request, authorization=authorization)
 
 
 async def get_current_admin(user: UserContext = Depends(get_current_user)) -> UserContext:

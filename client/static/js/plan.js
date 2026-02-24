@@ -98,25 +98,42 @@ function updateUsageUI(usageData) {
   const usageInfoDiv = document.getElementById("usage-info");
   const usageText = document.getElementById("usage-text");
   const usageFill = document.getElementById("usage-fill");
+  const usageLabel = document.getElementById("usage-label");
 
-  if (!usageData || usageData.unlimited) {
+  if (!usageInfoDiv) return;
+
+  const planRaw = usageData && usageData.plan;
+  const plan = Number(planRaw ?? 0);
+  const unlimitedFlag =
+    usageData &&
+    (usageData.unlimited === true ||
+      usageData.unlimited === "true" ||
+      usageData.is_unlimited === true ||
+      usageData.is_unlimited === "true");
+  const isUnlimited = unlimitedFlag || plan > 0;
+
+  if (!usageData || isUnlimited) {
     // Hide usage info for unlimited plans
-    if (usageInfoDiv) usageInfoDiv.style.display = "none";
+    usageInfoDiv.style.display = "none";
     return;
   }
 
   // Show usage info for free plan
-  if (usageInfoDiv) usageInfoDiv.style.display = "block";
+  usageInfoDiv.style.display = "block";
 
-  const used = usageData.monthly_usage || 0;
-  const limit = usageData.limit || 10;
-  const remaining = usageData.remaining || 0;
-  const percentage = (used / limit) * 100;
+  const used = Number(
+    usageData.monthly_usage ?? usageData.monthly_usage_count ?? usageData.usage ?? 0
+  );
+  const limit = Number(usageData.limit ?? usageData.monthly_limit ?? 10) || 10;
+  const remaining =
+    usageData.remaining !== undefined && usageData.remaining !== null
+      ? Number(usageData.remaining)
+      : Math.max(0, limit - used);
+  const percentage = Math.max(0, Math.min(100, Math.round((used / limit) * 100)));
 
-  const usageLabel = document.getElementById("usage-label");
-    if (usageLabel) {
-      usageLabel.textContent = `${Math.round(percentage)}%`;
-    }
+  if (usageLabel) {
+    usageLabel.textContent = `${percentage}%`;
+  }
 
   if (usageText) {
     usageText.textContent = `You've used ${used} out of ${limit} free scans this month. ${remaining} remaining.`;
@@ -217,6 +234,21 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   if (usageData) {
     updateUsageUI(usageData);
+  } else if (userData) {
+    const fallbackPlan = Number(userData.plan ?? 0);
+    if (fallbackPlan === 0) {
+      const fallbackUsed = Number(userData.monthly_usage_count ?? userData.monthly_usage ?? 0);
+      const fallbackLimit = 10;
+      updateUsageUI({
+        plan: fallbackPlan,
+        unlimited: false,
+        monthly_usage: fallbackUsed,
+        limit: fallbackLimit,
+        remaining: Math.max(0, fallbackLimit - fallbackUsed),
+      });
+    } else {
+      updateUsageUI({ plan: fallbackPlan, unlimited: true });
+    }
   }
 
   // Set up upgrade button handlers
