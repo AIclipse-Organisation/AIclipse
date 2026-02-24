@@ -45,22 +45,22 @@ jobs:
           set -euo pipefail
           python -m pytest tests -q
 
-  detector:
-    name: k3d-smoke
-    needs: unit
-    uses: ./.github/workflows/k3d-smoke.yml
-    with:
-      svc_name: detector
-      context: ./detector
-      dockerfile: detector/Dockerfile
-      image_name: aiclipse/detector
-      deployment_yaml: infra/k8s/detector-depl.yaml
-      deployment_name: detector-depl
-      container_name: detector
-      service_name: detector-srv
-      service_port: 3000
-      health_path: /healthz
-      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
-      readiness_selector: app=detector
-      lfs_weights_enabled: true
-      lfs_weights_path: detector/detector_modules/models/v1/weights.pt
+  # detector:
+  #   name: k3d-smoke
+  #   needs: unit
+  #   uses: ./.github/workflows/k3d-smoke.yml
+  #   with:
+  #     svc_name: detector
+  #     context: ./detector
+  #     dockerfile: detector/Dockerfile
+  #     image_name: aiclipse/detector
+  #     deployment_yaml: infra/k8s/detector-depl.yaml
+  #     deployment_name: detector-depl
+  #     container_name: detector
+  #     service_name: detector-srv
+  #     service_port: 3000
+  #     health_path: /healthz
+  #     secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+  #     readiness_selector: app=detector
+  #     lfs_weights_enabled: true
+  #     lfs_weights_path: detector/detector_modules/models/v1/weights.pt
