@@ -3,6 +3,7 @@ using MongoDB.Driver;
 using ModelCycle.Domain;
 using ModelCycle.Services.Training;
 using System.Linq;
+using System.Text.Json;
 
 namespace ModelCycle.Services;
 
@@ -11,15 +12,15 @@ public class VoteReceiver : BackgroundService
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<VoteReceiver> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
-    
+
     private const string StreamKey = "events:model_cycle";
     private const string ConsumerGroup = "model_service_group";
     private const string ConsumerName = "dotnet_worker_1";
-    
-    private const string PostCollectionName = "community.posts"; 
+
+    private const string PostCollectionName = "community.posts";
 
     public VoteReceiver(
-        IConnectionMultiplexer redis, 
+        IConnectionMultiplexer redis,
         ILogger<VoteReceiver> logger,
         IServiceScopeFactory scopeFactory)
     {
@@ -31,7 +32,7 @@ public class VoteReceiver : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var db = _redis.GetDatabase();
-        
+
         try
         {
             if (!(await db.KeyExistsAsync(StreamKey)) ||
@@ -46,7 +47,7 @@ public class VoteReceiver : BackgroundService
         }
 
         _logger.LogInformation("[Model-Cycle] .NET Vote Receiver Started.");
-        
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -65,7 +66,7 @@ public class VoteReceiver : BackgroundService
                     {
                         await ProcessMessageAsync(entry, scope.ServiceProvider);
                     }
-                    
+
                     await db.StreamAcknowledgeAsync(StreamKey, ConsumerGroup, entry.Id);
                 }
             }
@@ -77,7 +78,7 @@ public class VoteReceiver : BackgroundService
             catch (RedisException ex)
             {
                 _logger.LogError(ex, "Redis error in VoteReceiver loop");
-                await Task.Delay(5000, stoppingToken); 
+                await Task.Delay(5000, stoppingToken);
             }
             catch (MongoException ex)
             {
@@ -90,58 +91,62 @@ public class VoteReceiver : BackgroundService
         }
     }
 
+
     private async Task ProcessMessageAsync(StreamEntry entry, IServiceProvider services)
     {
-        string? postIdStr = null;
-        foreach (var field in entry.Values)
-        {
-            if (field.Name == "post_id") postIdStr = field.Value;
-        }
+        string? postIdStr = entry.Values.FirstOrDefault(f => f.Name == "post_id").Value;
+        if (string.IsNullOrEmpty(postIdStr)) return;
 
-        if (postIdStr == null) return;
-        
         var mongoDb = services.GetRequiredService<IMongoDatabase>();
         var workflow = services.GetRequiredService<ITrainingWorkflowService>();
-        
-        var postsCollection = mongoDb.GetCollection<MongoPost>("community.posts");
-        var imagesCollection = mongoDb.GetCollection<MongoImage>("images");
-        
-        var post = await postsCollection
-            .Find(p => p.PostId == postIdStr)
-            .FirstOrDefaultAsync();
 
+        var postsCol = mongoDb.GetCollection<MongoPost>("community.posts");
+        var imagesCol = mongoDb.GetCollection<MongoImage>("images");
+
+        var post = await postsCol.Find(p => p.PostId == postIdStr).FirstOrDefaultAsync();
         if (post == null)
         {
             _logger.LogWarning($"[Sync Error] Post {postIdStr} not found in MongoDB!");
             return;
         }
-        
-        var image = await imagesCollection
-            .Find(i => i.ImageId == post.ImageId)
-            .FirstOrDefaultAsync();
 
+        var image = await imagesCol.Find(i => i.ImageId == post.ImageId).FirstOrDefaultAsync();
         if (image == null)
         {
             _logger.LogWarning($"[Data Error] Post {postIdStr} refers to missing Image {post.ImageId}");
             return;
         }
-        
+
+
+        var votesCol = mongoDb.GetCollection<MongoVote>("community.votes");
+        var allVotesDocs = await votesCol.Find(v => v.PostId == postIdStr).ToListAsync();
+
+        var individualVotes = allVotesDocs.Select(v => new UserVoteDto
+        {
+            UserId = v.UserId,
+            IsAiVote = v.Vote.Equals("up", StringComparison.OrdinalIgnoreCase)
+        }).ToList();
+
         var request = new EvaluateImageRequest
         {
-            PostId = post.PostId, 
+            PostId = post.PostId,
             MediaImageId = post.ImageId,
-            S3Key = image.S3Key,             
-            Label = "Unknown", 
-            ModelConfidence = image.Score,   
-            UserAiVotes = post.UpVotes,       
-            UserNotAiVotes = post.DownVotes  
+            S3Key = image.S3Key,
+            Label = "ai",
+            ModelConfidence = (float)image.Score,
+            Votes = individualVotes
         };
 
-        _logger.LogInformation($"[Evaluating] {post.PostId} | Conf: {image.Score:F2} | Votes: +{post.UpVotes}/-{post.DownVotes}");
-        
-        try 
+        _logger.LogInformation(
+            "[Evaluating] {PostId} | Total Historical Voters: {Count} | Model Score: {Score:F2}",
+            post.PostId,
+            individualVotes.Count,
+            image.Score
+        );
+
+        try
         {
-            var result = await workflow.ProcessVoteAsync(request);
+            await workflow.ProcessVoteAsync(request);
         }
         catch (Exception ex)
         {

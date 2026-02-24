@@ -113,6 +113,8 @@ export async function POST(req) {
           post_id: 1,
           up_vote_count: 1,
           down_vote_count: 1,
+          is_admin_post: 1, 
+          ground_truth: 1,  
         },
       },
     );
@@ -127,93 +129,83 @@ export async function POST(req) {
       { projection: { _id: 1, vote: 1 } },
     );
 
-    const oldVote = existing?.vote; // undefined | "up" | "down"
-    let newUserVote = null; // null | "up" | "down"
-
-    // Compute deltas based on Reddit rules:
-    // - none -> up/down  : +1
-    // - up -> up         : remove => -1
-    // - down -> down     : remove => -1
-    // - up -> down       : up -1, down +1
-    // - down -> up       : down -1, up +1
-    let deltaUp = 0;
-    let deltaDown = 0;
-
-    if (!existing) {
-      // create vote
-      await votes.insertOne({
-        post_id: safePostId,
-        user_id: safeUserId,
-        vote,
-        created_at: now,
-        updated_at: now,
-      });
-      newUserVote = vote;
-      if (vote === "up") deltaUp = 1;
-      else deltaDown = 1;
-    } else if (oldVote === vote) {
-      // toggle off -> delete vote doc
-      await votes.deleteOne({ _id: existing._id });
-      newUserVote = null;
-      if (oldVote === "up") deltaUp = -1;
-      else deltaDown = -1;
-    } else {
-      // switch vote
-      await votes.updateOne(
-        { _id: existing._id },
-        { $set: { vote, updated_at: now } },
-      );
-      newUserVote = vote;
-
-      if (oldVote === "up") deltaUp -= 1;
-      if (oldVote === "down") deltaDown -= 1;
-      if (vote === "up") deltaUp += 1;
-      if (vote === "down") deltaDown += 1;
-    }
-
-    // Update user's total_guesses based on whether a vote was added or removed
-    const shouldIncrementGuesses = !existing; // First time voting
-    const shouldDecrementGuesses = existing && oldVote === vote; // Toggle off
-
-    if (shouldIncrementGuesses) {
-      await users.updateOne(
-        { user_id: safeUserId },
-        { $inc: { total_guesses: 1 } },
-      );
-    } else if (shouldDecrementGuesses) {
-      await users.updateOne(
-        { user_id: safeUserId },
-        { $inc: { total_guesses: -1 } },
+    if (existing) {
+      return NextResponse.json(
+        { error: "You have already voted on this post. Votes are final." },
+        { status: 403 }
       );
     }
+
+    // create vote
+    await votes.insertOne({
+      post_id: safePostId,
+      user_id: safeUserId,
+      vote,
+      created_at: now,
+      updated_at: now,
+    });
+
+    const newUserVote = vote;
+    const deltaUp = vote === "up" ? 1 : 0;
+    const deltaDown = vote === "down" ? 1 : 0;
+
+    const incQuery = { total_guesses: 1 };
+    const isAdmin = Boolean(postDoc.is_admin_post);
+
+    if (isAdmin && postDoc.ground_truth) {
+      const truth = String(postDoc.ground_truth).toLowerCase();
+      const isRealGT = truth === "real";
+      const isFakeGT =  truth === "ai" ;
+
+      incQuery.admin_guesses_total = 1;
+
+      if (isRealGT) {
+        incQuery.admin_real_total = 1;
+        if (vote === "up") { // Correct guess
+          incQuery.admin_guesses_correct = 1;
+          incQuery.admin_real_correct = 1;
+        }
+      } else if (isFakeGT) {
+        incQuery.admin_fake_total = 1;
+        if (vote === "down") { // Correct guess
+          incQuery.admin_guesses_correct = 1;
+          incQuery.admin_fake_correct = 1;
+        }
+      }
+    }
+
+    await users.updateOne(
+      { user_id: safeUserId },
+      { $inc: incQuery }
+    );
 
     // Buffer deltas in Redis and debounce flush
     // Buffer deltas in Redis with debounce + hard max-wait
     const redis = getRedis();
     const deltaKey = `post:${safePostId}:vote_deltas`;
+    const choicesKey = `post:${safePostId}:voter_choices`; //  Key for individual user choices
     const firstKey = `post:${safePostId}:vote_first_at`;
 
     if (deltaUp !== 0 || deltaDown !== 0) {
       const nowSec = Math.floor(Date.now() / 1000);
       const debounceAtSec = Math.floor((Date.now() + FLUSH_DEBOUNCE_MS) / 1000);
 
-      // 1) set burst start once (first pending delta time)
       await redis.set(firstKey, String(nowSec), "EX", DELTA_TTL_SECONDS, "NX");
 
-      // 2) read burst start
       const firstAtSec = Number((await redis.get(firstKey)) || nowSec);
-
-      // 3) schedule flush = min(debounce, hard deadline)
       const hardDeadlineSec = firstAtSec + FLUSH_MAX_WAIT_SEC;
       const flushAtSec = Math.min(debounceAtSec, hardDeadlineSec);
 
       const pipe = redis.pipeline();
+      
       if (deltaUp !== 0) pipe.hincrby(deltaKey, "up", deltaUp);
       if (deltaDown !== 0) pipe.hincrby(deltaKey, "down", deltaDown);
 
+      pipe.hset(choicesKey, safeUserId, vote === "up" ? "1" : "0");
+
       pipe.zadd(FLUSH_ZSET, flushAtSec, safePostId);
       pipe.expire(deltaKey, DELTA_TTL_SECONDS);
-      // optional but nice: keep firstKey alive if delta burst is long-lived
+      pipe.expire(choicesKey, DELTA_TTL_SECONDS); 
       pipe.expire(firstKey, DELTA_TTL_SECONDS);
 
       await pipe.exec();
