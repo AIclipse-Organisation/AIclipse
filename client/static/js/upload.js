@@ -310,102 +310,110 @@ window.addEventListener("DOMContentLoaded", () => {
 
     imgEl.src = url;
   }
+const placeholder = document.getElementById('upload-placeholder');
+const previewWrap = document.getElementById('upload-preview-wrap');
 
   // File chosen -> show preview frame + enable button
   if (fileInput) {
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files?.[0];
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    const uploadPlaceholder = document.getElementById("upload-placeholder"); // Get placeholder ref
 
-      updateFileLabel(!!file);
+    updateFileLabel(!!file);
 
-      if (file && file.size > MAX_IMAGE_BYTES) {
-        window.lastFile = null;
-        window.lastDetectionToken = null;
-
-        try {
-          fileInput.value = "";
-        } catch {}
-
-        updateFileLabel(false);
-
-        if (previewImg) {
-          if (lastPreviewUrl) {
-            URL.revokeObjectURL(lastPreviewUrl);
-            lastPreviewUrl = null;
-          }
-          previewImg.src = "";
-        }
-        if (uploadPreviewWrap) uploadPreviewWrap.hidden = true;
-
-        if (btnSave) btnSave.disabled = true;
-        if (saveState)
-          saveState.textContent = "Run detection first to enable saving.";
-        if (saveResult) saveResult.textContent = "";
-        if (saveStatus) setStatus(saveStatus, "info", "");
-
-        if (btnCheck) btnCheck.hidden = true;
-        if (checkState) checkState.textContent = TOO_LARGE_MSG;
-
-        if (detectResult) detectResult.textContent = "No detection yet.";
-        if (detectStatus) setStatus(detectStatus, "info", "");
-
-        if (btnCheck) {
-          btnCheck.disabled = true;
-          btnCheck.hidden = true;
-        }
-
-        return;
-      }
-
-      window.lastFile = file || null;
+    // --- CASE 1: FILE TOO LARGE ---
+    if (file && file.size > MAX_IMAGE_BYTES) {
+      window.lastFile = null;
       window.lastDetectionToken = null;
 
-      cropX = 50;
-      cropY = 20;
-      applyCropPosition();
-      if (cropHint) cropHint.style.opacity = "0.9";
+      try {
+        fileInput.value = "";
+      } catch {}
+
+      updateFileLabel(false);
 
       if (previewImg) {
         if (lastPreviewUrl) {
           URL.revokeObjectURL(lastPreviewUrl);
           lastPreviewUrl = null;
         }
-        if (file) {
-          lastPreviewUrl = URL.createObjectURL(file);
-          setImageSrcSafe(previewImg, lastPreviewUrl);
-        } else {
-          previewImg.removeAttribute("src");
-        }
+        previewImg.src = "";
       }
+      
+      // UI Reset: Hide preview, Show placeholder
+      if (uploadPreviewWrap) uploadPreviewWrap.hidden = true;
+      if (uploadPlaceholder) uploadPlaceholder.hidden = false;
 
-      if (uploadPreviewWrap) uploadPreviewWrap.hidden = !file;
-
-      // Reset SAVE UI if present
       if (btnSave) btnSave.disabled = true;
-      if (saveState)
-        saveState.textContent = "Run detection first to enable saving.";
+      if (saveState) saveState.textContent = "Run detection first to enable saving.";
       if (saveResult) saveResult.textContent = "";
       if (saveStatus) setStatus(saveStatus, "info", "");
 
-      if (file) {
-        if (btnCheck) {
-          btnCheck.hidden = false;
-          btnCheck.disabled = false;
-        }
-        if (checkState)
-          checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
-        if (detectResult)
-          detectResult.textContent = "No detection yet for this file.";
-      } else {
-        if (btnCheck) {
-          btnCheck.disabled = true;
-          btnCheck.hidden = true;
-        }
-        if (checkState) checkState.textContent = "Select an image to analyze.";
-        if (detectResult) detectResult.textContent = "No detection yet.";
+      if (btnCheck) btnCheck.hidden = true;
+      if (checkState) checkState.textContent = TOO_LARGE_MSG;
+
+      if (detectResult) detectResult.textContent = "No detection yet.";
+      if (detectStatus) setStatus(detectStatus, "info", "");
+
+      if (btnCheck) {
+        btnCheck.disabled = true;
+        btnCheck.hidden = true;
       }
-    });
-  }
+
+      return;
+    }
+
+    // --- CASE 2: VALID FILE OR CLEARED ---
+    window.lastFile = file || null;
+    window.lastDetectionToken = null;
+
+    cropX = 50;
+    cropY = 20;
+    applyCropPosition();
+    if (cropHint) cropHint.style.opacity = "0.9";
+
+    if (previewImg) {
+      if (lastPreviewUrl) {
+        URL.revokeObjectURL(lastPreviewUrl);
+        lastPreviewUrl = null;
+      }
+      if (file) {
+        lastPreviewUrl = URL.createObjectURL(file);
+        setImageSrcSafe(previewImg, lastPreviewUrl);
+      } else {
+        previewImg.removeAttribute("src");
+      }
+    }
+
+    // Toggle Preview vs Placeholder
+    if (uploadPreviewWrap) uploadPreviewWrap.hidden = !file;
+    if (uploadPlaceholder) uploadPlaceholder.hidden = !!file;
+
+    // Reset SAVE UI if present
+    if (btnSave) btnSave.disabled = true;
+    if (saveState) saveState.textContent = "Run detection first to enable saving.";
+    if (saveResult) saveResult.textContent = "";
+    if (saveStatus) setStatus(saveStatus, "info", "");
+
+    if (file) {
+      if (btnCheck) {
+        btnCheck.hidden = false;
+        btnCheck.disabled = false;
+      }
+      if (checkState)
+        checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+      if (detectResult)
+        detectResult.textContent = "No detection yet for this file.";
+    } else {
+      if (btnCheck) {
+        btnCheck.disabled = true;
+        btnCheck.hidden = true;
+      }
+      if (checkState) checkState.textContent = "Select an image to analyze.";
+      if (detectResult) detectResult.textContent = "No detection yet.";
+    }
+  });
+}
 
   // btnCheck click -> exports cropped file -> POST /checks with cropped file -> store preview+response -> /results
   if (btnCheck) {
