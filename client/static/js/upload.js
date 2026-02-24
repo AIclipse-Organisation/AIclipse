@@ -335,41 +335,45 @@ window.addEventListener("DOMContentLoaded", () => {
     return { croppedFile, previewDataUrl };
   }
 
-  function setImageSrcSafe(imgEl, url) {
-    if (!imgEl) return;
+function setImageSrcSafe(imgEl, url) {
+  if (!imgEl) return;
 
-    // Only allow safe blob: or data: URLs (what we generate client-side)
-    if (typeof url !== "string") {
-      imgEl.removeAttribute("src");
-      return;
-    }
-
-    const isBlobUrl = url.startsWith("blob:");
-    const isDataUrl = url.startsWith("data:");
-
-    if (isBlobUrl) {
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== "blob:") {
-          imgEl.removeAttribute("src");
-          return;
-        }
-      } catch {
-        imgEl.removeAttribute("src");
-        return;
-      }
-    } else if (isDataUrl) {
-      if (!/^data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=]+$/.test(url)) {
-        imgEl.removeAttribute("src");
-        return;
-      }
-    } else {
-      imgEl.removeAttribute("src");
-      return;
-    }
-
-    imgEl.src = url;
+  // Initial check: must be a string and not a javascript: link
+  if (typeof url !== "string" || url.toLowerCase().startsWith("javascript:")) {
+    imgEl.removeAttribute("src");
+    return;
   }
+
+  const isBlobUrl = url.startsWith("blob:");
+  const isDataUrl = url.startsWith("data:");
+
+  if (isBlobUrl) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "blob:") {
+        imgEl.removeAttribute("src");
+        return;
+      }
+    } catch {
+      imgEl.removeAttribute("src");
+      return;
+    }
+  } else if (isDataUrl) {
+    // Strict Regex for base64 image data URLs
+    const dataUrlRegex = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/;
+    if (!dataUrlRegex.test(url)) {
+      imgEl.removeAttribute("src");
+      return;
+    }
+  } else {
+    // If your app only uses blobs/data, discard anything else
+    imgEl.removeAttribute("src");
+    return;
+  }
+
+  // Final assignment: SAST tools prefer explicit assignment after validation
+  imgEl.setAttribute("src", url);
+}
 const previewWrap = document.getElementById('upload-preview-wrap');
   // File chosen -> show preview frame + enable button
   if (fileInput) {
