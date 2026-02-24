@@ -180,6 +180,7 @@ async def _run_asgi_lifespan(app, timeout_s: float = 10.0):
 @pytest.fixture(scope="session")
 def gateway_mod():
     os.environ.setdefault("AUTH_URI", "http://auth")
+    os.environ.setdefault("BILLING_URI", "http://billing-srv")
     os.environ.setdefault("DETECTOR_URI", "http://detector")
     os.environ.setdefault("MEDIA_URI", "http://media")
     os.environ.setdefault("DETECTION_TOKEN_SECRET", "test-detection-secret")
