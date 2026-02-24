@@ -335,20 +335,23 @@ window.addEventListener("DOMContentLoaded", () => {
     return { croppedFile, previewDataUrl };
   }
 
-  
+
 function setImageSrcSafe(imgEl, url) {
   if (!imgEl) return;
 
-  // Initial check: must be a string and not a javascript: link
-  if (typeof url !== "string" || url.toLowerCase().startsWith("javascript:")) {
+  // 1. Basic Type Check
+  if (typeof url !== "string") {
     imgEl.removeAttribute("src");
     return;
   }
 
-  const isBlobUrl = url.startsWith("blob:");
-  const isDataUrl = url.startsWith("data:");
+  // 2. Protocol Validation (Allowlist Approach)
+  // We only permit specifically generated blob: or data: image strings.
+  const lowerUrl = url.toLowerCase().trim();
+  const isBlob = lowerUrl.startsWith("blob:");
+  const isData = lowerUrl.startsWith("data:");
 
-  if (isBlobUrl) {
+  if (isBlob) {
     try {
       const parsed = new URL(url);
       if (parsed.protocol !== "blob:") {
@@ -359,20 +362,27 @@ function setImageSrcSafe(imgEl, url) {
       imgEl.removeAttribute("src");
       return;
     }
-  } else if (isDataUrl) {
-    // Strict Regex for base64 image data URLs
-    const dataUrlRegex = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/;
+  } else if (isData) {
+    // Rigid Regex for base64 image data URLs only (png, jpeg, jpg, webp)
+    // This blocks data:text/html or data:application/javascript injections.
+    const dataUrlRegex = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/i;
     if (!dataUrlRegex.test(url)) {
       imgEl.removeAttribute("src");
       return;
     }
   } else {
+    // Blocks javascript:, vbscript:, and standard http/https if not intended
     imgEl.removeAttribute("src");
     return;
   }
+
+  // 3. Safe Assignment
   imgEl.setAttribute("src", url);
 }
+
+
 const previewWrap = document.getElementById('upload-preview-wrap');
+
   // File chosen -> show preview frame + enable button
   if (fileInput) {
   fileInput.addEventListener("change", () => {
