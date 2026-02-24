@@ -29,68 +29,92 @@
           <div id="detect-card" class="detection-card" aria-live="polite">
             <div class="detection-row">
               <div class="detection-main">
-
                 <div class="bar-head">
                   <span class="bar-title">Aiclipse</span>
-                  <p id="detect-verdict" class="verdict-text label-neutral">—</p>
+                  <p id="detect-verdict" class="verdict-text label-neutral">
+                    —
+                  </p>
                 </div>
 
-                <div class="progress-panel" aria-hidden="true" title="Real probability">
+                <div
+                  class="progress-panel"
+                  aria-hidden="true"
+                  title="Real probability"
+                >
                   <div class="progress-bar">
-                    <div class="real-fill" style="--p:0;"></div>
-                    <div class="ai-fill" style="--p:0;"></div>
+                    <div class="real-fill" style="--p: 0"></div>
+                    <div class="ai-fill" style="--p: 0"></div>
 
                     <span class="bar-percent" id="real-percent">0%</span>
                   </div>
                 </div>
 
-                <!-- Actions (no action-card wrapper) -->
-                <h3 class="results-actions-title">Would you like to…</h3>
-
-                <button
-                  id="btn-save"
-                  disabled
-                  type="button"
-                  class="btn-save-image"
-                >
-                  Save Image
-                </button>
-
-                <button id="btn-delete" class="btn-delete-scan" type="button">
-                  Delete Scan
-                </button>
-
-                <button
-                  id="btn-publish-toggle"
-                  type="button"
-                  class="btn-publish"
-                >
-                  Publish to Community
-                </button>
-
                 <input id="save-public" type="checkbox" hidden />
 
                 <div id="public-desc-wrap" class="publish-extra" hidden>
                   <label for="post-description" class="publish-label"
-                    >Description</label
+                    >Community Description</label
                   >
                   <textarea
                     id="post-description"
                     rows="3"
-                    placeholder="Write a short description for the community post..."
+                    placeholder="What should the community know about this scan?"
                     class="publish-textarea"
                   ></textarea>
-                  <small id="post-description-hint" class="muted"></small>
+                </div>
+                <div class="action-row">
+                  <div class="visibility-selector">
+                  <button
+                    type="button"
+                    class="vis-btn is-selected"
+                    id="mode-private"
+                  >
+                    <image src="/static/images/lock.png" class="icon"></image>
+                    Private
+                  </button>
+                  <button type="button" class="vis-btn" id="mode-public">
+                    <image
+                      src="/static/images/icons8-community-100.png"
+                      class="icon"
+                    ></image>
+                    Public
+                  </button>
+                </div>
+                  <button
+                    id="btn-save"
+                    disabled
+                    type="button"
+                    class="btn-save-final"
+                  >
+                    Confirm & Save
+                  </button>
+                </div>
                 </div>
 
-                <div id="save-status" class="status-bar"></div>
-                <div id="save-result" class="muted"></div>
+                
 
+                <input id="save-public" type="checkbox" hidden />
+                <div id="public-desc-wrap" class="publish-extra" hidden>
+                  <label for="post-description" class="publish-label"
+                    >Community Description</label
+                  >
+                  <textarea
+                    id="post-description"
+                    rows="3"
+                    placeholder="What should the community know?"
+                    class="publish-textarea"
+                  ></textarea>
+                </div>
+
+                <div class="danger-zone">
+                  <button id="btn-delete" class="btn-delete-link" type="button">
+                    Delete this scan
+                  </button>
+                </div>
                 <div id="delete-modal" class="modal-overlay" hidden>
                   <div class="modal">
                     <h3 class="modal-title">Delete scan?</h3>
                     <p class="modal-text">This action cannot be undone.</p>
-
                     <div class="modal-actions">
                       <button
                         id="cancel-delete"
