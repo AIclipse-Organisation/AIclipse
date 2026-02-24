@@ -33,42 +33,47 @@
             />
           </div>
 
-          <!-- Verdict line + bar just below the image -->
+          <!-- Verdict cards just below the image -->
           <div
             id="verdict-block"
             class="verdict-block"
             hidden
             aria-label="Scan result"
           >
-            <div id="verdict-line" class="verdict-line verdict-text"></div>
-
-            <div
-              id="verdict-bar"
-              class="confidence-track"
-              hidden
-              aria-label="Scan result bar"
-            >
-              <div id="verdict-fill" class="confidence-fill"></div>
-            </div>
-
-            <!-- Votes line + bar just below the verdict bar -->
-            <div
-              id="votes-block"
-              class="votes-block"
-              hidden
-              aria-label="Vote-based result"
-            >
-              <div id="votes-line" class="votes-line verdict-text"></div>
-
-              <div
-                id="votes-bar"
-                class="confidence-track"
-                hidden
-                aria-label="Vote result bar"
-              >
-                <div id="votes-fill" class="confidence-fill"></div>
+            <!-- AICLIPSE (gold) -->
+            <section id="aiclipse-card" class="meter-card meter-card--gold" hidden>
+              <div class="meter-head">
+                <span class="meter-title">Aiclipse</span>
+                <p id="aiclipse-verdict" class="meter-verdict">—</p>
               </div>
-            </div>
+
+              <div class="meter-panel" aria-hidden="true" title="Real probability">
+                <div class="meter-bar">
+                  <div
+                    id="aiclipse-fill"
+                    class="meter-fill meter-fill--gold"
+                    data-p="0"
+                    style="width:0px;"
+                  ></div>
+                  <span class="meter-percent" id="aiclipse-percent">0.00%</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- COMMUNITY (purple) -->
+            <section id="community-card" class="meter-card meter-card--purple" hidden>
+              <div class="meter-head meter-head--purple">
+                <span class="meter-title meter-title--purple">Community</span>
+                <p id="community-verdict" class="meter-verdict meter-verdict--purple">—</p>
+              </div>
+
+              <div class="meter-panel meter-panel--purple" aria-hidden="true" title="Community real share">
+                <div class="meter-bar">
+                  <div id="community-fill" class="meter-fill meter-fill--purple"></div>
+                  <span class="meter-percent" id="community-percent">0.00%</span>
+                </div>
+              </div>
+            </section>
           </div>
 
           <div class="viewscan-meta">

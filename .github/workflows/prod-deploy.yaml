@@ -20,6 +20,7 @@ jobs:
       NS: default
       IMAGES: "auth gateway media detector plans billing client community model-cycle"
       KUBE_DNS_IP: 10.43.0.10
+      DOMAINS: "aiclipse.online aiclipse.site"
 
     steps:
       - name: Verify git-lfs is available on runner
@@ -48,6 +49,15 @@ jobs:
           registry: ghcr.io
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Pre-build cleanup (free disk)
+        run: |
+          set -euo pipefail
+          docker buildx prune -af || true
+          docker builder prune -af || true
+          docker system prune -af --volumes || true
+          df -h
+          docker system df || true
 
       - name: Build & push images
         run: |
@@ -96,6 +106,16 @@ jobs:
           kubectl -n "$NS" patch serviceaccount default \
             -p '{"imagePullSecrets":[{"name":"ghcr-pull"}]}' || true
 
+      - name: Node preflight (disk-pressure)
+        run: |
+          set -euo pipefail
+          if kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .spec.taints[*]}{.key}{"="}{.effect}{" "}{end}{"\n"}{end}' \
+              | grep -q 'node.kubernetes.io/disk-pressure'; then
+            echo "ERROR: node has disk-pressure taint. Free disk on the node (often /var/lib/docker build cache) and retry."
+            kubectl describe node "$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')" | sed -n '/Taints:/,/Conditions:/p' || true
+            exit 1
+          fi
+
       - name: Apply StorageClass (idempotent)
         run: |
           set -euo pipefail
@@ -142,7 +162,7 @@ jobs:
                       - >
                         set -e;
                         nslookup kubernetes.default.svc.cluster.local >/dev/null &&
-                        nslookup redis-srv.default.svc.cluster.local >/dev/null
+                        nslookup kube-dns.kube-system.svc.cluster.local >/dev/null
           YAML
 
           if ! kubectl -n "$NS" wait --for=condition=complete job/dns-smoke --timeout=180s; then
@@ -177,13 +197,33 @@ jobs:
               ]}}' || true
           kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
 
-      - name: Ingress smoke via NodePort
+      - name: Ingress smoke via cluster DNS (online OR site)
         run: |
           set -euo pipefail
           kubectl run curl --image=alpine:3.20 --restart=Never --command -- \
-            sh -lc 'apk add --no-cache curl >/dev/null; \
-                    curl -sI -H "Host: aiclipse.online"  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local | head -n1; \
-                    curl -sI -H "Host: storage.aiclipse.online" http://ingress-nginx-controller.ingress-nginx.svc.cluster.local | head -n1'
+            sh -lc '
+              set -e
+              apk add --no-cache curl >/dev/null
+
+              ok_root=0
+              for d in aiclipse.online aiclipse.site; do
+                code=$(curl -sS -o /dev/null -w "%{http_code}" -H "Host: $d" \
+                  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local || echo 000)
+                echo "$d -> $code"
+                echo "$code" | grep -Eq "^(2|3)" && ok_root=1
+              done
+
+              ok_storage=0
+              for d in aiclipse.online aiclipse.site; do
+                h="storage.$d"
+                code=$(curl -sS -o /dev/null -w "%{http_code}" -H "Host: $h" \
+                  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local || echo 000)
+                echo "$h -> $code"
+                echo "$code" | grep -Eq "^(2|3)" && ok_storage=1
+              done
+
+              [ "$ok_root" -eq 1 ] && [ "$ok_storage" -eq 1 ]
+            '
           kubectl logs curl --tail=-1 || true
           kubectl delete pod curl --wait=true --ignore-not-found
 
@@ -392,13 +432,27 @@ jobs:
         run: |
           kubectl -n "$NS" get pods,svc,deploy,rs,sts,hpa
 
+      - name: Choose public domain for smoke test (online OR site)
+        run: |
+          set -euo pipefail
+          for d in $DOMAINS; do
+            if getent ahosts "$d" >/dev/null 2>&1; then
+              echo "PUBLIC_DOMAIN=$d" >> "$GITHUB_ENV"
+              echo "PUBLIC_STORAGE_DOMAIN=storage.$d" >> "$GITHUB_ENV"
+              echo "Using PUBLIC_DOMAIN=$d"
+              exit 0
+            fi
+          done
+          echo "Neither aiclipse.online nor aiclipse.site resolves from the runner" >&2
+          exit 1
+
       - name: Smoke test
         run: |
           set -euo pipefail
           OK='^2|^3'
 
           for i in {1..30}; do
-            code=$(curl -sS -o /dev/null -w '%{http_code}' "https://aiclipse.online" || echo 000)
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "https://${PUBLIC_DOMAIN}" || echo 000)
             printf '%s  try %02d  -> %s\n' "$(date +%H:%M:%S)" "$i" "$code"
             if echo "$code" | grep -Eq "$OK"; then
               echo "ready"
@@ -409,3 +463,19 @@ jobs:
 
           echo "not ready after 60s"
           exit 1
+
+      - name: Final cleanup (always)
+        if: always()
+        run: |
+          set -euo pipefail
+          docker buildx prune -af || true
+          docker builder prune -af || true
+          docker system prune -af --volumes || true
+          df -h
+          docker system df || true
+
+      - name: Cleanup workspace (always)
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf "${GITHUB_WORKSPACE:?}"/*

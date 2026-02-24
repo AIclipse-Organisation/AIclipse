@@ -22,17 +22,13 @@
         <div class="upload-content">
           <div class="upload-previewWrap" hidden id="upload-preview-wrap">
             <div class="results-imageFrame" id="upload-frame">
-              <img
-                id="preview-image"
-                alt="Selected image preview"
-                draggable="false"
-              />
+              <img id="preview-image" alt="Selected image preview" draggable="false" />
               <div class="crop-hint" id="crop-hint">Drag to reposition</div>
-            </div>
 
-            <button type="button" class="btn-crop-reset" id="btn-crop-reset">
-              Reset crop
-            </button>
+              <button type="button" class="btn-crop-reset inside-frame" id="btn-crop-reset">
+                Reset Crop
+              </button>
+            </div>
           </div>
         </div>
 
@@ -40,14 +36,14 @@
           <input id="file-input" type="file" accept="image/*" hidden />
 
           <label for="file-input" class="file-upload">
-            Upload Image to Scan
+            Choose Image
           </label>
 
           <span id="check-state" class="muted">
             Select an image to analyze.
           </span>
 
-          <button id="btn-check" disabled>View Results</button>
+          <button id="btn-check" disabled hidden>Scan Image</button>
         </div>
 
         <div id="quota-modal" class="modal-overlay" hidden>

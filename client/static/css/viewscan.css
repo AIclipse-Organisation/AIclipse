@@ -106,12 +106,136 @@
 }
 
 /* =========================
-   Verdict block (matches scans page)
+   NEW: Community-style bar cards
    ========================= */
 
 .verdict-block {
   margin-top: 12px;
 }
+
+/* Card shell */
+.meter-card {
+  margin-top: 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.10);
+}
+
+.meter-card--gold {
+  border: 1px solid rgba(207, 184, 124, 0.55);
+}
+
+.meter-card--purple {
+  border: 1px solid rgba(170, 120, 255, 0.55);
+}
+
+/* Header row */
+.meter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 12px 14px 8px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.meter-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: rgba(207, 184, 124, 0.95);
+}
+
+.meter-verdict {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: rgba(207, 184, 124, 0.95);
+  text-align: right;
+}
+
+.meter-head--purple .meter-title,
+.meter-verdict--purple {
+  color: rgba(190, 150, 255, 0.95);
+}
+
+.meter-title--purple {
+  color: rgba(190, 150, 255, 0.95);
+}
+
+/* Panel */
+.meter-panel {
+  padding: 10px 12px 12px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.meter-panel--purple {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+/* Bar */
+.meter-bar {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+
+  height: 26px;
+  border-radius: 999px;
+
+  background: #141414;
+  border: 1px solid rgb(63, 63, 63);
+
+  padding: 4px;
+  overflow: hidden;
+}
+
+/* Fill */
+.meter-fill {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  bottom: 4px;
+  border-radius: 999px;
+
+  width: 0%;
+  max-width: calc(100% - 8px);
+  transition: width 300ms ease;
+  z-index: 1;
+}
+
+.meter-fill:not([style*="width: 0"]) {
+  min-width: 14px;
+}
+
+.meter-fill--gold {
+  background: rgba(207, 184, 124, 0.95);
+}
+
+.meter-fill--purple {
+  background: rgba(190, 150, 255, 0.85);
+}
+
+/* Percent text */
+.meter-percent {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  pointer-events: none;
+  z-index: 3;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+}
+
+/* =========================
+   (OLD verdict/votes bar styles kept as-is)
+   ========================= */
 
 .verdict-line {
   text-align: center;
@@ -165,7 +289,6 @@
   background: #e04646;
   /* red fill for fake */
 }
-
 
 /* =========================
    Votes block (same bar design)
@@ -516,8 +639,6 @@
   justify-content: flex-end;
 }
 
-
-
 /* Delete confirmation modal */
 
 .btn-delete-post {
@@ -662,8 +783,6 @@
   background: var(--btn-hover-color);
   color: #111;
 }
-
-
 
 /* =========================
   Comments
