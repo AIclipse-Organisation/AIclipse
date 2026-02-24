@@ -370,7 +370,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
     imgEl.src = url;
   }
-const placeholder = document.getElementById('upload-placeholder');
 const previewWrap = document.getElementById('upload-preview-wrap');
 
   // File chosen -> show preview frame + enable button
