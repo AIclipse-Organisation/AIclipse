@@ -19,6 +19,7 @@ def _get_int_env(name: str, default: int) -> int:
 @dataclass(frozen=True)
 class Settings:
     auth_uri: Optional[str]
+    billing_uri: Optional[str]
     media_uri: Optional[str]
     detector_uri: Optional[str]
     model_cycle_uri: Optional[str]
@@ -41,6 +42,7 @@ class Settings:
     def from_env() -> "Settings":
         return Settings(
             auth_uri=os.getenv("AUTH_URI"),
+            billing_uri=os.getenv("BILLING_URI"),
             media_uri=os.getenv("MEDIA_URI"),
             detector_uri=os.getenv("DETECTOR_URI"),
             detection_token_secret=os.getenv("DETECTION_TOKEN_SECRET"),

@@ -20,3 +20,13 @@ spec:
                 name: community-srv
                 port:
                   number: 3000
+    - host: aiclipse.site
+      http:
+        paths:
+          - path: /community/adminBFF/models/?(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: community-srv
+                port:
+                  number: 3000

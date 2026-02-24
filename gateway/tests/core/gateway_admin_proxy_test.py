@@ -1,7 +1,10 @@
 import httpx
 import pytest
 
-from tests.conftest import make_auth_token
+try:
+    from tests.conftest import make_auth_token
+except ModuleNotFoundError:
+    from gateway.tests.conftest import make_auth_token
 
 
 @pytest.mark.asyncio

@@ -10,6 +10,7 @@ from app.core.jwks import JwksService
 from app.core.settings import Settings
 from app.routers.health import router as health_router
 from app.routers.auth_proxy import router as auth_proxy_router
+from app.routers.billing_proxy import router as billing_proxy_router
 from app.routers.checks import router as checks_router
 from app.routers.media import router as media_router
 from app.routers.models import router as models_router
@@ -56,6 +57,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(auth_proxy_router)
+app.include_router(billing_proxy_router)
 app.include_router(checks_router)
 app.include_router(media_router)
 app.include_router(models_router, prefix="/admin")

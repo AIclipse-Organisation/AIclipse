@@ -70,6 +70,19 @@
 
           <button id="btn-check" disabled hidden>Analyze Image</button>
         </div>
+
+        <div id="quota-modal" class="modal-overlay" hidden>
+          <div class="modal" role="dialog" aria-modal="true" aria-labelledby="quota-modal-title">
+            <h3 id="quota-modal-title" class="modal-title">Free quota reached</h3>
+            <p id="quota-modal-text" class="modal-text">
+              You've reached your free quota of 10 uploads this month.
+            </p>
+            <div class="modal-actions">
+              <button id="quota-modal-close" class="secondary" type="button">Close</button>
+              <button id="quota-modal-plan" class="danger" type="button">Go to Plan</button>
+            </div>
+          </div>
+        </div>
       </main>
 
       {% include 'partials/navbar.html' %}

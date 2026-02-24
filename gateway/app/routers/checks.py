@@ -27,6 +27,34 @@ def _detail_from_detector(resp: httpx.Response) -> str:
 async def _checks_impl(request: Request, file: UploadFile, user: UserContext) -> JSONResponse:
     s = request.app.state.settings
     detector_uri = require_setting("DETECTOR_URI", s.detector_uri)
+    auth_uri = require_setting("AUTH_URI", s.auth_uri)
+
+    client: httpx.AsyncClient = request.app.state.http
+
+    # Best-effort usage check (fail open unless explicit free-tier block)
+    try:
+        usage_check_resp = await client.post(
+            auth_uri.rstrip("/") + "/usage/check",
+            headers={"Authorization": f"Bearer {user.token}"},
+            timeout=10.0,
+        )
+        if usage_check_resp.status_code == 200:
+            usage_data = usage_check_resp.json()
+            if not usage_data.get("allowed", False):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "usage_limit_exceeded",
+                        "message": "You've reached your free tier limit of 10 scans per month. Upgrade to premium for unlimited scans.",
+                        "monthly_usage": usage_data.get("monthly_usage", 0),
+                        "limit": usage_data.get("limit", 10),
+                    },
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # Do not fail scans if usage service has transient issues.
+        request.app.logger.warning("Usage check failed: %s", exc)
 
     data = await file.read()
     await sniff_and_validate_image(request, data)
@@ -39,7 +67,6 @@ async def _checks_impl(request: Request, file: UploadFile, user: UserContext) ->
         "Content-Type": "application/octet-stream",
     }
 
-    client: httpx.AsyncClient = request.app.state.http
     try:
         resp = await client.post(url, content=data, headers=headers, timeout=60.0)
     except httpx.TimeoutException:
@@ -84,6 +111,16 @@ async def _checks_impl(request: Request, file: UploadFile, user: UserContext) ->
         "confidence": confidence,
         "detection_token": detection_token,
     }
+
+    # Best-effort usage increment (do not fail successful scans)
+    try:
+        await client.post(
+            auth_uri.rstrip("/") + "/usage/increment",
+            headers={"Authorization": f"Bearer {user.token}"},
+            timeout=10.0,
+        )
+    except Exception as exc:
+        request.app.logger.warning("Usage increment failed: %s", exc)
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=response_body)
 
