@@ -49,9 +49,15 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         var userIds = request.Votes.Select(v => v.UserId).Distinct().ToList();
         var accuracyList = await _authService.GetUsersAccuracyAsync(userIds);
 
+        // Sanitize user-provided PostId before logging to prevent log forging
+        var rawPostId = request.PostId ?? "NULL";
+        var sanitizedPostId = rawPostId
+            .Replace("\r", " ")
+            .Replace("\n", " ");
+
         // --- DIAGNOSTIC LOGGING START ---
         _logger.LogInformation("[Diagnostic] Processing {Count} accuracy records for Post {PostId}",
-            accuracyList.Count, request.PostId);
+            accuracyList.Count, sanitizedPostId);
 
         foreach (var acc in accuracyList)
         {
