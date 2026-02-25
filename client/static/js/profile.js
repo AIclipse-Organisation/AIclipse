@@ -26,7 +26,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     const avgAcc = (aiAccuracy + realAccuracy) / 2;
 
-    let accuracyLevel = "Novice";
+    let accuracyLevel;
 
     if (avgAcc >= 75) {
       accuracyLevel = "Expert";
