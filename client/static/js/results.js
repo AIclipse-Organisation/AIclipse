@@ -189,57 +189,7 @@ window.addEventListener("DOMContentLoaded", () => {
     modePublic.addEventListener("click", () => updateVisibility(true));
   }
 
-  // Modified: btn-save listener with multi-part fetch logic
-  if (btnSave) {
-    btnSave.addEventListener("click", async () => {
-      // Toggle disabled to prevent double clicks
-      btnSave.disabled = true;
-      const originalText = btnSave.textContent;
-      btnSave.textContent = "Saving...";
-
-      const isPublic = publishCheck?.checked;
-      const description = document.getElementById("post-description")?.value || "";
-
-      // NEW: Prepare form data for upload
-      const formData = new FormData();
-      formData.append("image", window.lastFile);
-      formData.append("isPublic", isPublic);
-      formData.append("description", description);
-      if (stored) formData.append("detectionResult", stored);
-
-      try {
-        // NEW: Fetch request to backend save endpoint
-        const response = await fetch("/api/scans/save", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${window.lastDetectionToken}`
-          },
-          body: formData
-        });
-
-        if (!response.ok) throw new Error(`Server error: ${response.status}`);
-
-        const result = await response.json();
-        console.log("Save successful:", result);
-
-        // Redirect based on the chosen privacy mode
-        window.location.href = isPublic ? "/community" : "/history";
-
-      } catch (err) {
-        console.error("Save failed", err);
-        
-        // Error feedback to user
-        const saveResult = document.getElementById("save-result");
-        if (saveResult) {
-          saveResult.textContent = "Failed to save scan. Please try again.";
-          saveResult.style.color = "#e04646";
-        }
-
-        btnSave.disabled = false;
-        btnSave.textContent = originalText;
-      }
-    });
-  }
+  updateVisibility(!!publishCheck?.checked);
 
   const deleteBtn = document.getElementById("btn-delete");
   const modal = document.getElementById("delete-modal");
