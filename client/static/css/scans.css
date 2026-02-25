@@ -138,6 +138,38 @@
   animation: shimmer 2.5s infinite linear;
 }
 
+/* =========================
+   Visibility Badges (Top Right)
+   ========================= */
+
+.scan-visibility-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 10; /* Keeps it above the image and shimmering skeleton */
+  
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px); /* For iOS support */
+  
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85); /* Off-white icon color */
+  
+  /* Very subtle border to define the edge against dark images */
+  border: 1px solid rgba(255, 255, 255, 0.1); 
+}
+
+.scan-visibility-badge svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
 
 
 

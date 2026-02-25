@@ -1,13 +1,11 @@
 // =========================
-// Scans page: fetch + render + Private/Public tabs
-// Updated: decimal precision + fixed layout
+// Scans page: fetch + render all scans
 // =========================
 
 let allScans = [];
-let activeFilter = "private";
 
 // -------------------------
-// Filter helpers
+// Helper: Get Visibility
 // -------------------------
 function getVisibility(img) {
   if (img && typeof img.is_public === "boolean")
@@ -15,37 +13,8 @@ function getVisibility(img) {
   return "private";
 }
 
-function getFilteredScans() {
-  return allScans.filter((img) => getVisibility(img) === activeFilter);
-}
-
-function setupScanTabs() {
-  const tabs = document.querySelectorAll(".scans-tab");
-  if (!tabs.length) return;
-
-  tabs.forEach((t) => {
-    const isActive = t.dataset.filter === activeFilter;
-    t.classList.toggle("is-active", isActive);
-    t.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
-
-  tabs.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      activeFilter = btn.dataset.filter || "private";
-
-      tabs.forEach((t) => {
-        const isActive = t.dataset.filter === activeFilter;
-        t.classList.toggle("is-active", isActive);
-        t.setAttribute("aria-selected", isActive ? "true" : "false");
-      });
-
-      renderScans();
-    });
-  });
-}
-
 // -------------------------
-// Compute REAL% (same logic as results.js)
+// Compute REAL% (No changes here)
 // -------------------------
 function clamp01(n) {
   const x = Number(n);
@@ -80,7 +49,7 @@ function computeRealPct(img) {
 
   return {
     label: rawLabel || "Unknown",
-    realPct: (realProb * 100).toFixed(2), // 🔥 KEEP DECIMALS
+    realPct: (realProb * 100).toFixed(2),
   };
 }
 
@@ -98,26 +67,18 @@ function makeEl(tag, className, text) {
   return el;
 }
 
-function createEmptyStateForActiveTab() {
+// Unified empty state since tabs are gone
+function createEmptyState() {
   const wrapper = makeEl("div", "scans-empty-state");
-
-  const iconSrc =
-    activeFilter === "public"
-      ? "/static/images/community_icon.png"
-      : "/static/images/upload_icon.png";
-  const iconAlt = activeFilter === "public" ? "Published icon" : "Upload icon";
-
-  const message =
-    activeFilter === "public"
-      ? "No published scans yet."
-      : "No uploads done yet.";
-
   const box = makeEl("div", "scans-empty-box");
+  
   const iconEl = document.createElement("img");
   iconEl.className = "scans-empty-icon";
-  iconEl.src = iconSrc;
-  iconEl.alt = iconAlt;
-  const text = makeEl("p", "scans-empty-text", message);
+  iconEl.src = "/static/images/upload_icon.png";
+  iconEl.alt = "Upload icon";
+  
+  const text = makeEl("p", "scans-empty-text", "No scans yet.");
+  
   box.appendChild(iconEl);
   box.appendChild(text);
   wrapper.appendChild(box);
@@ -134,12 +95,8 @@ function createEmptyStateForActiveTab() {
 
 function createScanCard(img, index) {
   const scanNumber = index + 1;
-  // We still need these values for the bar width and accessibility label
-  const { label, realPct } = computeRealPct(img);
-
   const card = makeEl("div", "scan-card");
 
-  // Make the entire card clickable
   card.addEventListener("click", () => {
     sessionStorage.setItem("selectedScan", JSON.stringify(img));
     window.location.href = "/viewscan";
@@ -148,7 +105,6 @@ function createScanCard(img, index) {
   const row = makeEl("div", "scan-row");
   card.appendChild(row);
 
-  // The Image Container
   const left = makeEl("div", "scan-left");
   row.appendChild(left);
 
@@ -163,64 +119,61 @@ function createScanCard(img, index) {
     left.appendChild(makeEl("div", "image-placeholder", "No image"));
   }
 
-  // --- THE BAR HAS BEEN COMPLETELY REMOVED ---
-  // No track, no fill, no appending.
+  // --- ADD VISIBILITY BADGE ---
+  const visibility = getVisibility(img);
+  
+ if (visibility === "private") {
+    const badge = makeEl("div", "scan-visibility-badge");
+    badge.title = "Private Scan";
+    badge.innerHTML = `<svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>`;
+    
+    left.appendChild(badge);
+  }
+  
 
   return card;
 }
 
 // -------------------------
-// Render + Fetch
+// Skeleton Loader & Fetch
 // -------------------------
+function renderSkeletonCards(count = 9) {
+  const containerEl = document.getElementById("scans-container");
+  if (!containerEl) return;
+  clearEl(containerEl);
+  for (let i = 0; i < count; i++) {
+    containerEl.appendChild(makeEl("div", "skeleton-card"));
+  }
+}
+
 function renderScans() {
   const containerEl = document.getElementById("scans-container");
   if (!containerEl) return;
-
   clearEl(containerEl);
 
-  const items = getFilteredScans();
-
-  if (items.length === 0) {
-    containerEl.appendChild(createEmptyStateForActiveTab());
+  // Since tabs are gone, we just use allScans directly
+  if (allScans.length === 0) {
+    containerEl.appendChild(createEmptyState());
     return;
   }
 
-  items.forEach((img, idx) => {
+  allScans.forEach((img, idx) => {
     containerEl.appendChild(createScanCard(img, idx));
   });
 }
 
-// -------------------------
-// Skeleton Loader
-// -------------------------
-function renderSkeletonCards(count = 9) { // 9 cards perfectly fills 3 rows
-  const containerEl = document.getElementById("scans-container");
-  if (!containerEl) return;
-
-  clearEl(containerEl);
-
-  for (let i = 0; i < count; i++) {
-    const skeleton = makeEl("div", "skeleton-card");
-    containerEl.appendChild(skeleton);
-  }
-}
-
-// -------------------------
-// Render + Fetch
-// -------------------------
 async function loadScans() {
   const statusEl = document.getElementById("scans-status");
   const containerEl = document.getElementById("scans-container");
   if (!statusEl || !containerEl) return;
 
-  // 1. Clear any old text and show the animated skeletons
-  statusEl.textContent = ""; 
-  renderSkeletonCards(2); 
+  statusEl.textContent = "";
+  renderSkeletonCards(9);
 
   try {
     const res = await fetch("/images", { credentials: "include" });
     if (!res.ok) {
-      clearEl(containerEl); // Remove skeletons on error
+      clearEl(containerEl);
       statusEl.textContent = "Failed to load scans.";
       return;
     }
@@ -229,15 +182,14 @@ async function loadScans() {
     allScans = data.items || [];
     statusEl.textContent = "";
 
-    // 2. Render the real scans (this automatically overwrites the skeletons)
     renderScans();
   } catch (err) {
-    clearEl(containerEl); // Remove skeletons on error
+    clearEl(containerEl);
     statusEl.textContent = "Error loading scans.";
   }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  setupScanTabs();
+  // Setup tabs has been removed completely! Just load data.
   loadScans();
 });
