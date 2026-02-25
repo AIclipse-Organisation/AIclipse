@@ -75,7 +75,7 @@ function computeRealPct(img) {
 
   const isReal = labelLower.includes("real") && !isAi;
 
-  let realProb = isReal ? confidence : (1 - confidence);
+  let realProb = isReal ? confidence : 1 - confidence;
   realProb = clamp01(realProb);
 
   return {
@@ -134,15 +134,21 @@ function createEmptyStateForActiveTab() {
 
 function createScanCard(img, index) {
   const scanNumber = index + 1;
+  // We still need these values for the bar width and accessibility label
   const { label, realPct } = computeRealPct(img);
 
   const card = makeEl("div", "scan-card");
-  const title = makeEl("div", "scan-title", `Scan ${scanNumber}`);
-  card.appendChild(title);
+
+  // Make the entire card clickable
+  card.addEventListener("click", () => {
+    sessionStorage.setItem("selectedScan", JSON.stringify(img));
+    window.location.href = "/viewscan";
+  });
 
   const row = makeEl("div", "scan-row");
   card.appendChild(row);
 
+  // The Image Container
   const left = makeEl("div", "scan-left");
   row.appendChild(left);
 
@@ -151,42 +157,14 @@ function createScanCard(img, index) {
     image.className = "scan-image";
     image.src = img.url;
     image.alt = `Scan ${img.image_id || scanNumber}`;
+    image.draggable = false;
     left.appendChild(image);
   } else {
     left.appendChild(makeEl("div", "image-placeholder", "No image"));
   }
 
-  const analysis = makeEl("div", "scan-analysis");
-  row.appendChild(analysis);
-
-  const topLine = makeEl("div", "scan-topline");
-  const labelEl = makeEl("div", "scan-label", label);
-  const pctEl = makeEl("div", "scan-pct", `${realPct}%`);
-
-  topLine.appendChild(labelEl);
-  topLine.appendChild(pctEl);
-  analysis.appendChild(topLine);
-
-  const track = makeEl("div", "confidence-track");
-  track.setAttribute("role", "img");
-  track.setAttribute("aria-label", `Real probability ${realPct}%`);
-
-  const fill = makeEl("div", "confidence-fill");
-  fill.style.width = `${realPct}%`;
-
-  track.appendChild(fill);
-  analysis.appendChild(track);
-
-  const detailsLink = makeEl("a", "scan-details-link", "View more details");
-  detailsLink.href = "/viewscan";
-
-  detailsLink.addEventListener("click", (e) => {
-    e.preventDefault();
-    sessionStorage.setItem("selectedScan", JSON.stringify(img));
-    window.location.href = "/viewscan";
-  });
-
-  analysis.appendChild(detailsLink);
+  // --- THE BAR HAS BEEN COMPLETELY REMOVED ---
+  // No track, no fill, no appending.
 
   return card;
 }
@@ -212,17 +190,37 @@ function renderScans() {
   });
 }
 
+// -------------------------
+// Skeleton Loader
+// -------------------------
+function renderSkeletonCards(count = 9) { // 9 cards perfectly fills 3 rows
+  const containerEl = document.getElementById("scans-container");
+  if (!containerEl) return;
+
+  clearEl(containerEl);
+
+  for (let i = 0; i < count; i++) {
+    const skeleton = makeEl("div", "skeleton-card");
+    containerEl.appendChild(skeleton);
+  }
+}
+
+// -------------------------
+// Render + Fetch
+// -------------------------
 async function loadScans() {
   const statusEl = document.getElementById("scans-status");
   const containerEl = document.getElementById("scans-container");
   if (!statusEl || !containerEl) return;
 
-  statusEl.textContent = "Loading your scans...";
-  clearEl(containerEl);
+  // 1. Clear any old text and show the animated skeletons
+  statusEl.textContent = ""; 
+  renderSkeletonCards(2); 
 
   try {
     const res = await fetch("/images", { credentials: "include" });
     if (!res.ok) {
+      clearEl(containerEl); // Remove skeletons on error
       statusEl.textContent = "Failed to load scans.";
       return;
     }
@@ -231,8 +229,10 @@ async function loadScans() {
     allScans = data.items || [];
     statusEl.textContent = "";
 
+    // 2. Render the real scans (this automatically overwrites the skeletons)
     renderScans();
   } catch (err) {
+    clearEl(containerEl); // Remove skeletons on error
     statusEl.textContent = "Error loading scans.";
   }
 }
