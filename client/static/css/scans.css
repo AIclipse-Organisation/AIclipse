@@ -2,18 +2,18 @@
    Scan list layout (Instagram-style Grid)
    ========================= */
 
+.scansScreen{
+  padding: 0;
+}
+
 .scans-grid {
-  display: grid;
-  /* Forces exactly 3 equal columns */
-  grid-template-columns: repeat(3, 1fr);
-  /* Tight gap like Instagram */
-  gap: 4px;
-  padding: 4px 16px 24px;
-  width: 100%;
-  max-width: 800px;
-  /* Optional: keeps it from stretching too wide on desktop */
-  margin: 0 auto;
-  box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    box-sizing: border-box
 }
 
 /* Make the card flush and compact */

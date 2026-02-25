@@ -13,7 +13,7 @@
     <div class="app-container">
       {% include 'partials/topbar.html' %}
 
-      <main class="screen">
+      <div class="profileScreen">
         <section class="page-header" aria-label="Page title">
           <h1 id="page-title" class="page-title">Profile</h1>
           <div class="page-underline" role="presentation"></div>
@@ -21,110 +21,64 @@
 
         <!-- PROFILE SUMMARY (top) -->
         <section class="profile-summary" aria-label="Profile summary">
-          <div class="profile-summary-left">
-            <!-- Avatar (image) -->
-            <div class="profile-avatar">
-              <img
-                src="/static/images/profile.png"
-                alt="Profile"
-                class="profile-avatar-img"
-              />
-            </div>
-
-            <div class="profile-identity">
-              <div id="detail-username" class="profile-username">-</div>
-              <div id="detail-email" class="profile-email">-</div>
-
-              <!-- Plan BELOW name/email -->
-              <div class="profile-plan">
-                <span class="meta-label">Plan</span>
-                <span id="detail-plan" class="meta-value">-</span>
-              </div>
-            </div>
+          <div class="profile-avatar">
+            <img
+              src="/static/images/profile.png"
+              alt="Profile"
+              class="profile-avatar-img"
+            />
           </div>
 
-          <!-- Right side: member since + monthly usage (LEFT ALIGNED) -->
-          <div class="profile-summary-right profile-stats-left">
-            <div class="profile-meta">
-              <span class="meta-label">Member Since</span>
-              <span id="detail-created" class="meta-value">-</span>
+          <div class="profile-identity">
+            <div class="profile-name-row">
+              <div id="detail-username" class="profile-username">-</div>
+              <span id="detail-plan" class="plan-badge">-</span>
             </div>
 
-            <div class="profile-meta">
-              <span class="meta-label">Monthly Usage</span>
-              <span id="detail-monthly-usage" class="meta-value">-</span>
+            <div id="detail-email" class="profile-email">-</div>
+
+            <div class="profile-meta-row">
+              Member since <span id="detail-created">-</span> &bull; Monthly
+              Usage: <span id="detail-monthly-usage">-</span>
             </div>
           </div>
         </section>
 
-        <!-- STATUS -->
         <div id="user-details-status" class="status-message"></div>
 
-        <!-- DETAILS (below profile section) -->
         <section class="user-details-section" aria-label="User stats">
-          <!-- <h2>Details</h2> -->
-
-          <!-- WRAPPER keeps the same ID so your JS can still toggle display -->
           <div id="user-details-container" style="display: none">
-            <!-- INNER div is the grid (this is what your CSS targets) -->
             <div class="user-details-container">
               <div class="user-detail-item">
-                <span class="detail-label">Total guesses:</span>
+                <span class="detail-label">Guesses</span>
                 <span id="detail-total-guesses" class="detail-value">-</span>
               </div>
 
               <div class="user-detail-item">
-                <span class="detail-label">Your Accuracy Level:</span>
+                <span class="detail-label">Level</span>
                 <span id="detail-accuracy-level" class="detail-value">-</span>
               </div>
 
-              <!-- <div class="user-detail-item">
-                <span class="detail-label">Total Correct:</span>
-                <span id="detail-total-correct" class="detail-value">-</span>
-              </div> -->
-
-              <!-- <div class="user-detail-item">
-                <span class="detail-label">AI Detection Accuracy:</span>
+              <div class="user-detail-item">
+                <span class="detail-label">AI Acc.</span>
                 <span id="detail-acc-ai" class="detail-value">-</span>
               </div>
 
               <div class="user-detail-item">
-                <span class="detail-label">Real Detection Accuracy:</span>
+                <span class="detail-label">Real Acc.</span>
                 <span id="detail-acc-real" class="detail-value">-</span>
               </div>
-            </div> -->
-          </div>
-        </section>
-
-        <!-- Logout confirm modal (same design as results modal) -->
-        <div id="logout-modal" class="modal-overlay" hidden>
-          <div class="modal">
-            <h3 class="modal-title">Log out?</h3>
-            <p class="modal-text">
-              You’ll need to log in again to access your account.
-            </p>
-
-            <div class="modal-actions">
-              <button id="cancel-logout" class="secondary" type="button">
-                Cancel
-              </button>
-              <button id="confirm-logout" class="danger" type="button">
-                Log out
-              </button>
             </div>
           </div>
-        </div>
-      </main>
-
-      <main class="screen">
-        <section class="page-header" aria-label="Page title">
-          <h1 id="page-title" class="page-title">Scans</h1>
-          <div class="page-underline" role="presentation"></div>
         </section>
+      </div>
+
+      <div class="scansScreen">
+   
 
         <div id="scans-status" class="status-message"></div>
         <div id="scans-container" class="scans-grid"></div>
-      </main>
+      </div>
 
       {% include 'partials/navbar.html' %}
     </div>
