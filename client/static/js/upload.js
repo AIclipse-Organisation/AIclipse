@@ -83,6 +83,10 @@ window.addEventListener("DOMContentLoaded", () => {
   const cropHint = document.getElementById("crop-hint");
   const cropResetBtn = document.getElementById("btn-crop-reset");
   const uploadPreviewWrap = document.getElementById("upload-preview-wrap");
+  const quotaModal = document.getElementById("quota-modal");
+  const quotaModalText = document.getElementById("quota-modal-text");
+  const quotaModalClose = document.getElementById("quota-modal-close");
+  const quotaModalPlan = document.getElementById("quota-modal-plan");
 
   let lastPreviewUrl = null;
 
@@ -136,6 +140,62 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
+  }
+
+  function closeQuotaModal() {
+    if (!quotaModal) return;
+    quotaModal.hidden = true;
+  }
+
+  function openQuotaModal(message) {
+    if (!quotaModal) return;
+    if (quotaModalText) {
+      quotaModalText.textContent =
+        message || "You've reached your free quota of 10 uploads this month.";
+    }
+    quotaModal.hidden = false;
+  }
+
+  function getLimitMessage(payload) {
+    if (!payload || typeof payload !== "object") return null;
+    const detail = payload.detail;
+    if (detail && typeof detail === "object") {
+      if (typeof detail.message === "string" && detail.message.trim()) {
+        return detail.message;
+      }
+      if (typeof detail.error === "string" && detail.error.trim()) {
+        return detail.error;
+      }
+    }
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (typeof payload.message === "string" && payload.message.trim()) {
+      return payload.message;
+    }
+    return null;
+  }
+
+  function isUsageLimitExceeded(statusCode, payload) {
+    const detail = payload && typeof payload === "object" ? payload.detail : null;
+    const errorCode =
+      detail && typeof detail === "object" && typeof detail.error === "string"
+        ? detail.error
+        : null;
+    return statusCode === 403 && errorCode === "usage_limit_exceeded";
+  }
+
+  if (quotaModalClose) {
+    quotaModalClose.addEventListener("click", closeQuotaModal);
+  }
+  if (quotaModalPlan) {
+    quotaModalPlan.addEventListener("click", () => {
+      closeQuotaModal();
+      window.location.href = "/plan";
+    });
+  }
+  if (quotaModal) {
+    quotaModal.addEventListener("click", (event) => {
+      if (event.target === quotaModal) closeQuotaModal();
+    });
   }
 
   function applyCropPosition() {
@@ -469,6 +529,15 @@ window.addEventListener("DOMContentLoaded", () => {
             saveState.textContent = "Run detection first to enable saving.";
           if (detectResult)
             detectResult.textContent = JSON.stringify(data, null, 2);
+
+          if (isUsageLimitExceeded(res.status, data)) {
+            const limitMessage =
+              getLimitMessage(data) ||
+              "You've reached your free quota of 10 uploads this month.";
+            setStatus(detectStatus, "error", limitMessage);
+            openQuotaModal(limitMessage);
+            return;
+          }
 
           if (res.status === 413) {
             if (checkState) checkState.textContent = TOO_LARGE_MSG;
