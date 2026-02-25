@@ -5,7 +5,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(17, 17, 17, 0.78);
   backdrop-filter: blur(2px);
 }
 

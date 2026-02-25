@@ -21,7 +21,7 @@
 
         <div id="status-message"></div>
 
-        <div id="usage-info" class="usage-info" style="display: none;">
+        <div id="usage-info" class="usage-info" style="display: none">
           <h2>Your Usage</h2>
           <p id="usage-text"></p>
           <div class="usage-bar">
@@ -40,7 +40,9 @@
               <li>✓ Basic support</li>
               <li>✓ Community access</li>
             </ul>
-            <button class="plan-button" id="btn-plan-0" disabled>Current Plan</button>
+            <button class="plan-button" id="btn-plan-0" disabled>
+              Current Plan
+            </button>
           </div>
 
           <div class="plan-card" id="plan-1">
@@ -64,13 +66,20 @@
 
     <div id="usage-modal" class="modal" hidden>
       <div class="modal-backdrop" data-close></div>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="usage-modal-title">
+      <div
+        class="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="usage-modal-title"
+      >
         <h2 id="usage-modal-title">Usage limit reached</h2>
         <p id="usage-modal-message"></p>
         <p id="usage-modal-meta" class="muted"></p>
         <div class="modal-actions">
           <a class="plan-button" href="/plan">Upgrade</a>
-          <button class="plan-button" id="usage-modal-close" type="button">Close</button>
+          <button class="plan-button" id="usage-modal-close" type="button">
+            Close
+          </button>
         </div>
       </div>
     </div>

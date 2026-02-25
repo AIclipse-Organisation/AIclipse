@@ -869,3 +869,199 @@
   font-size: 14px;
   padding: 20px;
 }
+
+.visibility-selector {
+  display: flex;
+  gap: 0; /* No gap makes them look like one unit */
+  margin: 20px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15); /* Subtle outer border */
+}
+
+.vis-btn {
+  flex: 1;
+  all: unset; /* Reset default button styles */
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.5);
+  padding: 14px;
+  cursor: pointer;
+  transition: all 160ms ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.vis-btn .icon { 
+  font-size: 18px; 
+  opacity: 0.6;
+}
+
+/* Vertical divider between toggle buttons */
+#mode-private {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Active State: Highlight in Gold */
+.vis-btn.is-selected {
+  background: rgba(207, 184, 124, 0.12);
+  color: #CFB87C;
+}
+
+.vis-btn.is-selected .icon {
+  opacity: 1;
+}
+
+/* =========================
+   Visibility Toggle (Segmented Control)
+   ========================= */
+.visibility-selector {
+  display: flex;
+  gap: 0; 
+  margin: 20px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.vis-btn {
+  flex: 1;
+  all: unset;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 160ms ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.vis-btn .icon { 
+  font-size: 18px; 
+  opacity: 0.5;
+}
+
+/* Vertical separator for the segmented control */
+#mode-private {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Highlighted state for the selected mode */
+.vis-btn.is-selected {
+  background: rgba(207, 184, 124, 0.15);
+  color: #CFB87C;
+}
+
+.vis-btn.is-selected .icon {
+  opacity: 1;
+}
+
+/* =========================
+   Primary Action Button (Confirm & Save)
+   ========================= */
+.btn-save-final {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: block;
+  padding: 18px;
+  background: #CFB87C; /* AIclipse Gold */
+  color: #111;
+  border-radius: 999px;
+  font-weight: 800;
+  text-align: center;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: transform 100ms ease, opacity 160ms ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.btn-save-final:hover:not(:disabled) {
+  opacity: 0.95;
+}
+
+.btn-save-final:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-save-final:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* =========================
+   Danger Zone (Delete Scan Link)
+   ========================= */
+.danger-zone {
+  margin-top: 30px;
+  text-align: center;
+  padding-bottom: 24px;
+}
+
+.btn-delete-link {
+  all: unset;
+  color: #e04646; /* Red for deletion */
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 160ms ease;
+}
+
+.btn-delete-link:hover {
+  opacity: 1;
+}
+
+/* =========================
+   Publishing Dropdown (Description)
+   ========================= */
+.publish-extra {
+  margin-bottom: 20px;
+  animation: slideIn 240ms ease-out;
+}
+
+.publish-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+}
+
+.publish-textarea {
+  width: 100%;
+  min-height: 100px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.publish-textarea:focus {
+  outline: none;
+  border-color: #CFB87C;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

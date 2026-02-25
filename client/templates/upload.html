@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/static/css/styles.css" />
     <link rel="stylesheet" href="/static/css/upload.css" />
+    <link rel="stylesheet" href="/static/css/loader.css" />
   </head>
 
   <body class="app">
@@ -20,12 +21,39 @@
 
         <!-- PREVIEW AREA (flex grows) -->
         <div class="upload-content">
+          <div class="upload-placeholder" id="upload-placeholder">
+            <div class="placeholder-icon">
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </div>
+            <p>No image selected</p>
+          </div>
           <div class="upload-previewWrap" hidden id="upload-preview-wrap">
             <div class="results-imageFrame" id="upload-frame">
-              <img id="preview-image" alt="Selected image preview" draggable="false" />
+              <img
+                id="preview-image"
+                alt="Selected image preview"
+                draggable="false"
+              />
               <div class="crop-hint" id="crop-hint">Drag to reposition</div>
 
-              <button type="button" class="btn-crop-reset inside-frame" id="btn-crop-reset">
+              <button
+                type="button"
+                class="btn-crop-reset inside-frame"
+                id="btn-crop-reset"
+              >
                 Reset Crop
               </button>
             </div>
@@ -35,26 +63,35 @@
         <div class="upload-actions">
           <input id="file-input" type="file" accept="image/*" hidden />
 
-          <label for="file-input" class="file-upload">
-            Choose Image
-          </label>
+          <label for="file-input" class="file-upload"> Choose Image </label>
 
           <span id="check-state" class="muted">
             Select an image to analyze.
           </span>
 
-          <button id="btn-check" disabled hidden>Scan Image</button>
+          <button id="btn-check" disabled hidden>Analyze Image</button>
         </div>
 
         <div id="quota-modal" class="modal-overlay" hidden>
-          <div class="modal" role="dialog" aria-modal="true" aria-labelledby="quota-modal-title">
-            <h3 id="quota-modal-title" class="modal-title">Free quota reached</h3>
+          <div
+            class="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quota-modal-title"
+          >
+            <h3 id="quota-modal-title" class="modal-title">
+              Free quota reached
+            </h3>
             <p id="quota-modal-text" class="modal-text">
               You've reached your free quota of 10 uploads this month.
             </p>
             <div class="modal-actions">
-              <button id="quota-modal-close" class="secondary" type="button">Close</button>
-              <button id="quota-modal-plan" class="danger" type="button">Go to Plan</button>
+              <button id="quota-modal-close" class="secondary" type="button">
+                Close
+              </button>
+              <button id="quota-modal-plan" class="danger" type="button">
+                Go to Plan
+              </button>
             </div>
           </div>
         </div>
@@ -62,7 +99,7 @@
 
       {% include 'partials/navbar.html' %}
     </div>
-
+    <script src="/static/js/loader.js"></script>
     <script src="/static/js/include.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/upload.js"></script>

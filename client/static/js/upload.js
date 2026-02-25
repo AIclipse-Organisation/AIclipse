@@ -335,249 +335,276 @@ window.addEventListener("DOMContentLoaded", () => {
     return { croppedFile, previewDataUrl };
   }
 
-  function setImageSrcSafe(imgEl, url) {
-    if (!imgEl) return;
 
-    // Only allow safe blob: or data: URLs (what we generate client-side)
-    if (typeof url !== "string") {
-      imgEl.removeAttribute("src");
-      return;
-    }
+function setImageSrcSafe(imgEl, url) {
+  if (!imgEl) return;
 
-    const isBlobUrl = url.startsWith("blob:");
-    const isDataUrl = url.startsWith("data:");
-
-    if (isBlobUrl) {
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== "blob:") {
-          imgEl.removeAttribute("src");
-          return;
-        }
-      } catch {
-        imgEl.removeAttribute("src");
-        return;
-      }
-    } else if (isDataUrl) {
-      if (!/^data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=]+$/.test(url)) {
-        imgEl.removeAttribute("src");
-        return;
-      }
-    } else {
-      imgEl.removeAttribute("src");
-      return;
-    }
-
-    imgEl.src = url;
+  // 1. Basic Type Check
+  if (typeof url !== "string") {
+    imgEl.removeAttribute("src");
+    return;
   }
+
+  // 2. Protocol Validation (Allowlist Approach)
+  // We only permit specifically generated blob: or data: image strings.
+  const lowerUrl = url.toLowerCase().trim();
+  const isBlob = lowerUrl.startsWith("blob:");
+  const isData = lowerUrl.startsWith("data:");
+
+  if (isBlob) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "blob:") {
+        imgEl.removeAttribute("src");
+        return;
+      }
+    } catch {
+      imgEl.removeAttribute("src");
+      return;
+    }
+  } else if (isData) {
+    // Rigid Regex for base64 image data URLs only (png, jpeg, jpg, webp)
+    // This blocks data:text/html or data:application/javascript injections.
+    const dataUrlRegex = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/i;
+    if (!dataUrlRegex.test(url)) {
+      imgEl.removeAttribute("src");
+      return;
+    }
+  } else {
+    // Blocks javascript:, vbscript:, and standard http/https if not intended
+    imgEl.removeAttribute("src");
+    return;
+  }
+
+  // 3. Safe Assignment
+  imgEl.setAttribute("src", url);
+}
+
+
+const previewWrap = document.getElementById('upload-preview-wrap');
 
   // File chosen -> show preview frame + enable button
   if (fileInput) {
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files?.[0];
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    const uploadPlaceholder = document.getElementById("upload-placeholder"); // Get placeholder ref
 
-      updateFileLabel(!!file);
+    updateFileLabel(!!file);
 
-      if (file && file.size > MAX_IMAGE_BYTES) {
-        window.lastFile = null;
-        window.lastDetectionToken = null;
-
-        try {
-          fileInput.value = "";
-        } catch {}
-
-        updateFileLabel(false);
-
-        if (previewImg) {
-          if (lastPreviewUrl) {
-            URL.revokeObjectURL(lastPreviewUrl);
-            lastPreviewUrl = null;
-          }
-          previewImg.src = "";
-        }
-        if (uploadPreviewWrap) uploadPreviewWrap.hidden = true;
-
-        if (btnSave) btnSave.disabled = true;
-        if (saveState)
-          saveState.textContent = "Run detection first to enable saving.";
-        if (saveResult) saveResult.textContent = "";
-        if (saveStatus) setStatus(saveStatus, "info", "");
-
-        if (btnCheck) btnCheck.hidden = true;
-        if (checkState) checkState.textContent = TOO_LARGE_MSG;
-
-        if (detectResult) detectResult.textContent = "No detection yet.";
-        if (detectStatus) setStatus(detectStatus, "info", "");
-
-        if (btnCheck) {
-          btnCheck.disabled = true;
-          btnCheck.hidden = true;
-        }
-
-        return;
-      }
-
-      window.lastFile = file || null;
+    // --- CASE 1: FILE TOO LARGE ---
+    if (file && file.size > MAX_IMAGE_BYTES) {
+      window.lastFile = null;
       window.lastDetectionToken = null;
 
-      cropX = 50;
-      cropY = 20;
-      applyCropPosition();
-      if (cropHint) cropHint.style.opacity = "0.9";
+      try {
+        fileInput.value = "";
+      } catch {}
+
+      updateFileLabel(false);
 
       if (previewImg) {
         if (lastPreviewUrl) {
           URL.revokeObjectURL(lastPreviewUrl);
           lastPreviewUrl = null;
         }
-        if (file) {
-          lastPreviewUrl = URL.createObjectURL(file);
-          setImageSrcSafe(previewImg, lastPreviewUrl);
-        } else {
-          previewImg.removeAttribute("src");
-        }
+        previewImg.src = "";
       }
+      
+      // UI Reset: Hide preview, Show placeholder
+      if (uploadPreviewWrap) uploadPreviewWrap.hidden = true;
+      if (uploadPlaceholder) uploadPlaceholder.hidden = false;
 
-      if (uploadPreviewWrap) uploadPreviewWrap.hidden = !file;
-
-      // Reset SAVE UI if present
       if (btnSave) btnSave.disabled = true;
-      if (saveState)
-        saveState.textContent = "Run detection first to enable saving.";
+      if (saveState) saveState.textContent = "Run detection first to enable saving.";
       if (saveResult) saveResult.textContent = "";
       if (saveStatus) setStatus(saveStatus, "info", "");
 
-      if (file) {
-        if (btnCheck) {
-          btnCheck.hidden = false;
-          btnCheck.disabled = false;
-        }
-        if (checkState)
-          checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
-        if (detectResult)
-          detectResult.textContent = "No detection yet for this file.";
-      } else {
-        if (btnCheck) {
-          btnCheck.disabled = true;
-          btnCheck.hidden = true;
-        }
-        if (checkState) checkState.textContent = "Select an image to analyze.";
-        if (detectResult) detectResult.textContent = "No detection yet.";
+      if (btnCheck) btnCheck.hidden = true;
+      if (checkState) checkState.textContent = TOO_LARGE_MSG;
+
+      if (detectResult) detectResult.textContent = "No detection yet.";
+      if (detectStatus) setStatus(detectStatus, "info", "");
+
+      if (btnCheck) {
+        btnCheck.disabled = true;
+        btnCheck.hidden = true;
       }
-    });
-  }
+
+      return;
+    }
+
+    // --- CASE 2: VALID FILE OR CLEARED ---
+    window.lastFile = file || null;
+    window.lastDetectionToken = null;
+
+    cropX = 50;
+    cropY = 20;
+    applyCropPosition();
+    if (cropHint) cropHint.style.opacity = "0.9";
+
+    if (previewImg) {
+      if (lastPreviewUrl) {
+        URL.revokeObjectURL(lastPreviewUrl);
+        lastPreviewUrl = null;
+      }
+      if (file) {
+        lastPreviewUrl = URL.createObjectURL(file);
+        setImageSrcSafe(previewImg, lastPreviewUrl);
+      } else {
+        previewImg.removeAttribute("src");
+      }
+    }
+
+    // Toggle Preview vs Placeholder
+    if (uploadPreviewWrap) uploadPreviewWrap.hidden = !file;
+    if (uploadPlaceholder) uploadPlaceholder.hidden = !!file;
+
+    // Reset SAVE UI if present
+    if (btnSave) btnSave.disabled = true;
+    if (saveState) saveState.textContent = "Run detection first to enable saving.";
+    if (saveResult) saveResult.textContent = "";
+    if (saveStatus) setStatus(saveStatus, "info", "");
+
+    if (file) {
+      if (btnCheck) {
+        btnCheck.hidden = false;
+        btnCheck.disabled = false;
+      }
+      if (checkState)
+        checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+      if (detectResult)
+        detectResult.textContent = "No detection yet for this file.";
+    } else {
+      if (btnCheck) {
+        btnCheck.disabled = true;
+        btnCheck.hidden = true;
+      }
+      if (checkState) checkState.textContent = "Select an image to analyze.";
+      if (detectResult) detectResult.textContent = "No detection yet.";
+    }
+  });
+}
 
   // btnCheck click -> exports cropped file -> POST /checks with cropped file -> store preview+response -> /results
-  if (btnCheck) {
-    btnCheck.addEventListener("click", async () => {
-      if (!window.lastFile) {
-        setStatus(detectStatus, "error", "No file selected.");
-        return;
-      }
+if (btnCheck) {
+  btnCheck.addEventListener("click", async () => {
+    if (!window.lastFile) {
+      setStatus(detectStatus, "error", "No file selected.");
+      return;
+    }
 
-      if (window.lastFile.size > MAX_IMAGE_BYTES) {
-        window.lastFile = null;
-        try {
-          if (fileInput) fileInput.value = "";
-        } catch {}
-        btnCheck.disabled = true;
-        if (checkState) checkState.textContent = TOO_LARGE_MSG;
-        if (detectStatus) setStatus(detectStatus, "info", "");
-        return;
-      }
-
-      btnCheck.disabled = true;
-      window.lastDetectionToken = null;
-
-      // disable SAVE until token arrives (if present)
-      if (btnSave) btnSave.disabled = true;
-      if (saveState)
-        saveState.textContent = "Run detection first to enable saving.";
-      if (saveResult) saveResult.textContent = "";
-      if (saveStatus) setStatus(saveStatus, "info", "");
-
-      setStatus(detectStatus, "info", "Analyzing image...");
-
+    if (window.lastFile.size > MAX_IMAGE_BYTES) {
+      window.lastFile = null;
       try {
-        const frameAspect = 1;
-        const { croppedFile, previewDataUrl } =
-          await makeCroppedFileFromOriginal(window.lastFile, frameAspect);
+        if (fileInput) fileInput.value = "";
+      } catch {}
+      btnCheck.disabled = true;
+      if (checkState) checkState.textContent = TOO_LARGE_MSG;
+      if (detectStatus) setStatus(detectStatus, "info", "");
+      return;
+    }
 
-        window.lastFile = croppedFile;
-        sessionStorage.setItem("lastDetectionPreview", previewDataUrl);
+    // 1. Show the Global Loader
+    window.AppLoader.show("AIclipse is analyzing your image...");
 
-        const formData = new FormData();
-        formData.append("file", croppedFile);
+    btnCheck.disabled = true;
+    window.lastDetectionToken = null;
 
-        const res = await fetch("/checks", {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-        let data = null;
-        try {
-          data = await res.json();
-        } catch {
-          data = { detail: "Non-JSON response" };
-        }
-        setDebug({ url: "/checks", status: res.status, body: data });
+    // disable SAVE UI
+    if (btnSave) btnSave.disabled = true;
+    if (saveState) saveState.textContent = "Run detection first to enable saving.";
+    if (saveResult) saveResult.textContent = "";
+    if (saveStatus) setStatus(saveStatus, "info", "");
 
-        if (!res.ok) {
-          window.lastDetectionToken = null;
-          if (btnSave) btnSave.disabled = true;
-          if (saveState)
-            saveState.textContent = "Run detection first to enable saving.";
-          if (detectResult)
-            detectResult.textContent = JSON.stringify(data, null, 2);
+    setStatus(detectStatus, "info", "Analyzing image...");
 
-          if (isUsageLimitExceeded(res.status, data)) {
-            const limitMessage =
-              getLimitMessage(data) ||
-              "You've reached your free quota of 10 uploads this month.";
-            setStatus(detectStatus, "error", limitMessage);
-            openQuotaModal(limitMessage);
-            return;
-          }
+    try {
+      const frameAspect = 1;
+      const { croppedFile, previewDataUrl } =
+        await makeCroppedFileFromOriginal(window.lastFile, frameAspect);
 
-          if (res.status === 413) {
-            if (checkState) checkState.textContent = TOO_LARGE_MSG;
-            if (detectStatus) setStatus(detectStatus, "info", "");
-          } else {
-            setStatus(
-              detectStatus,
-              "error",
-              data.detail || `Detection failed (${res.status})`,
-            );
-          }
+      window.lastFile = croppedFile;
+      sessionStorage.setItem("lastDetectionPreview", previewDataUrl);
+
+      const formData = new FormData();
+      formData.append("file", croppedFile);
+
+      const res = await fetch("/checks", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = { detail: "Non-JSON response" };
+      }
+      
+      setDebug({ url: "/checks", status: res.status, body: data });
+
+      if (!res.ok) {
+        window.lastDetectionToken = null;
+        if (btnSave) btnSave.disabled = true;
+        if (saveState) saveState.textContent = "Run detection first to enable saving.";
+        if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
+
+        if (isUsageLimitExceeded(res.status, data)) {
+          const limitMessage = getLimitMessage(data) || "You've reached your free quota.";
+          setStatus(detectStatus, "error", limitMessage);
+          
+          // Hide loader before showing a modal so they don't overlap
+          window.AppLoader.hide(); 
+          openQuotaModal(limitMessage);
           return;
         }
 
-        const lastDetectionToken = data.detection_token || null;
-        window.lastDetectionToken = lastDetectionToken;
-
-        if (btnSave) btnSave.disabled = !lastDetectionToken;
-        if (saveState) {
-          saveState.textContent = lastDetectionToken
-            ? "Detection token ready. You can now save this image."
-            : "No detection token returned; cannot save.";
+        if (res.status === 413) {
+          if (checkState) checkState.textContent = TOO_LARGE_MSG;
+          if (detectStatus) setStatus(detectStatus, "info", "");
+        } else {
+          setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
         }
-
-        sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
-        sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
-
-        setStatus(detectStatus, "success", "Detection completed.");
-        window.location.href = "/results";
-      } catch (err) {
-        console.error(err);
-        if (btnSave) btnSave.disabled = true;
-        if (saveState)
-          saveState.textContent = "Run detection first to enable saving.";
-        setStatus(detectStatus, "error", "Network error during detection.");
-      } finally {
-        btnCheck.disabled = false;
+        return;
       }
-    });
-  }
+
+      const lastDetectionToken = data.detection_token || null;
+      window.lastDetectionToken = lastDetectionToken;
+
+      if (btnSave) btnSave.disabled = !lastDetectionToken;
+      if (saveState) {
+        saveState.textContent = lastDetectionToken
+          ? "Detection token ready. You can now save this image."
+          : "No detection token returned; cannot save.";
+      }
+
+      sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
+      sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
+
+      setStatus(detectStatus, "success", "Detection completed.");
+      
+      // We don't hide the loader here because we are redirecting. 
+      // It creates a smoother transition to the next page.
+      window.location.href = "/results";
+
+    } catch (err) {
+      console.error(err);
+      if (btnSave) btnSave.disabled = true;
+      if (saveState) saveState.textContent = "Run detection first to enable saving.";
+      setStatus(detectStatus, "error", "Network error during detection.");
+      
+      // Only hide on error so the user can see the error message
+      window.AppLoader.hide(); 
+    } finally {
+      btnCheck.disabled = false;
+      // If we didn't redirect (e.g., an error happened or we stayed on page), hide it.
+      if (window.location.pathname !== "/results") {
+        window.AppLoader.hide();
+      }
+    }
+  });
+}
 
   if (btnSave && !btnSave.dataset.bound) {
     btnSave.dataset.bound = "1";
@@ -616,6 +643,11 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // 1. Show the Global Loader immediately
+      if (window.AppLoader) {
+        window.AppLoader.show(isPublic ? "Publishing to Community..." : "Saving your scan...");
+      }
+
       btnSave.disabled = true;
       setStatus(saveStatus, "info", isPublic ? "Saving + publishing..." : "Saving image...");
 
@@ -640,18 +672,25 @@ window.addEventListener("DOMContentLoaded", () => {
         setDebug({ url: "/upload/image", status: res.status, body: data });
 
         if (!res.ok) {
+          // Hide loader only on error so user can see the status message
+          if (window.AppLoader) window.AppLoader.hide();
           setStatus(saveStatus, "error", data.detail || `Save failed (${res.status})`);
+          btnSave.disabled = false;
           return;
         }
 
+        // --- PRIVATE SAVE PATH ---
         if (!isPublic) {
           setStatus(saveStatus, "success", "Saved image.");
+          // Update loader for private redirect
+          if (window.AppLoader) window.AppLoader.show("Redirecting to your scans...");
           setTimeout(() => {
             window.location.href = "/scans";
           }, 900);
           return;
         }
 
+        // --- PUBLIC PUBLISHING PATH ---
         setStatus(saveStatus, "info", "Creating community post...");
 
         const uploadPayload =
@@ -669,41 +708,25 @@ window.addEventListener("DOMContentLoaded", () => {
           null;
 
         if (!resolvedImageId) {
+          if (window.AppLoader) window.AppLoader.hide();
           console.error("Upload response missing image_id. Raw response:", data);
           setStatus(
             saveStatus,
             "error",
             "Saved image, but could not read image_id from server response.",
           );
+          btnSave.disabled = false;
           return;
         }
-
-        const resolvedVerdict =
-          (uploadPayload && uploadPayload.verdict) ||
-          (uploadPayload && uploadPayload.result && uploadPayload.result.verdict) ||
-          (data && data.verdict) ||
-          null;
-
-        const resolvedLabel =
-          (uploadPayload && uploadPayload.label) ||
-          (uploadPayload && uploadPayload.result && uploadPayload.result.label) ||
-          (data && data.label) ||
-          null;
-
-        const resolvedConfidence =
-          (uploadPayload && uploadPayload.confidence) ||
-          (uploadPayload && uploadPayload.result && uploadPayload.result.confidence) ||
-          (data && data.confidence) ||
-          null;
 
         const postBody = {
           user_id: window.currentUserId,
           image_id: resolvedImageId,
           description,
           result: {
-            verdict: resolvedVerdict,
-            label: resolvedLabel,
-            confidence: resolvedConfidence,
+            verdict: (uploadPayload && uploadPayload.verdict) || (data && data.verdict) || null,
+            label: (uploadPayload && uploadPayload.label) || (data && data.label) || null,
+            confidence: (uploadPayload && uploadPayload.confidence) || (data && data.confidence) || null,
           },
         };
 
@@ -727,10 +750,18 @@ window.addEventListener("DOMContentLoaded", () => {
 
         if (postRes.ok) {
           setStatus(saveStatus, "success", "Saved image + published post.");
+          
+          // 2. Lock the loader for the external redirect
+          if (window.AppLoader) {
+            window.AppLoader.show("Loading Community...");
+          }
+
+          // Use a buffer to ensure the loader is visible while the browser fetches the external module
           setTimeout(() => {
             window.location.href = "/community";
-          }, 900);
+          }, 1000);
         } else {
+          if (window.AppLoader) window.AppLoader.hide();
           setStatus(
             saveStatus,
             "error",
@@ -738,13 +769,14 @@ window.addEventListener("DOMContentLoaded", () => {
               postJson.detail ||
               `Post failed (${postRes.status})`,
           );
+          btnSave.disabled = false;
         }
 
         if (saveResult) saveResult.textContent = "";
       } catch (err) {
         console.error(err);
+        if (window.AppLoader) window.AppLoader.hide();
         setStatus(saveStatus, "error", "Network error during save.");
-      } finally {
         btnSave.disabled = false;
       }
     });
