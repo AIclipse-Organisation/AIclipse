@@ -120,9 +120,9 @@ body.app .hamburger-line {
 
 /* Logo */
 body.app .topbar-logo img {
-  width: 150px;
-  height: auto;
-  display: block;
+    width: -webkit-fill-available;
+    max-height: 2vh;
+    display: block;
 }
 
 /* Avatar */
