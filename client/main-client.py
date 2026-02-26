@@ -79,17 +79,12 @@ def index():
 
 @app.get("/upload")
 def upload():
-    return render_template( "upload.html")
+    return render_template("upload.html")
 
 
 @app.get("/scans")
 def scans():
     return render_template("scans.html")
-
-
-# @app.get("/home")
-# def upload():
-#     return render_template("home.html")
 
 
 @app.get("/notification")
@@ -129,7 +124,85 @@ def docs():
 
 @app.get("/contact")
 def contact():
-    return render_template( "contact.html")
+    return render_template("contact.html")
+
+
+@app.post("/usage/check")
+def usage_check():
+    token = get_access_token(request)
+    if not token:
+        return jsonify({"detail": "Not authenticated"}), 401
+
+    data, status = gateway.call_json("POST", "/usage/check", token=token)
+    if data is None:
+        data = {"detail": "Invalid JSON from gateway"}
+
+    if status == 401:
+        session.clear()
+        resp = make_response(jsonify(data), 401)
+        clear_access_cookie(resp, request)
+        return resp
+
+    return jsonify(data), status
+
+
+@app.post("/billing/create-checkout-session")
+def billing_create_checkout_session():
+    token = get_access_token(request)
+    if not token:
+        return jsonify({"detail": "Not authenticated"}), 401
+
+    payload = request.get_json(force=True, silent=True) or {}
+    plan_id_raw = payload.get("plan_id")
+
+    try:
+        plan_id = int(plan_id_raw)
+    except Exception:
+        return jsonify({"detail": "Invalid plan_id"}), 400
+
+    if plan_id not in (1, 2):
+        return jsonify({"detail": "Invalid plan_id"}), 400
+
+    user = session.get("current_user")
+    if not isinstance(user, dict) or not user.get("user_id") or not user.get("email"):
+        me, me_status = gateway.fetch_me(token)
+        if me_status == 200 and isinstance(me, dict):
+            user = me
+            session["current_user"] = me
+            session["is_admin"] = bool(me.get("is_admin"))
+            session["auth_checked_at"] = int(time.time())
+        elif me_status == 401:
+            session.clear()
+            resp = make_response(jsonify({"detail": "Unauthorized"}), 401)
+            clear_access_cookie(resp, request)
+            return resp
+        else:
+            return jsonify({"detail": "Service Temporarily Unavailable"}), 502
+
+    user_id = user.get("user_id")
+    email = user.get("email")
+
+    if not user_id or not email:
+        return jsonify({"detail": "Missing user info for billing"}), 502
+
+    checkout_payload = {"user_id": user_id, "plan_id": plan_id, "email": email}
+
+    data, status = gateway.call_json(
+        "POST",
+        "/billing/create-checkout-session",
+        token=token,
+        json_data=checkout_payload,
+    )
+    if data is None:
+        data = {"detail": "Invalid JSON from gateway"}
+
+    if status == 401:
+        session.clear()
+        resp = make_response(jsonify(data), 401)
+        clear_access_cookie(resp, request)
+        return resp
+
+    return jsonify(data), status
 
 
 @app.post("/checks")

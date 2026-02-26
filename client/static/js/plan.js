@@ -20,9 +20,13 @@ function showMessage(type, message) {
   const statusDiv = document.getElementById("status-message");
   if (!statusDiv) return;
 
-  statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
-  
-  // Auto-hide after 5 seconds
+  statusDiv.innerHTML = "";
+
+  const el = document.createElement("div");
+  el.className = `status-message status-${type}`;
+  el.textContent = String(message ?? "");
+  statusDiv.appendChild(el);
+
   setTimeout(() => {
     statusDiv.innerHTML = "";
   }, 5000);
@@ -34,26 +38,10 @@ function hideLoaderSafely() {
   }
 }
 
-async function loadUserData() {
-  try {
-    const { res, data } = await jsonFetch("GET", "/auth/me");
-    
-    if (!res.ok) {
-      console.error("Failed to load user data");
-      return null;
-    }
-
-    return data;
-  } catch (err) {
-    console.error("Error loading user data:", err);
-    return null;
-  }
-}
-
 async function loadUsageData() {
   try {
-    const { res, data } = await jsonFetch("POST", "/api/usage/check");
-    
+    const { res, data } = await jsonFetch("POST", "/usage/check");
+
     if (!res.ok) {
       console.error("Failed to load usage data");
       return null;
@@ -159,46 +147,31 @@ async function handleUpgrade(planId) {
   try {
     showMessage("info", "Redirecting to checkout...");
     if (window.AppLoader && typeof window.AppLoader.show === "function") {
-      window.AppLoader.show("Redirecting , please wait...");
+      window.AppLoader.show("Redirecting, please wait...");
       loaderShown = true;
     }
 
-    // Get user data
-    const { res: meRes, data: userData } = await jsonFetch("GET", "/auth/me");
-    
-    if (!meRes.ok) {
-      if (loaderShown && window.AppLoader && typeof window.AppLoader.hide === "function") {
-        window.AppLoader.hide();
-      }
-      showMessage("error", "Failed to load user information");
-      return;
-    }
-
-    // Create checkout session
-    const { res, data } = await jsonFetch("POST", "/api/billing/create-checkout-session", {
-      user_id: userData.user_id,
+    const { res, data } = await jsonFetch("POST", "/billing/create-checkout-session", {
       plan_id: planId,
-      email: userData.email,
     });
 
     if (!res.ok) {
       if (loaderShown && window.AppLoader && typeof window.AppLoader.hide === "function") {
         window.AppLoader.hide();
       }
-      showMessage("error", data.detail || "Failed to create checkout session");
+      showMessage("error", (data && data.detail) || `Failed to create checkout session (${res.status})`);
       return;
     }
 
-    // Redirect to Stripe Checkout
-    if (data.checkout_url) {
+    if (data && data.checkout_url) {
       window.location.href = data.checkout_url;
-    } else {
-      if (loaderShown && window.AppLoader && typeof window.AppLoader.hide === "function") {
-        window.AppLoader.hide();
-      }
-      console.error("No checkout URL returned by billing service");
-      showMessage("error", "No checkout URL returned");
+      return;
     }
+
+    if (loaderShown && window.AppLoader && typeof window.AppLoader.hide === "function") {
+      window.AppLoader.hide();
+    }
+    showMessage("error", "No checkout URL returned");
   } catch (err) {
     if (loaderShown && window.AppLoader && typeof window.AppLoader.hide === "function") {
       window.AppLoader.hide();
@@ -223,62 +196,25 @@ window.addEventListener("DOMContentLoaded", async () => {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
-  // Load user and usage data
-  const userData = await loadUserData();
   const usageData = await loadUsageData();
 
-  if (userData) {
-    const currentPlan = userData.plan || 0;
-    updatePlanUI(currentPlan);
-  }
+  const currentPlan = Number((usageData && usageData.plan) ?? 0);
+  updatePlanUI(currentPlan);
 
   if (usageData) {
     updateUsageUI(usageData);
-  } else if (userData) {
-    const fallbackPlan = Number(userData.plan ?? 0);
-    if (fallbackPlan === 0) {
-      const fallbackUsed = Number(userData.monthly_usage_count ?? userData.monthly_usage ?? 0);
-      const fallbackLimit = 10;
-      updateUsageUI({
-        plan: fallbackPlan,
-        unlimited: false,
-        monthly_usage: fallbackUsed,
-        limit: fallbackLimit,
-        remaining: Math.max(0, fallbackLimit - fallbackUsed),
-      });
-    } else {
-      updateUsageUI({ plan: fallbackPlan, unlimited: true });
-    }
+  } else {
+    updateUsageUI(null);
   }
 
-  // Set up upgrade button handlers
   const btnPlan1 = document.getElementById("btn-plan-1");
-  
   if (btnPlan1) {
-    btnPlan1.addEventListener("click", () => {
-      if (userData) {
-        handleUpgrade(1);
-      } else {
-        console.error("No user data - user not logged in");
-        alert("Please sign in to upgrade your plan. Redirecting to login page...");
-        window.location.href = "/login";
-      }
-    });
+    btnPlan1.addEventListener("click", () => handleUpgrade(1));
   }
 
-  // Set up Premium (plan 2) button handler
   const btnPlan2 = document.getElementById("btn-plan-2");
-  
   if (btnPlan2) {
-    btnPlan2.addEventListener("click", () => {
-      if (userData) {
-        handleUpgrade(2);
-      } else {
-        console.error("No user data - user not logged in");
-        alert("Please sign in to upgrade your plan. Redirecting to login page...");
-        window.location.href = "/login";
-      }
-    });
+    btnPlan2.addEventListener("click", () => handleUpgrade(2));
   }
 });
 

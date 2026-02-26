@@ -240,29 +240,3 @@ async def usage_increment(request: Request, user: UserContext = Depends(get_curr
         headers={"Authorization": f"Bearer {user.token}"},
         timeout_s=_timeout(request),
     )
-
-
-@router.post("/api/usage/check")
-async def api_usage_check(request: Request, user: UserContext = Depends(get_current_user)):
-    auth_uri = _auth_base_url(request)
-    return await proxy_json(
-        request,
-        "POST",
-        auth_uri,
-        "/usage/check",
-        headers={"Authorization": f"Bearer {user.token}"},
-        timeout_s=_timeout(request),
-    )
-
-
-@router.post("/api/usage/increment")
-async def api_usage_increment(request: Request, user: UserContext = Depends(get_current_user)):
-    auth_uri = _auth_base_url(request)
-    return await proxy_json(
-        request,
-        "POST",
-        auth_uri,
-        "/usage/increment",
-        headers={"Authorization": f"Bearer {user.token}"},
-        timeout_s=_timeout(request),
-    )

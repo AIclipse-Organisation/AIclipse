@@ -19,10 +19,6 @@
             <div class="page-underline" role="presentation"></div>
           </section>
 
-          <!-- <button type="button" class="btn-results-back" id="btn-back">
-            Back to upload
-          </button> -->
-
           <div class="results-imageFrame">
             <img id="preview-image" alt="Selected image preview" />
           </div>
@@ -32,9 +28,7 @@
               <div class="detection-main">
                 <div class="bar-head">
                   <span class="bar-title">Aiclipse</span>
-                  <p id="detect-verdict" class="verdict-text label-neutral">
-                    —
-                  </p>
+                  <p id="detect-verdict" class="verdict-text label-neutral">—</p>
                 </div>
 
                 <div
@@ -53,9 +47,9 @@
                 <input id="save-public" type="checkbox" hidden />
 
                 <div id="public-desc-wrap" class="publish-extra" hidden>
-                  <label for="post-description" class="publish-label"
-                    >Community Description</label
-                  >
+                  <label for="post-description" class="publish-label">
+                    Community Description
+                  </label>
                   <textarea
                     id="post-description"
                     rows="3"
@@ -65,22 +59,25 @@
                 </div>
                 <div class="action-row">
                   <div class="visibility-selector">
-                  <button
-                    type="button"
-                    class="vis-btn is-selected"
-                    id="mode-private"
-                  >
-                    <image src="/static/images/lock.png" class="icon"></image>
-                    Private
-                  </button>
-                  <button type="button" class="vis-btn" id="mode-public">
-                    <image
-                      src="/static/images/icons8-community-100.png"
-                      class="icon"
-                    ></image>
-                    Public
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      class="vis-btn is-selected"
+                      id="mode-private"
+                    >
+                      <img src="/static/images/lock.png" class="icon" alt="" />
+                      Private
+                    </button>
+
+                    <button type="button" class="vis-btn" id="mode-public">
+                      <img
+                        src="/static/images/icons8-community-100.png"
+                        class="icon"
+                        alt=""
+                      />
+                      Public
+                    </button>
+                  </div>
+
                   <button
                     id="btn-save"
                     disabled
@@ -90,38 +87,19 @@
                     Save
                   </button>
                 </div>
-                </div>
-
-                
-
-                <input id="save-public" type="checkbox" hidden />
-                <div id="public-desc-wrap" class="publish-extra" hidden>
-                  <label for="post-description" class="publish-label"
-                    >Community Description</label
-                  >
-                  <textarea
-                    id="post-description"
-                    rows="3"
-                    placeholder="What should the community know?"
-                    class="publish-textarea"
-                  ></textarea>
-                </div>
 
                 <div class="danger-zone">
                   <button id="btn-delete" class="btn-delete-link" type="button">
                     Delete this scan
                   </button>
                 </div>
+
                 <div id="delete-modal" class="modal-overlay" hidden>
                   <div class="modal">
                     <h3 class="modal-title">Delete scan?</h3>
                     <p class="modal-text">This action cannot be undone.</p>
                     <div class="modal-actions">
-                      <button
-                        id="cancel-delete"
-                        class="secondary"
-                        type="button"
-                      >
+                      <button id="cancel-delete" class="secondary" type="button">
                         Cancel
                       </button>
                       <button id="confirm-delete" class="danger" type="button">
@@ -134,12 +112,6 @@
             </div>
           </div>
         </div>
-
-        <!-- <section class="card">
-                <h2>Raw responses</h2>
-                <p class="muted">Debug view. Last JSON response from the server:</p>
-                <pre id="debug-output">{}</pre>
-            </section> -->
       </main>
 
       {% include 'partials/navbar.html' %}
@@ -150,6 +122,6 @@
     <script src="/static/js/upload.js"></script>
     <script src="/static/js/results.js"></script>
     <script src="/static/js/main.js"></script>
-     <script src="/static/js/loader.js"></script>
+    <script src="/static/js/loader.js"></script>
   </body>
 </html>

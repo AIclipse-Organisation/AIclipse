@@ -52,6 +52,8 @@ def is_api_request(req: Request) -> bool:
         "/image/",
         "/community/",
         "/logout",
+        "/usage/",
+        "/billing/",
     )
     if p.startswith(api_prefixes):
         return True
