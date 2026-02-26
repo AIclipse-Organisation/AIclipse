@@ -4,18 +4,11 @@
 
 .profile-summary {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 18px;
-
-  /* NOT a card */
-  padding: 8px 0 14px;
+  gap: 16px;
+  padding: 8px 0 16px;
   margin-top: 10px;
   background: transparent;
-  border: 0;
-  border-radius: 0;
-
-  /* subtle divider */
   border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
 
@@ -31,12 +24,12 @@
    ========================= */
 
 .profile-avatar {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  /* Slightly larger for the new layout */
+  height: 72px;
   border-radius: 999px;
   overflow: hidden;
   flex: 0 0 auto;
-
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
@@ -54,15 +47,34 @@
 
 .profile-identity {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .profile-username {
-  color: rgba(255, 255, 255, 0.92);
-  font-weight: 700;
-  font-size: 16px;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 800;
+  font-size: 18px;
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -70,11 +82,25 @@
   margin-top: 2px;
   color: rgba(255, 255, 255, 0.65);
   font-weight: 500;
-  font-size: 13px;
+  font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+.profile-meta-row {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.50);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.profile-meta-row span {
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 600;
+}
+
 
 /* Plan row under username/email */
 .profile-plan {
@@ -133,7 +159,7 @@
    ========================= */
 
 .user-details-section {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .user-details-section h2 {
@@ -145,44 +171,40 @@
 /* Container is NOT a card anymore */
 .user-details-container {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-
-  padding: 0;              
-  border: 0;             
-  border-radius: 0;
-  background: transparent;  
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* 4 across */
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  /* Bottom line before post grid */
 }
 
 /* Each stat becomes its own “stat box” */
 .user-detail-item {
   display: flex;
   flex-direction: column;
-  align-items: center;      
-  justify-content: center;   
-  gap: 6px;
-
-  padding: 16px 14px;
-  min-height: 96px;         
-  border-radius: 14px;
-
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.03);
-
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-right: 1px solid rgba(255, 255, 255, 0.10);
+  /* Vertical separators */
   text-align: center;
 }
 
+.user-detail-item:last-child {
+  border-right: none;
+}
+
 .detail-label {
-  order: 2;                 
-  font-size: 12px;
+  order: 2;
+  font-size: 11px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.55);
 }
 
 .detail-value {
-  order: 1;                   
-  font-size: 28px;           
-  font-weight: 900;
+  order: 1;
+  font-size: 20px;
+  font-weight: 800;
   color: rgba(255, 255, 255, 0.95);
   line-height: 1;
 }
@@ -190,7 +212,20 @@
 /* Small screens: stack boxes */
 @media (max-width: 420px) {
   .user-details-container {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .detail-value {
+    font-size: 16px;
+  }
+
+  .detail-label {
+    font-size: 10px;
+  }
+
+  .profile-avatar {
+    width: 60px;
+    height: 60px;
   }
 }
 
@@ -205,6 +240,15 @@
 
 .logout-btn {
   width: 100%;
+}
+
+.profileScreen {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  padding-left: 2vh;
+  padding-right: 2vh;
+  padding-bottom: 2vh;
 }
 
 /* =========================

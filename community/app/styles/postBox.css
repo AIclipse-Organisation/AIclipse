@@ -933,10 +933,10 @@
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
-  color: #C0C0C0;
+  color: #af83c9;
   border: 2px solid transparent;
   background: linear-gradient(#222222, #222222) padding-box,
-    linear-gradient(90deg, #222222, #222222, #C0C0C0, #222222, #222222) border-box;
+    linear-gradient(90deg, #222222, #222222, #af83c9, #222222, #222222) border-box;
   background-size: 100% 100%, 400% 100%;
   animation: border-flow 6s linear infinite;
 }

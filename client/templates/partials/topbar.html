@@ -1,6 +1,7 @@
 {% set user_name = current_user.get('user_name') if current_user else '' %}
 {% set email = current_user.get('email') if current_user else '' %}
 {% set display_name = user_name or email %}
+
 <div class="topbar">
   <button id="menu-toggle" class="menu-button" type="button" aria-label="Menu">
       <span class="hamburger-line"></span>
@@ -8,17 +9,12 @@
       <span class="hamburger-line"></span>
   </button>
 
-  <div class="topbar-logo">
-    <img src="/static/images/aiclipse_logo_gold.png" alt="Logo">
+  <div class="topbar-center">
+    <span class="topbar-screen-name">{{ page_title }}</span>
   </div>
 
-  <div class="topbar-user">
-    <a href="/profile" class="topbar-avatar">
-      <img src="/static/images/profile.png" alt="Profile">
-    </a>
-    <div id="current-user-chip" class="badge {% if display_name %}success{% else %}muted{% endif %}" data-user-name="{{ display_name }}">
-      {% if display_name %}{{ display_name }}{% else %}Not signed in{% endif %}
-    </div>
+  <div class="topbar-logo">
+    <img src="/static/images/aiclipse_logo_gold.png" alt="Logo">
   </div>
 </div>
 
