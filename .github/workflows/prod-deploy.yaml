@@ -273,6 +273,7 @@ jobs:
           STRIPE_SECRET_KEY:          ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_PUBLISHABLE_KEY:     ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
           STRIPE_WEBHOOK_SECRET:      ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          CLIENT_URL:                 ${{ secrets.CLIENT_URL }}
 
         run: |
           set -euo pipefail
@@ -316,6 +317,7 @@ jobs:
 
           kubectl -n "$NS" create configmap app-configmap \
             --from-literal=CONFIG_URL="$CONFIG_URL" \
+            --from-literal=CLIENT_URL="$CLIENT_URL" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply data layer
