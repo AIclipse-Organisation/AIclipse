@@ -1,7 +1,7 @@
 name: prod-deploy
 on:
   push:
-    branches: [main]
+    branches: [ftr/prod/UpdateProdPipelineToHandlePayment]
   workflow_dispatch: {}
 
 concurrency:
@@ -18,7 +18,7 @@ jobs:
     env:
       ORG: ${{ secrets.GHCR_USERNAME }}
       NS: default
-      IMAGES: "auth gateway media detector plans billing client community model-cycle"
+      IMAGES: "auth gateway media detector billing client community model-cycle"
       KUBE_DNS_IP: 10.43.0.10
       DOMAINS: "aiclipse.online aiclipse.site"
 
@@ -262,6 +262,10 @@ jobs:
           API_KEY_PEPPER:             ${{ secrets.API_KEY_PEPPER }}
           CONFIG_URL:                 ${{ secrets.CONFIG_URL }}
           FLASK_SECRET_KEY:           ${{ secrets.FLASK_SECRET_KEY }}
+          STRIPE_SECRET_KEY:          ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PUBLISHABLE_KEY:     ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET:      ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
         run: |
           set -euo pipefail
           kubectl -n "$NS" create secret generic mongo-sec \
@@ -290,6 +294,12 @@ jobs:
             --from-literal=DETECTION_TOKEN_SECRET="$DETECTION_TOKEN_SECRET" \
             --from-literal=INTERNAL_AUTH_TOKEN="$INTERNAL_AUTH_TOKEN" \
             --from-literal=API_KEY_PEPPER="$API_KEY_PEPPER" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic stripe-sec \
+            --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+            --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
             --dry-run=client -o yaml | kubectl apply -f -
 
           kubectl -n "$NS" create secret generic flask-secret \
@@ -336,7 +346,6 @@ jobs:
           kubectl -n "$NS" apply -f infra/k8s/gateway-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/media-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/detector-depl.yaml
-          kubectl -n "$NS" apply -f infra/k8s/plans-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/billing-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/client-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/vote-flush-depl.yaml
