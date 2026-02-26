@@ -76,11 +76,13 @@ function createEmptyState() {
   iconEl.className = "scans-empty-icon";
   iconEl.src = "/static/images/upload_icon.png";
   iconEl.alt = "Upload icon";
-  
+
   const text = makeEl("p", "scans-empty-text", "No scans yet.");
   
   box.appendChild(iconEl);
   box.appendChild(text);
+  
+  // Appending box just once now
   wrapper.appendChild(box);
 
   const button = makeEl("button", "scans-empty-btn", "Go to Upload");

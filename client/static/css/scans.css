@@ -2,18 +2,18 @@
    Scan list layout (Instagram-style Grid)
    ========================= */
 
-.scansScreen{
+.scansScreen {
   padding: 0;
 }
 
 .scans-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
-    width: 100%;
-    max-width: 800px;
-    margin: 0 auto;
-    box-sizing: border-box
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  box-sizing: border-box
 }
 
 /* Make the card flush and compact */
@@ -115,6 +115,7 @@
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -123,17 +124,16 @@
 .skeleton-card {
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: 0; /* Matches your current edge-to-edge look */
+  border-radius: 0;
+  /* Matches your current edge-to-edge look */
   position: relative;
   overflow: hidden;
-  
+
   /* The shimmering gradient */
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.02) 25%,
-    rgba(255, 255, 255, 0.06) 50%,
-    rgba(255, 255, 255, 0.02) 75%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.02) 25%,
+      rgba(255, 255, 255, 0.06) 50%,
+      rgba(255, 255, 255, 0.02) 75%);
   background-size: 200% 100%;
   animation: shimmer 2.5s infinite linear;
 }
@@ -146,23 +146,26 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  z-index: 10; /* Keeps it above the image and shimmering skeleton */
-  
+  z-index: 10;
+  /* Keeps it above the image and shimmering skeleton */
+
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px); /* For iOS support */
-  
+  -webkit-backdrop-filter: blur(4px);
+  /* For iOS support */
+
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  
+
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.85); /* Off-white icon color */
-  
+  color: rgba(255, 255, 255, 0.85);
+  /* Off-white icon color */
+
   /* Very subtle border to define the edge against dark images */
-  border: 1px solid rgba(255, 255, 255, 0.1); 
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .scan-visibility-badge svg {
@@ -286,54 +289,49 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  padding: 40px 12px;
   text-align: center;
+
+  /* Pushes it toward the middle of the screen */
+  min-height: 40vh;
+
+  /* If #scans-container is a CSS grid, this ensures the empty state spans the full width */
+  grid-column: 1 / -1;
   width: 100%;
+  gap: 16px;
 }
 
 .scans-empty-box {
-  width: 100%;
-  max-width: 340px;
-  min-height: 112px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
 }
 
 .scans-empty-icon {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
+  width: 48px;
+  /* Adjust based on your preferred icon size */
+  height: auto;
+  opacity: 0.6;
 }
 
 .scans-empty-text {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 16px;
+  font-weight: 500;
   margin: 0;
-  font-size: 14px;
-  color: var(--accent, #CFB87C);
-  font-weight: 600;
 }
 
 .scans-empty-btn {
-  all: unset;
-  box-sizing: border-box;
-  padding: 10px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--accent, #c9a64b);
-  color: rgba(255, 255, 255, 0.92);
-  font-weight: 700;
-  font-size: 14px;
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background 150ms ease;
 }
 
 .scans-empty-btn:hover {
-  background: var(--accent, #c9a64b);
-  color: #111;
+  background: rgba(255, 255, 255, 0.2);
 }
