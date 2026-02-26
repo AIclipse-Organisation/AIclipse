@@ -4,7 +4,8 @@ body {
   margin: 0;
   padding: 0;
   background: #141414;
-  color: #222;;
+  color: #222;
+  ;
   padding: 0;
   min-height: 100vh;
   background: white;
@@ -54,36 +55,45 @@ main {
 
 /* small responsive tweak */
 @media (max-width:420px) {
-  .detection-row { flex-direction: column; align-items: center; }
-  .detection-thumb { width: 100%; height: 160px; }
-  .detection-main { width: 100%; }
+  .detection-row {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .detection-thumb {
+    width: 100%;
+    height: 160px;
+  }
+
+  .detection-main {
+    width: 100%;
+  }
 }
 
 /* App container wrapper */
 body.app {
-  background: #222222; /* overrides default body background */
+  background: #222222;
+  /* overrides default body background */
 }
 
 /* Constrain everything to phone width */
 body.app .app-container {
-  position: relative; 
+  position: relative;
   min-height: 100vh;
   background: #222222;
   margin: 0 auto;
   max-width: 480px;
-  overflow: hidden; 
+  overflow: hidden;
 }
 
 /* Top bar */
 body.app .topbar {
-  height: 56px;
-  background: #222222;
-  border-bottom: 1px solid #2c2c2c;
-
+  position: relative;
+  /* Essential for absolute centering inside it */
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  align-items: center;
+  padding: 10px 16px;
 }
 
 body .topbar {
@@ -100,7 +110,7 @@ body .topbar {
 /* Hamburger */
 body.app .menu-button {
   position: relative;
-  z-index: 10; 
+  z-index: 10;
   background: transparent;
   border: none;
   padding: 6px 8px;
@@ -112,16 +122,16 @@ body.app .menu-button {
 
 /* The actual lines */
 body.app .hamburger-line {
-  width: 22px;           
-  height: 2px;           
-  background-color: #CFB87C; 
+  width: 22px;
+  height: 2px;
+  background-color: #CFB87C;
   border-radius: 2px;
 }
 
 /* Logo */
 body.app .topbar-logo img {
-  width: 150px;
-  height: auto;
+  width: -webkit-fill-available;
+  max-height: 2vh;
   display: block;
 }
 
@@ -148,6 +158,15 @@ body.app .topbar-user {
   display: flex;
   flex-direction: column;
   align-items: center;
+  color: #CFB87C;
+}
+
+.topbar-screen-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #CFB87C;
 }
 
 body.app #current-user-chip {
@@ -156,7 +175,7 @@ body.app #current-user-chip {
   padding: 2px 4px;
   border-radius: 999px;
   white-space: nowrap;
-  color:#CFB87C;
+  color: #CFB87C;
 }
 
 /* Page title */
@@ -230,7 +249,8 @@ body.app .navbar a.active::after {
    Add bottom padding so content doesn't hide behind navbar */
 body.app .screen {
   padding: 20px;
-  padding-bottom: 80px; /* space for bottom nav */
+  padding-bottom: 80px;
+  /* space for bottom nav */
 }
 
 /* IMPORTANT: override your existing main max-width when in app shell */
@@ -243,36 +263,39 @@ body.app main {
 /* Responsive: keep phone width centered on large screens */
 @media (min-width: 768px) {
   body.app {
-    background: #f5f5f5; /* optional: subtle contrast outside phone shell */
+    background: #f5f5f5;
+    /* optional: subtle contrast outside phone shell */
   }
 }
 
 /* Overlay styles */
 .menu-overlay {
-  position: absolute; /* Changed from fixed to absolute */
+  position: absolute;
+  /* Changed from fixed to absolute */
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.7);
   z-index: 2000;
-  display: none; 
+  display: none;
 }
 
 /* Drawer styles */
 .nav-drawer {
-  position: absolute; /* Changed from fixed to absolute */
+  position: absolute;
+  /* Changed from fixed to absolute */
   top: 0;
-  left: 0; 
+  left: 0;
   width: 280px;
   height: 100%;
   background: #222222;
   border-right: 1px solid #2c2c2c;
-  
+
   /* Initial state: Hidden to the left of the container */
-  transform: translateX(-100%); 
-  
-  z-index: 2001; 
+  transform: translateX(-100%);
+
+  z-index: 2001;
   transition: transform 0.3s ease-in-out;
   display: flex;
   flex-direction: column;
@@ -300,7 +323,8 @@ body.app main {
   padding: 20px 0;
 }
 
-.drawer-links a, .logout-button {
+.drawer-links a,
+.logout-button {
   padding: 15px 25px;
   text-decoration: none;
   color: #f3f3f3;

@@ -685,7 +685,7 @@ if (btnCheck) {
           // Update loader for private redirect
           if (window.AppLoader) window.AppLoader.show("Redirecting to your scans...");
           setTimeout(() => {
-            window.location.href = "/scans";
+            window.location.href = "/profile";
           }, 900);
           return;
         }
