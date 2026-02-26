@@ -34,29 +34,37 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Cache Git LFS objects
-        uses: actions/cache@v4
         with:
-          path: .git/lfs/objects
-          key: lfs-${{ runner.os }}-${{ hashFiles('detector/detector_modules/models/v1/weights.pt') }}
-          restore-keys: |
-            lfs-${{ runner.os }}-
+          lfs: true
+          fetch-depth: 0
 
-      - name: Ensure weights (Git LFS)
-        shell: bash
+      - name: Ensure LFS objects present
         run: |
           set -euo pipefail
-          cd "$(git rev-parse --show-toplevel)"
+          git lfs pull
 
-          FILE="detector/detector_modules/models/v1/weights.pt"
-          if [[ -z "$FILE" ]]; then
-            echo "ERROR: lfs_weights_path is empty while lfs_weights_enabled=true" >&2
-            exit 1
-          fi
+      # - name: Cache Git LFS objects
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: .git/lfs/objects
+      #     key: lfs-${{ runner.os }}-${{ hashFiles('detector/detector_modules/models/v1/weights.pt') }}
+      #     restore-keys: |
+      #       lfs-${{ runner.os }}-
 
-          git lfs pull --include="$FILE" --exclude="*"
-          git lfs status || true
+      # - name: Ensure weights (Git LFS)
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     cd "$(git rev-parse --show-toplevel)"
+
+      #     FILE="detector/detector_modules/models/v1/weights.pt"
+      #     if [[ -z "$FILE" ]]; then
+      #       echo "ERROR: lfs_weights_path is empty while lfs_weights_enabled=true" >&2
+      #       exit 1
+      #     fi
+
+      #     git lfs pull --include="$FILE" --exclude="*"
+      #     git lfs status || true
 
       - name: Login to GHCR
         uses: docker/login-action@v3
