@@ -62,6 +62,7 @@ async def test_signup_success(client, users_coll):
     assert body["user_name"] == "Alice"
     assert body["is_admin"] is False
     assert body["plan"] == 0
+    assert body["do_not_show_disclaimer_again"] is False
     assert "password" not in body
     assert "created_at" in body
 
@@ -197,6 +198,7 @@ async def test_get_me_ok(client, users_coll, auth_mod):
     assert body["age"] == 25
     assert body["total_guesses"] == 3
     assert body["total_correct"] == 2
+    assert body["do_not_show_disclaimer_again"] is False
 
 
 @pytest.mark.asyncio
@@ -252,6 +254,40 @@ async def test_update_me_updates_fields(client, users_coll, auth_mod):
     body = r.json()
     assert body["user_name"] == "New Name"
     assert body["email"] == "new@example.com"
+
+
+@pytest.mark.asyncio
+async def test_update_me_disclaimer_preference(client, users_coll, auth_mod):
+    await users_coll.insert_one(
+        {
+            "user_id": "u_me_pref",
+            "user_name": "Pref",
+            "email": "pref@example.com",
+            "password": _bcrypt_hash("Secret123!"),
+            "is_admin": False,
+            "plan": 0,
+            "created_at": _now_utc(),
+            "age": None,
+            "total_guesses": 0,
+            "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
+            "do_not_show_disclaimer_again": False,
+        }
+    )
+    token = _make_user_jwt(auth_mod, "u_me_pref", "pref@example.com", is_admin=False, plan=0, user_name="Pref")
+
+    r = await client.patch(
+        "/me",
+        json={"do_not_show_disclaimer_again": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    assert r.json()["do_not_show_disclaimer_again"] is True
+
+    stored = await users_coll.find_one({"user_id": "u_me_pref"})
+    assert stored is not None
+    assert stored["do_not_show_disclaimer_again"] is True
 
 
 @pytest.mark.asyncio

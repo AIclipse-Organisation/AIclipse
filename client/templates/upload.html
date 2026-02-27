@@ -97,6 +97,72 @@
             </div>
           </div>
         </div>
+
+        <div id="disclaimer-modal" class="modal-overlay" hidden>
+          <div
+            class="modal modal--disclaimer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="disclaimer-modal-title"
+          >
+            <h3 id="disclaimer-modal-title" class="modal-title">Disclaimer</h3>
+            <div class="modal-text modal-text--disclaimer">
+              <p>
+                All results provided by AIclipse are probabilistic and not
+                definitive. AIclipse is not responsible for any decisions,
+                assumptions, or actions taken based on our predictions.
+              </p>
+              <p>
+                By uploading an image, you agree that it will be processed on
+                our secure EU-based servers solely to generate a deepfake
+                detection result.
+              </p>
+              <p>
+                If you do not save or share the image publicly, it is not
+                stored in our database and is deleted after processing.
+              </p>
+              <p>
+                If you choose to post it to the Community Page, the image,
+                result, description, and your username will be visible to other
+                registered.
+              </p>
+              <p>
+                We do not sell your images. Images that are not shared publicly
+                are never used for model training. Public community posts may
+                be used to improve and train our detection system.
+              </p>
+              <p>
+                For full details, please visit our Terms and Conditions
+                <a
+                  href="/static/files/AIclipse_Terms_of_Service.pdf"
+                  target="_blank"
+                  rel="noopener"
+                  >here</a
+                >.
+              </p>
+              <p>
+                By continuing, you confirm that you understand how your data is
+                processed and stored and that you consent to this use.
+              </p>
+            </div>
+            <label class="modal-checkbox-row" for="disclaimer-dont-show-again">
+              <input id="disclaimer-dont-show-again" type="checkbox" />
+              <span>Don't show again</span>
+            </label>
+            <div class="modal-actions">
+              <button
+                id="disclaimer-disagree"
+                class="secondary"
+                type="button"
+              >
+                I do not agree
+              </button>
+              <button id="disclaimer-agree" class="danger" type="button">
+                I agree
+              </button>
+            </div>
+          </div>
+        </div>
       </main>
 
       {% include 'partials/navbar.html' %}

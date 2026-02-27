@@ -41,6 +41,7 @@ class UserPublic(BaseModel):
     monthly_usage_count: Optional[int] = 0
     usage_reset_date: Optional[datetime] = None
     stripe_customer_id: Optional[str] = None
+    do_not_show_disclaimer_again: bool = False
 
 
 FREE_TIER_LIMIT = 10
@@ -73,6 +74,7 @@ class UpdateMeRequest(BaseModel):
     user_name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
+    do_not_show_disclaimer_again: Optional[bool] = None
 
 
 class TokenUser(BaseModel):
@@ -98,6 +100,7 @@ def build_user_public(doc: dict) -> UserPublic:
         monthly_usage_count=doc.get("monthly_usage_count", 0),
         usage_reset_date=doc.get("usage_reset_date"),
         stripe_customer_id=doc.get("stripe_customer_id"),
+        do_not_show_disclaimer_again=bool(doc.get("do_not_show_disclaimer_again", False)),
     )
 
 
@@ -189,6 +192,7 @@ async def signup(request: Request, payload: SignupRequest):
         "monthly_usage_count": 0,
         "usage_reset_date": None,
         "stripe_customer_id": None,
+        "do_not_show_disclaimer_again": False,
     }
 
     await users.insert_one(user_doc)
@@ -252,6 +256,8 @@ async def update_me(request: Request, body: UpdateMeRequest, user: TokenUser = D
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+    if "do_not_show_disclaimer_again" in raw and raw["do_not_show_disclaimer_again"] is not None:
+        update_doc["do_not_show_disclaimer_again"] = bool(raw["do_not_show_disclaimer_again"])
 
     if not update_doc:
         doc = await users.find_one({"user_id": user.user_id})

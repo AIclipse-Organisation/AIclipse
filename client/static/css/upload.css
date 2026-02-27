@@ -642,6 +642,77 @@ textarea {
   color: #111;
 }
 
+.modal--disclaimer {
+  width: 90%;
+  max-width: 360px;
+  text-align: left;
+}
+
+.modal--disclaimer .modal-title {
+  color: #CFB87C;
+}
+
+.modal-text--disclaimer {
+  max-height: calc(50vh + 15px);
+  overflow-y: auto;
+  margin-bottom: 12px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.modal-text--disclaimer::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.modal-text--disclaimer p {
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.modal-text--disclaimer p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-text--disclaimer a {
+  color: #CFB87C;
+}
+
+.modal-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  color: #CFB87C;
+}
+
+.modal-checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: #CFB87C;
+}
+
+.modal--disclaimer .modal-actions .secondary {
+  border-color: #e04646;
+  color: #e04646;
+}
+
+.modal--disclaimer .modal-actions .secondary:hover {
+  background: #e04646;
+  color: #111;
+}
+
+.modal--disclaimer .modal-actions .danger {
+  border-color: #CFB87C;
+  color: #CFB87C;
+}
+
+.modal--disclaimer .modal-actions .danger:hover {
+  background: #CFB87C;
+  color: #111;
+}
+
 /* Upload page layout inside the phone shell */
 .upload-screen {
   display: flex;
