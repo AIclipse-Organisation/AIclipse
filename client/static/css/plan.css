@@ -105,9 +105,9 @@
     }
 
     .plan-card.current .plan-button:disabled {
-      background: #CFB87C;
+      background: #7a6e4c;
       color: #222222;
-      border-color: #CFB87C;
+      border-color: #7a6e4c;
       box-shadow: 0 0 0 1px rgba(207, 184, 124, 0.4);
       opacity: 1;
     }
