@@ -16,6 +16,8 @@ eggs/
 .eggs/
 lib/
 !community/lib/
+!community/lib/notifications/
+!community/lib/notifications/notifications.js
 lib64/
 parts/
 sdist/
