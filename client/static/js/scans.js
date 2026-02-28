@@ -100,6 +100,18 @@ function createScanCard(img, index) {
   const card = makeEl("div", "scan-card");
 
   card.addEventListener("click", () => {
+    const postId = String(
+      img?.post_id || img?.postId || img?.community_post_id || "",
+    ).trim();
+
+    // Only scans-page navigation sets this flag, so viewscan can safely
+    // mark notifications read for the corresponding post.
+    if (postId) {
+      sessionStorage.setItem("notif_mark_post_id_from_scans", postId);
+    } else {
+      sessionStorage.removeItem("notif_mark_post_id_from_scans");
+    }
+
     sessionStorage.setItem("selectedScan", JSON.stringify(img));
     window.location.href = "/viewscan";
   });
