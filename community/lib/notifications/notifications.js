@@ -43,20 +43,33 @@ export async function trimNotificationRetention(db) {
 export async function capNotificationsForUser(db, recipientUserId, limit = USER_CAP) {
   const col = db.collection(NOTIFICATIONS_COLLECTION);
 
-  const overflow = await col
+  const cursor = col
     .find(
       { recipient_user_id: recipientUserId },
       { projection: { _id: 1 } },
     )
     .sort({ last_event_at: -1, created_at: -1 })
-    .skip(limit)
-    .toArray();
+    .skip(limit);
 
-  if (!overflow.length) return;
+  const BATCH_SIZE = 100;
+  let batchIds = [];
 
-  await col.deleteMany({
-    _id: { $in: overflow.map((x) => x._id) },
-  });
+  // Iterate over all overflow notifications and delete them in bounded batches
+  // to avoid loading all IDs into memory at once.
+  // Uses async iteration supported by the MongoDB Node.js driver cursor.
+  // If there are no overflow documents, the loop simply won't execute.
+  for await (const doc of cursor) {
+    batchIds.push(doc._id);
+
+    if (batchIds.length >= BATCH_SIZE) {
+      await col.deleteMany({ _id: { $in: batchIds } });
+      batchIds = [];
+    }
+  }
+
+  if (batchIds.length > 0) {
+    await col.deleteMany({ _id: { $in: batchIds } });
+  }
 }
 
 function makeNotificationId() {
@@ -141,4 +154,3 @@ export async function recordCollapsedNotification(db, payload) {
     console.warn("[notifications] cap enforcement failed after write:", String(err));
   }
 }
-"" 
