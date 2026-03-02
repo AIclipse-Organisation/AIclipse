@@ -154,4 +154,3 @@ export async function recordCollapsedNotification(db, payload) {
     console.warn("[notifications] cap enforcement failed after write:", String(err));
   }
 }
-"" 
