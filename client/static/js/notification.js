@@ -195,7 +195,6 @@ async function loadNotifications() {
   statusEl.textContent = "Loading...";
 
   try {
-    await markAllNotificationsRead();
 
     // Load notifications for current user session.
     const res = await fetch("/community/notifications", {
@@ -214,6 +213,9 @@ async function loadNotifications() {
 
     // Render with server read/unread state.
     renderList(items);
+
+    // Mark as read only after successfully fetching and rendering the list.
+    await markAllNotificationsRead();
 
     // Trigger global refresh for notification badge indicators.
     window.dispatchEvent(new Event("notifications:updated"));
