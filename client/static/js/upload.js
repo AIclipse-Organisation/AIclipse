@@ -1,4 +1,6 @@
-/* imageProcessing.js
+// upload.js
+
+/* upload.js 
    - Upload page: shows a fixed preview frame + lets user drag to reposition crop
    - When clicking "View Results" (btn-check), it exports a CROPPED file via canvas
      and sends that cropped file to /checks (and uses it for later save/publish too).
@@ -68,6 +70,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const TOO_LARGE_MSG = "Image is too large. Max allowed size is 5 MB.";
 
   const fileInput = document.getElementById("file-input");
+  const fileLabel = document.querySelector("label.file-upload");
+
   const btnCheck = document.getElementById("btn-check");
   const checkState = document.getElementById("check-state");
 
@@ -79,6 +83,10 @@ window.addEventListener("DOMContentLoaded", () => {
   const cropHint = document.getElementById("crop-hint");
   const cropResetBtn = document.getElementById("btn-crop-reset");
   const uploadPreviewWrap = document.getElementById("upload-preview-wrap");
+  const quotaModal = document.getElementById("quota-modal");
+  const quotaModalText = document.getElementById("quota-modal-text");
+  const quotaModalClose = document.getElementById("quota-modal-close");
+  const quotaModalPlan = document.getElementById("quota-modal-plan");
 
   let lastPreviewUrl = null;
 
@@ -101,14 +109,23 @@ window.addEventListener("DOMContentLoaded", () => {
   const realFill = document.querySelector(".real-fill");
   const aiFill = document.querySelector(".ai-fill");
 
+  // =========================
   // State
-  window.lastFile = null; // IMPORTANT: will become the cropped file after user clicks View Results
-  window.lastDetectionToken = null;
-  window.currentUserId = null;
+  // =========================
+  // [ADDED] Don't clobber results.js values on /results
+  if (!("lastFile" in window)) window.lastFile = null;
+  if (!("lastDetectionToken" in window)) window.lastDetectionToken = null;
+  if (!("currentUserId" in window)) window.currentUserId = null;
 
   // Crop state (object-position % values)
   let cropX = 50; // 0..100
   let cropY = 20; // 0..100 (top-biased helps keep heads)
+
+  function updateFileLabel(hasFile) {
+    if (!fileLabel) return;
+    fileLabel.classList.toggle("is-selected", !!hasFile);
+    fileLabel.textContent = hasFile ? "Change Image" : "Choose Image";
+  }
 
   function syncPublishUI() {
     const isPublic = !!(savePublic && savePublic.checked);
@@ -123,6 +140,62 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
+  }
+
+  function closeQuotaModal() {
+    if (!quotaModal) return;
+    quotaModal.hidden = true;
+  }
+
+  function openQuotaModal(message) {
+    if (!quotaModal) return;
+    if (quotaModalText) {
+      quotaModalText.textContent =
+        message || "You've reached your free quota of 10 uploads this month.";
+    }
+    quotaModal.hidden = false;
+  }
+
+  function getLimitMessage(payload) {
+    if (!payload || typeof payload !== "object") return null;
+    const detail = payload.detail;
+    if (detail && typeof detail === "object") {
+      if (typeof detail.message === "string" && detail.message.trim()) {
+        return detail.message;
+      }
+      if (typeof detail.error === "string" && detail.error.trim()) {
+        return detail.error;
+      }
+    }
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (typeof payload.message === "string" && payload.message.trim()) {
+      return payload.message;
+    }
+    return null;
+  }
+
+  function isUsageLimitExceeded(statusCode, payload) {
+    const detail = payload && typeof payload === "object" ? payload.detail : null;
+    const errorCode =
+      detail && typeof detail === "object" && typeof detail.error === "string"
+        ? detail.error
+        : null;
+    return statusCode === 403 && errorCode === "usage_limit_exceeded";
+  }
+
+  if (quotaModalClose) {
+    quotaModalClose.addEventListener("click", closeQuotaModal);
+  }
+  if (quotaModalPlan) {
+    quotaModalPlan.addEventListener("click", () => {
+      closeQuotaModal();
+      window.location.href = "/plan";
+    });
+  }
+  if (quotaModal) {
+    quotaModal.addEventListener("click", (event) => {
+      if (event.target === quotaModal) closeQuotaModal();
+    });
   }
 
   function applyCropPosition() {
@@ -187,6 +260,9 @@ window.addEventListener("DOMContentLoaded", () => {
       cropY = 20;
       applyCropPosition();
       if (cropHint) cropHint.style.opacity = "0.9";
+    });
+    cropResetBtn?.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
     });
   })();
 
@@ -259,257 +335,287 @@ window.addEventListener("DOMContentLoaded", () => {
     return { croppedFile, previewDataUrl };
   }
 
-  function setImageSrcSafe(imgEl, url) {
-    if (!imgEl) return;
 
-    // Only allow safe blob: or data: URLs (what we generate client-side)
-    if (typeof url !== "string") {
-      imgEl.removeAttribute("src");
-      return;
-    }
+function setImageSrcSafe(imgEl, url) {
+  if (!imgEl) return;
 
-    const isBlobUrl = url.startsWith("blob:");
-    const isDataUrl = url.startsWith("data:");
-
-    // For blob: URLs, do a minimal structural check to ensure they look like
-    // ones produced via URL.createObjectURL (e.g., "blob:<origin>/<uuid>").
-    if (isBlobUrl) {
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== "blob:") {
-          imgEl.removeAttribute("src");
-          return;
-        }
-      } catch {
-        imgEl.removeAttribute("src");
-        return;
-      }
-    } else if (isDataUrl) {
-      // Only allow data URLs for image media types, e.g. data:image/png;base64,...
-      // This prevents arbitrary data: payloads from being used as active content.
-      if (!/^data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=]+$/.test(url)) {
-        imgEl.removeAttribute("src");
-        return;
-      }
-    } else {
-      imgEl.removeAttribute("src");
-      return;
-    }
-
-    imgEl.src = url;
+  // 1. Basic Type Check
+  if (typeof url !== "string") {
+    imgEl.removeAttribute("src");
+    return;
   }
+
+  // 2. Protocol Validation (Allowlist Approach)
+  // We only permit specifically generated blob: or data: image strings.
+  const lowerUrl = url.toLowerCase().trim();
+  const isBlob = lowerUrl.startsWith("blob:");
+  const isData = lowerUrl.startsWith("data:");
+
+  if (isBlob) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "blob:") {
+        imgEl.removeAttribute("src");
+        return;
+      }
+    } catch {
+      imgEl.removeAttribute("src");
+      return;
+    }
+  } else if (isData) {
+    // Rigid Regex for base64 image data URLs only (png, jpeg, jpg, webp)
+    // This blocks data:text/html or data:application/javascript injections.
+    const dataUrlRegex = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/i;
+    if (!dataUrlRegex.test(url)) {
+      imgEl.removeAttribute("src");
+      return;
+    }
+  } else {
+    // Blocks javascript:, vbscript:, and standard http/https if not intended
+    imgEl.removeAttribute("src");
+    return;
+  }
+
+  // 3. Safe Assignment
+  imgEl.setAttribute("src", url);
+}
+
+
+const previewWrap = document.getElementById('upload-preview-wrap');
 
   // File chosen -> show preview frame + enable button
   if (fileInput) {
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files?.[0];
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    const uploadPlaceholder = document.getElementById("upload-placeholder"); // Get placeholder ref
 
-      if (file && file.size > MAX_IMAGE_BYTES) {
-        window.lastFile = null;
-        window.lastDetectionToken = null;
+    updateFileLabel(!!file);
 
-        try {
-          fileInput.value = "";
-        } catch {}
-
-        const uploadLabel = document.querySelector("label.file-upload");
-        if (uploadLabel) uploadLabel.classList.remove("is-selected");
-
-        if (previewImg) {
-          if (lastPreviewUrl) {
-            URL.revokeObjectURL(lastPreviewUrl);
-            lastPreviewUrl = null;
-          }
-          previewImg.src = "";
-        }
-        if (uploadPreviewWrap) uploadPreviewWrap.hidden = true;
-
-        if (btnSave) btnSave.disabled = true;
-        if (saveState)
-          saveState.textContent = "Run detection first to enable saving.";
-        if (saveResult) saveResult.textContent = "";
-        if (saveStatus) setStatus(saveStatus, "info", "");
-
-        if (btnCheck) btnCheck.disabled = true;
-        if (checkState) checkState.textContent = TOO_LARGE_MSG;
-
-        if (detectResult) detectResult.textContent = "No detection yet.";
-        if (detectStatus) setStatus(detectStatus, "info", "");
-        return;
-      }
-
-      window.lastFile = file || null;
+    // --- CASE 1: FILE TOO LARGE ---
+    if (file && file.size > MAX_IMAGE_BYTES) {
+      window.lastFile = null;
       window.lastDetectionToken = null;
 
-      const uploadLabel = document.querySelector("label.file-upload");
-      if (uploadLabel) uploadLabel.classList.toggle("is-selected", !!file);
+      try {
+        fileInput.value = "";
+      } catch {}
 
-      // Reset crop position on new file (nice UX)
-      cropX = 50;
-      cropY = 20;
-      applyCropPosition();
-      if (cropHint) cropHint.style.opacity = "0.9";
+      updateFileLabel(false);
 
       if (previewImg) {
         if (lastPreviewUrl) {
           URL.revokeObjectURL(lastPreviewUrl);
           lastPreviewUrl = null;
         }
-        if (file) {
-          lastPreviewUrl = URL.createObjectURL(file);
-          setImageSrcSafe(previewImg, lastPreviewUrl);
-        } else {
-          previewImg.removeAttribute("src");
-        }
+        previewImg.src = "";
       }
+      
+      // UI Reset: Hide preview, Show placeholder
+      if (uploadPreviewWrap) uploadPreviewWrap.hidden = true;
+      if (uploadPlaceholder) uploadPlaceholder.hidden = false;
 
-      if (uploadPreviewWrap) uploadPreviewWrap.hidden = !file;
-
-      // Reset SAVE UI if present
       if (btnSave) btnSave.disabled = true;
-      if (saveState)
-        saveState.textContent = "Run detection first to enable saving.";
+      if (saveState) saveState.textContent = "Run detection first to enable saving.";
       if (saveResult) saveResult.textContent = "";
       if (saveStatus) setStatus(saveStatus, "info", "");
 
-      if (file) {
-        if (btnCheck) btnCheck.disabled = false;
-        if (checkState)
-          checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
-        if (detectResult)
-          detectResult.textContent = "No detection yet for this file.";
-      } else {
-        if (btnCheck) btnCheck.disabled = true;
-        if (checkState) checkState.textContent = "Select an image to analyze.";
-        if (detectResult) detectResult.textContent = "No detection yet.";
+      if (btnCheck) btnCheck.hidden = true;
+      if (checkState) checkState.textContent = TOO_LARGE_MSG;
+
+      if (detectResult) detectResult.textContent = "No detection yet.";
+      if (detectStatus) setStatus(detectStatus, "info", "");
+
+      if (btnCheck) {
+        btnCheck.disabled = true;
+        btnCheck.hidden = true;
       }
-    });
-  }
+
+      return;
+    }
+
+    // --- CASE 2: VALID FILE OR CLEARED ---
+    window.lastFile = file || null;
+    window.lastDetectionToken = null;
+
+    cropX = 50;
+    cropY = 20;
+    applyCropPosition();
+    if (cropHint) cropHint.style.opacity = "0.9";
+
+    if (previewImg) {
+      if (lastPreviewUrl) {
+        URL.revokeObjectURL(lastPreviewUrl);
+        lastPreviewUrl = null;
+      }
+      if (file) {
+        lastPreviewUrl = URL.createObjectURL(file);
+        setImageSrcSafe(previewImg, lastPreviewUrl);
+      } else {
+        previewImg.removeAttribute("src");
+      }
+    }
+
+    // Toggle Preview vs Placeholder
+    if (uploadPreviewWrap) uploadPreviewWrap.hidden = !file;
+    if (uploadPlaceholder) uploadPlaceholder.hidden = !!file;
+
+    // Reset SAVE UI if present
+    if (btnSave) btnSave.disabled = true;
+    if (saveState) saveState.textContent = "Run detection first to enable saving.";
+    if (saveResult) saveResult.textContent = "";
+    if (saveStatus) setStatus(saveStatus, "info", "");
+
+    if (file) {
+      if (btnCheck) {
+        btnCheck.hidden = false;
+        btnCheck.disabled = false;
+      }
+      if (checkState)
+        checkState.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+      if (detectResult)
+        detectResult.textContent = "No detection yet for this file.";
+    } else {
+      if (btnCheck) {
+        btnCheck.disabled = true;
+        btnCheck.hidden = true;
+      }
+      if (checkState) checkState.textContent = "Select an image to analyze.";
+      if (detectResult) detectResult.textContent = "No detection yet.";
+    }
+  });
+}
 
   // btnCheck click -> exports cropped file -> POST /checks with cropped file -> store preview+response -> /results
-  if (btnCheck) {
-    btnCheck.addEventListener("click", async () => {
-      if (!window.lastFile) {
-        setStatus(detectStatus, "error", "No file selected.");
-        return;
-      }
+if (btnCheck) {
+  btnCheck.addEventListener("click", async () => {
+    if (!window.lastFile) {
+      setStatus(detectStatus, "error", "No file selected.");
+      return;
+    }
 
-      if (window.lastFile.size > MAX_IMAGE_BYTES) {
-        window.lastFile = null;
-        try {
-          if (fileInput) fileInput.value = "";
-        } catch {}
-        btnCheck.disabled = true;
-        if (checkState) checkState.textContent = TOO_LARGE_MSG;
-        if (detectStatus) setStatus(detectStatus, "info", "");
-        return;
-      }
-
-      btnCheck.disabled = true;
-      window.lastDetectionToken = null;
-
-      // disable SAVE until token arrives (if present)
-      if (btnSave) btnSave.disabled = true;
-      if (saveState)
-        saveState.textContent = "Run detection first to enable saving.";
-      if (saveResult) saveResult.textContent = "";
-      if (saveStatus) setStatus(saveStatus, "info", "");
-
-      setStatus(detectStatus, "info", "Analyzing image...");
-
+    if (window.lastFile.size > MAX_IMAGE_BYTES) {
+      window.lastFile = null;
       try {
-        // IMPORTANT: create cropped file based on user's drag framing.
-        // Must match your CSS aspect-ratio. If square: 1. If 4/5: 0.8, etc.
-        const frameAspect = 1; // <-- change if you change the frame ratio in CSS
-        const { croppedFile, previewDataUrl } =
-          await makeCroppedFileFromOriginal(window.lastFile, frameAspect);
+        if (fileInput) fileInput.value = "";
+      } catch {}
+      btnCheck.disabled = true;
+      if (checkState) checkState.textContent = TOO_LARGE_MSG;
+      if (detectStatus) setStatus(detectStatus, "info", "");
+      return;
+    }
 
-        // Use CROPPED file from now on (for checks + later saving/publishing)
-        window.lastFile = croppedFile;
+    // 1. Show the Global Loader
+    window.AppLoader.show("AIclipse is analyzing your image...");
 
-        // Store CROPPED preview for results page
-        sessionStorage.setItem("lastDetectionPreview", previewDataUrl);
+    btnCheck.disabled = true;
+    window.lastDetectionToken = null;
 
-        const formData = new FormData();
-        formData.append("file", croppedFile);
+    // disable SAVE UI
+    if (btnSave) btnSave.disabled = true;
+    if (saveState) saveState.textContent = "Run detection first to enable saving.";
+    if (saveResult) saveResult.textContent = "";
+    if (saveStatus) setStatus(saveStatus, "info", "");
 
-        const res = await fetch("/checks", {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-        let data = null;
-        try {
-          data = await res.json();
-        } catch {
-          data = { detail: "Non-JSON response" };
-        }
-        setDebug({ url: "/checks", status: res.status, body: data });
+    setStatus(detectStatus, "info", "Analyzing image...");
 
-        if (!res.ok) {
-          window.lastDetectionToken = null;
-          if (btnSave) btnSave.disabled = true;
-          if (saveState)
-            saveState.textContent = "Run detection first to enable saving.";
-          if (detectResult)
-            detectResult.textContent = JSON.stringify(data, null, 2);
+    try {
+      const frameAspect = 1;
+      const { croppedFile, previewDataUrl } =
+        await makeCroppedFileFromOriginal(window.lastFile, frameAspect);
 
-          if (res.status === 413) {
-            if (checkState) checkState.textContent = TOO_LARGE_MSG;
-            if (detectStatus) setStatus(detectStatus, "info", "");
-          } else {
-            setStatus(
-              detectStatus,
-              "error",
-              data.detail || `Detection failed (${res.status})`,
-            );
-          }
+      window.lastFile = croppedFile;
+      sessionStorage.setItem("lastDetectionPreview", previewDataUrl);
+
+      const formData = new FormData();
+      formData.append("file", croppedFile);
+
+      const res = await fetch("/checks", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = { detail: "Non-JSON response" };
+      }
+      
+      setDebug({ url: "/checks", status: res.status, body: data });
+
+      if (!res.ok) {
+        window.lastDetectionToken = null;
+        if (btnSave) btnSave.disabled = true;
+        if (saveState) saveState.textContent = "Run detection first to enable saving.";
+        if (detectResult) detectResult.textContent = JSON.stringify(data, null, 2);
+
+        if (isUsageLimitExceeded(res.status, data)) {
+          const limitMessage = getLimitMessage(data) || "You've reached your free quota.";
+          setStatus(detectStatus, "error", limitMessage);
+          
+          // Hide loader before showing a modal so they don't overlap
+          window.AppLoader.hide(); 
+          openQuotaModal(limitMessage);
           return;
         }
 
-        const lastDetectionToken = data.detection_token || null;
-        window.lastDetectionToken = lastDetectionToken;
-        window.lastDetectionToken = lastDetectionToken;
-
-        // enable SAVE if we have a token (results page only)
-        if (btnSave) btnSave.disabled = !lastDetectionToken;
-        if (saveState) {
-          saveState.textContent = lastDetectionToken
-            ? "Detection token ready. You can now save this image."
-            : "No detection token returned; cannot save.";
+        if (res.status === 413) {
+          if (checkState) checkState.textContent = TOO_LARGE_MSG;
+          if (detectStatus) setStatus(detectStatus, "info", "");
+        } else {
+          setStatus(detectStatus, "error", data.detail || `Detection failed (${res.status})`);
         }
-
-        // store results for results page
-        sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
-        sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
-
-        setStatus(detectStatus, "success", "Detection completed.");
-        window.location.href = "/results";
-      } catch (err) {
-        console.error(err);
-        if (btnSave) btnSave.disabled = true;
-        if (saveState)
-          saveState.textContent = "Run detection first to enable saving.";
-        setStatus(detectStatus, "error", "Network error during detection.");
-      } finally {
-        btnCheck.disabled = false;
+        return;
       }
-    });
-  }
 
-  // SAVE button -> POST /upload/image with file + detection_token (uses CROPPED window.lastFile)
-  if (btnSave) {
+      const lastDetectionToken = data.detection_token || null;
+      window.lastDetectionToken = lastDetectionToken;
+
+      if (btnSave) btnSave.disabled = !lastDetectionToken;
+      if (saveState) {
+        saveState.textContent = lastDetectionToken
+          ? "Detection token ready. You can now save this image."
+          : "No detection token returned; cannot save.";
+      }
+
+      sessionStorage.setItem("lastDetectionResponse", JSON.stringify(data));
+      sessionStorage.setItem("lastDetectionToken", lastDetectionToken);
+
+      setStatus(detectStatus, "success", "Detection completed.");
+      
+      // We don't hide the loader here because we are redirecting. 
+      // It creates a smoother transition to the next page.
+      window.location.href = "/results";
+
+    } catch (err) {
+      console.error(err);
+      if (btnSave) btnSave.disabled = true;
+      if (saveState) saveState.textContent = "Run detection first to enable saving.";
+      setStatus(detectStatus, "error", "Network error during detection.");
+      
+      // Only hide on error so the user can see the error message
+      window.AppLoader.hide(); 
+    } finally {
+      btnCheck.disabled = false;
+      // If we didn't redirect (e.g., an error happened or we stayed on page), hide it.
+      if (window.location.pathname !== "/results") {
+        window.AppLoader.hide();
+      }
+    }
+  });
+}
+
+  if (btnSave && !btnSave.dataset.bound) {
+    btnSave.dataset.bound = "1";
+
     btnSave.addEventListener("click", async () => {
       if (!window.lastFile) {
         setStatus(saveStatus, "error", "No file selected.");
         return;
       }
       if (!window.lastDetectionToken) {
-        setStatus(
-          saveStatus,
-          "error",
-          "No detection token. Run detection first.",
-        );
+        setStatus(saveStatus, "error", "No detection token. Run detection first.");
         return;
       }
 
@@ -521,19 +627,11 @@ window.addEventListener("DOMContentLoaded", () => {
       ).trim();
 
       if (isPublic && !window.currentUserId) {
-        setStatus(
-          saveStatus,
-          "error",
-          "You must be signed in to publish to community.",
-        );
+        setStatus(saveStatus, "error", "You must be signed in to publish to community.");
         return;
       }
       if (isPublic && !description) {
-        setStatus(
-          saveStatus,
-          "error",
-          "Description is required when publishing.",
-        );
+        setStatus(saveStatus, "error", "Description is required when publishing.");
         return;
       }
       if (description.length > 1000) {
@@ -545,8 +643,13 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // 1. Show the Global Loader immediately
+      if (window.AppLoader) {
+        window.AppLoader.show(isPublic ? "Publishing to Community..." : "Saving your scan...");
+      }
+
       btnSave.disabled = true;
-      setStatus(saveStatus, "info", "Saving image...");
+      setStatus(saveStatus, "info", isPublic ? "Saving + publishing..." : "Saving image...");
 
       const formData = new FormData();
       formData.append("file", window.lastFile);
@@ -559,6 +662,7 @@ window.addEventListener("DOMContentLoaded", () => {
           body: formData,
           credentials: "include",
         });
+
         let data = null;
         try {
           data = await res.json();
@@ -568,136 +672,117 @@ window.addEventListener("DOMContentLoaded", () => {
         setDebug({ url: "/upload/image", status: res.status, body: data });
 
         if (!res.ok) {
-          setStatus(
-            saveStatus,
-            "error",
-            data.detail || `Save failed (${res.status})`,
-          );
+          // Hide loader only on error so user can see the status message
+          if (window.AppLoader) window.AppLoader.hide();
+          setStatus(saveStatus, "error", data.detail || `Save failed (${res.status})`);
+          btnSave.disabled = false;
           return;
         }
 
-        setStatus(saveStatus, "success", "Saved image.");
-
-        if (isPublic) {
-          setStatus(saveStatus, "info", "Creating community post...");
-
-          const uploadPayload =
-            data &&
-            typeof data === "object" &&
-            data.body &&
-            typeof data.body === "object"
-              ? data.body
-              : data;
-
-          const resolvedImageId =
-            (uploadPayload && uploadPayload.image_id) ||
-            (uploadPayload &&
-              uploadPayload.image &&
-              uploadPayload.image.image_id) ||
-            (data && data.image && data.image.image_id) ||
-            null;
-
-          if (!resolvedImageId) {
-            console.error(
-              "Upload response missing image_id. Raw response:",
-              data,
-            );
-            setStatus(
-              saveStatus,
-              "error",
-              "Saved image, but could not read image_id from server response.",
-            );
-            return;
-          }
-
-          const resolvedVerdict =
-            (uploadPayload && uploadPayload.verdict) ||
-            (uploadPayload &&
-              uploadPayload.result &&
-              uploadPayload.result.verdict) ||
-            (data && data.verdict) ||
-            null;
-
-          const resolvedLabel =
-            (uploadPayload && uploadPayload.label) ||
-            (uploadPayload &&
-              uploadPayload.result &&
-              uploadPayload.result.label) ||
-            (data && data.label) ||
-            null;
-
-          const resolvedConfidence =
-            (uploadPayload && uploadPayload.confidence) ||
-            (uploadPayload &&
-              uploadPayload.result &&
-              uploadPayload.result.confidence) ||
-            (data && data.confidence) ||
-            null;
-
-          const postBody = {
-            user_id: window.currentUserId,
-            image_id: resolvedImageId,
-            description,
-            result: {
-              verdict: resolvedVerdict,
-              label: resolvedLabel,
-              confidence: resolvedConfidence,
-            },
-          };
-
-          const postRes = await fetch("/community/posts", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            credentials: "include",
-            body: JSON.stringify(postBody),
-          });
-
-          let postJson = null;
-          try {
-            postJson = await postRes.json();
-          } catch {
-            postJson = { detail: "Non-JSON response" };
-          }
-          setDebug({
-            url: "/community/posts",
-            status: postRes.status,
-            body: postJson,
-          });
-
-          if (postRes.ok) {
-            setStatus(saveStatus, "success", "Saved image + published post.");
-            setTimeout(() => {
-              window.location.href = "/community";
-            }, 1000);
-          } else {
-            setStatus(
-              saveStatus,
-              "error",
-              postJson.error ||
-                postJson.detail ||
-                `Post failed (${postRes.status})`,
-            );
-          }
-        } else {
+        // --- PRIVATE SAVE PATH ---
+        if (!isPublic) {
+          setStatus(saveStatus, "success", "Saved image.");
+          // Update loader for private redirect
+          if (window.AppLoader) window.AppLoader.show("Redirecting to your scans...");
           setTimeout(() => {
-            window.location.href = "/scans";
+            window.location.href = "/profile";
+          }, 900);
+          return;
+        }
+
+        // --- PUBLIC PUBLISHING PATH ---
+        setStatus(saveStatus, "info", "Creating community post...");
+
+        const uploadPayload =
+          data &&
+          typeof data === "object" &&
+          data.body &&
+          typeof data.body === "object"
+            ? data.body
+            : data;
+
+        const resolvedImageId =
+          (uploadPayload && uploadPayload.image_id) ||
+          (uploadPayload && uploadPayload.image && uploadPayload.image.image_id) ||
+          (data && data.image && data.image.image_id) ||
+          null;
+
+        if (!resolvedImageId) {
+          if (window.AppLoader) window.AppLoader.hide();
+          console.error("Upload response missing image_id. Raw response:", data);
+          setStatus(
+            saveStatus,
+            "error",
+            "Saved image, but could not read image_id from server response.",
+          );
+          btnSave.disabled = false;
+          return;
+        }
+
+        const postBody = {
+          user_id: window.currentUserId,
+          image_id: resolvedImageId,
+          description,
+          result: {
+            verdict: (uploadPayload && uploadPayload.verdict) || (data && data.verdict) || null,
+            label: (uploadPayload && uploadPayload.label) || (data && data.label) || null,
+            confidence: (uploadPayload && uploadPayload.confidence) || (data && data.confidence) || null,
+          },
+        };
+
+        const postRes = await fetch("/community/posts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(postBody),
+        });
+
+        let postJson = null;
+        try {
+          postJson = await postRes.json();
+        } catch {
+          postJson = { detail: "Non-JSON response" };
+        }
+        setDebug({ url: "/community/posts", status: postRes.status, body: postJson });
+
+        if (postRes.ok) {
+          setStatus(saveStatus, "success", "Saved image + published post.");
+          
+          // 2. Lock the loader for the external redirect
+          if (window.AppLoader) {
+            window.AppLoader.show("Loading Community...");
+          }
+
+          // Use a buffer to ensure the loader is visible while the browser fetches the external module
+          setTimeout(() => {
+            window.location.href = "/community";
           }, 1000);
+        } else {
+          if (window.AppLoader) window.AppLoader.hide();
+          setStatus(
+            saveStatus,
+            "error",
+            postJson.error ||
+              postJson.detail ||
+              `Post failed (${postRes.status})`,
+          );
+          btnSave.disabled = false;
         }
 
         if (saveResult) saveResult.textContent = "";
       } catch (err) {
         console.error(err);
+        if (window.AppLoader) window.AppLoader.hide();
         setStatus(saveStatus, "error", "Network error during save.");
-      } finally {
         btnSave.disabled = false;
       }
     });
   }
 
-  // Optional renderDetection (used on results page if you call it)
+  // Expose renderDetection if you ever want to call it from results.js
   function renderDetection(resp) {
     if (!resp || typeof resp !== "object") {
       if (detectResult) {
@@ -767,6 +852,9 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   })();
 
-  // Expose renderDetection if you ever want to call it from results.js
-  window.renderDetection = renderDetection;
+  // Only export this renderDetection on the UPLOAD page.
+  // (On Results page, results.js owns renderDetection.)
+  if (document.getElementById("btn-check")) {
+    window.renderDetection = renderDetection;
+  }
 });

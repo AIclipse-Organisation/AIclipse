@@ -106,12 +106,136 @@
 }
 
 /* =========================
-   Verdict block (matches scans page)
+   NEW: Community-style bar cards
    ========================= */
 
 .verdict-block {
   margin-top: 12px;
 }
+
+/* Card shell */
+.meter-card {
+  margin-top: 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.10);
+}
+
+.meter-card--gold {
+  border: 1px solid rgba(207, 184, 124, 0.55);
+}
+
+.meter-card--purple {
+  border: 1px solid rgba(170, 120, 255, 0.55);
+}
+
+/* Header row */
+.meter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 12px 14px 8px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.meter-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: rgba(207, 184, 124, 0.95);
+}
+
+.meter-verdict {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: rgba(207, 184, 124, 0.95);
+  text-align: right;
+}
+
+.meter-head--purple .meter-title,
+.meter-verdict--purple {
+  color: rgba(190, 150, 255, 0.95);
+}
+
+.meter-title--purple {
+  color: rgba(190, 150, 255, 0.95);
+}
+
+/* Panel */
+.meter-panel {
+  padding: 10px 12px 12px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.meter-panel--purple {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+/* Bar */
+.meter-bar {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+
+  height: 26px;
+  border-radius: 999px;
+
+  background: #141414;
+  border: 1px solid rgb(63, 63, 63);
+
+  padding: 4px;
+  overflow: hidden;
+}
+
+/* Fill */
+.meter-fill {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  bottom: 4px;
+  border-radius: 999px;
+
+  width: 0%;
+  max-width: calc(100% - 8px);
+  transition: width 300ms ease;
+  z-index: 1;
+}
+
+.meter-fill:not([style*="width: 0"]) {
+  min-width: 14px;
+}
+
+.meter-fill--gold {
+  background: rgba(207, 184, 124, 0.95);
+}
+
+.meter-fill--purple {
+  background: rgba(190, 150, 255, 0.85);
+}
+
+/* Percent text */
+.meter-percent {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  pointer-events: none;
+  z-index: 3;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+}
+
+/* =========================
+   (OLD verdict/votes bar styles kept as-is)
+   ========================= */
 
 .verdict-line {
   text-align: center;
@@ -165,7 +289,6 @@
   background: #e04646;
   /* red fill for fake */
 }
-
 
 /* =========================
    Votes block (same bar design)
@@ -235,7 +358,6 @@
 
 /* Status */
 .status-message {
-  padding: 1rem;
   text-align: center;
 }
 
@@ -516,8 +638,6 @@
   justify-content: flex-end;
 }
 
-
-
 /* Delete confirmation modal */
 
 .btn-delete-post {
@@ -663,8 +783,6 @@
   color: #111;
 }
 
-
-
 /* =========================
   Comments
    ========================= */
@@ -749,4 +867,200 @@
   color: rgba(255, 255, 255, 0.5);
   font-size: 14px;
   padding: 20px;
+}
+
+.visibility-selector {
+  display: flex;
+  gap: 0; /* No gap makes them look like one unit */
+  margin: 20px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15); /* Subtle outer border */
+}
+
+.vis-btn {
+  flex: 1;
+  all: unset; /* Reset default button styles */
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.5);
+  padding: 14px;
+  cursor: pointer;
+  transition: all 160ms ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.vis-btn .icon { 
+  font-size: 18px; 
+  opacity: 0.6;
+}
+
+/* Vertical divider between toggle buttons */
+#mode-private {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Active State: Highlight in Gold */
+.vis-btn.is-selected {
+  background: rgba(207, 184, 124, 0.12);
+  color: #CFB87C;
+}
+
+.vis-btn.is-selected .icon {
+  opacity: 1;
+}
+
+/* =========================
+   Visibility Toggle (Segmented Control)
+   ========================= */
+.visibility-selector {
+  display: flex;
+  gap: 0; 
+  margin: 20px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.vis-btn {
+  flex: 1;
+  all: unset;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 160ms ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.vis-btn .icon { 
+  font-size: 18px; 
+  opacity: 0.5;
+}
+
+/* Vertical separator for the segmented control */
+#mode-private {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Highlighted state for the selected mode */
+.vis-btn.is-selected {
+  background: rgba(207, 184, 124, 0.15);
+  color: #CFB87C;
+}
+
+.vis-btn.is-selected .icon {
+  opacity: 1;
+}
+
+/* =========================
+   Primary Action Button (Confirm & Save)
+   ========================= */
+.btn-save-final {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: block;
+  padding: 18px;
+  background: #CFB87C; /* AIclipse Gold */
+  color: #111;
+  border-radius: 999px;
+  font-weight: 800;
+  text-align: center;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: transform 100ms ease, opacity 160ms ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.btn-save-final:hover:not(:disabled) {
+  opacity: 0.95;
+}
+
+.btn-save-final:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-save-final:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* =========================
+   Danger Zone (Delete Scan Link)
+   ========================= */
+.danger-zone {
+  margin-top: 30px;
+  text-align: center;
+  padding-bottom: 24px;
+}
+
+.btn-delete-link {
+  all: unset;
+  color: #e04646; /* Red for deletion */
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 160ms ease;
+}
+
+.btn-delete-link:hover {
+  opacity: 1;
+}
+
+/* =========================
+   Publishing Dropdown (Description)
+   ========================= */
+.publish-extra {
+  margin-bottom: 20px;
+  animation: slideIn 240ms ease-out;
+}
+
+.publish-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+}
+
+.publish-textarea {
+  width: 100%;
+  min-height: 100px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.publish-textarea:focus {
+  outline: none;
+  border-color: #CFB87C;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }

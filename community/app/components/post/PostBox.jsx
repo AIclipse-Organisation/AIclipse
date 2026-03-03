@@ -224,6 +224,7 @@ export default function PostBox({
       setCommentsBusy(false);
     }
   }
+
   useEffect(() => {
     if (postId) {
       loadComments();
@@ -231,68 +232,100 @@ export default function PostBox({
   }, [postId]);
 
   /* =========================
-      ✅ ADDED: bar helpers + derived values
+     REAL% only + Results-style inversion logic
      ========================= */
 
-  function toPercentNumber01(conf) {
-    const n = Number(conf);
+  function clamp01(n) {
+    n = Number(n);
     if (!Number.isFinite(n)) return 0;
-    const clamped = Math.max(0, Math.min(1, n));
-    return clamped * 100; // float 0..100
+    return Math.max(0, Math.min(1, n));
   }
 
-  function verdictTypeFrom(img) {
-    const v = String(img?.result?.verdict ?? img?.verdict ?? "").toLowerCase();
-    const l = String(img?.result?.label ?? img?.label ?? "").toLowerCase();
-
-    if (v.includes("real") || v === "safe" || l.includes("real")) return "safe";
-    if (v.includes("ai") || v.includes("fake") || v.includes("deepfake"))
-      return "risk";
-    if (l.includes("ai") || l.includes("fake") || l.includes("deepfake"))
-      return "risk";
-
-    return "risk";
+  function cleanLabelText(raw) {
+    return String(raw || "Unknown").replace(/^\s*\d+(\.\d+)?%\s*/i, "").trim();
   }
 
-  function getVoteBucketFromPctReal(pctReal) {
-    if (pctReal >= 40 && pctReal <= 60)
-      return { text: "Not sure", type: "neutral" };
+  function isAiLabel(labelLower) {
+    return (
+      labelLower.includes("ai") ||
+      labelLower.includes("fake") ||
+      labelLower.includes("deepfake")
+    );
+  }
 
-    if (pctReal > 60) {
-      if (pctReal >= 86) return { text: "Most Likely Real", type: "safe" };
+  function isRealLabel(labelLower) {
+    return labelLower.includes("real") && !isAiLabel(labelLower);
+  }
+
+  // Same rule as Results page:
+  // - If verdict is REAL -> confidence is REAL%
+  // - Else treat confidence as AI% -> REAL = 1 - confidence
+  function computeRealPctFromModel(img) {
+    const rawLabel = cleanLabelText(
+      img?.result?.label ??
+        img?.label ??
+        img?.result?.verdict ??
+        img?.verdict ??
+        "Unknown",
+    );
+    const labelLower = rawLabel.toLowerCase();
+
+    const confRaw =
+      img?.result?.confidence ??
+      img?.confidence ??
+      img?.result?.score ??
+      img?.score ??
+      0;
+
+    const confidence = clamp01(confRaw);
+    const realProb = isRealLabel(labelLower) ? confidence : 1 - confidence;
+
+    return Math.max(0, Math.min(100, realProb * 100));
+  }
+
+  // Bucket based on REAL% (text can still say AI when real is low)
+  function bucketFromRealPct(realPct) {
+    const r = Math.max(0, Math.min(100, Number(realPct) || 0));
+
+    if (r >= 40 && r <= 60) return { text: "Not sure", type: "neutral" };
+
+    if (r > 60) {
+      if (r >= 86) return { text: "Most Likely Real", type: "safe" };
       return { text: "Likely Real", type: "safe" };
     }
 
-    const pctAI = 100 - pctReal;
+    const pctAI = 100 - r;
     if (pctAI >= 86) return { text: "Most Likely AI", type: "risk" };
     return { text: "Likely AI", type: "risk" };
   }
 
-  const analysisConfidence =
-    image?.result?.confidence ?? image?.confidence ?? 0;
-  const analysisPct = toPercentNumber01(analysisConfidence);
-  const analysisType = verdictTypeFrom(image); // safe | risk
+  function setWidthStyle(pct) {
+    const p = Math.max(0, Math.min(100, Number(pct) || 0));
+    if (p === 0) return "0px";
+    return `calc(${p}% - 8px)`; 
+  }
 
+  // Analysis (model) => REAL%
+  const analysisRealPct = computeRealPctFromModel(image);
+  const analysisBucket = bucketFromRealPct(analysisRealPct);
+
+  // Community => REAL% from votes
   const totalVotes = up + down;
-  const pctReal = totalVotes > 0 ? (up / totalVotes) * 100 : null; // 0..100
-  const voteBucket =
-    pctReal === null ? null : getVoteBucketFromPctReal(pctReal);
-  const pctAI = pctReal === null ? null : 100 - pctReal;
-
-  const communityDisplayPct =
-    pctReal === null ? null : voteBucket?.type === "risk" ? pctAI : pctReal;
+  const communityRealPct = totalVotes > 0 ? (up / totalVotes) * 100 : null;
+  const communityBucket =
+    communityRealPct === null ? null : bucketFromRealPct(communityRealPct);
 
   const isTrending = image.isTrending;
 
   return (
     <div
-      className={`comm_postBox ${isOfficial && userHasVoted ? "is-revealed-benchmark" : ""}`}
+      className={`comm_postBox ${
+        isOfficial && userHasVoted ? "is-revealed-benchmark" : ""
+      }`}
     >
-     
       <div className="comm_topRow">
         <div className="comm_headerLeft">
           <div className="comm_avatar" aria-hidden="true">
-            {/* If you ever have an avatar URL later, drop an <img> here */}
             <div className="comm_avatarInitials">{initials}</div>
           </div>
 
@@ -309,12 +342,12 @@ export default function PostBox({
         </div>
 
         <div className="comm_headerActions">
+          {isTrending && (
+            <div className="trend_div_container_body">
+              <span className="comm_trendingBadge">POPULAR</span>
+            </div>
+          )}
 
-             {isTrending && (
-        <div className="trend_div_container_body">
-          <span className="comm_trendingBadge">POPULAR</span>
-        </div>
-      )}
           <div className="comm_menu">
             <button
               type="button"
@@ -357,10 +390,7 @@ export default function PostBox({
                           "selectedScan",
                           JSON.stringify(editData),
                         );
-                        sessionStorage.setItem(
-                          "selectedScanTitle",
-                          `Edit Post`,
-                        );
+                        sessionStorage.setItem("selectedScanTitle", `Edit Post`);
                         window.location.href = "/viewscan";
                       } catch (err) {
                         console.error("Failed to store scan data:", err);
@@ -425,8 +455,6 @@ export default function PostBox({
         <div className="comm_description">{description}</div>
       </div>
 
-    
-
       {/* IMAGE */}
       <div className="comm_postImageWrap">
         <img
@@ -437,7 +465,9 @@ export default function PostBox({
         />
         {isOfficial && userHasVoted && (
           <div
-            className={`comm_truthReveal ${isUserCorrect ? "is-correct" : "is-incorrect"}`}
+            className={`comm_truthReveal ${
+              isUserCorrect ? "is-correct" : "is-incorrect"
+            }`}
           >
             <div className="comm_truthIcon">{isUserCorrect ? "✅" : "❌"}</div>
             <div className="comm_truthText">
@@ -450,95 +480,108 @@ export default function PostBox({
         )}
       </div>
 
-
       {/* bars above image */}
       <div className="comm_bars_wrapper">
-        {/* The Prompt Overlay - Only visible if NOT voted */}
         {!userHasVoted && (
           <div className="comm_vote_prompt">Vote to see results</div>
         )}
 
-        {/* The Bars Container - This gets blurred/revealed */}
         <div
           className={`comm_bars ${!userHasVoted ? "is-hidden" : "is-revealed"}`}
         >
-          {/* Analysis / model bar */}
-          <div className="comm_barBlock" aria-label="Analysis result">
-            <div
-              className={`comm_barLine ${analysisType === "safe" ? "is-safe" : "is-risk"}`}
-            >
-              {image?.result?.label
-                ? String(image.result.label)
-                : `${analysisPct.toFixed(0)}% ${analysisType === "safe" ? "Likely Real" : "Likely AI"}`}
+          {/* Analysis / model bar (REAL% only) */}
+          <div
+            className={`comm_barBlock is-${analysisBucket.type}`}
+            aria-label="Analysis result"
+          >
+            <div className="comm_barHead">
+              <div className="comm_barTitle">Aiclipse</div>
+              <div className="comm_barVerdict">{analysisBucket.text}</div>
             </div>
 
-            <div
-              className={`comm_barTrack ${analysisType === "risk" ? "is-risk" : ""}`}
-              role="img"
-              aria-label={`Confidence ${analysisPct.toFixed(0)}% (Aiclipse Model)`}
-            >
+            <div className="comm_progressPanel">
               <div
-                className={`comm_barFill ${analysisType === "risk" ? "is-risk" : ""}`}
-                style={{ width: `${Math.max(0, Math.min(100, analysisPct))}%` }}
-              />
+                className="comm_progressBar"
+                role="img"
+                aria-label={`Aiclipse real probability ${analysisRealPct.toFixed(
+                  2,
+                )}%`}
+              >
+                <div
+                  className="comm_progressFill"
+                  data-p={String(Math.round(analysisRealPct))}
+                  style={{ width: setWidthStyle(analysisRealPct) }}
+                />
+                <div className="comm_barPercent">
+                  {analysisRealPct.toFixed(2)}%
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Community votes bar */}
-          <div className="comm_barBlock" aria-label="Community result">
-            {pctReal === null ? (
+          {/* Community votes bar (REAL% only, purple via CSS) */}
+          <div className="comm_barBlock comm_communityBar" aria-label="Community result">
+            {communityRealPct === null ? (
               <>
-                <div className="comm_barLine is-neutral">
-                  No community votes
+                <div className="comm_barHead">
+                  <div className="comm_barTitle">Community</div>
+                  <div className="comm_barVerdict">No votes</div>
                 </div>
-                <div
-                  className="comm_barTrack is-neutral"
-                  role="img"
-                  aria-label="No community votes"
-                >
+
+                <div className="comm_progressPanel">
                   <div
-                    className="comm_barFill is-neutral"
-                    style={{ width: "100%" }}
-                  />
+                    className="comm_progressBar"
+                    role="img"
+                    aria-label="No community votes"
+                  >
+                    <div
+                      className="comm_progressFill"
+                      data-p="0"
+                      style={{
+                        width: "0px",
+                        background: "rgba(255, 255, 255, 0.22)",
+                      }}
+                    />
+                    <div className="comm_barPercent">—</div>
+                  </div>
                 </div>
               </>
             ) : (
               <>
-                <div
-                  className={`comm_barLine ${
-                    voteBucket.type === "safe"
-                      ? "is-safe"
-                      : voteBucket.type === "risk"
-                        ? "is-risk"
-                        : "is-neutral"
-                  }`}
-                >
-                  {`${communityDisplayPct.toFixed(0)}% ${voteBucket.text} (Community)`}
+                <div className="comm_barHead">
+                  <div className="comm_barTitle">Community</div>
+                  <div className="comm_barVerdict">
+                    {communityBucket.text}
+                  </div>
                 </div>
 
-                <div
-                  className="comm_barTrack"
-                  role="img"
-                  aria-label={
-                    voteBucket.type === "risk"
-                      ? `Vote confidence ${pctAI.toFixed(0)}% AI`
-                      : `Vote confidence ${pctReal.toFixed(0)}% real`
-                  }
-                >
+                <div className="comm_progressPanel">
                   <div
-                    className="comm_barFill"
-                    style={{ width: `${Math.max(0, Math.min(100, pctReal))}%` }}
-                  />
+                    className="comm_progressBar"
+                    role="img"
+                    aria-label={`Community real probability ${communityRealPct.toFixed(
+                      2,
+                    )}%`}
+                  >
+                    <div
+                      className="comm_progressFill"
+                      data-p={String(Math.round(communityRealPct))}
+                      style={{ width: setWidthStyle(communityRealPct) }}
+                    />
+                    <div className="comm_barPercent">
+                      {communityRealPct.toFixed(2)}%
+                    </div>
+                  </div>
                 </div>
               </>
             )}
           </div>
         </div>
+
         <div />
 
         {/* ACTIONS (like/dislike/comment) */}
         <div className="comm_bottomRow">
-          {/* LEFT: votes */}
           <div className="comm_actionsLeft">
             <button
               type="button"
@@ -579,7 +622,6 @@ export default function PostBox({
             </button>
           </div>
 
-          {/* RIGHT: comments */}
           <div className="comm_actionsRight">
             <button
               type="button"
@@ -669,12 +711,6 @@ export default function PostBox({
         )}
 
         {error && <div className="muted">{error}</div>}
-
-        {/* {isTrending && (
-        <div className="comm_trendingCornerFire" aria-hidden="true">
-          🔥
-        </div>
-      )} */}
       </div>
     </div>
   );

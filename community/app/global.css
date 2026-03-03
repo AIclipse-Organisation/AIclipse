@@ -1,4 +1,5 @@
 @import "tailwindcss";
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
@@ -18,21 +19,19 @@ body {
 }
 
 .topbar {
-  height: 56px;
-  background: #222222;
-  border-bottom: 1px solid #2c2c2c;
-
+  position: relative;
+  /* Essential for absolute centering inside it */
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  width:100%;
+  align-items: center;
+  padding: 10px 160px;
+  background-color: red;
 }
 
 /* Hamburger */
 .menu-button {
   position: relative;
-  z-index: 10; 
+  z-index: 10;
   background: transparent;
   border: none;
   padding: 6px 8px;
@@ -43,17 +42,25 @@ body {
 }
 
 /* The actual lines */
- .hamburger-line {
-  width: 22px;           
-  height: 2px;           
-  background-color: #CFB87C; 
+.hamburger-line {
+  width: 22px;
+  height: 2px;
+  background-color: #CFB87C;
   border-radius: 2px;
+}
+
+.topbar-screen-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #CFB87C;
 }
 
 /* Logo */
 .topbar-logo img {
-  width: 150px;
-  height: auto;
+  width: -webkit-fill-available;
+  max-height: 2vh;
   display: block;
 }
 
@@ -82,13 +89,13 @@ body {
   align-items: center;
 }
 
- #current-user-chip {
+#current-user-chip {
   font-size: 12px;
   line-height: 1;
   padding: 2px 4px;
   border-radius: 999px;
   white-space: nowrap;
-  color:#CFB87C;
+  color: #CFB87C;
 }
 
 .menu-backdrop {
@@ -97,9 +104,9 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(0, 0, 0, 0.5); 
-  z-index: 40; 
-  backdrop-filter: blur(2px); 
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  backdrop-filter: blur(2px);
 }
 
 /* ---------- Empty State ---------- */
@@ -126,6 +133,14 @@ body {
   opacity: 0.9;
 }
 
+.empty-icon-image {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 14px;
+  display: block;
+  object-fit: contain;
+}
+
 .empty-text {
   margin: 0;
   font-size: 14px;
@@ -133,4 +148,3 @@ body {
   color: #CFB87C;
   letter-spacing: 0.01em;
 }
-

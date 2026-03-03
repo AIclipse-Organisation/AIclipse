@@ -293,6 +293,47 @@ input:focus {
   cursor: pointer;
 }
 
+#btn-signup:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(35%);
+}
+
+#btn-signup:disabled:hover,
+#btn-signup:disabled:active {
+  transform: none;
+}
+
+/* =========================
+   T&C
+========================= */
+.terms-row {
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.terms-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.25;
+  color: rgba(255,255,255,0.86);
+  cursor: pointer;
+}
+
+.terms-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+}
+
+.terms-label a {
+  color: #C9BA83;
+  text-decoration: underline;
+}
+
+
 /* =========================
    ACCESSIBILITY
 ========================= */

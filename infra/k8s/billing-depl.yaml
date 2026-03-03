@@ -16,6 +16,14 @@ spec:
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
             - name: MONGO_DB
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+            - name: STRIPE_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: stripe-sec, key: STRIPE_SECRET_KEY } }
+            - name: STRIPE_PUBLISHABLE_KEY
+              valueFrom: { secretKeyRef: { name: stripe-sec, key: STRIPE_PUBLISHABLE_KEY } }
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom: { secretKeyRef: { name: stripe-sec, key: STRIPE_WEBHOOK_SECRET } }
+            - name: CLIENT_URL
+              value: "http://aiclipse.local"
           ports: [{ name: http, containerPort: 3000 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }

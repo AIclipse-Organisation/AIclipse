@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/static/css/styles.css" />
     <link rel="stylesheet" href="/static/css/docs.css" />
+    <link rel="stylesheet" href="/static/css/loader.css" />
   </head>
 
   <body class="app">
@@ -13,7 +14,6 @@
       {% include 'partials/topbar.html' %}
 
       <main class="screen">
-
         <section class="page-header" aria-label="Page title">
           <h1 id="page-title" class="page-title">Documentation</h1>
           <div class="page-underline" role="presentation"></div>
@@ -269,7 +269,10 @@
                       Copy
                     </button>
                   </div>
-                  <pre class="mono" id="code-example-python"><code>import requests
+                  <pre
+                    class="mono"
+                    id="code-example-python"
+                  ><code>import requests
 
   url = "https://aiclipse.online/api/v1/checks"
   headers = {
@@ -343,8 +346,8 @@
                 <div class="docs-callout" style="margin-top: 8px">
                   <div class="docs-callout-title">Recommended</div>
                   <div class="muted">
-                    Use Postman’s API Key auth. It still sends the key as a header
-                    — it’s just a cleaner UI for managing it.
+                    Use Postman’s API Key auth. It still sends the key as a
+                    header — it’s just a cleaner UI for managing it.
                   </div>
                 </div>
 
@@ -356,7 +359,8 @@
                     >
                   </li>
                   <li>
-                    Authorization → Type: <span class="mono">API Key</span><br />
+                    Authorization → Type: <span class="mono">API Key</span
+                    ><br />
                     Key: <span class="mono">X-Api-Key</span><br />
                     Value: <span class="mono">&lt;YOUR_API_KEY&gt;</span><br />
                     Add to: <span class="mono">Header</span>
@@ -375,8 +379,9 @@
                 <div class="docs-callout" style="margin-top: 12px">
                   <div class="docs-callout-title">Important</div>
                   <div class="muted">
-                    Do not add <span class="mono">Content-Type</span> manually in
-                    Headers. Postman will set the correct boundary automatically.
+                    Do not add <span class="mono">Content-Type</span> manually
+                    in Headers. Postman will set the correct boundary
+                    automatically.
                   </div>
                 </div>
 
@@ -402,7 +407,9 @@
                   <div class="row">
                     <div class="cell mono">422</div>
                     <div class="cell">Missing form field</div>
-                    <div class="cell mono">{"detail":[...,"Field required"]}</div>
+                    <div class="cell mono">
+                      {"detail":[...,"Field required"]}
+                    </div>
                   </div>
                   <div class="row">
                     <div class="cell mono">413</div>
@@ -427,7 +434,9 @@
 
                 <div class="code-block" style="margin-top: 12px">
                   <div class="code-top">
-                    <div class="code-label">Wrong example (missing file key)</div>
+                    <div class="code-label">
+                      Wrong example (missing file key)
+                    </div>
                     <button
                       class="copy-code"
                       type="button"

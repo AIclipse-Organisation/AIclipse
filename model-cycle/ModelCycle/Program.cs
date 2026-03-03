@@ -17,11 +17,26 @@ var builder = WebApplication.CreateBuilder(args);
 var mongoUri = Environment.GetEnvironmentVariable("MONGO_URI") ?? "mongodb://localhost:27017";
 var mongoDbName = Environment.GetEnvironmentVariable("MONGO_DB") ?? "aiclipse";
 
+var authUri = Environment.GetEnvironmentVariable("AUTH_URI");
+
 Console.WriteLine($"[Mongo] Connecting to {mongoDbName}...");
 
 builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoUri));
 builder.Services.AddScoped<IMongoDatabase>(sp =>
     sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDbName));
+
+
+builder.Services.AddHttpClient<IAuthService, AuthService>(client =>
+{
+    // 2. Validate the URL scheme to prevent "mongodb://" errors
+    if (!Uri.TryCreate(authUri, UriKind.Absolute, out var baseUri) ||
+        (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
+    {
+        throw new Exception($"Invalid AUTH_URI scheme. Expected http/https but got: {authUri}");
+    }
+
+    client.BaseAddress = baseUri;
+});
 
 var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST") ?? "localhost";
 var redisPortStr = Environment.GetEnvironmentVariable("REDIS_PORT") ?? "6379";

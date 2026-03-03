@@ -47,6 +47,19 @@ function toPercentNumber(confidence) {
   return Math.round(clamped * 100);
 }
 
+function clamp(n, min, max) {
+  n = Number(n);
+  if (!Number.isFinite(n)) n = 0;
+  return Math.max(min, Math.min(max, n));
+}
+
+function setFillPercent(fillEl, percent) {
+  if (!fillEl) return;
+  const p = clamp(percent, 0, 100);
+  fillEl.style.width = `${p}%`;
+  fillEl.dataset.p = String(p);
+}
+
 function formatDate(dt) {
   if (!dt) return "N/A";
   const d = new Date(dt);
@@ -63,6 +76,185 @@ function isPrivateScan(img) {
   if (!img) return false;
   if (typeof img.is_public === "boolean") return img.is_public === false;
   return true; // default to private if missing
+}
+
+function getPostId(img) {
+  if (!img) return null;
+
+  // Most common
+  if (img.post_id) return img.post_id;
+
+  // Common variations across branches / APIs
+  if (img.postId) return img.postId;
+  if (img.community_post_id) return img.community_post_id;
+
+  // Nested shapes (just in case)
+  if (img.post && (img.post.post_id || img.post.id)) return img.post.post_id || img.post.id;
+
+  return null;
+}
+
+function normalizeId(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function getImageId(post) {
+  if (!post) return null;
+  if (post.image_id) return post.image_id;
+  if (post.imageId) return post.imageId;
+  if (post.image && (post.image.image_id || post.image.id)) return post.image.image_id || post.image.id;
+  return null;
+}
+
+function findMatchingPost(payload, matcher) {
+  if (!payload || typeof matcher !== "function") return null;
+
+  const fromItem = payload.item;
+  if (fromItem && matcher(fromItem)) return fromItem;
+
+  if (Array.isArray(payload.items)) {
+    const found = payload.items.find((post) => matcher(post));
+    if (found) return found;
+  }
+
+  if (matcher(payload)) return payload;
+
+  return null;
+}
+
+async function fetchPostByImageId(imageId) {
+  if (!imageId) return null;
+
+  const requestedImageId = normalizeId(imageId);
+  const matchesImageId = (post) => normalizeId(getImageId(post)) === requestedImageId;
+
+  // Try a couple likely endpoints (only GETs). We gracefully ignore failures.
+  const urls = [
+    `/community/posts?image_id=${encodeURIComponent(imageId)}`,
+    `/community/posts/by_image?image_id=${encodeURIComponent(imageId)}`,
+    `/community/posts/by_image_id?image_id=${encodeURIComponent(imageId)}`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      });
+
+      if (!res.ok) continue;
+
+      const data = await res.json().catch(() => null);
+      if (!data) continue;
+
+      const matched = findMatchingPost(data, matchesImageId);
+      if (matched) return matched;
+    } catch (_) {
+      // ignore and try next
+    }
+  }
+
+  return null;
+}
+
+async function ensurePostIdForPublicScan(img) {
+  // Only for public scans missing post id
+  if (!img || isPrivateScan(img)) return false;
+  if (getPostId(img)) return true;
+  if (!img.image_id) return false;
+
+  const post = await fetchPostByImageId(img.image_id);
+  if (!post) return false;
+
+  // Normalize onto currentScan so the rest of your code works unchanged
+  img.post_id = post.post_id || post.postId || post.id || null;
+
+  // If the post has a description and scan doesn't, use it
+  if (!img.description && post.description) img.description = post.description;
+
+  return !!img.post_id;
+}
+
+// =========================
+// NEW (necessary): refresh live community vote counts from backend
+// so View Scan matches Community page.
+// =========================
+
+async function fetchPostByPostId(postId) {
+  if (!postId) return null;
+
+  const requestedPostId = normalizeId(postId);
+  const matchesPostId = (post) => normalizeId(getPostId(post)) === requestedPostId;
+
+  const urls = [
+    `/community/posts?post_id=${encodeURIComponent(postId)}`,
+    `/community/posts/by_id?post_id=${encodeURIComponent(postId)}`,
+    `/community/posts/by_post_id?post_id=${encodeURIComponent(postId)}`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      });
+
+      if (!res.ok) continue;
+
+      const data = await res.json().catch(() => null);
+      if (!data) continue;
+
+      const matched = findMatchingPost(data, matchesPostId);
+      if (matched) return matched;
+    } catch (_) {}
+  }
+
+  return null;
+}
+
+function mergePostFieldsIntoScan(scan, post) {
+  if (!scan || !post) return;
+
+  // normalize post id (keep your behavior)
+  scan.post_id = scan.post_id || post.post_id || post.postId || post.id || null;
+
+  // IMPORTANT: pull the live vote counts
+  if (post.up_vote_count != null) scan.up_vote_count = post.up_vote_count;
+  if (post.down_vote_count != null) scan.down_vote_count = post.down_vote_count;
+
+  // optional: keep some common fields in sync if present
+  if (!scan.description && post.description) scan.description = post.description;
+  if (post.updated_at) scan.updated_at = post.updated_at;
+  if (post.comment_count != null) scan.comment_count = post.comment_count;
+}
+
+async function refreshCommunityData(scan) {
+  // Only matters for public scans
+  if (!scan || isPrivateScan(scan)) return false;
+
+  // Prefer post_id (most accurate)
+  const pid = getPostId(scan);
+  if (pid) {
+    const post = await fetchPostByPostId(pid);
+    if (post) {
+      mergePostFieldsIntoScan(scan, post);
+      return true;
+    }
+  }
+
+  // Fallback by image_id (what you already do)
+  if (scan.image_id) {
+    const post = await fetchPostByImageId(scan.image_id);
+    if (post) {
+      mergePostFieldsIntoScan(scan, post);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // -------------------------
@@ -85,7 +277,117 @@ function showPanel(panel) {
 }
 
 // -------------------------
+// NEW: Aiclipse card (gold) computations
+// Matches your Results logic:
+// - If AI/fake/deepfake => confidence is AI% => REAL = 1 - confidence
+// - If REAL => confidence is REAL% => REAL = confidence
+// - Otherwise => treat as AI% => REAL = 1 - confidence
+// -------------------------
+function normalizeLabelText(raw) {
+  const s = (raw || "Unknown").toString();
+  return s.replace(/^\s*\d+(\.\d+)?%\s*/i, "").trim();
+}
+
+function renderAiclipseCard(img) {
+  const wrap = document.getElementById("verdict-block");
+  const card = document.getElementById("aiclipse-card");
+  const verdictEl = document.getElementById("aiclipse-verdict");
+  const fillEl = document.getElementById("aiclipse-fill");
+  const pctEl = document.getElementById("aiclipse-percent");
+
+  if (!wrap || !card || !verdictEl || !fillEl || !pctEl) return;
+
+  if (!img) {
+    card.hidden = true;
+    return;
+  }
+
+  const rawLabel = normalizeLabelText(img.label || img.result || img.verdict || "Unknown");
+  const labelLower = rawLabel.toLowerCase();
+
+  const confidenceRaw = Number.isFinite(img.confidence) ? img.confidence : (img.score ?? 0);
+  const confidence = clamp(confidenceRaw, 0, 1);
+
+  const isAi =
+    labelLower.includes("ai") ||
+    labelLower.includes("fake") ||
+    labelLower.includes("deepfake");
+
+  const isReal = labelLower.includes("real") && !isAi;
+
+  let realProb = isReal ? confidence : (1 - confidence);
+  realProb = clamp(realProb, 0, 1);
+
+  const realPct = realProb * 100;
+
+  verdictEl.textContent = rawLabel || "—";
+  pctEl.textContent = `${realPct.toFixed(2)}%`;
+
+  setFillPercent(fillEl, realPct);
+
+  wrap.hidden = false;
+  card.hidden = false;
+}
+
+// -------------------------
+// NEW: Community card (purple)
+// - bar shows REAL vote share (up/(up+down))
+// - verdict text uses your buckets
+// - no votes => "No community votes" and 0.00%
+// -------------------------
+function communityVerdictText(pctReal) {
+  if (pctReal >= 40 && pctReal <= 60) return "Not sure";
+
+  if (pctReal > 60) {
+    if (pctReal >= 86) return "Most Likely Real";
+    return "Likely Real";
+  }
+
+  const pctAI = 100 - pctReal;
+  if (pctAI >= 86) return "Most Likely AI";
+  return "Likely AI";
+}
+
+function renderCommunityCard(img) {
+  const card = document.getElementById("community-card");
+  const verdictEl = document.getElementById("community-verdict");
+  const fillEl = document.getElementById("community-fill");
+  const pctEl = document.getElementById("community-percent");
+
+  if (!card || !verdictEl || !fillEl || !pctEl) return;
+
+  // Only show for public posts
+  if (!img || isPrivateScan(img)) {
+    card.hidden = true;
+    return;
+  }
+
+  const up = Number(img.up_vote_count);
+  const down = Number(img.down_vote_count);
+  const upN = Number.isFinite(up) ? up : 0;
+  const downN = Number.isFinite(down) ? down : 0;
+  const total = upN + downN;
+
+  if (total <= 0) {
+    verdictEl.textContent = "No community votes";
+    pctEl.textContent = "0.00%";
+    setFillPercent(fillEl, 0);
+    card.hidden = false;
+    return;
+  }
+
+  const pctReal = clamp((upN / total) * 100, 0, 100);
+
+  verdictEl.textContent = communityVerdictText(pctReal);
+  pctEl.textContent = `${pctReal.toFixed(2)}%`;
+  setFillPercent(fillEl, pctReal);
+
+  card.hidden = false;
+}
+
+// -------------------------
 // Verdict + confidence helpers (match scans page behavior)
+// (LEFT AS-IS, no longer used by renderScan)
 // -------------------------
 function verdictType(img) {
   const v = (img && img.verdict != null ? String(img.verdict) : "").toLowerCase();
@@ -103,16 +405,7 @@ function verdictType(img) {
 }
 
 // -------------------------
-// Votes helpers (up/down -> "real %" + label)
-// Rules:
-// - real% = up / (up+down) * 100
-// - 0 votes => hidden
-// Thresholds (community):
-// 40-60 not sure
-// 61-85 likely real (upvote majority)
-// 61-85 likely ai (downvote majority)
-// 86-100 most likely real (upvote majority)
-// 86-100 most likely ai (downvote majority)
+// Votes helpers (LEFT AS-IS, no longer used by renderScan)
 // -------------------------
 function getVoteCounts(img) {
   const up = Number(img && img.up_vote_count);
@@ -132,20 +425,16 @@ function voteRealPercent(img) {
 }
 
 function voteBucket(pctReal) {
-  // pctReal is 0..100 (upvote share = "real")
-  // Determine direction by majority, then apply the same strength bands.
   if (pctReal >= 40 && pctReal <= 60) return { text: "Not sure", type: "neutral" };
 
   if (pctReal > 60) {
-    // Upvote majority => Real
     if (pctReal >= 86) return { text: "Most Likely Real", type: "safe" };
-    return { text: "Likely Real", type: "safe" }; // 61-85
+    return { text: "Likely Real", type: "safe" };
   }
 
-  // Downvote majority => AI (strength based on AI share)
   const pctAI = 100 - pctReal;
   if (pctAI >= 86) return { text: "Most Likely AI", type: "risk" };
-  return { text: "Likely AI", type: "risk" }; // 61-85 AI share (i.e. pctReal 39-15)
+  return { text: "Likely AI", type: "risk" };
 }
 
 function renderVotesBlock(img) {
@@ -156,7 +445,6 @@ function renderVotesBlock(img) {
 
   if (!block || !line || !track || !fill) return;
 
-  // Only for public posts (votes matter there)
   if (!img || isPrivateScan(img)) {
     block.hidden = true;
     track.hidden = true;
@@ -164,7 +452,6 @@ function renderVotesBlock(img) {
     line.classList.remove("is-safe", "is-risk", "is-neutral");
     fill.style.width = "0%";
 
-    // reset any inline styling we may apply below
     track.style.removeProperty("background");
     fill.style.removeProperty("background");
 
@@ -173,24 +460,19 @@ function renderVotesBlock(img) {
 
   const pctReal = voteRealPercent(img);
 
-  // ✅ No votes yet -> show "No community votes" and a grey bar
   if (pctReal === null) {
     line.textContent = "No community votes";
     line.classList.remove("is-safe", "is-risk");
     line.classList.add("is-neutral");
 
-    // Grey bar (track + fill)
     const grey = "rgba(255, 255, 255, 0.22)";
     track.classList.remove("is-risk");
     fill.classList.remove("is-risk");
 
     track.style.background = grey;
     fill.style.background = grey;
-
-    // fill full width so it looks like a single grey bar
     fill.style.width = "100%";
 
-    // a11y
     track.setAttribute("role", "img");
     track.setAttribute("aria-label", "No community votes");
 
@@ -199,14 +481,7 @@ function renderVotesBlock(img) {
     return;
   }
 
-  const { up, down } = getVoteCounts(img);
   const bucket = voteBucket(pctReal);
-
-  // Text
-  // Text: show % for the *majority side*
-  // - safe => show "real%" (up share)
-  // - risk => show "ai%" (down share)
-  // - neutral => show real% (fine either way)
   const pctAI = 100 - pctReal;
   const displayPct = bucket.type === "risk" ? pctAI : pctReal;
 
@@ -217,16 +492,13 @@ function renderVotesBlock(img) {
   else if (bucket.type === "risk") line.classList.add("is-risk");
   else line.classList.add("is-neutral");
 
-  // Bar: green fill = "real %" , red remainder = the rest (AI)
-  fill.classList.remove("is-risk");  // keep fill green
-  track.classList.remove("is-risk"); // keep track red
+  fill.classList.remove("is-risk");
+  track.classList.remove("is-risk");
   fill.style.width = `${pctReal}%`;
 
-  // reset inline styling (in case it was "no votes" previously)
   track.style.removeProperty("background");
   fill.style.removeProperty("background");
 
-  // a11y
   track.setAttribute("role", "img");
   track.setAttribute(
     "aria-label",
@@ -267,19 +539,16 @@ function renderVerdictBlock(img) {
   }
 
   const pct = toPercentNumber(img.confidence);
-  const type = verdictType(img); // safe | risk
+  const type = verdictType(img);
 
-  // text line
   line.textContent = verdictLineText(img);
   line.classList.remove("is-safe", "is-risk");
   line.classList.add(type === "safe" ? "is-safe" : "is-risk");
 
-  // bar (track + fill), exactly like scans page
   track.classList.toggle("is-risk", type === "risk");
   fill.classList.toggle("is-risk", type === "risk");
   fill.style.width = `${pct}%`;
 
-  // a11y
   track.setAttribute("role", "img");
   track.setAttribute("aria-label", `Confidence ${pct}%`);
 
@@ -386,6 +655,34 @@ function renderScan(img, title) {
   const imageEl = document.getElementById("viewscan-image");
   const titleEl = document.getElementById("viewscan-title");
 
+  // ✅ NEW (necessary): refresh live votes from backend, then re-render community card/meta.
+  // This keeps the first render fast (cached), and then syncs with Community page.
+  refreshCommunityData(img).then((ok) => {
+    if (!ok) return;
+
+    renderMeta(currentScan);
+
+    setupEditDescriptionInline(currentScan);
+    setupShowComments(currentScan);
+    setupDeletePost(currentScan);
+
+    renderCommunityCard(currentScan);
+  });
+
+  // Keep your existing enrichment (post_id/description) as-is
+  ensurePostIdForPublicScan(img).then((ok) => {
+    if (!ok) return;
+
+    renderMeta(currentScan);
+
+    setupEditDescriptionInline(currentScan);
+    setupShowComments(currentScan);
+    setupDeletePost(currentScan);
+
+    // re-render community card after enrichment (votes/post id)
+    renderCommunityCard(currentScan);
+  });
+
   if (!card || !imageEl || !titleEl) return;
 
   if (!img) {
@@ -408,11 +705,9 @@ function renderScan(img, title) {
     imageEl.style.display = "none";
   }
 
-  // Verdict block (line + bar) just below image
-  renderVerdictBlock(img);
-
-  // Votes block (line + bar) just below verdict bar
-  renderVotesBlock(img);
+  // NEW: community-style cards
+  renderAiclipseCard(img);
+  renderCommunityCard(img);
 
   renderMeta(img);
   card.hidden = false;
@@ -436,12 +731,7 @@ function renderScan(img, title) {
 
 // -------------------------
 // Edit Description (INLINE)
-// Requirements:
-// - "Edit Description" button is visible only when scan has post_id
-// - Clicking it reveals textarea + Save/Cancel
-// - Clicking it again closes it + unselects
-// - Cancel hides it and resets the value
-// - Save PATCHes the post description and updates the meta on this page
+// (UNCHANGED)
 // -------------------------
 function setupEditDescriptionInline(img) {
   const section = document.getElementById("edit-description-section");
@@ -454,11 +744,12 @@ function setupEditDescriptionInline(img) {
   const cancelBtn = document.getElementById("edit-description-cancel");
 
   if (!section || !openBtn || !form || !input || !statusEl || !saveBtn || !cancelBtn) {
-    if (section) section.style.display = img && img.post_id ? "block" : "none";
+    if (section) section.style.display = img && getPostId(img) ? "block" : "none";
     return;
   }
 
-  const shouldShow = !!(img && img.post_id);
+  const postId = getPostId(img);
+  const shouldShow = !!postId;
   section.style.display = shouldShow ? "block" : "none";
 
   if (!shouldShow) {
@@ -517,7 +808,6 @@ function setupEditDescriptionInline(img) {
   };
 
   const toggleForm = () => {
-    // If opening Edit Description, close Make Public if it exists
     const makePublicForm = document.getElementById("make-public-form");
     const makePublicBtn = document.getElementById("btn-make-public");
     if (makePublicForm && !makePublicForm.hidden) {
@@ -529,7 +819,6 @@ function setupEditDescriptionInline(img) {
     else closeForm();
   };
 
-  // Bind once
   if (!openBtn.dataset.bound) {
     openBtn.dataset.bound = "1";
     openBtn.addEventListener("click", toggleForm);
@@ -543,7 +832,6 @@ function setupEditDescriptionInline(img) {
     });
   }
 
-  // Warn only if the form is open AND changes exist
   if (!window.__editDescBeforeUnloadBound) {
     window.__editDescBeforeUnloadBound = true;
     window.addEventListener("beforeunload", (e) => {
@@ -564,7 +852,8 @@ function setupEditDescriptionInline(img) {
   if (!saveBtn.dataset.bound) {
     saveBtn.dataset.bound = "1";
     saveBtn.addEventListener("click", async () => {
-      if (!currentScan || !currentScan.post_id) return;
+      const postIdNow = getPostId(currentScan);
+      if (!currentScan || !postIdNow) return;
       if (saveBtn.disabled) return;
 
       const description = input.value.trim();
@@ -583,16 +872,14 @@ function setupEditDescriptionInline(img) {
       setFormStatus("Saving...", null);
 
       try {
-        await patchPostDescription(currentScan.post_id, description);
+        await patchPostDescription(postIdNow, description);
 
-        // Update local + rerender meta so Details -> Description updates immediately
         currentScan.description = description;
         currentScan.updated_at = new Date().toISOString();
         renderMeta(currentScan);
 
         setFormStatus("✓ Description updated.", "success");
 
-        // Close after a short beat so user sees success
         setTimeout(() => closeForm(), 600);
       } catch (err) {
         setFormStatus(err?.message || "Failed to update description.", "error");
@@ -624,11 +911,7 @@ async function patchPostDescription(postId, description) {
 }
 
 // -------------------------
-// Show Comments
-// Requirements:
-// - "Show Comments" button is visible only when scan is public and has post_id
-// - Clicking it fetches and displays all comments for the post
-// - Clicking again collapses the comments
+// Show Comments (UNCHANGED)
 // -------------------------
 function setupShowComments(img) {
   const section = document.getElementById("show-comments-section");
@@ -642,8 +925,9 @@ function setupShowComments(img) {
     return;
   }
 
-  // Show only for public posts with post_id
-  const shouldShow = !!(img && img.post_id && !isPrivateScan(img));
+  const postId = getPostId(img);
+
+  const shouldShow = !!(postId && !isPrivateScan(img));
   section.style.display = shouldShow ? "block" : "none";
 
   if (!shouldShow) {
@@ -687,13 +971,11 @@ function setupShowComments(img) {
 
   const toggleComments = async () => {
     if (commentsVisible) {
-      // Hide comments
       container.hidden = true;
       commentsVisible = false;
       showBtn.textContent = "Show Comments";
       setSelected(showBtn, false);
     } else {
-      // Show and fetch comments
       container.hidden = false;
       commentsVisible = true;
       showBtn.textContent = "Hide Comments";
@@ -703,7 +985,13 @@ function setupShowComments(img) {
       clearEl(listEl);
 
       try {
-        const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(currentScan.post_id)}`, {
+        const postIdNow = getPostId(currentScan);
+        if (!postIdNow) {
+          setStatus("Missing post id for this scan.", true);
+          return;
+        }
+
+        const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(postIdNow)}`, {
           method: "GET",
           headers: { Accept: "application/json" },
           credentials: "include",
@@ -731,12 +1019,7 @@ function setupShowComments(img) {
 }
 
 // -------------------------
-// Delete Post
-// Requirements:
-// - "Delete Post" button is visible only when scan is public and has post_id
-// - Clicking it confirms with the user before deleting
-// - Deletes the post from community (same as community PostBox)
-// - Redirects to scans page after successful deletion
+// Delete Post (UNCHANGED)
 // -------------------------
 function setupDeletePost(img) {
   const section = document.getElementById("delete-post-section");
@@ -748,8 +1031,9 @@ function setupDeletePost(img) {
     return;
   }
 
-  // Show only for public posts with post_id
-  const shouldShow = !!(img && img.post_id && !isPrivateScan(img));
+  const postId = getPostId(img);
+
+  const shouldShow = !!(postId && !isPrivateScan(img));
   section.style.display = shouldShow ? "block" : "none";
 
   if (!shouldShow) {
@@ -780,7 +1064,8 @@ function setupDeletePost(img) {
   if (!deleteBtn.dataset.bound) {
     deleteBtn.dataset.bound = "1";
     deleteBtn.addEventListener("click", () => {
-      if (!currentScan || !currentScan.post_id) return;
+      const postIdNow = getPostId(currentScan);
+      if (!currentScan || !postIdNow) return;
       showModal();
     });
   }
@@ -793,7 +1078,8 @@ function setupDeletePost(img) {
   if (modalConfirm && !modalConfirm.dataset.bound) {
     modalConfirm.dataset.bound = "1";
     modalConfirm.addEventListener("click", async () => {
-      if (!currentScan || !currentScan.post_id) return;
+      const postIdNow = getPostId(currentScan);
+      if (!currentScan || !postIdNow) return;
 
       hideModal();
       deleteBtn.disabled = true;
@@ -801,7 +1087,7 @@ function setupDeletePost(img) {
       setStatus("Deleting post...", null);
 
       try {
-        const res = await fetch(`/community/posts?post_id=${encodeURIComponent(currentScan.post_id)}`, {
+        const res = await fetch(`/community/posts?post_id=${encodeURIComponent(postIdNow)}`, {
           method: "DELETE",
           credentials: "include",
           headers: { Accept: "application/json" },
@@ -815,11 +1101,9 @@ function setupDeletePost(img) {
 
         setStatus("✓ Post deleted. Redirecting...", "success");
 
-        // Clean session data
         sessionStorage.removeItem("selectedScan");
         sessionStorage.removeItem("selectedScanTitle");
 
-        // Redirect to scans page after a brief delay
         setTimeout(() => {
           window.location.href = "/scans";
         }, 800);
@@ -831,7 +1115,6 @@ function setupDeletePost(img) {
     });
   }
 
-  // Close modal on backdrop click
   if (modal && !modal.dataset.bound) {
     modal.dataset.bound = "1";
     modal.addEventListener("click", (e) => {
@@ -841,12 +1124,7 @@ function setupDeletePost(img) {
 }
 
 // -------------------------
-// Delete Scan
-// Requirements:
-// - "Delete Scan" button is visible only when scan is private
-// - Clicking it confirms with the user before deleting
-// - Deletes the scan/image from the system
-// - Redirects to scans page after successful deletion
+// Delete Scan (UNCHANGED)
 // -------------------------
 function setupDeleteScan(img) {
   const section = document.getElementById("delete-scan-section");
@@ -858,7 +1136,6 @@ function setupDeleteScan(img) {
     return;
   }
 
-  // Show only for private scans
   const shouldShow = !!(img && img.image_id && isPrivateScan(img));
   section.style.display = shouldShow ? "block" : "none";
 
@@ -925,11 +1202,9 @@ function setupDeleteScan(img) {
 
         setStatus("✓ Scan deleted. Redirecting...", "success");
 
-        // Clean session data
         sessionStorage.removeItem("selectedScan");
         sessionStorage.removeItem("selectedScanTitle");
 
-        // Redirect to scans page after a brief delay
         setTimeout(() => {
           window.location.href = "/scans";
         }, 800);
@@ -941,7 +1216,6 @@ function setupDeleteScan(img) {
     });
   }
 
-  // Close modal on backdrop click
   if (modal && !modal.dataset.bound) {
     modal.dataset.bound = "1";
     modal.addEventListener("click", (e) => {
@@ -951,13 +1225,7 @@ function setupDeleteScan(img) {
 }
 
 // -------------------------
-// Make Public (INLINE, no modal)
-// Requirements:
-// - "Make Public" button is visible only when scan is private
-// - Clicking it reveals a description box + Publish/Cancel
-// - Clicking it again closes it + unselects
-// - Cancel hides it again
-// - Publish posts + updates image visibility, then redirects to Scans (Public tab)
+// Make Public (INLINE, no modal) (UNCHANGED)
 // -------------------------
 function setupMakePublicInline(img) {
   const makePublicBtn = document.getElementById("btn-make-public");
@@ -1013,7 +1281,6 @@ function setupMakePublicInline(img) {
   };
 
   const toggleForm = () => {
-    // If opening Make Public, close Edit Description if it exists
     const editForm = document.getElementById("edit-description-form");
     const editBtn = document.getElementById("btn-edit-description");
     if (editForm && !editForm.hidden) {
@@ -1067,11 +1334,9 @@ function setupMakePublicInline(img) {
       try {
         await handleMakePublic(currentScan, description);
 
-        // Clean session data (optional)
         sessionStorage.removeItem("selectedScan");
         sessionStorage.removeItem("selectedScanTitle");
 
-        // Redirect to Scans and force Public tab
         window.location.href = "/scans?tab=public";
       } catch (err) {
         setFormStatus(err?.message || "Failed to publish.", "error");

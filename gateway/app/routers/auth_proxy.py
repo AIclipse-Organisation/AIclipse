@@ -211,3 +211,32 @@ async def gateway_delete_api_key(request: Request, user: UserContext = Depends(g
         headers={"Authorization": f"Bearer {user.token}"},
         timeout_s=_timeout(request),
     )
+
+
+# Usage routes
+
+
+@router.post("/usage/check")
+async def usage_check(request: Request, user: UserContext = Depends(get_current_user)):
+    auth_uri = _auth_base_url(request)
+    return await proxy_json(
+        request,
+        "POST",
+        auth_uri,
+        "/usage/check",
+        headers={"Authorization": f"Bearer {user.token}"},
+        timeout_s=_timeout(request),
+    )
+
+
+@router.post("/usage/increment")
+async def usage_increment(request: Request, user: UserContext = Depends(get_current_user)):
+    auth_uri = _auth_base_url(request)
+    return await proxy_json(
+        request,
+        "POST",
+        auth_uri,
+        "/usage/increment",
+        headers={"Authorization": f"Bearer {user.token}"},
+        timeout_s=_timeout(request),
+    )

@@ -1,3 +1,63 @@
+const { fetch: originalFetch } = window;
+
+function _getFetchUrl(input) {
+  try {
+    if (typeof input === "string") return input;
+    if (input instanceof URL) return input.href;
+    if (input && typeof input.url === "string") return input.url; // Request-like
+  } catch {}
+  return "";
+}
+
+function _loaderShow(message) {
+  if (window.AppLoader && typeof window.AppLoader.show === "function") {
+    window.AppLoader.show(message);
+  }
+}
+
+function _loaderHide() {
+  if (window.AppLoader && typeof window.AppLoader.hide === "function") {
+    window.AppLoader.hide();
+  }
+}
+
+window.fetch = async (...args) => {
+  const url = _getFetchUrl(args[0]);
+  const isApiCall = url.includes("/api/") || url.includes("/scan");
+
+  if (isApiCall) _loaderShow("Analyzing Image...");
+
+  try {
+    const response = await originalFetch(...args);
+    return response;
+  } finally {
+    if (isApiCall) _loaderHide();
+  }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("form").forEach((form) => {
+    form.addEventListener("submit", () => {
+      _loaderShow("Processing...");
+    });
+  });
+
+  document.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      const href = link.getAttribute("href");
+      if (href && !href.startsWith("#") && !link.target) {
+        _loaderShow("Loading...");
+      }
+    });
+  });
+});
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    _loaderHide();
+  }
+});
+
 function setStatus(el, type, text) {
   if (!el) return;
   el.innerHTML = "";
@@ -11,7 +71,7 @@ function setStatus(el, type, text) {
       ? "status-success"
       : type === "error"
       ? "status-error"
-      : "status-info"
+      : "status-info",
   );
 
   el.appendChild(span);
@@ -175,9 +235,22 @@ window.addEventListener("DOMContentLoaded", () => {
   const signupPasswordInput = document.getElementById("signup-password");
   const signupPolicyRoot = document.getElementById("signup-password-policy");
 
+  const signupTerms = document.getElementById("signup-terms");
+  const btnSignup = document.getElementById("btn-signup");
+
   let policyActivated = false;
 
   if (signupPolicyRoot) signupPolicyRoot.hidden = true;
+
+  function syncSignupButtonState() {
+    if (!btnSignup) return;
+    btnSignup.disabled = signupTerms ? !signupTerms.checked : false;
+  }
+
+  if (signupTerms) {
+    signupTerms.addEventListener("change", syncSignupButtonState);
+    syncSignupButtonState();
+  }
 
   function updateSignupPolicyUI() {
     if (!policyActivated) return;
@@ -216,13 +289,18 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  onEl("btn-signup", (btnSignup) => {
-    btnSignup.addEventListener("click", async () => {
-      const user_name = document
-        .getElementById("signup-username")
-        ?.value.trim();
+  onEl("btn-signup", (btnSignupEl) => {
+    btnSignupEl.addEventListener("click", async () => {
+      const user_name = document.getElementById("signup-username")?.value.trim();
       const email = document.getElementById("signup-email")?.value.trim();
       const password = document.getElementById("signup-password")?.value;
+
+      const termsAccepted = document.getElementById("signup-terms")?.checked;
+      if (!termsAccepted) {
+        setStatus(accountStatus, "error", "You must accept the Terms & Conditions to sign up.");
+        return;
+      }
+
       let loginSuccess = false;
 
       activateSignupPolicyIfNeeded();
@@ -246,7 +324,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (authToggleContainer) authToggleContainer.style.display = "none";
       if (loginSpinner) loginSpinner.style.display = "block";
 
-      btnSignup.disabled = true;
+      btnSignupEl.disabled = true;
       setStatus(accountStatus, "info", "Creating account...");
 
       try {
@@ -280,7 +358,7 @@ window.addEventListener("DOMContentLoaded", () => {
             setStatus(
               accountStatus,
               "error",
-              "Account created, but auto-login failed. Please log in manually."
+              "Account created, but auto-login failed. Please log in manually.",
             );
           }
         } else {
@@ -295,7 +373,7 @@ window.addEventListener("DOMContentLoaded", () => {
           setStatus(
             accountStatus,
             "error",
-            normalized.message || `Signup failed (${res.status})`
+            normalized.message || `Signup failed (${res.status})`,
           );
         }
       } catch (err) {
@@ -303,7 +381,7 @@ window.addEventListener("DOMContentLoaded", () => {
         setStatus(accountStatus, "error", "Network error during signup.");
       } finally {
         if (!loginSuccess) {
-          btnSignup.disabled = false;
+          btnSignupEl.disabled = false;
           if (signupPanel) signupPanel.style.display = "block";
           if (authToggleContainer) authToggleContainer.style.display = "";
           if (loginSpinner) loginSpinner.style.display = "none";
@@ -356,7 +434,7 @@ window.addEventListener("DOMContentLoaded", () => {
           setStatus(
             accountStatus,
             "error",
-            normalized.message || `Login failed (${res.status})`
+            normalized.message || `Login failed (${res.status})`,
           );
           setCurrentUserChip(null);
         }

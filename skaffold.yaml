@@ -43,13 +43,13 @@ build:
     - image: aiclipse/model-cycle
       context: model-cycle
       docker: { dockerfile: Dockerfile.dev }
-    - image: aiclipse/plans
-      context: plans
-      docker: { dockerfile: Dockerfile }
-      sync:
-        manual:
-          - src: "**/*.py"
-            dest: .
+    # - image: aiclipse/plans
+    #   context: plans
+    #   docker: { dockerfile: Dockerfile }
+    #   sync:
+    #     manual:
+    #       - src: "**/*.py"
+    #         dest: .
     - image: aiclipse/billing
       context: billing
       docker: { dockerfile: Dockerfile }

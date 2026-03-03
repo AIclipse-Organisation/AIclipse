@@ -4,52 +4,90 @@ function setDebug(data) {
   pre.textContent = JSON.stringify(data, null, 2);
 }
 
+function clamp(n, min, max) {
+  n = Number(n);
+  if (!Number.isFinite(n)) n = 0;
+  return Math.max(min, Math.min(max, n));
+}
+
+function setFillPercent(fillEl, percent) {
+  if (!fillEl) return;
+  const p = clamp(percent, 0, 100);
+
+  fillEl.style.width = p === 0 ? "0px" : `calc(${p}% - 0px)`;
+  fillEl.dataset.p = String(p);
+}
+
 function renderDetection(resp) {
   const detectCard = document.getElementById("detect-card");
   const verdictEl = document.getElementById("detect-verdict");
   const confidenceEl = document.getElementById("detect-confidence");
-  const track = document.querySelector(".progress-bar");
-  const fill = document.querySelector(".progress-fill");
+
+  const panel = document.querySelector(".progress-panel");
+  const realFill = document.querySelector(".progress-panel .real-fill");
+  const aiFill = document.querySelector(".progress-panel .ai-fill");
+
+  const realPercentEl = document.getElementById("real-percent");
 
   if (!resp || typeof resp !== "object") {
     if (detectCard) detectCard.hidden = true;
     return;
   }
 
-  const label = (resp.label || resp.result || "Unknown").toString();
-  const confidenceRaw = Number.isFinite(resp.confidence) ? resp.confidence : (resp.score || 0);
+  const rawLabel = (resp.label || resp.result || "Unknown").toString();
+
+  // Strip "87.74%" if present
+  const cleanLabel = rawLabel.replace(/^\s*\d+(\.\d+)?%\s*/i, "").trim();
+
+  const confidenceRaw = Number.isFinite(resp.confidence)
+    ? resp.confidence
+    : (resp.score ?? 0);
+
   const confidence = Math.max(0, Math.min(1, Number(confidenceRaw) || 0));
-  const pct = confidence * 100;
 
-  const labelLower = label.toLowerCase();
-  const isRisk = labelLower.includes("ai") || labelLower.includes("fake") || labelLower.includes("deepfake");
+  const labelLower = cleanLabel.toLowerCase();
 
-  let labelClass = "label-neutral";
-  if (labelLower.includes("ai") || labelLower.includes("fake") || labelLower.includes("deepfake")) {
-    if (labelLower.includes("most likely")) labelClass = "label-strong-ai";
-    else labelClass = "label-medium-ai";
-  } else if (labelLower.includes("real")) {
-    if (labelLower.includes("most likely")) labelClass = "label-strong-real";
-    else labelClass = "label-medium-real";
-  }
+  const isAi =
+    labelLower.includes("ai") ||
+    labelLower.includes("fake") ||
+    labelLower.includes("deepfake");
 
-  const hasPercent = /\d+(\.\d+)?%/.test(label);
-  const verdictText = hasPercent ? label : `${pct.toFixed(2)}% ${label}`;
+  const isReal = labelLower.includes("real") && !isAi;
+
+  // REAL% rules:
+  // - If verdict is AI: confidence is AI% => REAL = 1 - confidence
+  // - If verdict is REAL: confidence is REAL% => REAL = confidence
+  // - Otherwise: treat confidence as AI% => REAL = 1 - confidence
+  let realProb = isReal ? confidence : (1 - confidence);
+
+  realProb = Math.max(0, Math.min(1, realProb));
+  const realPct = realProb * 100;
+
+  window.__lastRealPct = realPct;
+
+  const labelClass = "label-gold";
 
   if (verdictEl) {
-    verdictEl.textContent = verdictText;
+    verdictEl.textContent = cleanLabel;
     verdictEl.className = `verdict-text ${labelClass}`;
   }
-  if (confidenceEl) confidenceEl.textContent = `Confidence: ${pct.toFixed(1)}%`;
 
-  if (track && fill) {
-    track.classList.toggle("is-risk", isRisk);
-    fill.classList.toggle("is-risk", isRisk);
-    fill.style.width = `${pct.toFixed(2)}%`;
+  if (confidenceEl) {
+    confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
   }
+
+  setFillPercent(realFill, realPct);
+
+  setFillPercent(aiFill, 0);
+
+  if (realPercentEl) realPercentEl.textContent = `${realPct.toFixed(2)}%`;
+
+  if (panel) panel.classList.toggle("is-risk", isAi);
 
   if (detectCard) detectCard.hidden = false;
 }
+
+window.renderDetection = renderDetection;
 
 function dataURLtoFile(dataUrl, filename = "upload.png") {
   const [header, base64] = (dataUrl || "").split(",");
@@ -77,18 +115,19 @@ window.addEventListener("DOMContentLoaded", () => {
   const preview = sessionStorage.getItem("lastDetectionPreview");
   const token = sessionStorage.getItem("lastDetectionToken") || "";
 
-  // Must have these to use results + save
   if (!stored || !preview || !token) {
-    console.log("Missing sessionStorage items:", { stored: !!stored, preview: !!preview, token: !!token });
+    console.log("Missing sessionStorage items:", {
+      stored: !!stored,
+      preview: !!preview,
+      token: !!token,
+    });
     window.location.href = "/imgProcessing";
     return;
   }
 
-  // Rebuild file + token for saving
   window.lastDetectionToken = token;
   window.lastFile = dataURLtoFile(preview, "upload.png");
 
-  // HARD DEBUG (this will show you immediately what's wrong)
   setDebug({
     from: "sessionStorage",
     tokenExists: !!window.lastDetectionToken,
@@ -99,96 +138,83 @@ window.addEventListener("DOMContentLoaded", () => {
     fileSize: window.lastFile?.size,
   });
 
-  // If file reconstruction failed, stop and show error
   if (!window.lastFile) {
     const saveStatus = document.getElementById("save-status");
     if (saveStatus) {
-      saveStatus.textContent = "Could not rebuild file for saving. Please re-upload.";
+      saveStatus.textContent =
+        "Could not rebuild file for saving. Please re-upload.";
     }
     return;
   }
 
-  // Preview image
   const img = document.getElementById("preview-image");
   if (img) img.src = preview;
 
-  // Render results UI
   const data = JSON.parse(stored);
   renderDetection(data);
+  window.renderDetection = renderDetection;
 
-  // Enable Save now that we have file + token
   const btnSave = document.getElementById("btn-save");
   const saveState = document.getElementById("save-state");
   if (btnSave) btnSave.disabled = false;
   if (saveState) saveState.textContent = "Ready to save.";
 
-  // Back button
   const btnBack = document.getElementById("btn-back");
   if (btnBack) btnBack.addEventListener("click", () => history.back());
 
-  // Publishing (button toggle + dropdown)
-  const publishBtn = document.getElementById("btn-publish-toggle");
+  // NEW: Visibility Toggle elements
+  const modePrivate = document.getElementById("mode-private");
+  const modePublic = document.getElementById("mode-public");
   const publishCheck = document.getElementById("save-public");
   const wrap = document.getElementById("public-desc-wrap");
 
-  // Ensure dropdown starts closed
-  if (wrap) wrap.hidden = true;
-  if (publishCheck) publishCheck.checked = false;
-  setSelected(publishBtn, false);
-
-  if (publishBtn && publishCheck && wrap && !publishBtn.dataset.bound) {
-    publishBtn.dataset.bound = "1";
-
-    publishBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-
-      publishCheck.checked = !publishCheck.checked;
-      wrap.hidden = !publishCheck.checked;
-
-      // Selected state stays filled while open
-      setSelected(publishBtn, publishCheck.checked);
-    });
+  // NEW: Function to sync button states and UI visibility
+  function updateVisibility(isPublic) {
+    if (publishCheck) publishCheck.checked = isPublic;
+    if (wrap) wrap.hidden = !isPublic;
+    
+    // Update visual button selection state
+    setSelected(modePublic, isPublic);
+    setSelected(modePrivate, !isPublic);
+    
+    // Update main button text contextually
+    if (btnSave) {
+      btnSave.textContent = isPublic ? "Publish to Community" : "Confirm & Save";
+    }
   }
 
-  // =========================
-  // Delete modal logic
-  // =========================
+  // NEW: Listeners for Public/Private segmented toggle
+  if (modePrivate && modePublic) {
+    modePrivate.addEventListener("click", () => updateVisibility(false));
+    modePublic.addEventListener("click", () => updateVisibility(true));
+  }
+
+  updateVisibility(!!publishCheck?.checked);
 
   const deleteBtn = document.getElementById("btn-delete");
   const modal = document.getElementById("delete-modal");
   const cancelBtn = document.getElementById("cancel-delete");
   const confirmBtn = document.getElementById("confirm-delete");
 
-  // Ensure modal starts closed on page load.
-  // This works together with CSS:
-  //   .modal-overlay[hidden] { display: none; }
-  // Without that CSS rule, display:flex would override "hidden".
   if (modal) modal.hidden = true;
 
   if (deleteBtn && modal && cancelBtn && confirmBtn) {
-
-    // Open modal when Delete is clicked
     deleteBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       modal.hidden = false;
     });
 
-    // Close modal without action
     cancelBtn.addEventListener("click", (e) => {
       e.preventDefault();
       modal.hidden = true;
     });
 
-    // Confirm delete
-    // Currently this only clears UI state and navigates back.
-    // No backend delete is triggered here.
     confirmBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       modal.hidden = true;
 
       try {
-        // Clear UI (safe fallback)
         const preview = document.getElementById("preview-image");
         if (preview) preview.src = "";
 

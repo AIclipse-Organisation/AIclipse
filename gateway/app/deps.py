@@ -14,7 +14,7 @@ def _parse_bearer_token(authorization: Optional[str]) -> str:
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing Authorization header",
+            detail="Missing auth token (Authorization Bearer or auth cookie)",
         )
     parts = authorization.split(" ", 1)
     if len(parts) != 2 or parts[0].lower() != "bearer":

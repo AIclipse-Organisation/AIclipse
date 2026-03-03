@@ -1,4 +1,5 @@
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -39,7 +40,7 @@ html, body {
   position: relative;
   min-height: 100vh;
   background: #222222;
-  overflow: hidden; 
+  overflow: hidden;
   margin: 0 auto;
   max-width: 480px;
   border-left: 1px solid #2c2c2c;
@@ -79,9 +80,16 @@ html, body {
 
 /* Logo */
 .app .topbar-logo img {
-  width: 150px;
-  height: auto;
+  width: -webkit-fill-available;
+  max-height: 2vh;
   display: block;
+}
+
+.how_to_spot_container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
 }
 
 /* Avatar */
@@ -121,7 +129,8 @@ html, body {
 /* Screen content area (pad bottom so it doesn't hide under navbar) */
 .app .screen {
   padding: 20px;
-  padding-bottom: 100px; /* space for bottom nav */
+  padding-bottom: 100px;
+  /* space for bottom nav */
 }
 
 /* Bottom navbar */
@@ -178,27 +187,27 @@ html, body {
 }
 
 .menu-overlay {
-  position: absolute; 
+  position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.7);
   z-index: 2000;
-  display: none; 
+  display: none;
 }
 
 .nav-drawer {
-  position: absolute; 
+  position: absolute;
   top: 0;
-  left: 0; 
+  left: 0;
   width: 280px;
   height: 100%;
   background: #222222;
   border-right: 1px solid #2c2c2c;
-  transform: translateX(-100%); 
-  
-  z-index: 2001; 
+  transform: translateX(-100%);
+
+  z-index: 2001;
   transition: transform 0.3s ease-in-out;
   display: flex;
   flex-direction: column;
@@ -225,7 +234,8 @@ html, body {
   padding: 20px 0;
 }
 
-.drawer-links a, .logout-button {
+.drawer-links a,
+.logout-button {
   padding: 15px 25px;
   text-decoration: none;
   color: #f3f3f3;
@@ -253,4 +263,11 @@ html, body {
   color: #CFB87C;
   font-size: 2rem;
   cursor: pointer;
+}
+
+.home_tab_bottomNav {
+  color: #CFB87C;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

@@ -52,8 +52,8 @@
   font-size: 15px;
   font-weight: 800;
 
-  line-height: 0;            
-  padding-bottom: 1px;      
+  line-height: 0;
+  padding-bottom: 1px;
 
   border: 1px solid var(--btn-outline-color);
 }
@@ -121,7 +121,6 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
-
 
 .card {
   background: white;
@@ -193,18 +192,18 @@ textarea {
 
   position: relative;
   user-select: none;
-  touch-action: none; /* important for mobile dragging */
+  touch-action: none;
 }
 
 #preview-image {
   width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: cover;
-    object-position: 50% 20%;
-    cursor: grab;
-    -webkit-user-drag: none;
-    user-select: none;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: 50% 20%;
+  cursor: grab;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 #preview-image:active {
@@ -257,65 +256,151 @@ textarea {
   color: #111;
 }
 
+/* Reset crop button INSIDE the image frame */
+.btn-crop-reset.inside-frame {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 5;
 
+  width: auto;
+  min-width: 70%;
+  margin-top: 0;
 
+  padding: 10px 14px;
+  border-radius: 999px;
 
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(2px);
+}
+
+.btn-crop-reset.inside-frame:hover {
+  background: #CFB87C;
+  color: #111;
+}
+
+.crop-hint { bottom: 52px; }
+
+/* Your label colors kept exactly */
 .verdict-text {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
   margin: 14px 0 10px;
 }
 
-.label-strong-ai {
-  color: #ff3b3b;
-}
-
-.label-medium-ai {
-  color: #ff9900;
-}
-
-.label-neutral {
-  color: #f1c40f;
-}
-
-.label-medium-real {
-  color: #32cd32;
-}
-
-.label-strong-real {
-  color: #00b050;
+.label-gold {
+  color: rgba(207, 184, 124, 0.95);
 }
 
 /* =========================
-   Progress bar
+   Bar header + outlined panel
    ========================= */
 
-.progress-bar {
+.bar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  margin: 14px 0 0;
+  padding: 12px 14px 8px;
+
+  border: 1px solid rgba(207, 184, 124, 0.55);
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.bar-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(207, 184, 124, 0.95);
+}
+
+.bar-head .verdict-text {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+  color: rgba(207, 184, 124, 0.95) !important;
+}
+
+/* =========================
+   Progress panel (contained)
+   ========================= */
+
+.progress-panel {
   width: 100%;
-  height: 18px;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  padding: 10px 12px 12px;
+  margin: 0 0 12px;
+
+  border: 1px solid rgba(207, 184, 124, 0.55);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: rgba(0, 0, 0, 0.12);
+
+  overflow: hidden; 
+}
+
+.progress-panel .progress-bar {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+
+  height: 26px;                 
   border-radius: 999px;
+
+  background: #141414;
+  border: 1px solid rgb(63, 63, 63);
+
+  padding: 4px;                 
   overflow: hidden;
-  background: #e04646;
-  margin-bottom: 12px;
+  margin-bottom: 5px;
 }
 
-.progress-bar.is-risk {
-  background: #18c46c;
-}
-
-.fill {
-  height: 100%;
-  transition: width 300ms ease;
+.progress-panel .real-fill {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  bottom: 4px;
+  width: 0px;
+  background: rgba(207, 184, 124, 0.95);
   border-radius: 999px;
+  transition: width 300ms ease;
+  z-index: 1;
+  min-width: 0px;
 }
 
-.progress-fill {
-  background: #18c46c;
+.progress-panel .real-fill[data-p]:not([data-p="0"]) {
+  min-width: 14px; 
 }
 
-.progress-fill.is-risk {
-  background: #e04646;
+.progress-panel .ai-fill {
+  display: none;
+}
+
+.progress-panel .progress-bar .bar-percent {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  font-size: 13px;  
+  font-weight: 700;
+
+  color: rgba(255, 255, 255, 0.92);
+  pointer-events: none;
+  z-index: 3;
+  white-space: nowrap;
+
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
 }
 
 /* =========================
@@ -360,7 +445,6 @@ textarea {
 
 .results-actions-title {
   margin: 28px 0 14px;
-  /* ✅ spacing before actions */
   text-align: center;
   font-size: 22px;
   font-weight: 700;
@@ -393,15 +477,12 @@ textarea {
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 
   margin-top: 10px;
-  /* ✅ spacing between buttons */
 }
 
-/* First action button gets extra separation */
 .btn-save-image {
   margin-top: 16px;
 }
 
-/* Save image — green */
 .btn-save-image {
   --btn-outline-color: #18c46c;
   --btn-hover-color: #18c46c;
@@ -418,7 +499,6 @@ textarea {
   cursor: not-allowed;
 }
 
-/* Delete scan — red */
 .btn-delete-scan {
   --btn-outline-color: #e04646;
   --btn-hover-color: #e04646;
@@ -430,7 +510,6 @@ textarea {
   color: #111;
 }
 
-/* Publish — blue, filled when toggled */
 .btn-publish {
   --btn-outline-color: #5f8affe0;
   --btn-hover-color: #5f8affe0;
@@ -539,7 +618,6 @@ textarea {
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
 
-/* Cancel — neutral outline */
 .modal-actions .secondary {
   --btn-outline-color: rgba(255, 255, 255, 0.35);
   --btn-hover-color: rgba(255, 255, 255, 0.85);
@@ -552,7 +630,6 @@ textarea {
   color: #111;
 }
 
-/* Delete — danger (red, same as delete scan) */
 .modal-actions .danger {
   --btn-outline-color: #e04646;
   --btn-hover-color: #e04646;
@@ -565,82 +642,14 @@ textarea {
   color: #111;
 }
 
-
-
-
-
-
-.upload-previewWrap {
-  margin-top: 14px;
-}
-
-.results-imageFrame {
-  width: 100%;
-  aspect-ratio: 1 / 1;        
-  border-radius: 12px;
-  overflow: hidden;
-
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-#preview-image {
-  width: 100%;
-  height: 100%;                 
-  display: block;
-  object-fit: cover;          
-}
-
-
-#preview-image:active {
-  cursor: grabbing;
-}
-
-.crop-hint {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255,255,255,0.12);
-  padding: 6px 10px;
-  border-radius: 999px;
-  pointer-events: none;
-  opacity: 0.9;
-}
-
-.btn-crop-reset {
-  all: unset;
-  box-sizing: border-box;
-  width: 100%;
-  margin-top: 12px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  cursor: pointer;
-  text-align: center;
-  transition: background 160ms ease, color 160ms ease;
-}
-.btn-crop-reset:hover {
-  background: rgba(255, 255, 255, 0.85);
-  color: #111;
-}
-
 /* Upload page layout inside the phone shell */
 .upload-screen {
   display: flex;
   flex-direction: column;
-  height: 100%;          /* uses .screen area */
-  padding-bottom: 100px; /* extra safety above navbar */
+  height: 100%;
+  padding-bottom: 100px;
 }
 
-/* Preview area takes remaining space */
 .upload-content {
   flex: 1;
   display: flex;
@@ -648,7 +657,6 @@ textarea {
   justify-content: center;
 }
 
-/* Sticky action panel that sits ABOVE the bottom nav */
 .upload-actions {
   position: sticky;
   bottom: 0;
@@ -660,7 +668,6 @@ textarea {
   padding-top: 14px;
   padding-bottom: 12px;
 
-  /* makes it feel like a dock */
   background: linear-gradient(
     to top,
     rgba(34, 34, 34, 0.98),
@@ -669,12 +676,216 @@ textarea {
   );
 }
 
-/* Remove the huge margin you had */
 .file-upload {
   margin: 0;
 }
 
-/* ensure button doesn't add extra margin */
 #btn-check {
   margin: 0;
+}
+
+/* =========================
+   Visibility Toggle (Segmented Control)
+   ========================= */
+
+.action-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.visibility-selector {
+    display: flex;
+    gap: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.03);
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.visibility-selector .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.vis-btn {
+  flex: 1;
+  all: unset;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 160ms ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.vis-btn .icon { 
+  font-size: 18px; 
+  opacity: 0.5;
+}
+
+/* Vertical separator for the segmented control */
+#mode-private {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Highlighted state for the selected mode */
+.vis-btn.is-selected {
+  background: rgba(207, 184, 124, 0.15);
+  color: #CFB87C;
+}
+
+.vis-btn.is-selected .icon {
+  opacity: 1;
+}
+
+/* =========================
+   Primary Action Button (Confirm & Save)
+   ========================= */
+.btn-save-final {
+  display: block;
+  flex: 1!important; 
+  width: 0;
+  min-width: 0; 
+  margin: 0 !important;
+  all: unset;
+  box-sizing: border-box;
+  padding: 18px;
+  background: #CFB87C; 
+  color: #111;
+  border-radius: 999px;
+  font-weight: 800;
+  text-align: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 100ms ease, opacity 160ms ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.btn-save-final:hover:not(:disabled) {
+  opacity: 0.95;
+}
+
+.btn-save-final:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-save-final:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* =========================
+   Danger Zone (Delete Scan Link)
+   ========================= */
+.danger-zone {
+  margin-top: 30px;
+  text-align: center;
+  padding-bottom: 24px;
+}
+
+.btn-delete-link {
+  all: unset;
+  color: #e04646; /* Red for deletion */
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 160ms ease;
+}
+
+.btn-delete-link:hover {
+  opacity: 1;
+}
+
+/* =========================
+   Publishing Dropdown (Description)
+   ========================= */
+.publish-extra {
+  margin-bottom: 20px;
+  animation: slideIn 240ms ease-out;
+}
+
+.publish-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+}
+
+.publish-textarea {
+  width: 100%;
+  min-height: 100px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.publish-textarea:focus {
+  outline: none;
+  border-color: #CFB87C;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.upload-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  
+
+  background: rgba(255, 255, 255, 0.04); 
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  
+  color: rgba(255, 255, 255, 0.4);
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.placeholder-icon {
+  margin-bottom: 8px;
+  opacity: 0.6;
+  color: #CFB87C; 
+}
+
+.upload-placeholder p {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.upload-placeholder[hidden] {
+  display: none !important;
 }

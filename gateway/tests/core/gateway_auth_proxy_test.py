@@ -3,7 +3,10 @@ import json
 import httpx
 import pytest
 
-from tests.conftest import make_auth_token
+try:
+    from tests.conftest import make_auth_token
+except ModuleNotFoundError:
+    from gateway.tests.conftest import make_auth_token
 
 
 @pytest.mark.asyncio
@@ -40,7 +43,7 @@ async def test_auth_login_proxies_json(client, patch_upstreams):
 async def test_auth_me_requires_auth(client):
     r = await client.get("/auth/me")
     assert r.status_code == 401
-    assert r.json()["detail"] == "Missing Authorization header"
+    assert r.json()["detail"] == "Missing auth token (Authorization Bearer or auth cookie)"
 
 
 @pytest.mark.asyncio
