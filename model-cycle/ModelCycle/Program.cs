@@ -19,6 +19,8 @@ var mongoDbName = Environment.GetEnvironmentVariable("MONGO_DB") ?? "aiclipse";
 
 var authUri = Environment.GetEnvironmentVariable("AUTH_URI");
 
+var detectorUri = Environment.GetEnvironmentVariable("DETECTOR_URI");
+
 Console.WriteLine($"[Mongo] Connecting to {mongoDbName}...");
 
 builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoUri));
@@ -26,9 +28,20 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
     sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDbName));
 
 
+builder.Services.AddHttpClient<IDetectorClientService, DetectorClientService>((serviceProvider, client) =>
+{
+    if (!Uri.TryCreate(detectorUri, UriKind.Absolute, out var baseUri) ||
+           (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
+    {
+        throw new Exception($"Invalid detectorUri scheme. Expected http/https but got: {detectorUri}");
+    }
+
+    client.BaseAddress = baseUri;
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.AddHttpClient<IAuthService, AuthService>(client =>
 {
-    // 2. Validate the URL scheme to prevent "mongodb://" errors
     if (!Uri.TryCreate(authUri, UriKind.Absolute, out var baseUri) ||
         (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
     {
@@ -123,6 +136,7 @@ var dbPath = Path.Join("/app/data", "modelcycle.db");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
+builder.Services.AddScoped<IModelDeploymentService, ModelDeploymentService>();
 builder.Services.AddSingleton<IBetaDistribution, BetaDistribution>();
 builder.Services.AddSingleton<IConfidenceService, ConfidenceService>();
 

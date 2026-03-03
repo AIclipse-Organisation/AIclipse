@@ -16,7 +16,6 @@ public class TrainingWorkflowService : ITrainingWorkflowService
     private readonly ILogger<TrainingWorkflowService> _logger;
     private readonly TrainingJobQueue _jobQueue;
     private readonly IModelWeightsRepository _modelRepo;
-
     private readonly IAuthService _authService;
 
     public TrainingWorkflowService(
@@ -49,13 +48,9 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         var userIds = request.Votes.Select(v => v.UserId).Distinct().ToList();
         var accuracyList = await _authService.GetUsersAccuracyAsync(userIds);
 
-        // Sanitize user-provided PostId before logging to prevent log forging
         var rawPostId = request.PostId ?? "NULL";
-        var sanitizedPostId = rawPostId
-            .Replace("\r", " ")
-            .Replace("\n", " ");
+        var sanitizedPostId = rawPostId.Replace("\r", " ").Replace("\n", " ");
 
-        // --- DIAGNOSTIC LOGGING START ---
         _logger.LogInformation("[Diagnostic] Processing {Count} accuracy records for Post {PostId}",
             accuracyList.Count, sanitizedPostId);
 
@@ -155,7 +150,7 @@ public class TrainingWorkflowService : ITrainingWorkflowService
                 PostId = request.PostId,
                 MediaImageId = mediaMetadata.ImageId,
                 S3Key = mediaMetadata.S3Key,
-                Label = request.Label,
+                Label = request.Label?.ToLowerInvariant(),
                 UploadedAt = DateTime.UtcNow,
                 Status = TrainingStatus.Pending,
                 ModelVersion = mediaMetadata.ModelVersion,
@@ -185,7 +180,7 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         if (isNowReady)
         {
             image.Status = TrainingStatus.Ready;
-            image.Label = result.TrainingLabel;
+            image.Label = result.TrainingLabel?.ToLowerInvariant();
 
             if (!string.IsNullOrEmpty(image.S3Key))
             {
@@ -211,5 +206,5 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         }
     }
 
-    private record PreviousImageState(TrainingStatus Status, string Label);
+    private record PreviousImageState(TrainingStatus Status, string? Label);
 }

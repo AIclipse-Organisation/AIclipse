@@ -12,6 +12,8 @@ RUN pip install --no-cache-dir \
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN mkdir -p models/updates
+
 COPY detector_modules/ detector_modules/
 COPY routers/ routers/ 
 COPY routers/swagger/ routers/swagger/

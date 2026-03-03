@@ -10,6 +10,11 @@ spec:
     metadata:
       labels: { app: detector }
     spec:
+      # Wait for MinIO before starting the Detector
+      initContainers:
+        - name: wait-for-minio
+          image: busybox
+          command: ['sh', '-c', 'until nc -z s3-srv 9000; do echo detector waiting for minio; sleep 2; done;']
       containers:
         - name: detector
           image: aiclipse/detector
@@ -22,6 +27,16 @@ spec:
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
             - name: REDIS_URI
               valueFrom: { secretKeyRef: { name: redis-sec, key: REDIS_URI } }
+            - name: S3_ENDPOINT 
+              valueFrom: { secretKeyRef: { name: s3-sec, key: S3_ENDPOINT } } 
+            - name: S3_PUBLIC_ENDPOINT
+              valueFrom: { secretKeyRef: { name: s3-sec, key: S3_PUBLIC_ENDPOINT } } 
+            - name: AWS_ACCESS_KEY_ID 
+              valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_USER } } 
+            - name: AWS_SECRET_ACCESS_KEY 
+              valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD } }
+            - name: MINIO_BUCKET_NAME
+              value: "model-cycle-storage"
             - name: STREAM
               value: "jobs"
             - name: GROUP

@@ -124,7 +124,7 @@ public class VoteReceiver : BackgroundService
         var individualVotes = allVotesDocs.Select(v => new UserVoteDto
         {
             UserId = v.UserId,
-            IsAiVote = v.Vote.Equals("up", StringComparison.OrdinalIgnoreCase)
+            IsAiVote = v.Vote.Equals("down", StringComparison.OrdinalIgnoreCase)
         }).ToList();
 
         var request = new EvaluateImageRequest
