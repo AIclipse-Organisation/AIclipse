@@ -50,7 +50,8 @@ def cleanup_old_models(active_model_path: str):
         if not updates_dir.exists():
             return
 
-        for file_path in updates_dir.glob("*.pt"):
+
+        for file_path in list(updates_dir.glob("*.pt")) + list(updates_dir.glob("*.safetensors")):
             file_path_obj = file_path.resolve()
             
             # If the file isn't the one we just loaded, delete it
