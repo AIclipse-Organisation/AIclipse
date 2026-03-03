@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react"; // Added useRef and useCallback
 import PostBox from "./components/post/PostBox";
 import LoadingGrid from "./components/common/LoadingGrid";
 
@@ -12,7 +12,75 @@ export default function Page() {
   const [currentUserName, setCurrentUserName] = useState(null);
 
   const [error, setError] = useState(null); // displayable error message
-  const [loading, setLoading] = useState(true); // initial loading state
+  const [loading, setLoading] = useState(false); // Changed to false initially to allow controlled triggers
+  const [hasMore, setHasMore] = useState(true); // Track if there are more pages
+  const [page, setPage] = useState(1);
+  const [initialLoad, setInitialLoad] = useState(true); // Dedicated initial loading state
+
+  const observerTarget = useRef(null); // Sentinel ref for infinite scroll
+
+  // --- NEW: SHARED LOADING LOGIC ---
+  const loadPosts = useCallback(async (pageNum, signal) => {
+    if (loading) return;
+    setLoading(true);
+
+    try {
+      // Fetch images + posts at the same time
+      // Added pagination params to the URL
+      const [imgsRes, postsRes] = await Promise.all([
+        fetch("/community/images", { credentials: "include", signal }),
+        fetch(`/community/posts?page=${pageNum}&limit=12`, { credentials: "include", signal }),
+      ]);
+
+      if (!imgsRes.ok || !postsRes.ok) {
+        throw new Error("Failed to load data");
+      }
+
+      const imgs = await imgsRes.json().catch(() => ({}));
+      const posts = await postsRes.json().catch(() => ({}));
+
+      const images = imgs.items || [];
+      const postItems = posts.items || [];
+
+      // Build lookup table: image_id -> image data (for getting S3 URLs)
+      const imageById = new Map(images.map((img) => [img.image_id, img]));
+
+      // Start with posts (which are already filtered to public images)
+      // and enrich with image data if available
+      const merged = postItems.map((post) => {
+        const img = imageById.get(post.image_id) || {};
+        return { ...img, ...post }; // Post fields override image fields
+      });
+
+      // --- SORTING & TRENDING LOGIC ---
+      // 1. Sort by score descending 
+      const sorted = merged.sort(
+        (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0),
+      );
+
+      // 2. Identify trending items (top 15%)
+      const trendingCount = Math.floor(sorted.length * 0.15);
+      const enriched = sorted.map((item, index) => ({
+        ...item,
+        isTrending: trendingCount > 0 && index < trendingCount,
+      }));
+
+      // Append items if page > 1, replace if page 1
+      setItems(prev => pageNum === 1 ? enriched : [...prev, ...enriched]);
+      
+      // Determine if there are more items to load
+      // Using the flag sent from the backend
+      setHasMore(posts.hasMore ?? enriched.length >= 12);
+
+    } catch (e) {
+      if (e.name !== "AbortError") {
+        setError(e?.message || "Failed to load community feed");
+      }
+    } finally {
+      setLoading(false);
+      setInitialLoad(false);
+    }
+  }, [loading]);
 
   // Callback to update vote counts when a post is voted on
   const handleVoteUpdate = (postId, upVoteCount, downVoteCount) => {
@@ -36,110 +104,75 @@ export default function Page() {
     );
   };
 
+  // --- INITIAL DATA LOAD (Session + Page 1) ---
   useEffect(() => {
     let alive = true;
     const abortController = new AbortController();
     const signal = abortController.signal;
 
-    async function load() {
+    async function init() {
       try {
-        // Get signed-in user from cookie session
-        const meRes = await fetch("/auth/me", {
-          credentials: "include",
-          signal,
-        });
+        const meRes = await fetch("/auth/me", { credentials: "include", signal });
         const contentType = meRes.headers.get("content-type");
+        
         if (contentType && contentType.includes("text/html")) {
           window.location.href = "/";
           return;
         }
+
         if (meRes.ok) {
           const me = await meRes.json().catch(() => null);
           if (alive) {
             setCurrentUserId(me?.user_id || null);
             setCurrentUserName(me?.user_name || me?.email || null);
           }
-        } else {
-          // Not signed in (or session expired)
-          if (alive) {
-            setCurrentUserId(null);
-            setCurrentUserName(null);
-          }
         }
-
-        // Fetch images + posts at the same time
-        const [imgsRes, postsRes] = await Promise.all([
-          fetch("/community/images", { credentials: "include", signal }),
-          fetch("/community/posts", { credentials: "include", signal }),
-        ]);
-
-        if (!imgsRes.ok || !postsRes.ok) {
-          return (
-            <div className="empty-state">
-              <div className="empty-card">
-                <img
-                  className="empty-icon-image"
-                  src="/static/images/community_icon.png"
-                  alt="Community"
-                />
-                <p className="empty-text">No community posts yet.</p>
-              </div>
-            </div>
-          );
-        }
-
-        const imgs = await imgsRes.json().catch(() => ({}));
-        const posts = await postsRes.json().catch(() => ({}));
-
-        const images = imgs.items || [];
-        const postItems = posts.items || [];
-
-        // Build lookup table: image_id -> image data (for getting S3 URLs)
-        const imageById = new Map(images.map((img) => [img.image_id, img]));
-
-        // Start with posts (which are already filtered to public images)
-        // and enrich with image data if available
-        const merged = postItems.map((post) => {
-          const img = imageById.get(post.image_id) || {};
-          return { ...img, ...post }; // Post fields override image fields
-        });
-
-        // --- SORTING & TRENDING LOGIC ---
-        // 1. Sort by score descending 
-        const sorted = merged.sort(
-          (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0),
-        );
-
-        // 2. Identify trending items (top 15%)
-        const trendingCount = Math.floor(sorted.length * 0.15);
-
-        const finalItems = sorted.map((item, index) => ({
-          ...item,
-          isTrending: trendingCount > 0 && index < trendingCount,
-        }));
-
-        if (alive) setItems(finalItems);
-      } catch (e) {
-        // Don't set error state if request was aborted due to unmount
-        if (e.name === "AbortError") return;
-        if (alive) setError(e?.message || "Failed to load community feed");
-      } finally {
-        if (alive) setLoading(false);
+        
+        // Initial load of first page
+        await loadPosts(1, signal);
+      } catch (err) {
+        console.error(err);
       }
     }
 
-    load();
+    init();
 
     return () => {
-      abortController.abort(); // Cancel all pending fetch requests
+      abortController.abort();
       alive = false;
     };
-  }, []);
+  }, []); // Only runs once on mount
+
+  // --- INFINITE SCROLL OBSERVER ---
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // If bottom sentinel is visible and we aren't already loading...
+        if (entries[0].isIntersecting && hasMore && !loading && !initialLoad) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 0.1, rootMargin: "300px" } // Start loading 300px before reaching bottom
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loading, initialLoad]);
+
+  // --- TRIGGER LOADING ON PAGE CHANGE ---
+  useEffect(() => {
+    if (page > 1) {
+      loadPosts(page);
+    }
+  }, [page]);
 
   if (error) return <p>{error}</p>;
-  if (loading) return <LoadingGrid count={3} />;
+  if (initialLoad) return <LoadingGrid count={3} />;
 
-  if (!items.length)
+  if (!items.length && !loading)
     return (
       <div className="empty-state">
         <div className="empty-card">
@@ -167,6 +200,14 @@ export default function Page() {
               onPostDelete={handlePostDelete}
             />
           ))}
+        </div>
+
+        {/* SENTINEL: This invisible div detects the bottom scroll */}
+        <div ref={observerTarget} className="flex justify-center py-10 w-full">
+           {loading && <div className="animate-pulse text-gray-400 text-sm">Loading more items...</div>}
+           {!hasMore && items.length > 0 && (
+             <p className="text-gray-400 text-sm italic">You've seen everything!</p>
+           )}
         </div>
       </section>
     </main>
