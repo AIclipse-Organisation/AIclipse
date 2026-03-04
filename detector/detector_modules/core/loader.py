@@ -46,7 +46,7 @@ class ModelManager:
             if checkpoint_path and "updates" in str(checkpoint_path):
                 logger.warning(f"Corrupted or invalid update detected at {checkpoint_path}. Cleaning up...")
                 
-                # 1. Delete the bad file so it doesn't break future boots
+                # Delete the bad file so it doesn't break future boots
                 try:
                     p = Path(checkpoint_path)
                     if p.exists():
@@ -55,7 +55,6 @@ class ModelManager:
                 except Exception as cleanup_err:
                     logger.error(f"Failed to delete bad file: {cleanup_err}")
 
-                # 2. Recursive Fallback: Try reloading with base weights (passing None)
                 logger.info("Attempting fallback to original base weights...")
                 self.reload(None)
             else:
@@ -73,7 +72,6 @@ def cleanup_old_models(active_model_path: str):
 
     try:
         active_path_obj = Path(active_model_path).resolve()
-        # Adjusted path logic to find /models/updates correctly
         updates_dir = Path(__file__).resolve().parents[2] / "models" / "updates"
 
         if not updates_dir.exists():
