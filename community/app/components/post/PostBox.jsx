@@ -1,3 +1,5 @@
+"use client";
+
 import "../../styles/postBox.css";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -10,6 +12,10 @@ import {
   deleteCommentAPI,
   formatScore,
 } from "./postBoxActions";
+
+import { 
+  useDisclosure, RadioGroup, Radio, Textarea 
+} from "@heroui/react";
 
 export default function PostBox({
   image,
@@ -28,6 +34,11 @@ export default function PostBox({
 
   const isOfficial = !!(image?.is_admin_post || image?.is_official);
   const groundTruth = image?.ground_truth;
+
+  // MODAL STATE
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const [reportReason, setReportReason] = useState("AI Misinformation");
+  const [reportDetails, setReportDetails] = useState("");
 
   const isUserCorrect = useMemo(() => {
     if (!userHasVoted || !groundTruth) return null;
@@ -118,10 +129,8 @@ export default function PostBox({
 
   async function loadComments() {
     if (!postId) return;
-
     setCommentsBusy(true);
     setCommentError("");
-
     try {
       const items = await fetchComments(postId);
       setComments(items);
@@ -136,36 +145,26 @@ export default function PostBox({
     trackPostClick(postId);
   }
 
-  function reportPost() {
-    if (!postId) return;
-
-    setIsReported(true);
-
-    reportPostAPI(postId)
-      .then((isReported) => {
-        setIsReported(isReported);
-      })
-      .catch(() => {
-        setIsReported(false);
-        setError("Failed to report post.");
-      });
-  }
+  const submitReport = async () => {
+    setBusy(true);
+    try {
+      await reportPostAPI(postId, { reason: reportReason, details: reportDetails });
+      setIsReported(true);
+      onOpenChange(false); 
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   async function deletePost() {
     if (!postId) return;
     if (!isOwner) return setError("You can only delete your own posts.");
-
-    if (
-      !confirm(
-        "Are you sure you want to delete this post? This action cannot be undone.",
-      )
-    ) {
-      return;
-    }
+    if (!confirm("Are you sure you want to delete this post? This action cannot be undone.")) return;
 
     setBusy(true);
     setError("");
-
     try {
       await deletePostAPI(postId);
       if (onPostDelete) onPostDelete(postId);
@@ -178,24 +177,13 @@ export default function PostBox({
 
   async function submitComment() {
     if (!postId) return setCommentError("Missing post_id.");
-    if (!currentUserId)
-      return setCommentError("You must be signed in to comment.");
-    if (!currentUserName)
-      return setCommentError("Missing user name in session.");
-
+    if (!currentUserId) return setCommentError("You must be signed in to comment.");
     const text = commentText.trim();
     if (!text) return setCommentError("Write a comment first.");
 
     setCommentsBusy(true);
-    setCommentError("");
-
     try {
-      const data = await submitCommentAPI(
-        postId,
-        currentUserId,
-        currentUserName,
-        text,
-      );
+      const data = await submitCommentAPI(postId, currentUserId, currentUserName, text);
       setComments((arr) => [data, ...arr]);
       setCommentText("");
     } catch (err) {
@@ -207,511 +195,231 @@ export default function PostBox({
 
   async function deleteComment(comment_id) {
     if (!comment_id) return;
-
-    if (!confirm("Are you sure you want to delete this comment?")) {
-      return;
-    }
-
+    if (!confirm("Are you sure?")) return;
     setCommentsBusy(true);
-    setCommentError("");
-
     try {
       await deleteCommentAPI(comment_id);
       setComments((arr) => arr.filter((c) => c.comment_id !== comment_id));
     } catch (err) {
-      setCommentError(err.message || "Network error while deleting comment.");
+      setCommentError(err.message || "Error deleting comment.");
     } finally {
       setCommentsBusy(false);
     }
   }
 
-  useEffect(() => {
-    if (postId) {
-      loadComments();
-    }
-  }, [postId]);
+  useEffect(() => { if (postId) loadComments(); }, [postId]);
 
-  /* =========================
-     REAL% only + Results-style inversion logic
-     ========================= */
-
+  /* Progress Bar Calculations */
   function clamp01(n) {
     n = Number(n);
     if (!Number.isFinite(n)) return 0;
     return Math.max(0, Math.min(1, n));
   }
-
   function cleanLabelText(raw) {
     return String(raw || "Unknown").replace(/^\s*\d+(\.\d+)?%\s*/i, "").trim();
   }
-
   function isAiLabel(labelLower) {
-    return (
-      labelLower.includes("ai") ||
-      labelLower.includes("fake") ||
-      labelLower.includes("deepfake")
-    );
+    return labelLower.includes("ai") || labelLower.includes("fake") || labelLower.includes("deepfake");
   }
-
   function isRealLabel(labelLower) {
     return labelLower.includes("real") && !isAiLabel(labelLower);
   }
-
-  // Same rule as Results page:
-  // - If verdict is REAL -> confidence is REAL%
-  // - Else treat confidence as AI% -> REAL = 1 - confidence
   function computeRealPctFromModel(img) {
-    const rawLabel = cleanLabelText(
-      img?.result?.label ??
-        img?.label ??
-        img?.result?.verdict ??
-        img?.verdict ??
-        "Unknown",
-    );
+    const rawLabel = cleanLabelText(img?.result?.label ?? img?.label ?? img?.result?.verdict ?? img?.verdict ?? "Unknown");
     const labelLower = rawLabel.toLowerCase();
-
-    const confRaw =
-      img?.result?.confidence ??
-      img?.confidence ??
-      img?.result?.score ??
-      img?.score ??
-      0;
-
+    const confRaw = img?.result?.confidence ?? img?.confidence ?? img?.result?.score ?? img?.score ?? 0;
     const confidence = clamp01(confRaw);
     const realProb = isRealLabel(labelLower) ? confidence : 1 - confidence;
-
     return Math.max(0, Math.min(100, realProb * 100));
   }
-
-  // Bucket based on REAL% (text can still say AI when real is low)
   function bucketFromRealPct(realPct) {
     const r = Math.max(0, Math.min(100, Number(realPct) || 0));
-
     if (r >= 40 && r <= 60) return { text: "Not sure", type: "neutral" };
-
-    if (r > 60) {
-      if (r >= 86) return { text: "Most Likely Real", type: "safe" };
-      return { text: "Likely Real", type: "safe" };
-    }
-
+    if (r > 60) return { text: r >= 86 ? "Most Likely Real" : "Likely Real", type: "safe" };
     const pctAI = 100 - r;
-    if (pctAI >= 86) return { text: "Most Likely AI", type: "risk" };
-    return { text: "Likely AI", type: "risk" };
+    return { text: pctAI >= 86 ? "Most Likely AI" : "Likely AI", type: "risk" };
   }
-
   function setWidthStyle(pct) {
     const p = Math.max(0, Math.min(100, Number(pct) || 0));
     if (p === 0) return "0px";
     return `calc(${p}% - 8px)`; 
   }
 
-  // Analysis (model) => REAL%
   const analysisRealPct = computeRealPctFromModel(image);
   const analysisBucket = bucketFromRealPct(analysisRealPct);
-
-  // Community => REAL% from votes
   const totalVotes = up + down;
   const communityRealPct = totalVotes > 0 ? (up / totalVotes) * 100 : null;
-  const communityBucket =
-    communityRealPct === null ? null : bucketFromRealPct(communityRealPct);
-
-  const isTrending = image.isTrending;
+  const communityBucket = communityRealPct === null ? null : bucketFromRealPct(communityRealPct);
 
   return (
-    <div
-      className={`comm_postBox ${
-        isOfficial && userHasVoted ? "is-revealed-benchmark" : ""
-      }`}
-    >
+    <div className={`comm_postBox ${isOfficial && userHasVoted ? "is-revealed-benchmark" : ""}`}>
+      {/* HEADER SECTION */}
       <div className="comm_topRow">
         <div className="comm_headerLeft">
-          <div className="comm_avatar" aria-hidden="true">
-            <div className="comm_avatarInitials">{initials}</div>
-          </div>
-
+          <div className="comm_avatar" aria-hidden="true"><div className="comm_avatarInitials">{initials}</div></div>
           <div className="comm_headerMeta">
             <div className="comm_headerNameLine">
               <div className="comm_headerName">{posterName}</div>
-
-              {isOfficial && userHasVoted && (
-                <span className="comm_officialBadge">Official Post</span>
-              )}
+              {isOfficial && userHasVoted && <span className="comm_officialBadge">Official Post</span>}
             </div>
             {timeText && <div className="comm_headerTime">{timeText}</div>}
           </div>
         </div>
-
         <div className="comm_headerActions">
-          {isTrending && (
-            <div className="trend_div_container_body">
-              <span className="comm_trendingBadge">POPULAR</span>
-            </div>
-          )}
-
+          {image.isTrending && <div className="trend_div_container_body"><span className="comm_trendingBadge">POPULAR</span></div>}
           <div className="comm_menu">
-            <button
-              type="button"
-              className="comm_menuBtn"
-              onClick={() => setMenuOpen((v) => !v)}
-              disabled={!postId}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen ? "true" : "false"}
-              title="Post actions"
-            >
-              ⋮
-            </button>
-
-            {menuOpen && (
-              <div className="comm_menuBackdrop" onClick={closeMenu} />
-            )}
-
+            <button type="button" className="comm_menuBtn" onClick={() => setMenuOpen((v) => !v)} disabled={!postId}>⋮</button>
+            {menuOpen && <div className="comm_menuBackdrop" onClick={closeMenu} />}
             {menuOpen && (
               <div className="comm_menuPanel" role="menu">
                 {isOwner && (
-                  <button
-                    type="button"
-                    className="comm_menuItem"
-                    role="menuitem"
-                    onClick={() => {
-                      closeMenu();
-                      try {
-                        const editData = {
-                          post_id: image.post_id,
-                          image_id: image.image_id,
-                          description: description,
-                          url: image.url,
-                          uploaded_at: image.uploaded_at,
-                          label: image.label,
-                          verdict: image.verdict,
-                          confidence: image.confidence,
-                          is_public: image.is_public,
-                        };
-                        sessionStorage.setItem(
-                          "selectedScan",
-                          JSON.stringify(editData),
-                        );
-                        sessionStorage.setItem("selectedScanTitle", `Edit Post`);
-                        window.location.href = "/viewscan";
-                      } catch (err) {
-                        console.error("Failed to store scan data:", err);
-                      }
-                    }}
-                    disabled={busy}
-                    title="Edit description"
-                    aria-label="Edit description"
-                  >
-                    <span aria-hidden="true">✏️</span> Edit description
+                  <button type="button" className="comm_menuItem" onClick={() => { closeMenu(); window.location.href = "/viewscan"; }}>
+                    ✏️ Edit description
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  className="comm_menuItem"
-                  role="menuitem"
-                  onClick={() => {
-                    closeMenu();
-                    reportPost();
-                  }}
-                  disabled={!postId || isReported}
-                  title={isReported ? "Already reported" : "Report this post"}
-                >
-                  <span aria-hidden="true">🚩</span>{" "}
-                  {isReported ? "Reported" : "Report"}
+                <button type="button" className="comm_menuItem" onClick={() => { onOpen(); closeMenu(); }} disabled={isReported}>
+                  🚩 {isReported ? "Reported" : "Report"}
                 </button>
-
-                {isOwner && (
-                  <button
-                    type="button"
-                    className="comm_menuItem comm_menuItemDanger"
-                    role="menuitem"
-                    onClick={() => {
-                      closeMenu();
-                      deletePost();
-                    }}
-                    disabled={!postId || busy}
-                    title="Delete this post"
-                    aria-label="Delete this post"
-                  >
-                    <span aria-hidden="true">🗑️</span> Delete
-                  </button>
-                )}
-
-                {!isOwner && isReported && (
-                  <div
-                    className="comm_menuItem comm_menuItemMuted"
-                    role="presentation"
-                  >
-                    Already reported
-                  </div>
-                )}
+                {isOwner && <button type="button" className="comm_menuItem comm_menuItemDanger" onClick={deletePost}>🗑️ Delete</button>}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* BODY TEXT (description FIRST like YouTube) */}
-      <div className="comm_body">
-        <div className="comm_description">{description}</div>
-      </div>
+      <div className="comm_body"><div className="comm_description">{description}</div></div>
 
-      {/* IMAGE */}
+      {/* MEDIA SECTION */}
       <div className="comm_postImageWrap">
-        <img
-          className="comm_postImage"
-          src={image?.url}
-          alt={image?.label || "Community image"}
-          onClick={handleClick}
-        />
+        <img className="comm_postImage" src={image?.url} alt={image?.label || "Community image"} onClick={handleClick} />
         {isOfficial && userHasVoted && (
-          <div
-            className={`comm_truthReveal ${
-              isUserCorrect ? "is-correct" : "is-incorrect"
-            }`}
-          >
+          <div className={`comm_truthReveal ${isUserCorrect ? "is-correct" : "is-incorrect"}`}>
             <div className="comm_truthIcon">{isUserCorrect ? "✅" : "❌"}</div>
             <div className="comm_truthText">
-              <span className="comm_truthTitle">
-                {isUserCorrect ? "Nice Work!" : "Nice Try!"}
-              </span>
+              <span className="comm_truthTitle">{isUserCorrect ? "Nice Work!" : "Nice Try!"}</span>
               <span className="comm_truthSub">Truth: {groundTruth}</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* bars above image */}
+      {/* RESULT BARS */}
       <div className="comm_bars_wrapper">
-        {!userHasVoted && (
-          <div className="comm_vote_prompt">Vote to see results</div>
-        )}
-
-        <div
-          className={`comm_bars ${!userHasVoted ? "is-hidden" : "is-revealed"}`}
-        >
-          {/* Analysis / model bar (REAL% only) */}
-          <div
-            className={`comm_barBlock is-${analysisBucket.type}`}
-            aria-label="Analysis result"
-          >
-            <div className="comm_barHead">
-              <div className="comm_barTitle">Aiclipse</div>
-              <div className="comm_barVerdict">{analysisBucket.text}</div>
-            </div>
-
-            <div className="comm_progressPanel">
-              <div
-                className="comm_progressBar"
-                role="img"
-                aria-label={`Aiclipse real probability ${analysisRealPct.toFixed(
-                  2,
-                )}%`}
-              >
-                <div
-                  className="comm_progressFill"
-                  data-p={String(Math.round(analysisRealPct))}
-                  style={{ width: setWidthStyle(analysisRealPct) }}
-                />
-                <div className="comm_barPercent">
-                  {analysisRealPct.toFixed(2)}%
-                </div>
-              </div>
+        {!userHasVoted && <div className="comm_vote_prompt">Vote to see results</div>}
+        <div className={`comm_bars ${!userHasVoted ? "is-hidden" : "is-revealed"}`}>
+          <div className={`comm_barBlock is-${analysisBucket.type}`}>
+            <div className="comm_barHead"><div className="comm_barTitle">Aiclipse</div><div className="comm_barVerdict">{analysisBucket.text}</div></div>
+            <div className="comm_progressBar">
+              <div className="comm_progressFill" style={{ width: setWidthStyle(analysisRealPct) }} />
+              <div className="comm_barPercent">{analysisRealPct.toFixed(2)}%</div>
             </div>
           </div>
-
-          {/* Community votes bar (REAL% only, purple via CSS) */}
-          <div className="comm_barBlock comm_communityBar" aria-label="Community result">
-            {communityRealPct === null ? (
-              <>
-                <div className="comm_barHead">
-                  <div className="comm_barTitle">Community</div>
-                  <div className="comm_barVerdict">No votes</div>
-                </div>
-
-                <div className="comm_progressPanel">
-                  <div
-                    className="comm_progressBar"
-                    role="img"
-                    aria-label="No community votes"
-                  >
-                    <div
-                      className="comm_progressFill"
-                      data-p="0"
-                      style={{
-                        width: "0px",
-                        background: "rgba(255, 255, 255, 0.22)",
-                      }}
-                    />
-                    <div className="comm_barPercent">—</div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="comm_barHead">
-                  <div className="comm_barTitle">Community</div>
-                  <div className="comm_barVerdict">
-                    {communityBucket.text}
-                  </div>
-                </div>
-
-                <div className="comm_progressPanel">
-                  <div
-                    className="comm_progressBar"
-                    role="img"
-                    aria-label={`Community real probability ${communityRealPct.toFixed(
-                      2,
-                    )}%`}
-                  >
-                    <div
-                      className="comm_progressFill"
-                      data-p={String(Math.round(communityRealPct))}
-                      style={{ width: setWidthStyle(communityRealPct) }}
-                    />
-                    <div className="comm_barPercent">
-                      {communityRealPct.toFixed(2)}%
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
+          <div className="comm_barBlock comm_communityBar">
+            <div className="comm_barHead"><div className="comm_barTitle">Community</div><div className="comm_barVerdict">{communityBucket?.text || "No votes"}</div></div>
+            <div className="comm_progressBar">
+              <div className="comm_progressFill" style={{ width: setWidthStyle(communityRealPct || 0) }} />
+              <div className="comm_barPercent">{communityRealPct !== null ? communityRealPct.toFixed(2) + "%" : "—"}</div>
+            </div>
           </div>
         </div>
 
-        <div />
-
-        {/* ACTIONS (like/dislike/comment) */}
+        {/* INTERACTION ROW */}
         <div className="comm_bottomRow">
           <div className="comm_actionsLeft">
-            <button
-              type="button"
-              onClick={() => vote("up")}
-              disabled={busy || !postId || userHasVoted}
-              title="Vote Real"
-              aria-label="Vote Real"
-              className="comm_actionBtn comm_voteUp"
-            >
-              <img
-                className="comm_icon"
-                src="/static/images/upvote.png"
-                alt=""
-                aria-hidden="true"
-              />
-              <span className="comm_actionText">
-                Real {userHasVoted ? `(${up})` : ""}
-              </span>
+            <button type="button" onClick={() => vote("up")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteUp">
+              <img className="comm_icon" src="/static/images/upvote.png" alt="" />
+              <span className="comm_actionText">Real {userHasVoted ? `(${up})` : ""}</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => vote("down")}
-              disabled={busy || !postId || userHasVoted}
-              title="Vote AI"
-              aria-label="Vote AI"
-              className="comm_actionBtn comm_voteDown"
-            >
-              <img
-                className="comm_icon"
-                src="/static/images/downvote.png"
-                alt=""
-                aria-hidden="true"
-              />
-              <span className="comm_actionText">
-                AI {userHasVoted ? `(${down})` : ""}
-              </span>
+            <button type="button" onClick={() => vote("down")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteDown">
+              <img className="comm_icon" src="/static/images/downvote.png" alt="" />
+              <span className="comm_actionText">AI {userHasVoted ? `(${down})` : ""}</span>
             </button>
           </div>
-
           <div className="comm_actionsRight">
-            <button
-              type="button"
-              onClick={() => setShowComments((v) => !v)}
-              disabled={!postId}
-              title="Comments"
-              aria-label="Toggle comments"
-              className="comm_actionBtn comm_commentBtn"
-            >
-              <img
-                className="comm_icon"
-                src="/static/images/comment.png"
-                alt=""
-                aria-hidden="true"
-              />
+            <button type="button" onClick={() => setShowComments((v) => !v)} className="comm_actionBtn comm_commentBtn">
+              <img className="comm_icon" src="/static/images/comment.png" alt="" />
               <span className="comm_actionText">({comments.length})</span>
             </button>
           </div>
         </div>
 
-        {/* COMMENTS */}
+        {/* COMMENTS SECTION */}
         {showComments && (
           <div className="comm_commentsWrapper">
-            <div className="comm_commentsHeader">
-              Comments {commentsBusy ? "(loading…)" : `(${comments.length})`}
-            </div>
-
-            {!currentUserId && (
-              <div className="muted">Sign in to post comments.</div>
-            )}
-            {commentError && <div className="muted">{commentError}</div>}
-
             <div className="comm_commentInputWrapper">
-              <input
-                className="comm_commentInput"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder={
-                  currentUserId ? "Write a comment…" : "Sign in to comment"
-                }
-                disabled={!currentUserId || commentsBusy}
-              />
-              <button
-                className="comm_commentButton"
-                type="button"
-                onClick={submitComment}
-                disabled={!currentUserId || commentsBusy}
-              >
-                Post comment
-              </button>
+              <input className="comm_commentInput" value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder={currentUserId ? "Write a comment…" : "Sign in to comment"} disabled={!currentUserId || commentsBusy} />
+              <button className="comm_commentButton" type="button" onClick={submitComment} disabled={!currentUserId || commentsBusy}>Post</button>
             </div>
-
             <div className="comm_commentsList">
-              {comments.map((c) => {
-                const isCommentOwner =
-                  currentUserId && c.user_id === currentUserId;
-                return (
-                  <div key={c.comment_id} className="comm_comment">
-                    <div className="comm_commentMeta">
-                      {c.user_name || "Unknown"} ·{" "}
-                      {c.created_at
-                        ? new Date(c.created_at).toLocaleString()
-                        : ""}
-                      {isCommentOwner && (
-                        <button
-                          type="button"
-                          onClick={() => deleteComment(c.comment_id)}
-                          disabled={commentsBusy}
-                          title="Delete this comment"
-                          aria-label="Delete comment"
-                          className="comm_deleteCommentButton"
-                        >
-                          <span aria-hidden="true">🗑️</span>
-                        </button>
-                      )}
-                    </div>
-                    <div className="comm_commentText">{c.text}</div>
+              {comments.map((c) => (
+                <div key={c.comment_id} className="comm_comment">
+                  <div className="comm_commentMeta">
+                    {c.user_name} · {c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}
+                    {currentUserId && c.user_id === currentUserId && (
+                      <button onClick={() => deleteComment(c.comment_id)} className="comm_deleteCommentButton">🗑️</button>
+                    )}
                   </div>
-                );
-              })}
-
-              {!commentsBusy && comments.length === 0 && (
-                <div className="muted">No comments yet.</div>
-              )}
+                  <div className="comm_commentText">{c.text}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
-
         {error && <div className="muted">{error}</div>}
       </div>
+
+      {/* AICLIPSE BRANDED CUSTOM MODAL */}
+      {isOpen && (
+        <div className="modal-overlay" onClick={() => onOpenChange(false)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Report Post</h2>
+              <button className="modal-close" onClick={() => onOpenChange(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <p className="modal-lead">Why are you reporting this content?</p>
+              
+              <RadioGroup 
+                value={reportReason} 
+                onValueChange={setReportReason}
+                color="warning"
+                classNames={{ wrapper: "gap-3" }}
+              >
+                <Radio value="AI Misinformation" classNames={{ label: "text-sm text-[#f3f3f3]" }}>AI Misinformation</Radio>
+                <Radio value="Harassment" classNames={{ label: "text-sm text-[#f3f3f3]" }}>Harassment</Radio>
+                <Radio value="Spam" classNames={{ label: "text-sm text-[#f3f3f3]" }}>Spam</Radio>
+                <Radio value="Inappropriate Content" classNames={{ label: "text-sm text-[#f3f3f3]" }}>Inappropriate Content</Radio>
+              </RadioGroup>
+
+              <div className="modal-section">
+                <Textarea
+                  label="Extra details (Optional)"
+                  labelPlacement="outside"
+                  placeholder="Provide context for our moderators..."
+                  value={reportDetails}
+                  onValueChange={setReportDetails}
+                  classNames={{
+                    input: "text-[#f3f3f3] placeholder:text-gray-500",
+                    inputWrapper: "bg-[#2c2c2c] border-[#2c2c2c] focus-within:!border-[#CFB87C] transition-colors"
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="modal-secondary" onClick={() => onOpenChange(false)}>Cancel</button>
+              <button 
+                className="modal-primary" 
+                onClick={submitReport}
+                disabled={busy}
+              >
+                {busy ? "Sending..." : "Submit Report"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -20,12 +20,15 @@ body {
 
 .topbar {
   position: relative;
-  /* Essential for absolute centering inside it */
   display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding: 10px 160px;
-  background-color: red;
+  background-color: #222222;;
+  height: 56px;
+  background: #222222;
+  border-bottom: 1px solid #2c2c2c;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
 }
 
 /* Hamburger */

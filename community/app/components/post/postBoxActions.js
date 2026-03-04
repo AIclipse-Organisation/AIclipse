@@ -67,16 +67,21 @@ export function trackPostClick(postId) {
 /**
  * Report a post
  */
-export async function reportPostAPI(postId) {
+export async function reportPostAPI(postId, reportData) {
   const res = await fetch("/community/posts/report", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ post_id: postId }),
+    body: JSON.stringify({ 
+      post_id: postId,
+      reason: reportData.reason, 
+      details: reportData.details  
+    }),
   });
 
-  const data = await res.json();
-  return data?.is_reported !== false;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Report failed");
+  return true;
 }
 
 /**

@@ -81,5 +81,29 @@ export const adminService = {
       throw new Error(err.error || "Upload failed");
     }
     return res.json();
+  },
+
+  getReportedPosts: async () => {
+    const res = await fetch("/community/posts/report");
+    if (!res.ok) throw new Error("Failed to load queue");
+    return res.json();
+  },
+
+  moderatePost: async ({ post_id, action }) => {
+    const res = await fetch("/community/posts/report", {
+      method: "PATCH",
+      body: JSON.stringify({ post_id, action }),
+    });
+    if (!res.ok) throw new Error("Moderation failed");
+    return res.json();
+  },
+
+  hardDeletePost: async (post_id) => {
+    const res = await fetch(`/community/posts?post_id=${post_id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Delete failed");
+    return res.json();
   }
+  
 };

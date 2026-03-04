@@ -19,7 +19,7 @@ export default function Page() {
 
   const observerTarget = useRef(null); // Sentinel ref for infinite scroll
 
-  // --- NEW: SHARED LOADING LOGIC ---
+
   const loadPosts = useCallback(async (pageNum, signal) => {
     if (loading) return;
     setLoading(true);
@@ -141,7 +141,7 @@ export default function Page() {
       abortController.abort();
       alive = false;
     };
-  }, []); // Only runs once on mount
+  }, []); 
 
   // --- INFINITE SCROLL OBSERVER ---
   useEffect(() => {
