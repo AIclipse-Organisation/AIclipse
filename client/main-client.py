@@ -609,6 +609,104 @@ def community_report():
     return jsonify(data), resp.status_code
 
 
+@app.get("/community/notifications")
+def community_notifications():
+    "Retrieve notifications for the authenticated user with unread filter."
+    token = get_access_token(request)
+    if not token:
+        return jsonify({"error": "Unauthorized", "detail": "Missing auth token"}), 401
+
+    community_url = os.getenv("COMMUNITY_URI")
+    url = f"{community_url}/community/notifications"
+
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+
+    params = {}
+    unread_only = request.args.get("unread_only")
+    if unread_only is not None:
+        params["unread_only"] = unread_only
+
+    try:
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community notifications request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
+@app.get("/community/notifications/unread-count")
+def community_notifications_unread_count():
+    "Return unread notification count for the authenticated user."
+    token = get_access_token(request)
+    if not token:
+        return jsonify({"error": "Unauthorized", "detail": "Missing auth token"}), 401
+
+    community_url = os.getenv("COMMUNITY_URI")
+    url = f"{community_url}/community/notifications/unread-count"
+
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community notifications unread-count request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
+@app.post("/community/notifications/read")
+def community_notifications_read():
+    "Mark one or more notifications as read for the authenticated user."
+    token = get_access_token(request)
+    if not token:
+        return jsonify({"error": "Unauthorized", "detail": "Missing auth token"}), 401
+
+    try:
+        read_data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    community_url = os.getenv("COMMUNITY_URI")
+    url = f"{community_url}/community/notifications/read"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+
+    try:
+        resp = requests.post(url, json=read_data, headers=headers, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community notifications read request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
 class Quiet(WSGIRequestHandler):
     def log(self, type, message, *args):
         try:

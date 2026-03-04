@@ -3,6 +3,8 @@ import { getDb } from "@/lib/mongo/mongo.js";
 import jwt from "jsonwebtoken";
 import { validateUserId, validatePostId } from "../validation.js";
 import { getRedis } from "@/lib/redis/redis";
+// Shared helper: saves smaller notification data and merges repeats.
+import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 
 export const runtime = "nodejs";
 
@@ -111,6 +113,8 @@ export async function POST(req) {
         projection: {
           _id: 0,
           post_id: 1,
+          user_id: 1,
+          image_id: 1,
           up_vote_count: 1,
           down_vote_count: 1,
           is_admin_post: 1, 
@@ -178,6 +182,24 @@ export async function POST(req) {
       { user_id: safeUserId },
       { $inc: incQuery }
     );
+
+    if (postDoc.user_id && postDoc.user_id !== safeUserId) {
+      try {
+        const voteLabel = vote === "up" ? "real" : "ai";
+
+        // Add notification for post owner; repeated same events are merged into one row.
+        await recordCollapsedNotification(db, {
+          recipient_user_id: postDoc.user_id,
+          actor_user_id: safeUserId,
+          post_id: safePostId,
+          type: "vote",
+          vote_value: voteLabel,
+          image_id: postDoc.image_id || null,
+        });
+      } catch (notifyErr) {
+        console.error("Failed to create vote notification:", notifyErr);
+      }
+    }
 
     // Buffer deltas in Redis and debounce flush
     // Buffer deltas in Redis with debounce + hard max-wait

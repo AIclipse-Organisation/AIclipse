@@ -9,6 +9,7 @@
 // =========================
 
 let currentScan = null;
+const markedNotificationPostIds = new Set();
 
 function clearEl(el) {
   while (el.firstChild) el.removeChild(el.firstChild);
@@ -97,6 +98,28 @@ function getPostId(img) {
 function normalizeId(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
+}
+
+async function markNotificationsReadForPost(postId) {
+  const normalizedPostId = normalizeId(postId);
+  if (!normalizedPostId) return;
+  if (markedNotificationPostIds.has(normalizedPostId)) return;
+
+  await fetch("/community/notifications/read", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ post_id: normalizedPostId }),
+  }).catch(() => null);
+
+  markedNotificationPostIds.add(normalizedPostId);
+  window.dispatchEvent(new Event("notifications:updated"));
+}
+
+function consumeScansMarkPostId() {
+  const raw = sessionStorage.getItem("notif_mark_post_id_from_scans");
+  sessionStorage.removeItem("notif_mark_post_id_from_scans");
+  return normalizeId(raw);
 }
 
 function getImageId(post) {
@@ -650,6 +673,13 @@ function renderMeta(img) {
 
 function renderScan(img, title) {
   currentScan = img;
+
+  // Mark by post only for explicit scans-origin navigation.
+  const scansOriginPostId = consumeScansMarkPostId();
+  const currentPostId = normalizeId(getPostId(img));
+  if (scansOriginPostId && currentPostId && scansOriginPostId === currentPostId) {
+    markNotificationsReadForPost(currentPostId);
+  }
 
   const card = document.getElementById("viewscan-card");
   const imageEl = document.getElementById("viewscan-image");
