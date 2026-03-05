@@ -29,6 +29,7 @@
     .plan-card.current {
       border-color: #CFB87C;
       background: #2f2a1d;
+      box-shadow: 0 0 0 1px rgba(207, 184, 124, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3);
     }
 
 
@@ -74,30 +75,41 @@
       border-bottom: none;
     }
 
-    .plan-button {
+    .plans-container .plan-button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       width: 100%;
       padding: 10px 12px;
-      background: #CFB87C;
-      color: #111;
+      background: transparent;
+      color: #CFB87C;
       text-decoration: none;
       border-radius: 999px;
       font-weight: bold;
       cursor: pointer;
-      border: none;
+      border: 1px solid #CFB87C;
       font-size: 0.95rem;
-      transition: background 0.2s;
+      transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
     }
 
-    .plan-button:hover {
-      background: #bda669;
+    .plans-container .plan-button:hover:not(:disabled) {
+      background: #CFB87C;
+      color: #111;
     }
 
-    .plan-button:disabled {
-      background: #666;
+    .plans-container .plan-button:disabled {
+      background: #2f2a1d;
+      color: #111;
+      border-color: #444;
       cursor: not-allowed;
+    }
+
+    .plan-card.current .plan-button:disabled {
+      background: #7a6e4c;
+      color: #222222;
+      border-color: #7a6e4c;
+      box-shadow: 0 0 0 1px rgba(207, 184, 124, 0.4);
+      opacity: 1;
     }
 
     .usage-info {

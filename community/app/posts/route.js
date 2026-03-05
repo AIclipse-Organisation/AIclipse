@@ -508,6 +508,12 @@ export async function GET(req) {
     const IMAGES_COLLECTION = "images";
     const imagesCol = db.collection(IMAGES_COLLECTION);
 
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.max(1, parseInt(searchParams.get("limit") || "10"));
+    const skip = (page - 1) * limit;
+
+
     let currentUserId = null;
     try {
       currentUserId = getAuthenticatedUserId(req);
@@ -524,10 +530,10 @@ export async function GET(req) {
 
     // 2) posts for public images
     const posts = await col
-      .find({ image_id: { $in: publicImageIds } }, { projection: { _id: 0 } })
-      .sort({ created_at: -1 })
-      .limit(100)
-      .toArray();
+          .find({ image_id: { $in: publicImageIds } }, { projection: { _id: 0 } })
+          .sort({ created_at: -1 })
+          .limit(100) 
+          .toArray();
 
     if (!posts.length) {
       return NextResponse.json({ items: [] }, { status: 200 });
@@ -624,7 +630,11 @@ export async function GET(req) {
 
       let score = engagement / timeFactor;
 
-      // demo boosts
+      if (post.user_vote) {
+        score *= 0.001; 
+      }
+
+      // demo boosts`
       if (engagement === 0 && ageHours < 24) score = Math.max(score, 0.5);
       if (ageHours < 24) score *= 1.2;
 
@@ -640,7 +650,13 @@ export async function GET(req) {
     // 8) sort by score desc
     ranked.sort((a, b) => (b.score || 0) - (a.score || 0));
 
-    return NextResponse.json({ items: ranked }, { status: 200 });
+    const paginatedItems = ranked.slice(skip, skip + limit);
+
+    return NextResponse.json({ 
+      items: paginatedItems,
+      hasMore: ranked.length > skip + limit 
+    }, { status: 200 });
+
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to list posts", detail: String(err) },
