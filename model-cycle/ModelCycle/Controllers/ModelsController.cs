@@ -42,7 +42,21 @@ public class ModelsController : ControllerBase
     public async Task<IActionResult> GetModelImages()
     {
         var images = await _dbContext.TrainingImages
+            .AsNoTracking()
             .OrderByDescending(i => i.UploadedAt)
+            .Select(i => new
+            {
+                i.Id,
+                i.MediaImageId,
+                i.S3Key,
+                i.Label,
+                i.Status,
+                i.UploadedAt,
+                i.UserAiVotes,
+                i.UserRealVotes,
+                i.ModelConfidenceScore,
+                i.ModelVersion
+            })
             .ToListAsync();
 
         return Ok(images);

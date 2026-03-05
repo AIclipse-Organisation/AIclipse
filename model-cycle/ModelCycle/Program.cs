@@ -185,6 +185,37 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<AppDbContext>();
         context.Database.EnsureCreated();
         Console.WriteLine("[SQLite] Database migrated successfully.");
+
+        var modelWeightsRepository = services.GetRequiredService<IModelWeightsRepository>();
+        var v1Weights = await modelWeightsRepository.GetByVersionAsync("v1.0.0");
+
+        if (v1Weights == null)
+        {
+            Console.WriteLine("[Seed] No v1.0.0 model weights found. Seeding default weights.");
+            var newWeights = new ModelCycle.Models.ModelWeights
+            {
+                Id = Guid.NewGuid(),
+                Version = "v1.0.0",
+                MinioObjectPath = "seed_model/v1.0.0.pt",
+                CreatedAt = DateTime.UtcNow,
+                NewImagesCount = 0,
+                ReplayBufferCount = 0,
+                ValidationAccuracy = 0.5,
+                ValidationPrecision = 0.5,
+                ValidationRecall = 0.5,
+                ValidationF1Score = 0.5,
+                GoldenTestAccuracy = 0.5,
+                GoldenTestPrecision = 0.5,
+                GoldenTestRecall = 0.5,
+                GoldenTestF1Score = 0.5,
+                GoldenFakeToRealMisclassifications = 0,
+                GoldenRealToFakeMisclassifications = 0,
+                IsDeployed = false,
+            };
+            context.ModelWeights.Add(newWeights);
+            await context.SaveChangesAsync();
+            Console.WriteLine("[Seed] Default v1.0.0 model weights seeded.");
+        }
     }
     catch (Exception ex)
     {

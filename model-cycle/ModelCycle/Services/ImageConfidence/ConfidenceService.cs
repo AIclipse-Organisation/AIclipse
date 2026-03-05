@@ -63,8 +63,8 @@ public class ConfidenceService : IConfidenceService
         double modelRealNot = probabilityOfAi * (1 - modelAccuracyAi);
 
         // 4. Bayesian Parameters
-        double alpha = 1 + userAi + userAiNot + modelAi + modelAiNot;
-        double beta = 1 + userReal + userRealNot + modelReal + modelRealNot;
+        double alpha = 1 + userAi + modelAi;
+        double beta = 1 + userReal + modelReal;
 
         double posteriorMean = alpha / (alpha + beta);
         string trainingLabel = posteriorMean >= 0.5 ? "ai" : "real";

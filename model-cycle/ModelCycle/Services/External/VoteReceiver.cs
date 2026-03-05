@@ -144,13 +144,6 @@ public class VoteReceiver : BackgroundService
             image.Score
         );
 
-        try
-        {
-            await workflow.ProcessVoteAsync(request);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Workflow failed for {postIdStr}");
-        }
+        await workflow.ProcessVoteAsync(request);
     }
 }

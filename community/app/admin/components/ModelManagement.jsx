@@ -5,6 +5,7 @@ import {
   Divider, Chip, Button, Spinner, Progress, Input
 } from "@heroui/react";
 import { adminService } from "@/admin/admin.js";
+import TrainingImagesTable from "./TrainingImagesTable";
 
 export default function ModelManagement() {
   const [models, setModels] = useState([]);
@@ -255,6 +256,10 @@ export default function ModelManagement() {
             </Card>
           ))}
         </div>
+
+      <Divider className="my-6" />
+
+      <TrainingImagesTable />
     </div>
   );
 }
