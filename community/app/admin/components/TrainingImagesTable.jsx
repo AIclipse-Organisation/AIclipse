@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Card, CardBody, Chip, Spinner, Button } from "@heroui/react";
+import { Card, Spinner, Button } from "@heroui/react";
 import { adminService } from "@/admin/admin.js";
 
 const STATUS_MAP = {
