@@ -23,7 +23,7 @@ spec:
             - name: STRIPE_WEBHOOK_SECRET
               valueFrom: { secretKeyRef: { name: stripe-sec, key: STRIPE_WEBHOOK_SECRET } }
             - name: CLIENT_URL
-              value: "http://aiclipse.local"
+              valueFrom: { configMapKeyRef: { name: app-configmap, key: CLIENT_URL } }
           ports: [{ name: http, containerPort: 3000 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }
