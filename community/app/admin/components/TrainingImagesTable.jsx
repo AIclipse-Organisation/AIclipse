@@ -3,12 +3,6 @@ import { useState, useEffect } from "react";
 import { Card, Spinner, Button } from "@heroui/react";
 import { adminService } from "@/admin/admin.js";
 
-const STATUS_MAP = {
-  0: { label: "Pending", color: "warning" },
-  1: { label: "Ready", color: "success" },
-  2: { label: "Used", color: "primary" },
-};
-
 export default function TrainingImagesTable() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
