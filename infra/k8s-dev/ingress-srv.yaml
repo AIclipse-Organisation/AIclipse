@@ -13,6 +13,37 @@ spec:
     - host: aiclipse.local
       http:
         paths:
+          # These Next.js paths are requested from root (not /community).
+          # Send them to community-srv so they do not hit client-srv and 404.
+
+          - path: /__nextjs_original-stack-frames
+            pathType: Prefix
+            backend:
+              service:
+                name: community-srv
+                port:
+                  number: 3000
+          - path: /__nextjs_font
+            pathType: Prefix
+            backend:
+              service:
+                name: community-srv
+                port:
+                  number: 3000
+          - path: /_nextjs_original-stack-frames
+            pathType: Prefix
+            backend:
+              service:
+                name: community-srv
+                port:
+                  number: 3000
+          - path: /_nextjs_font
+            pathType: Prefix
+            backend:
+              service:
+                name: community-srv
+                port:
+                  number: 3000
           - path: /community
             pathType: Prefix
             backend:

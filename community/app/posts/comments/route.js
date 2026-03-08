@@ -7,6 +7,8 @@ import {
   validateCommentId,
 } from "../validation.js";
 import { getRedis } from "@/lib/redis/redis";
+// Shared helper: saves smaller notification data and merges repeats.
+import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 
 export const runtime = "nodejs";
 
@@ -208,7 +210,7 @@ export async function POST(req) {
     // ensure the post exists
     const postExists = await postsCol.findOne(
       { post_id: safePostId },
-      { projection: { _id: 0, post_id: 1 } },
+      { projection: { _id: 0, post_id: 1, user_id: 1, image_id: 1 } },
     );
     if (!postExists) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
@@ -228,6 +230,21 @@ export async function POST(req) {
     };
 
     await commentsCol.insertOne(doc);
+
+    if (postExists.user_id && postExists.user_id !== safeUserId) {
+      try {
+        // Add notification for post owner; repeated same events are merged into one row.
+        await recordCollapsedNotification(db, {
+          recipient_user_id: postExists.user_id,
+          actor_user_id: safeUserId,
+          post_id: safePostId,
+          type: "comment",
+          image_id: postExists.image_id || null,
+        });
+      } catch (notifyErr) {
+        console.error("Failed to create comment notification:", notifyErr);
+      }
+    }
 
     // counter on the post to show number of comments
     // await postsCol.updateOne({ post_id: safePostId }, { $inc: { comment_count: 1 } });

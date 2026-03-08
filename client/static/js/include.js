@@ -87,9 +87,54 @@ function goToCommunity() {
   window.location.href = "/community";
 }
 
+async function updateNotificationDot() {
+  // Notification badge element in the bottom navigation.
+  const dot = document.getElementById("notif-dot");
+  if (!dot) return;
+
+  try {
+    // Ask the backend for the current unread notification count.
+    const res = await fetch("/community/notifications/unread-count", {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+
+    // Hide the dot when request fails (unauthorized/server/network issues).
+    if (!res.ok) {
+      dot.hidden = true;
+      return;
+    }
+
+    // Parse count safely; default to zero when payload is missing/invalid.
+    const data = await res.json().catch(() => ({}));
+    const unread = Number(data?.unread_count || 0);
+
+    // Show the dot only if there is at least one unread notification.
+    dot.hidden = unread <= 0;
+  } catch {
+    // Fail closed: hide indicator if unread count cannot be fetched.
+    dot.hidden = true;
+  }
+}
+
 // Main Initialization
 document.addEventListener("DOMContentLoaded", () => {
   setActiveNavLink();
   initNavDrawer();
   initAuthTabs();
+
+  // On the notifications page itself, always hide the nav dot.
+  // On other pages, refresh the dot from unread-count endpoint.
+  const isNotificationPage = window.location.pathname === "/notification";
+  if (isNotificationPage) {
+    const dot = document.getElementById("notif-dot");
+    if (dot) dot.hidden = true;
+  } else {
+    updateNotificationDot();
+  }
+});
+
+window.addEventListener("notifications:updated", () => {
+  // Keep badge state in sync after notification read/update actions.
+  updateNotificationDot();
 });

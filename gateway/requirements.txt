@@ -1,7 +1,7 @@
-fastapi
-uvicorn[standard]
-httpx
-PyJWT
-cryptography
-python-multipart
-pillow
+fastapi==0.129.2
+uvicorn[standard]==0.41.0
+httpx==0.28.1
+PyJWT==2.11.0
+cryptography==46.0.5
+python-multipart==0.0.22
+pillow==12.1.1

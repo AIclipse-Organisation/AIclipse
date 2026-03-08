@@ -16,13 +16,20 @@ public class ModelsController : ControllerBase
     private readonly AppDbContext _dbContext;
     private readonly TrainingJobQueue _jobQueue;
 
-    public ModelsController(BlobStorageService blobService, AppDbContext dbContext, TrainingJobQueue jobQueue)
+    private readonly IModelDeploymentService _deploymentService;
+
+    public ModelsController(
+    BlobStorageService blobService,
+    AppDbContext dbContext,
+    TrainingJobQueue jobQueue,
+    IModelDeploymentService deploymentService)
     {
         _blobService = blobService;
         _dbContext = dbContext;
         _jobQueue = jobQueue;
+        _deploymentService = deploymentService;
     }
-    
+
     [HttpPost("train")]
     public async Task<IActionResult> TriggerManualTraining()
     {
@@ -30,17 +37,31 @@ public class ModelsController : ControllerBase
 
         return Accepted(new { Message = "Training signal sent to background queue." });
     }
-    
+
     [HttpGet("/images")]
     public async Task<IActionResult> GetModelImages()
     {
         var images = await _dbContext.TrainingImages
-            .OrderByDescending(i => i.UploadedAt) 
+            .AsNoTracking()
+            .OrderByDescending(i => i.UploadedAt)
+            .Select(i => new
+            {
+                i.Id,
+                i.MediaImageId,
+                i.S3Key,
+                i.Label,
+                i.Status,
+                i.UploadedAt,
+                i.UserAiVotes,
+                i.UserRealVotes,
+                i.ModelConfidenceScore,
+                i.ModelVersion
+            })
             .ToListAsync();
-        
+
         return Ok(images);
     }
-    
+
     [HttpGet("current")]
     public async Task<IActionResult> GetCurrentModel()
     {
@@ -54,9 +75,9 @@ public class ModelsController : ControllerBase
         {
             return NotFound("No deployed model found.");
         }
-        
-        return Ok(new 
-        { 
+
+        return Ok(new
+        {
             Version = activeModel.Version,
             Accuracy = activeModel.GoldenTestAccuracy,
             Precision = activeModel.GoldenTestPrecision,
@@ -71,57 +92,28 @@ public class ModelsController : ControllerBase
     {
         if (request.File == null || request.File.Length == 0)
             return BadRequest("No file provided.");
-        
-        var currentlyDeployed = await _dbContext.ModelWeights
-            .Where(m => m.IsDeployed)
-            .ToListAsync();
 
-        if (currentlyDeployed.Any())
-        {
-            foreach (var model in currentlyDeployed)
-            {
-                model.IsDeployed = false;
-            }
-        }
-        
-        var extension = Path.GetExtension(request.File.FileName);
-        var fileName = $"{request.Version}{extension}"; 
-        
-        var minioPath = await _blobService.UploadFileAsync(
-            request.File.OpenReadStream(), 
-            "models", 
-            fileName, 
-            request.File.ContentType
-        );
-        
         var modelId = Guid.NewGuid();
         var modelWeight = new ModelWeights
         {
             Id = modelId,
             Version = request.Version,
-            MinioObjectPath = minioPath,
-            CreatedAt = DateTime.UtcNow,
-            
             NewImagesCount = request.NewImagesCount,
             ReplayBufferCount = request.ReplayBufferCount,
-            
             ValidationAccuracy = request.ValidationAccuracy,
             ValidationPrecision = request.ValidationPrecision,
             ValidationRecall = request.ValidationRecall,
             ValidationF1Score = request.ValidationF1Score,
-            
             GoldenTestAccuracy = request.GoldenTestAccuracy,
             GoldenTestPrecision = request.GoldenTestPrecision,
             GoldenTestRecall = request.GoldenTestRecall,
             GoldenTestF1Score = request.GoldenTestF1Score,
             GoldenFakeToRealMisclassifications = request.GoldenFakeToRealMisclassifications,
-            GoldenRealToFakeMisclassifications = request.GoldenRealToFakeMisclassifications,
-            
-            IsDeployed = true, 
+            GoldenRealToFakeMisclassifications = request.GoldenRealToFakeMisclassifications
         };
-        
+
         var links = new List<ModelImageLink>();
-        
+
         void AddLinks(List<Guid>? ids, ImageUsageType usage)
         {
             if (ids == null) return;
@@ -140,30 +132,39 @@ public class ModelsController : ControllerBase
         AddLinks(request.ReplayImageIds, ImageUsageType.Replay);
         AddLinks(request.GoldenTestImageIds, ImageUsageType.GoldenTest);
 
-        modelWeight.ImageLinks = links;
-        
-        _dbContext.ModelWeights.Add(modelWeight);
-        await _dbContext.SaveChangesAsync();
+        var extension = Path.GetExtension(request.File.FileName);
+        var fileName = $"{request.Version}{extension}";
 
-        return Ok(new 
-        { 
-            Message = "Model uploaded, deployed, and lineage tracked.", 
-            Id = modelWeight.Id, 
-            Version = modelWeight.Version,
-            ImagesLinked = links.Count 
+        using var stream = request.File.OpenReadStream();
+        var deployedModel = await _deploymentService.UploadAndDeployModelAsync(
+            stream,
+            fileName,
+            request.File.ContentType,
+            modelWeight,
+            links
+        );
+
+        return Ok(new
+        {
+            Message = "Model uploaded, deployed, and lineage tracked.",
+            Id = deployedModel.Id,
+            Version = deployedModel.Version,
+            ImagesLinked = links.Count
         });
     }
+
 
     [HttpGet]
     public async Task<IActionResult> GetModels()
     {
         var models = await _dbContext.ModelWeights
             .OrderByDescending(m => m.CreatedAt)
+            .AsNoTracking()
             .ToListAsync();
-            
+
         return Ok(models);
     }
-    
+
 
     [HttpDelete("{version}")]
     public async Task<IActionResult> DeleteModel(string version)
@@ -180,10 +181,10 @@ public class ModelsController : ControllerBase
         {
             return NotFound($"Model version '{version}' not found.");
         }
-        
+
         if (_blobService != null && !string.IsNullOrEmpty(model.MinioObjectPath))
         {
-            try 
+            try
             {
                 var fileName = Path.GetFileName(model.MinioObjectPath);
                 if (!string.IsNullOrEmpty(fileName))

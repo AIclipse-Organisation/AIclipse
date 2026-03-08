@@ -32,6 +32,9 @@ public class ConfidenceService : IConfidenceService
         foreach (var vote in voteData.Votes)
         {
             double reliability = vote.GetCurrentReliability();
+            // Sanitize reliability: if 0 (uninitialized), assume 0.5 (neutral).
+            if (reliability <= 0.0001) reliability = 0.5;
+
             string voteType = vote.IsAiVote ? "AI" : "REAL";
 
             if (vote.IsAiVote)
@@ -49,8 +52,10 @@ public class ConfidenceService : IConfidenceService
         }
 
         // 3. Calculate Model Influence
-        double modelAccuracyAi = modelWeights.GoldenTestPrecision;
-        double modelAccuracyReal = modelWeights.GoldenTestRecall;
+        // Sanitize weights: if 0 (uninitialized), assume 0.5 (neutral) to avoid inverting logic.
+        // A value of 0.0 would imply the model is always wrong, which generates strong opposite evidence.
+        double modelAccuracyAi = modelWeights.GoldenTestPrecision <= 0.0001 ? 0.5 : modelWeights.GoldenTestPrecision;
+        double modelAccuracyReal = modelWeights.GoldenTestRecall <= 0.0001 ? 0.5 : modelWeights.GoldenTestRecall;
 
         double modelAi = probabilityOfAi * modelAccuracyAi;
         double modelAiNot = (1 - probabilityOfAi) * (1 - modelAccuracyReal);
@@ -58,8 +63,8 @@ public class ConfidenceService : IConfidenceService
         double modelRealNot = probabilityOfAi * (1 - modelAccuracyAi);
 
         // 4. Bayesian Parameters
-        double alpha = 1 + userAi + userAiNot + modelAi + modelAiNot;
-        double beta = 1 + userReal + userRealNot + modelReal + modelRealNot;
+        double alpha = 1 + userAi + modelAi;
+        double beta = 1 + userReal + modelReal;
 
         double posteriorMean = alpha / (alpha + beta);
         string trainingLabel = posteriorMean >= 0.5 ? "ai" : "real";

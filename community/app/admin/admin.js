@@ -27,6 +27,7 @@ async function fetchLocal(endpoint, options = {}) {
 export const adminService = {
   getModels: async () => fetchLocal("/models"),
   getCurrentModel: async () => fetchLocal("/models/current"),
+  getTrainingImages: async () => fetchLocal("/models/training-images"),
   triggerTraining: async () => fetchLocal("/models/train", { method: "POST" }),
   deleteModel: async (version) => fetchLocal(`/models/${version}`, { method: "DELETE" }),
   getStatistics: async () => fetchLocal("/stats"),

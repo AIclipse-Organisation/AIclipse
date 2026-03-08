@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { 
-  Card, CardHeader, CardBody, Chip, Button, 
-  Spinner, Progress, Input, ScrollShadow 
+  Card, CardHeader, CardBody, CardFooter, Chip, Button, 
+  Spinner, Progress, Input, ScrollShadow, Divider 
 } from "@heroui/react";
 import { adminService } from "@/admin/admin.js";
+import TrainingImagesTable from "./TrainingImagesTable";
 
 export default function ModelManagement() {
   const [models, setModels] = useState([]);
@@ -47,6 +48,17 @@ export default function ModelManagement() {
     }
   };
 
+  const handleDelete = async (version) => {
+    if(!confirm(`Are you sure you want to delete ${version}?`)) return;
+    try {
+      // Assumes adminService.deleteModel exists on your backend
+      await adminService.deleteModel(version);
+      loadModels();
+    } catch (err) {
+      alert(`Delete failed: ${err.message}`);
+    }
+  };
+
   if (loading && models.length === 0) return (
     <div className="flex justify-center h-full items-center">
       <Spinner size="lg" color="warning" label="Loading..." />
@@ -75,8 +87,6 @@ export default function ModelManagement() {
           </Button>
         </div>
       </div>
-
-      
 
       <ScrollShadow className="flex-grow pb-12 pr-4 scrollbar-hide" size={40}>
         <div className="flex flex-col gap-8">
@@ -122,40 +132,115 @@ export default function ModelManagement() {
           </Card>
 
           {/* VERSION GRID */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {models.map((model) => (
               <Card key={model.id} className="border border-white/5 bg-[#1a1a1a] shadow-xl rounded-[2.5rem] p-4 text-white">
-                <CardHeader className="p-6 pb-2 flex justify-between items-start">
+                <CardHeader className="p-4 pb-0 flex justify-between items-start">
                   <div>
                      <h4 className="text-2xl font-black text-white italic tracking-tighter">{model.version}</h4>
-                     <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{new Date(model.createdAt).toLocaleDateString()}</p>
+                     <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{new Date(model.createdAt).toLocaleString()}</p>
                   </div>
-                  {model.isDeployed && <Chip className="bg-[#CFB87C] text-[#222222] font-black uppercase text-[8px] tracking-widest px-3 border-none shadow-lg shadow-[#CFB87C]/10">ACTIVE</Chip>}
+                  <div className="flex items-center gap-2">
+                    {model.isDeployed ? (
+                      <Chip className="bg-[#CFB87C] text-[#222222] font-black uppercase text-[8px] tracking-widest px-3 border-none shadow-lg shadow-[#CFB87C]/10">ACTIVE</Chip>
+                    ) : model.rejectionReason ? (
+                      <Chip className="bg-danger/20 text-danger font-black uppercase text-[8px] tracking-widest px-3 border border-danger/20">REJECTED</Chip>
+                    ) : (
+                      <Chip className="bg-white/5 text-gray-500 font-black uppercase text-[8px] tracking-widest px-3 border border-white/5">ARCHIVED</Chip>
+                    )}
+                  </div>
                 </CardHeader>
-                <CardBody className="p-6 flex flex-col gap-6">
+                
+                <CardBody className="gap-6 p-4 py-6 flex flex-col">
+                  
+                  {/* GOLDEN TEST SET SECTION */}
+                  <div className="p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Golden Test Set</span>
+                      <span className="text-lg font-black text-blue-400">
+                        {(model.goldenTestAccuracy * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-gray-500 font-black uppercase">F1 Score</span>
+                        <span className="text-sm font-black text-white">{(model.goldenTestF1Score).toFixed(3)}</span>
+                      </div>
+                      <div className="flex flex-col text-right">
+                        <span className="text-[8px] text-gray-500 font-black uppercase">Recall</span>
+                        <span className="text-sm font-black text-white">{(model.goldenTestRecall).toFixed(3)}</span>
+                      </div>
+                    </div>
+
+                    <Divider className="my-3 bg-white/5" />
+
+                    <div className="flex justify-between text-[10px] font-bold italic">
+                      <div className="text-gray-500">
+                        Fake → <span className="text-danger">Real</span>: {model.goldenFakeToRealMisclassifications}
+                      </div>
+                      <div className="text-gray-500">
+                        Real → <span className="text-danger">Fake</span>: {model.goldenRealToFakeMisclassifications}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECONDARY STAT: VALIDATION */}
                   <div>
-                    <div className="flex justify-between items-end mb-2 px-1">
-                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Precision Rate</span>
-                      <span className="text-lg font-black text-[#CFB87C]">{(model.validationAccuracy * 100).toFixed(1)}%</span>
+                    <div className="flex justify-between items-end mb-2 px-1 text-[9px] font-black uppercase tracking-widest">
+                      <span className="text-gray-500">Validation Accuracy</span>
+                      <span className="text-[#CFB87C]">{(model.validationAccuracy * 100).toFixed(1)}%</span>
                     </div>
-                    <Progress size="md" value={model.validationAccuracy * 100} classNames={{ track: "bg-white/5", indicator: "bg-[#CFB87C]" }} />
+                    <Progress 
+                      size="sm" 
+                      value={model.validationAccuracy * 100} 
+                      classNames={{ track: "bg-white/5", indicator: "bg-[#CFB87C]" }} 
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-black/20 p-4 rounded-2xl text-center border border-white/5">
-                      <p className="text-[8px] font-black text-gray-500 uppercase mb-1">F1 Score</p>
-                      <p className="font-black text-white">{(model.validationF1Score * 100).toFixed(1)}</p>
-                    </div>
-                    <div className="bg-black/20 p-4 rounded-2xl text-center border border-white/5">
-                      <p className="text-[8px] font-black text-gray-500 uppercase mb-1">Recall</p>
-                      <p className="font-black text-white">{(model.validationRecall * 100).toFixed(1)}</p>
+
+                  {/* TRAINING DATA LINEAGE */}
+                  <div className="flex justify-between items-center pt-2 border-t border-white/5">
+                    <div className="flex gap-4">
+                      <div className="flex flex-col">
+                          <span className="text-[8px] text-gray-500 font-black uppercase">New Data</span>
+                          <span className="text-xs font-black text-white">{model.newImagesCount} <span className="text-[9px] text-gray-600">IMG</span></span>
+                      </div>
+                      <div className="flex flex-col border-l border-white/10 pl-4">
+                          <span className="text-[8px] text-gray-500 font-black uppercase">Replay</span>
+                          <span className="text-xs font-black text-white">{model.replayBufferCount} <span className="text-[9px] text-gray-600">IMG</span></span>
+                      </div>
                     </div>
                   </div>
+
+                  {/* REJECTION REASON */}
+                  {model.rejectionReason && (
+                    <div className="text-[10px] text-danger bg-danger/5 p-3 rounded-xl border border-danger/10 italic font-medium">
+                      Reason: {model.rejectionReason}
+                    </div>
+                  )}
+
                 </CardBody>
+                
+                <CardFooter className="justify-end p-4 pt-0">
+                  <Button 
+                    size="sm" 
+                    variant="light" 
+                    className="font-black uppercase text-[9px] tracking-tighter text-gray-600 hover:text-danger transition-colors"
+                    onPress={() => handleDelete(model.version)}
+                    isDisabled={model.isDeployed}
+                  >
+                    Delete Version
+                  </Button>
+                </CardFooter>
               </Card>
             ))}
           </div>
         </div>
       </ScrollShadow>
+
+      <Divider className="my-6 bg-white/5" />
+
+      <TrainingImagesTable />
     </div>
   );
 }

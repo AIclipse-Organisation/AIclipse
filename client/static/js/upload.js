@@ -87,8 +87,13 @@ window.addEventListener("DOMContentLoaded", () => {
   const quotaModalText = document.getElementById("quota-modal-text");
   const quotaModalClose = document.getElementById("quota-modal-close");
   const quotaModalPlan = document.getElementById("quota-modal-plan");
+  const disclaimerModal = document.getElementById("disclaimer-modal");
+  const disclaimerDontShowAgain = document.getElementById("disclaimer-dont-show-again");
+  const disclaimerDisagreeBtn = document.getElementById("disclaimer-disagree");
+  const disclaimerAgreeBtn = document.getElementById("disclaimer-agree");
 
   let lastPreviewUrl = null;
+  let doNotShowDisclaimerAgain = false;
 
   // SAVE UI (only exists on results page; guarded)
   const btnSave = document.getElementById("btn-save");
@@ -156,6 +161,17 @@ window.addEventListener("DOMContentLoaded", () => {
     quotaModal.hidden = false;
   }
 
+  function closeDisclaimerModal() {
+    if (!disclaimerModal) return;
+    disclaimerModal.hidden = true;
+  }
+
+  function openDisclaimerModal() {
+    if (!disclaimerModal) return;
+    if (disclaimerDontShowAgain) disclaimerDontShowAgain.checked = false;
+    disclaimerModal.hidden = false;
+  }
+
   function getLimitMessage(payload) {
     if (!payload || typeof payload !== "object") return null;
     const detail = payload.detail;
@@ -195,6 +211,49 @@ window.addEventListener("DOMContentLoaded", () => {
   if (quotaModal) {
     quotaModal.addEventListener("click", (event) => {
       if (event.target === quotaModal) closeQuotaModal();
+    });
+  }
+
+  if (fileLabel && fileInput) {
+    fileLabel.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (doNotShowDisclaimerAgain) {
+        fileInput.click();
+        return;
+      }
+      openDisclaimerModal();
+    });
+  }
+
+  if (disclaimerDisagreeBtn) {
+    disclaimerDisagreeBtn.addEventListener("click", () => {
+      closeDisclaimerModal();
+    });
+  }
+
+  if (disclaimerModal) {
+    disclaimerModal.addEventListener("click", (event) => {
+      if (event.target === disclaimerModal) closeDisclaimerModal();
+    });
+  }
+
+  if (disclaimerAgreeBtn && fileInput) {
+    disclaimerAgreeBtn.addEventListener("click", async () => {
+      const wantsToSkip = !!disclaimerDontShowAgain?.checked;
+
+      if (wantsToSkip && !doNotShowDisclaimerAgain) {
+        try {
+          const { res } = await jsonFetch("PATCH", "/auth/me", {
+            do_not_show_disclaimer_again: true,
+          });
+          if (res.ok) doNotShowDisclaimerAgain = true;
+        } catch {
+          // ignore and proceed with upload flow
+        }
+      }
+
+      closeDisclaimerModal();
+      fileInput.click();
     });
   }
 
@@ -843,12 +902,15 @@ if (btnCheck) {
       if (res.ok) {
         setCurrentUserChip(data);
         window.currentUserId = data.user_id || null;
+        doNotShowDisclaimerAgain = !!data.do_not_show_disclaimer_again;
       } else {
         setCurrentUserChip(null);
         window.currentUserId = null;
+        doNotShowDisclaimerAgain = false;
       }
     } catch {
       // ignore
+      doNotShowDisclaimerAgain = false;
     }
   })();
 

@@ -18,7 +18,7 @@ jobs:
     env:
       ORG: ${{ secrets.GHCR_USERNAME }}
       NS: default
-      IMAGES: "auth gateway media detector plans billing client community model-cycle"
+      IMAGES: "auth gateway media detector billing client community model-cycle"
       KUBE_DNS_IP: 10.43.0.10
       DOMAINS: "aiclipse.online aiclipse.site"
 
@@ -34,29 +34,14 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Cache Git LFS objects
-        uses: actions/cache@v4
         with:
-          path: .git/lfs/objects
-          key: lfs-${{ runner.os }}-${{ hashFiles('detector/detector_modules/models/v1/weights.pt') }}
-          restore-keys: |
-            lfs-${{ runner.os }}-
+          lfs: true
+          fetch-depth: 0
 
-      - name: Ensure weights (Git LFS)
-        shell: bash
+      - name: Ensure LFS objects present
         run: |
           set -euo pipefail
-          cd "$(git rev-parse --show-toplevel)"
-
-          FILE="detector/detector_modules/models/v1/weights.pt"
-          if [[ -z "$FILE" ]]; then
-            echo "ERROR: lfs_weights_path is empty while lfs_weights_enabled=true" >&2
-            exit 1
-          fi
-
-          git lfs pull --include="$FILE" --exclude="*"
-          git lfs status || true
+          git lfs pull
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -262,6 +247,11 @@ jobs:
           API_KEY_PEPPER:             ${{ secrets.API_KEY_PEPPER }}
           CONFIG_URL:                 ${{ secrets.CONFIG_URL }}
           FLASK_SECRET_KEY:           ${{ secrets.FLASK_SECRET_KEY }}
+          STRIPE_SECRET_KEY:          ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PUBLISHABLE_KEY:     ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET:      ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          CLIENT_URL:                 ${{ secrets.CLIENT_URL }}
+
         run: |
           set -euo pipefail
           kubectl -n "$NS" create secret generic mongo-sec \
@@ -292,12 +282,19 @@ jobs:
             --from-literal=API_KEY_PEPPER="$API_KEY_PEPPER" \
             --dry-run=client -o yaml | kubectl apply -f -
 
+          kubectl -n "$NS" create secret generic stripe-sec \
+            --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+            --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
           kubectl -n "$NS" create secret generic flask-secret \
             --from-literal=FLASK_SECRET_KEY="$FLASK_SECRET_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
 
           kubectl -n "$NS" create configmap app-configmap \
             --from-literal=CONFIG_URL="$CONFIG_URL" \
+            --from-literal=CLIENT_URL="$CLIENT_URL" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply data layer
@@ -336,7 +333,6 @@ jobs:
           kubectl -n "$NS" apply -f infra/k8s/gateway-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/media-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/detector-depl.yaml
-          kubectl -n "$NS" apply -f infra/k8s/plans-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/billing-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/client-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/vote-flush-depl.yaml

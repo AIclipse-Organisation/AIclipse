@@ -14,6 +14,7 @@ public class ModelTrainingService : IModelTrainingService
     private readonly ITrainingJobManager _jobManager;
     private readonly IPythonExecutor _pythonExecutor;
     private readonly IBlobStorageService _blobStorage;
+    private readonly IModelDeploymentService _deploymentService;
     private readonly ILogger<ModelTrainingService> _logger;
     private readonly ModelCycleConfig _config;
 
@@ -22,6 +23,7 @@ public class ModelTrainingService : IModelTrainingService
         ITrainingJobManager jobManager,
         IPythonExecutor pythonExecutor,
         IBlobStorageService blobStorage,
+        IModelDeploymentService deploymentService,
         ILogger<ModelTrainingService> logger,
         IOptions<ModelCycleConfig> config)
     {
@@ -29,6 +31,7 @@ public class ModelTrainingService : IModelTrainingService
         _jobManager = jobManager;
         _pythonExecutor = pythonExecutor;
         _blobStorage = blobStorage;
+        _deploymentService = deploymentService;
         _logger = logger;
         _config = config.Value;
     }
@@ -61,10 +64,7 @@ public class ModelTrainingService : IModelTrainingService
             string nextVersion = await GetNextVersionStringAsync();
             _logger.LogInformation("New model version will be: {Version}", nextVersion);
 
-            _logger.LogInformation("Uploading trained model...");
-            string s3ModelPath = await UploadModelToMinioAsync(jobScope, nextVersion);
-
-            return await ProcessTrainingResults(jobScope, newImages, replayImages, s3ModelPath, nextVersion);
+            return await EvaluateAndProcessModelAsync(jobScope, newImages, replayImages, nextVersion);
         }
         catch (Exception ex)
         {
@@ -73,14 +73,13 @@ public class ModelTrainingService : IModelTrainingService
         }
     }
 
-
     private async Task<(List<TrainingImage> NewImages, List<TrainingImage> ReplayImages)> GetTrainingData()
     {
         var readyRealCount = await _context.TrainingImages
-            .CountAsync(t => t.Status == TrainingStatus.Ready && t.Label == "real");
+            .CountAsync(t => t.Status == TrainingStatus.Ready && t.Label.ToLower() == "real");
 
         var readyAiCount = await _context.TrainingImages
-            .CountAsync(t => t.Status == TrainingStatus.Ready && t.Label == "ai");
+            .CountAsync(t => t.Status == TrainingStatus.Ready && t.Label.ToLower() == "ai");
 
         var batchSizePerClass = Math.Min(readyRealCount, readyAiCount);
 
@@ -93,13 +92,13 @@ public class ModelTrainingService : IModelTrainingService
         }
 
         var newReal = await _context.TrainingImages
-            .Where(t => t.Status == TrainingStatus.Ready && t.Label == "real")
+            .Where(t => t.Status == TrainingStatus.Ready && t.Label.ToLower() == "real")
             .OrderBy(t => EF.Functions.Random())
             .Take(batchSizePerClass)
             .ToListAsync();
 
         var newAi = await _context.TrainingImages
-            .Where(t => t.Status == TrainingStatus.Ready && t.Label == "ai")
+            .Where(t => t.Status == TrainingStatus.Ready && t.Label.ToLower() == "ai")
             .OrderBy(t => EF.Functions.Random())
             .Take(batchSizePerClass)
             .ToListAsync();
@@ -115,34 +114,6 @@ public class ModelTrainingService : IModelTrainingService
             .ToListAsync();
 
         return (newImages, replayImages);
-    }
-
-    private async Task<string> UploadModelToMinioAsync(TrainingJobManager.JobScope scope, string version)
-    {
-        var expectedFile = "pytorch_model.bin";
-        var modelPath = Path.Combine(scope.OutputDir, expectedFile);
-
-        if (!File.Exists(modelPath))
-        {
-            var altPath = Path.Combine(scope.OutputDir, "model.safetensors");
-            if (File.Exists(altPath))
-            {
-                modelPath = altPath;
-                expectedFile = "model.safetensors";
-            }
-            else
-            {
-                _logger.LogError("Expected model file not found at {Path}", modelPath);
-                throw new FileNotFoundException($"Python did not produce a {expectedFile} file");
-            }
-        }
-
-        var fileName = $"{version}.pt";
-
-        _logger.LogInformation("Uploading {LocalFile} to MinIO as {RemoteFile}...", expectedFile, fileName);
-
-        using var stream = File.OpenRead(modelPath);
-        return await _blobStorage.UploadFileAsync(stream, "models", fileName, "application/octet-stream");
     }
 
     private async Task<string> GetNextVersionStringAsync()
@@ -166,11 +137,32 @@ public class ModelTrainingService : IModelTrainingService
         return $"v{maxVer + 1}";
     }
 
-    private async Task<Guid> ProcessTrainingResults(
+    private string GetModelFilePath(TrainingJobManager.JobScope scope, out string expectedFileName)
+    {
+        expectedFileName = "pytorch_model.bin";
+        var modelPath = Path.Combine(scope.OutputDir, expectedFileName);
+
+        if (!File.Exists(modelPath))
+        {
+            var altPath = Path.Combine(scope.OutputDir, "model.safetensors");
+            if (File.Exists(altPath))
+            {
+                modelPath = altPath;
+                expectedFileName = "model.safetensors";
+            }
+            else
+            {
+                _logger.LogError("Expected model file not found at {Path}", modelPath);
+                throw new FileNotFoundException($"Python did not produce a valid model file");
+            }
+        }
+        return modelPath;
+    }
+
+    private async Task<Guid> EvaluateAndProcessModelAsync(
         TrainingJobManager.JobScope scope,
         List<TrainingImage> newImages,
         List<TrainingImage> replayImages,
-        string s3ModelPath,
         string version)
     {
         if (!File.Exists(scope.MetricsPath))
@@ -180,21 +172,17 @@ public class ModelTrainingService : IModelTrainingService
         var results = JsonSerializer.Deserialize<PythonTrainingResult>(json)
                       ?? throw new InvalidOperationException("Failed to deserialize metrics json.");
 
+        var modelId = Guid.NewGuid();
         var weights = new ModelWeights
         {
-            Id = Guid.NewGuid(),
+            Id = modelId,
             Version = version,
-            CreatedAt = DateTime.UtcNow,
-            MinioObjectPath = s3ModelPath,
-
             NewImagesCount = newImages.Count,
             ReplayBufferCount = replayImages.Count,
-
             ValidationAccuracy = results.Validation.Accuracy,
             ValidationPrecision = results.Validation.Precision,
             ValidationRecall = results.Validation.Recall,
             ValidationF1Score = results.Validation.F1Score,
-
             GoldenTestAccuracy = results.GoldenTest.Accuracy,
             GoldenTestPrecision = results.GoldenTest.Precision,
             GoldenTestRecall = results.GoldenTest.Recall,
@@ -218,37 +206,49 @@ public class ModelTrainingService : IModelTrainingService
             }
         }
 
+        var links = new List<ModelImageLink>();
+        foreach (var img in newImages)
+        {
+            links.Add(new ModelImageLink { ModelWeightId = modelId, TrainingImageId = img.Id, UsageType = ImageUsageType.NewTraining });
+        }
+        foreach (var img in replayImages)
+        {
+            links.Add(new ModelImageLink { ModelWeightId = modelId, TrainingImageId = img.Id, UsageType = ImageUsageType.Replay });
+        }
+
+        var localModelPath = GetModelFilePath(scope, out var originalExtension);
+        var uploadFileName = $"{version}{Path.GetExtension(originalExtension)}";
+        using var stream = File.OpenRead(localModelPath);
+
         if (isImproved)
         {
-            weights.IsDeployed = true;
-            if (currentModel != null) currentModel.IsDeployed = false;
+            _logger.LogInformation("Model improved. Triggering active deployment pipeline...");
 
             foreach (var img in newImages)
             {
                 img.Status = TrainingStatus.UsedInTraining;
-                weights.ImageLinks.Add(new ModelImageLink
-                {
-                    TrainingImageId = img.Id,
-                    UsageType = ImageUsageType.NewTraining
-                });
             }
 
-            foreach (var img in replayImages)
-            {
-                weights.ImageLinks.Add(new ModelImageLink
-                {
-                    TrainingImageId = img.Id,
-                    UsageType = ImageUsageType.Replay
-                });
-            }
+            await _deploymentService.UploadAndDeployModelAsync(
+                stream,
+                uploadFileName,
+                "application/octet-stream",
+                weights,
+                links
+            );
         }
         else
         {
-            weights.IsDeployed = false;
-        }
+            _logger.LogInformation("Model rejected. Uploading to storage for auditing purposes only...");
 
-        _context.ModelWeights.Add(weights);
-        await _context.SaveChangesAsync();
+            weights.IsDeployed = false;
+            weights.CreatedAt = DateTime.UtcNow;
+            weights.ImageLinks = links;
+            weights.MinioObjectPath = await _blobStorage.UploadFileAsync(stream, "models", uploadFileName, "application/octet-stream");
+
+            _context.ModelWeights.Add(weights);
+            await _context.SaveChangesAsync();
+        }
 
         return weights.Id;
     }

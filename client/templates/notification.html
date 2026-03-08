@@ -14,21 +14,8 @@
       {% include 'partials/topbar.html' %}
 
       <main class="screen">
-        <!-- <section class="page-header" aria-label="Page title">
-          <h1 id="page-title" class="page-title">Notifications</h1>
-          <div class="page-underline" role="presentation"></div>
-        </section> -->
-
-        <section class="notification-placeholder" aria-live="polite">
-          <img
-            class="notification-icon"
-            src="/static/images/construction.png"
-            alt=""
-            aria-hidden="true"
-          />
-          <h2 class="notification-title">Under construction</h2>
-          <p class="notification-subtitle">Coming soon</p>
-        </section>
+        <section class="notification-list" id="notification-list" aria-live="polite"></section>
+        <p class="notification-status" id="notification-status"></p>
       </main>
 
       {% include 'partials/navbar.html' %}
@@ -36,6 +23,7 @@
     <script src="/static/js/loader.js"></script>
     <script src="/static/js/include.js"></script>
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/notification.js"></script>
     <script src="/static/js/main.js"></script>
   </body>
 </html>

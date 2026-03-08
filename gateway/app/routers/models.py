@@ -180,3 +180,23 @@ async def gateway_delete_model(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
 
     return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+# ---------------------------------------------------------
+# 7. GET MODEL IMAGES
+# ---------------------------------------------------------
+@router.get("/models/images")
+async def gateway_get_model_images(
+    request: Request,
+    version: str,
+    user: UserContext = Depends(get_current_admin),
+):
+    base_url = get_cycle_url(request)
+    url = f"{base_url}/api/models/images"
+    
+    client: httpx.AsyncClient = request.app.state.http
+    try:
+        resp = await client.get(url, timeout=10.0)
+    except httpx.RequestError:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
+
+    return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")

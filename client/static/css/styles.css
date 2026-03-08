@@ -245,6 +245,24 @@ body.app .navbar a.active::after {
   border-radius: 999px;
 }
 
+body.app .nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.app .notif-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #CFB87C;
+  border: 1px solid #222222;
+}
+
 /* Screen content area
    Add bottom padding so content doesn't hide behind navbar */
 body.app .screen {

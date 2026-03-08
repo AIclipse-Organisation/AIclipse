@@ -66,6 +66,8 @@ spec:
               valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD } }
             - name: AUTH_URI
               value: "http://auth-srv:3000"
+            - name: DETECTOR_URI
+              value: "http://detector-srv:3000"
             - name: MINIO_BUCKET_NAME
               value: "model-cycle-storage"
           readinessProbe:
@@ -95,7 +97,7 @@ spec:
             failureThreshold: 60
           resources:
             requests: { cpu: "200m", memory: "512Mi" }
-            limits: { cpu: "2000m", memory: "2Gi" }
+            limits: { cpu: "2000m", memory: "3Gi" }
 ---
 apiVersion: v1
 kind: Service
