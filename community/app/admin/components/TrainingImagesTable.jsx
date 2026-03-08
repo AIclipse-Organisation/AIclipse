@@ -3,8 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, Spinner, Button } from "@heroui/react";
 import { adminService } from "@/admin/admin.js";
 
-// Helper component for consistent stat cards
-function StatCard({ title, value, titleColor = "text-gray-400", bgStyle = "bg-[#1a1a1a]", borderStyle = "border-white/5" }) {
+function StatCard({ title, value, titleColor = "text-gray-300", bgStyle = "bg-[#2a2a2a]", borderStyle = "border-white/10" }) {
   return (
     <Card className={`p-6 shadow-xl rounded-[2.5rem] border ${borderStyle} ${bgStyle}`}>
       <div className={`text-[11px] font-black uppercase tracking-widest mb-2 ${titleColor}`}>
@@ -22,7 +21,6 @@ export default function TrainingImagesTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Split images into Available (Pending/Ready) and Used
   const availableImages = images.filter((i) => i.status === 0 || i.status === 1);
   const usedImages = images.filter((i) => i.status === 2);
 
@@ -65,16 +63,16 @@ export default function TrainingImagesTable() {
     <div className="flex flex-col gap-8">
       
       {/* HEADER ACTIONS */}
-      <div className="flex justify-between items-center bg-[#1a1a1a] p-6 px-8 rounded-[2.5rem] shadow-xl border border-white/5">
+      <div className="flex justify-between items-center bg-[#2a2a2a] p-6 px-8 rounded-[2.5rem] shadow-xl border border-white/10">
         <div>
           <h3 className="text-xl font-black text-white italic tracking-tighter uppercase">Dataset Candidates</h3>
-          <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+          <p className="text-[11px] text-gray-300 font-bold uppercase tracking-widest mt-1">
             {images.length} total images accumulating
           </p>
         </div>
         <Button 
           onPress={fetchImages}
-          className="bg-white/5 text-white border border-white/10 font-black uppercase text-[10px] tracking-widest h-12 px-8 rounded-2xl hover:bg-white/10 transition-all"
+          className="bg-white/10 text-white border border-white/20 font-black uppercase text-[10px] tracking-widest h-12 px-8 rounded-2xl hover:bg-white/20 transition-all"
         >
           Refresh Data
         </Button>
@@ -82,7 +80,7 @@ export default function TrainingImagesTable() {
       
       {/* SECTION 1: AVAILABLE FOR TRAINING */}
       <div>
-        <h4 className="text-[12px] font-black text-gray-500 uppercase tracking-widest mb-4 px-2">
+        <h4 className="text-[12px] font-black text-gray-400 uppercase tracking-widest mb-4 px-2">
           Available for Next Cycle
         </h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -94,15 +92,15 @@ export default function TrainingImagesTable() {
             title="Ready" 
             value={availableImages.filter(i => i.status === 1).length} 
             titleColor="text-success-400"
-            bgStyle="bg-success/5"
-            borderStyle="border-success/10"
+            bgStyle="bg-success/10"
+            borderStyle="border-success/20"
           />
           <StatCard 
             title="Pending Review" 
             value={availableImages.filter(i => i.status === 0).length} 
             titleColor="text-warning-400"
-            bgStyle="bg-warning/5"
-            borderStyle="border-warning/10"
+            bgStyle="bg-warning/10"
+            borderStyle="border-warning/20"
           />
           
           {/* Dynamically render available labels */}
@@ -112,8 +110,8 @@ export default function TrainingImagesTable() {
               title={`Label: ${label}`}
               value={count}
               titleColor="text-[#CFB87C]"
-              bgStyle="bg-[#CFB87C]/5"
-              borderStyle="border-[#CFB87C]/10"
+              bgStyle="bg-[#CFB87C]/10"
+              borderStyle="border-[#CFB87C]/20"
             />
           ))}
         </div>
@@ -121,7 +119,7 @@ export default function TrainingImagesTable() {
 
       {/* SECTION 2: ALREADY USED */}
       <div className="pt-4">
-        <h4 className="text-[12px] font-black text-gray-500 uppercase tracking-widest mb-4 px-2">
+        <h4 className="text-[12px] font-black text-gray-400 uppercase tracking-widest mb-4 px-2">
           Used in Previous Cycles
         </h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -129,16 +127,19 @@ export default function TrainingImagesTable() {
             title="Total Used" 
             value={usedImages.length} 
             titleColor="text-blue-400"
-            bgStyle="bg-blue-500/5"
-            borderStyle="border-blue-500/10"
+            bgStyle="bg-blue-500/10"
+            borderStyle="border-blue-500/20"
           />
           
-          {/* Dynamically render used labels */}
+          {/* Dynamically render used labels with a subtle purple tint instead of grey */}
           {Object.entries(usedLabels).map(([label, count]) => (
             <StatCard 
               key={`used-${label}`}
               title={`Label: ${label}`}
               value={count}
+              titleColor="text-purple-300"
+              bgStyle="bg-purple-500/10"
+              borderStyle="border-purple-500/20"
             />
           ))}
         </div>
