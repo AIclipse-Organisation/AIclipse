@@ -13,9 +13,8 @@ import {
   formatScore,
 } from "./postBoxActions";
 
-import { 
-  useDisclosure, RadioGroup, Radio, Textarea 
-} from "@heroui/react";
+import { useDisclosure } from "@heroui/react";
+import ReportModal from "./ReportModal"; // Import your new component
 
 export default function PostBox({
   image,
@@ -37,8 +36,6 @@ export default function PostBox({
 
   // MODAL STATE
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
-  const [reportReason, setReportReason] = useState("AI Misinformation");
-  const [reportDetails, setReportDetails] = useState("");
 
   const isUserCorrect = useMemo(() => {
     if (!userHasVoted || !groundTruth) return null;
@@ -145,12 +142,13 @@ export default function PostBox({
     trackPostClick(postId);
   }
 
-  const submitReport = async () => {
+  // UPDATED: Now accepts reason and details directly from the modal component
+  const submitReport = async ({ reason, details }) => {
     setBusy(true);
     try {
-      await reportPostAPI(postId, { reason: reportReason, details: reportDetails });
+      await reportPostAPI(postId, { reason, details });
       setIsReported(true);
-      onOpenChange(false); 
+      onOpenChange(false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -242,7 +240,7 @@ export default function PostBox({
   function setWidthStyle(pct) {
     const p = Math.max(0, Math.min(100, Number(pct) || 0));
     if (p === 0) return "0px";
-    return `calc(${p}% - 8px)`; 
+    return `calc(${p}% - 8px)`;
   }
 
   const analysisRealPct = computeRealPctFromModel(image);
@@ -368,58 +366,12 @@ export default function PostBox({
         {error && <div className="muted">{error}</div>}
       </div>
 
-      {/* AICLIPSE BRANDED CUSTOM MODAL */}
-      {isOpen && (
-        <div className="modal-overlay" onClick={() => onOpenChange(false)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">Report Post</h2>
-              <button className="modal-close" onClick={() => onOpenChange(false)}>×</button>
-            </div>
-            
-            <div className="modal-body">
-              <p className="modal-lead">Why are you reporting this content?</p>
-              
-              <RadioGroup 
-                value={reportReason} 
-                onValueChange={setReportReason}
-                color="warning"
-                classNames={{ wrapper: "gap-3" }}
-              >
-                <Radio value="AI Misinformation" classNames={{ label: "text-sm text-[#f3f3f3]" }}>AI Misinformation</Radio>
-                <Radio value="Harassment" classNames={{ label: "text-sm text-[#f3f3f3]" }}>Harassment</Radio>
-                <Radio value="Spam" classNames={{ label: "text-sm text-[#f3f3f3]" }}>Spam</Radio>
-                <Radio value="Inappropriate Content" classNames={{ label: "text-sm text-[#f3f3f3]" }}>Inappropriate Content</Radio>
-              </RadioGroup>
-
-              <div className="modal-section">
-                <Textarea
-                  label="Extra details (Optional)"
-                  labelPlacement="outside"
-                  placeholder="Provide context for our moderators..."
-                  value={reportDetails}
-                  onValueChange={setReportDetails}
-                  classNames={{
-                    input: "text-[#f3f3f3] placeholder:text-gray-500",
-                    inputWrapper: "bg-[#2c2c2c] border-[#2c2c2c] focus-within:!border-[#CFB87C] transition-colors"
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button className="modal-secondary" onClick={() => onOpenChange(false)}>Cancel</button>
-              <button 
-                className="modal-primary" 
-                onClick={submitReport}
-                disabled={busy}
-              >
-                {busy ? "Sending..." : "Submit Report"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReportModal
+        isOpen={isOpen}
+        onClose={() => onOpenChange(false)}
+        onSubmit={submitReport}
+        isSubmitting={busy}
+      />
     </div>
   );
 }
