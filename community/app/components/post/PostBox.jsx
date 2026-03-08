@@ -14,7 +14,7 @@ import {
 } from "./postBoxActions";
 
 import { useDisclosure } from "@heroui/react";
-import ReportModal from "./ReportModal"; // Import your new component
+import ReportModal from "../modals/ReportModal"; 
 
 export default function PostBox({
   image,
