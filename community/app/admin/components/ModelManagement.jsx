@@ -113,7 +113,7 @@ export default function ModelManagement() {
         </div>
       </div>
 
-      <Card className="border-none shadow-sm bg-gray-50">
+      <Card className="border-none shadow-sm bg-gray-50 shrink-0">
         <CardBody>
           <form onSubmit={handleUploadSubmit} className="flex gap-4 items-end">
             <div className="flex-1">
@@ -126,6 +126,7 @@ export default function ModelManagement() {
                  className="bg-white"
                />
             </div>
+
             <div className="flex-1">
                <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">Model File (.pt / .onnx)</label>
                <input 
@@ -134,6 +135,7 @@ export default function ModelManagement() {
                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                />
             </div>
+
             <Button 
               type="submit" 
               color="primary" 

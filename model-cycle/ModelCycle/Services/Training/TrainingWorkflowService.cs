@@ -121,18 +121,21 @@ public class TrainingWorkflowService : ITrainingWorkflowService
 
         bool statusChangedToReady = result.IsReadyForTraining && previousState.Status != TrainingStatus.Ready;
         bool isNewAndReady = isNew && result.IsReadyForTraining;
+        bool labelChangedWhileReady = result.IsReadyForTraining
+                                    && previousState.Status == TrainingStatus.Ready
+                                    && previousState.Label != result.TrainingLabel?.ToLowerInvariant();
 
-        if (statusChangedToReady || isNewAndReady)
+        if (statusChangedToReady || isNewAndReady || labelChangedWhileReady)
         {
             await _jobQueue.QueueJobAsync();
             _logger.LogInformation(
-                "Image {PostId} promoted to Ready (New: {IsNew}). Training signal queued.",
-                request.PostId, isNew);
+                "Image {PostId} triggered training signal. (New: {IsNew}, Promoted to Ready: {Promoted}, Label Flipped: {Flipped})",
+                request.PostId, isNew, statusChangedToReady, labelChangedWhileReady);
         }
         else if (result.IsReadyForTraining && previousState.Status == TrainingStatus.Ready)
         {
             _logger.LogInformation(
-                "Image {PostId} is already in the dataset (Status: Ready). Skipping training trigger.",
+                "Image {PostId} is already in the dataset with the same label. Skipping training trigger.",
                 request.PostId);
         }
 
