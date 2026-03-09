@@ -43,7 +43,7 @@ export default function TrainingImagesTable() {
     try {
       setLoading(true);
       const data = await adminService.getTrainingImages();
-      setImages(data);
+      setImages(data || []);
     } catch (err) {
       setError(err.message);
     } finally {

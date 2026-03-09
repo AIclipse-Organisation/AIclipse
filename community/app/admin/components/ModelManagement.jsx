@@ -22,8 +22,13 @@ export default function ModelManagement() {
     try {
       setLoading(true);
       const data = await adminService.getModels();
-      setModels(data);
-    } finally { setLoading(false); }
+      // Added the protective fallback from the dev branch
+      setModels(data || []);
+    } catch (err) {
+      console.error("Failed to load models:", err.message);
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleUploadSubmit = async (e) => {
