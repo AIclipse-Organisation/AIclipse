@@ -22,7 +22,7 @@ export default function ModelManagement() {
     try {
       setLoading(true);
       const data = await adminService.getModels();
-      setModels(data);
+      setModels(data || []);
       setError(null);
     } catch (err) {
       setError(err.message);
