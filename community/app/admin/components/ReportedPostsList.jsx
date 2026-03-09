@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Card, CardBody, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure, ScrollShadow, User } from "@heroui/react";
+import { Card, CardBody, Spinner, Modal, ModalContent, useDisclosure, ScrollShadow, User } from "@heroui/react";
 import { adminService } from "@/admin/admin.js";
 
 export default function ReportedPostsList() {
