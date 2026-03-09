@@ -11,13 +11,10 @@
 
   <body class="app">
     <div class="app-container">
+      {% set page_title = 'Results' %}
       {% include 'partials/topbar.html' %}
       <main class="screen">
         <div class="grid">
-          <section class="page-header" aria-label="Page title">
-            <h1 class="page-title">Results</h1>
-            <div class="page-underline" role="presentation"></div>
-          </section>
 
           <div class="results-imageFrame">
             <img id="preview-image" alt="Selected image preview" />
