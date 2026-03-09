@@ -54,7 +54,7 @@ export default function ReportedPostsList() {
                 <div className="p-8">
                     <span className="font-black text-xs text-white uppercase tracking-tighter block mb-2">{post.user_name}</span>
                     <p className="text-xs text-gray-500 font-medium line-clamp-2 italic mb-6">"{post.description || "No description provided."}"</p>
-                    <span className="text-[10px] font-black text-[#CFB87C] uppercase tracking-widest group-hover:translate-x-1 transition-transform inline-block">Review Case Details →</span>
+                    <span className="text-[10px] font-black text-[#CFB87C] uppercase tracking-widest group-hover:translate-x-1 transition-transform inline-block">Review Post</span>
                 </div>
               </CardBody>
             </Card>
@@ -87,7 +87,6 @@ export default function ReportedPostsList() {
               {/* RIGHT SIDE: Header + Meta + Footer */}
               <div className="w-full md:w-2/5 flex flex-col bg-[#1a1a1a] h-full">
                 <div className="p-8 border-b border-white/5">
-                  <h3 className="text-xl font-black tracking-tighter uppercase italic text-white leading-none mb-1">Investigation</h3>
                   <p className="text-gray-500 text-[8px] font-black uppercase tracking-[0.3em]">REF ID: {selectedPost?.post_id}</p>
                 </div>
 
@@ -119,10 +118,10 @@ export default function ReportedPostsList() {
 
                 <div className="p-8 bg-black/40 border-t border-white/5 flex flex-wrap gap-4 mt-auto">
                   <div className="flex gap-4 w-full">
-                    <button className="flex-1 bg-white/5 text-white border border-white/10 font-black py-4 rounded-xl text-[9px] uppercase tracking-widest hover:bg-white/10 transition-all" onClick={() => handleAction(selectedPost.post_id, "dismiss")}>Clear Case</button>
-                    <button className="flex-1 bg-orange-500/10 text-orange-500 border border-orange-500/20 font-black py-4 rounded-xl text-[9px] uppercase tracking-widest hover:bg-orange-500/20" onClick={() => handleAction(selectedPost.post_id, "remove")}>Hide Post</button>
+                    <button className="flex-1 bg-white/5 text-white border border-white/10 font-black py-4 rounded-xl text-[9px] uppercase tracking-widest hover:bg-white/10 transition-all" onClick={() => handleAction(selectedPost.post_id, "dismiss")}>Dismiss</button>
+                    <button className="flex-1 bg-white/5 text-white border border-orange-500/20 font-black py-4 rounded-xl text-[9px] uppercase tracking-widest hover:bg-white/10" onClick={() => handleAction(selectedPost.post_id, "remove")}>Remove</button>
                   </div>
-                  <button className="w-full bg-red-600 text-white font-black py-5 rounded-xl text-[10px] uppercase tracking-widest shadow-xl hover:bg-red-700 transition-all" onClick={() => handleAction(selectedPost.post_id, "delete")}>Hard Delete</button>
+                  <button className="w-full bg-red-600 text-white font-black py-5 rounded-xl text-[10px] uppercase tracking-widest shadow-xl hover:bg-red-700 transition-all" onClick={() => handleAction(selectedPost.post_id, "delete")}>Delete</button>
                 </div>
               </div>
             </div>

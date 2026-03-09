@@ -102,26 +102,14 @@ export default function ModelManagement() {
               Data
             </Button>
           </div>
-
-          {/* Only show Initialize Training when on the Models tab */}
-          {activeView === "models" && (
-            <Button 
-              onPress={() => adminService.triggerTraining()}
-              className="bg-white/5 text-white border border-white/10 font-black uppercase text-[10px] tracking-widest h-16 px-6 rounded-3xl hover:bg-[#CFB87C] hover:text-[#222222] hover:border-[#CFB87C] transition-all shadow-xl"
-            >
-              Initialize Training
-            </Button>
-          )}
         </div>
       </div>
 
       <div className="flex-grow overflow-hidden relative">
         <ScrollShadow className="h-full pr-4 scrollbar-hide" size={40}>
-          
-          {/* TAB 1: MODEL VERSIONS */}
+
           {activeView === "models" && (
             <div className="flex flex-col gap-8 pb-12">
-              {/* COMPACT INJECTION PANEL */}
               <Card className="border border-white/5 shadow-2xl bg-[#1a1a1a] rounded-[2.5rem] overflow-hidden flex-shrink-0">
                 <CardBody className="p-8 text-white">
                   <form onSubmit={handleUploadSubmit} className="flex flex-col md:flex-row gap-8 items-center justify-between">
