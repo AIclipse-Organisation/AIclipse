@@ -3,6 +3,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: model-cycle-pvc
 spec:
+  storageClassName: hostpath-retain
   accessModes:
     - ReadWriteOnce
   resources:

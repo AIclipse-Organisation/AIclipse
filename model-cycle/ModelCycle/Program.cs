@@ -19,6 +19,8 @@ var mongoDbName = Environment.GetEnvironmentVariable("MONGO_DB") ?? "aiclipse";
 
 var authUri = Environment.GetEnvironmentVariable("AUTH_URI");
 
+var detectorUri = Environment.GetEnvironmentVariable("DETECTOR_URI");
+
 Console.WriteLine($"[Mongo] Connecting to {mongoDbName}...");
 
 builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoUri));
@@ -26,9 +28,20 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
     sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDbName));
 
 
+builder.Services.AddHttpClient<IDetectorClientService, DetectorClientService>((serviceProvider, client) =>
+{
+    if (!Uri.TryCreate(detectorUri, UriKind.Absolute, out var baseUri) ||
+           (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
+    {
+        throw new Exception($"Invalid detectorUri scheme. Expected http/https but got: {detectorUri}");
+    }
+
+    client.BaseAddress = baseUri;
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.AddHttpClient<IAuthService, AuthService>(client =>
 {
-    // 2. Validate the URL scheme to prevent "mongodb://" errors
     if (!Uri.TryCreate(authUri, UriKind.Absolute, out var baseUri) ||
         (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
     {
@@ -123,6 +136,7 @@ var dbPath = Path.Join("/app/data", "modelcycle.db");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
+builder.Services.AddScoped<IModelDeploymentService, ModelDeploymentService>();
 builder.Services.AddSingleton<IBetaDistribution, BetaDistribution>();
 builder.Services.AddSingleton<IConfidenceService, ConfidenceService>();
 
@@ -171,6 +185,37 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<AppDbContext>();
         context.Database.EnsureCreated();
         Console.WriteLine("[SQLite] Database migrated successfully.");
+
+        var modelWeightsRepository = services.GetRequiredService<IModelWeightsRepository>();
+        var v1Weights = await modelWeightsRepository.GetByVersionAsync("v1.0.0");
+
+        if (v1Weights == null)
+        {
+            Console.WriteLine("[Seed] No v1.0.0 model weights found. Seeding default weights.");
+            var newWeights = new ModelCycle.Models.ModelWeights
+            {
+                Id = Guid.NewGuid(),
+                Version = "v1.0.0",
+                MinioObjectPath = "seed_model/v1.0.0.pt",
+                CreatedAt = DateTime.UtcNow,
+                NewImagesCount = 0,
+                ReplayBufferCount = 0,
+                ValidationAccuracy = 0.5,
+                ValidationPrecision = 0.5,
+                ValidationRecall = 0.5,
+                ValidationF1Score = 0.5,
+                GoldenTestAccuracy = 0.5,
+                GoldenTestPrecision = 0.5,
+                GoldenTestRecall = 0.5,
+                GoldenTestF1Score = 0.5,
+                GoldenFakeToRealMisclassifications = 0,
+                GoldenRealToFakeMisclassifications = 0,
+                IsDeployed = false,
+            };
+            context.ModelWeights.Add(newWeights);
+            await context.SaveChangesAsync();
+            Console.WriteLine("[Seed] Default v1.0.0 model weights seeded.");
+        }
     }
     catch (Exception ex)
     {

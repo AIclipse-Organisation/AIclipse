@@ -1,7 +1,7 @@
 using ModelCycle.Data;
 using ModelCycle.Models;
 using Microsoft.EntityFrameworkCore;
-using ModelCycle.Services; 
+using ModelCycle.Services;
 
 namespace ModelCycle.Services.Training;
 
@@ -26,7 +26,7 @@ public class TrainingJobManager : ITrainingJobManager
         _context = context;
         _logger = logger;
     }
-    
+
     public class JobScope : IDisposable
     {
         public Guid JobId { get; }
@@ -34,8 +34,8 @@ public class TrainingJobManager : ITrainingJobManager
         public string DataDir => Path.Combine(JobRootPath, "data");
         public string OutputDir => Path.Combine(JobRootPath, "output");
         public string BaseModelDir => Path.Combine(JobRootPath, "base_model");
-        public string GoldenDir { get; } 
-        
+        public string GoldenDir { get; }
+
         public string OutputModelPath => Path.Combine(OutputDir, "pytorch_model.bin");
         public string MetricsPath => Path.Combine(OutputDir, "metrics.json");
 
@@ -53,7 +53,7 @@ public class TrainingJobManager : ITrainingJobManager
         {
             if (Directory.Exists(JobRootPath))
             {
-                try 
+                try
                 {
                     Directory.Delete(JobRootPath, true);
                     _logger.LogInformation("Cleaned up job directory: {Path}", JobRootPath);
@@ -77,7 +77,7 @@ public class TrainingJobManager : ITrainingJobManager
             _logger.LogCritical("Golden set directory not found at {Path}. ", goldenPath);
             throw new DirectoryNotFoundException($"Golden set not found at {goldenPath}.");
         }
-        
+
         Directory.CreateDirectory(Path.Combine(jobPath, "data"));
         Directory.CreateDirectory(Path.Combine(jobPath, "output"));
         Directory.CreateDirectory(Path.Combine(jobPath, "base_model"));
@@ -88,15 +88,15 @@ public class TrainingJobManager : ITrainingJobManager
     public async Task StageImagesAsync(JobScope scope, List<TrainingImage> newImages, List<TrainingImage> replayImages)
     {
         var allImages = newImages.Concat(replayImages);
-        
+
         foreach (var img in allImages)
         {
             var destFolder = Path.Combine(scope.DataDir, img.Label.ToUpper());
             Directory.CreateDirectory(destFolder);
-            
+
             string sourcePath = _datasetService.GetLocalFilePath(img.MediaImageId);
             var destPath = Path.Combine(destFolder, $"{img.Id}.jpg");
-            
+
             if (File.Exists(sourcePath))
             {
                 File.Copy(sourcePath, destPath, overwrite: true);
@@ -106,7 +106,7 @@ public class TrainingJobManager : ITrainingJobManager
                 _logger.LogWarning("Expected local image {Id} not found at {Path}. Skipping.", img.Id, sourcePath);
             }
         }
-        await Task.CompletedTask; 
+        await Task.CompletedTask;
     }
 
     public async Task<string> PrepareBaseModelAsync(JobScope scope)
@@ -123,18 +123,18 @@ public class TrainingJobManager : ITrainingJobManager
             if (File.Exists(source)) File.Copy(source, dest, overwrite: true);
             else throw new FileNotFoundException($"Missing config file: {file}");
         }
-        
+
         var latestModel = await _context.ModelWeights
             .Where(m => m.IsDeployed)
             .OrderByDescending(m => m.CreatedAt)
             .FirstOrDefaultAsync();
 
         if (latestModel == null)
-             throw new InvalidOperationException("Invariant violation: No deployed model found in DB.");
+            throw new InvalidOperationException("Invariant violation: No deployed model found in DB.");
 
         if (string.IsNullOrEmpty(latestModel.MinioObjectPath))
-             throw new InvalidOperationException($"Model {latestModel.Version} has no MinIO path.");
-        
+            throw new InvalidOperationException($"Model {latestModel.Version} has no MinIO path.");
+
         string targetWeightsFile = Path.Combine(scope.BaseModelDir, "pytorch_model.bin");
         _logger.LogInformation("Downloading weights {Version} from {Path}...", latestModel.Version, latestModel.MinioObjectPath);
 
