@@ -23,7 +23,11 @@ function buildActionLine(item) {
   }
 
   if (item?.type === "moderation") {
+    const action = item?.moderation_action || "removed";
     const reason = item?.moderation_reason || "content policy violation";
+    if (action === "deleted") {
+      return `permanently deleted your post for ${reason}.`;
+    }
     return `removed your post for ${reason}.`;
   }
 

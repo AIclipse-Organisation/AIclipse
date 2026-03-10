@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
 import jwt from "jsonwebtoken";
 import { validateUserId, validateImageId, validatePostId } from "./validation.js";
+import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 
 import { getRedis } from "@/lib/redis/redis";
 
@@ -434,6 +435,23 @@ export async function DELETE(req) {
         }
       }
     );
+
+    // Notify post owner if admin deleted their post
+    if (isAdmin && !isOwner && post.user_id) {
+      try {
+        await recordCollapsedNotification(db, {
+          recipient_user_id: post.user_id,
+          actor_user_id: authenticatedUserId,
+          post_id: post.post_id,
+          type: "moderation",
+          moderation_action: "deleted",
+          moderation_reason: "Content permanently deleted by moderation team",
+          image_id: post.image_id || null,
+        });
+      } catch (notifyErr) {
+        console.error("Failed to create deletion notification:", notifyErr);
+      }
+    }
 
     // Cleanup Comments/Votes
     await db.collection("community.comments").deleteMany({ post_id: safePostId });
