@@ -440,7 +440,6 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
 
-  const previewWrap = document.getElementById('upload-preview-wrap');
 
   // File chosen -> show preview frame + enable button
   if (fileInput) {
