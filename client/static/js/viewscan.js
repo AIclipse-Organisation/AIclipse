@@ -232,7 +232,7 @@ async function fetchPostByPostId(postId) {
 
       const matched = findMatchingPost(data, matchesPostId);
       if (matched) return matched;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return null;
@@ -1272,8 +1272,34 @@ function setupMakePublicInline(img) {
     return;
   }
 
-  const shouldShow = isPrivateScan(img);
+  // Check if image has been removed by moderation
+  const isModerated = img && img.moderation_status === "removed";
+  const shouldShow = isPrivateScan(img) && !isModerated;
+
   makePublicSection.style.display = shouldShow ? "block" : "none";
+
+  // If moderated, show a warning message instead
+  if (isModerated && isPrivateScan(img)) {
+    makePublicSection.style.display = "block";
+    form.hidden = true;
+    setSelected(makePublicBtn, false);
+
+    // Show moderation warning
+    const warningDiv = document.createElement("div");
+    warningDiv.id = "moderation-warning";
+    warningDiv.style.cssText = "padding: 16px; background: rgba(220, 53, 69, 0.1); border: 1px solid rgba(220, 53, 69, 0.3); border-radius: 12px; color: rgba(220, 53, 69, 0.9); font-size: 14px; margin-top: 12px;";
+    warningDiv.innerHTML = `
+      <strong>⚠️ Content Removed</strong><br>
+      <span style="font-size: 13px; opacity: 0.8;">${img.moderation_reason || "This image has been removed by moderation and cannot be posted to the community."}</span>
+    `;
+
+    // Remove existing warning if any
+    const existingWarning = document.getElementById("moderation-warning");
+    if (existingWarning) existingWarning.remove();
+
+    makePublicSection.appendChild(warningDiv);
+    return;
+  }
 
   if (!shouldShow) {
     form.hidden = true;
@@ -1410,6 +1436,12 @@ async function handleMakePublic(img, description) {
 
   if (!postRes.ok) {
     const errorData = await postRes.json().catch(() => ({}));
+
+    // Check if it's a moderation block (403)
+    if (postRes.status === 403) {
+      throw new Error(errorData.error || "This image cannot be posted to the community.");
+    }
+
     throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
   }
 

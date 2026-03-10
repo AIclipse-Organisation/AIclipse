@@ -6,14 +6,14 @@ async function fetchLocal(endpoint, options = {}) {
   const res = await fetch(`/community/adminBFF${endpoint}`, {
     ...options,
     headers,
-    credentials: "include", 
+    credentials: "include",
   });
 
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) {
-        console.warn("Unauthorized. Redirecting to login...");
-        // window.location.href = "/"; 
-        return null;
+      console.warn("Unauthorized. Redirecting to login...");
+      // window.location.href = "/"; 
+      return null;
     }
 
     const errorBody = await res.json().catch(() => ({}));
@@ -35,10 +35,10 @@ export const adminService = {
   scanImage: async (file) => {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("/checks", { 
-      method: "POST", 
-      body: formData, 
-      credentials: "include" 
+    const res = await fetch("/checks", {
+      method: "POST",
+      body: formData,
+      credentials: "include"
     });
     if (!res.ok) throw new Error("AI Scan failed");
     return res.json();
@@ -49,11 +49,11 @@ export const adminService = {
     formData.append("file", file);
     formData.append("detection_token", token);
     formData.append("is_public", "true");
-    
-    const res = await fetch("/upload/image", { 
-      method: "POST", 
-      body: formData, 
-      credentials: "include" 
+
+    const res = await fetch("/upload/image", {
+      method: "POST",
+      body: formData,
+      credentials: "include"
     });
     if (!res.ok) throw new Error("Image save failed");
     return res.json();
@@ -69,14 +69,14 @@ export const adminService = {
     if (!res.ok) throw new Error("Community publish failed");
     return res.json();
   },
-  
+
   uploadModel: async (formData) => {
     const res = await fetch(`/community/adminBFF/models`, {
       method: "POST",
       body: formData,
       credentials: "include",
     });
-    
+
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || "Upload failed");
@@ -90,10 +90,12 @@ export const adminService = {
     return res.json();
   },
 
-  moderatePost: async ({ post_id, action }) => {
+  moderatePost: async ({ post_id, action, note }) => {
     const res = await fetch("/community/posts/report", {
       method: "PATCH",
-      body: JSON.stringify({ post_id, action }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ post_id, action, note }),
+      credentials: "include",
     });
     if (!res.ok) throw new Error("Moderation failed");
     return res.json();
@@ -106,5 +108,5 @@ export const adminService = {
     if (!res.ok) throw new Error("Delete failed");
     return res.json();
   }
-  
+
 };

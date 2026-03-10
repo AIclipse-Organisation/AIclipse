@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
 import { validatePostId } from "../validation.js";
 import jwt from "jsonwebtoken";
+import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 
 export const runtime = "nodejs";
 
 
 const POSTS_COLLECTION = "community.posts";
 
-function getAuthenticatedUserId(req) {
+function extractToken(req) {
   let token = null;
 
   // Try Authorization header first
@@ -33,6 +34,12 @@ function getAuthenticatedUserId(req) {
       token = cookies.access_token;
     }
   }
+
+  return token;
+}
+
+function getAuthenticatedUserId(req) {
+  const token = extractToken(req);
 
   if (!token) {
     throw new Error("Missing authentication token");
@@ -62,7 +69,7 @@ export async function POST(req) {
   try {
     let reporterId;
     try {
-      reporterId = getAuthenticatedUserId(req); 
+      reporterId = getAuthenticatedUserId(req);
     } catch (authErr) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -93,9 +100,9 @@ export async function POST(req) {
         },
         $inc: { report_count: 1 }
       },
-      { 
+      {
         returnDocument: "after",
-        projection: { _id: 0, post_id: 1, report_count: 1 } 
+        projection: { _id: 0, post_id: 1, report_count: 1 }
       }
     );
 
@@ -119,7 +126,7 @@ export async function POST(req) {
 export async function PATCH(req) {
   try {
     const adminUserId = getAuthenticatedUserId(req);
-    const { post_id, action, note } = await req.json(); 
+    const { post_id, action, note } = await req.json();
 
     const db = await getDb();
     const postsCol = db.collection(POSTS_COLLECTION);
@@ -135,8 +142,8 @@ export async function PATCH(req) {
     };
 
     let updateDoc = {
-      $set: { 
-        is_reported: false, 
+      $set: {
+        is_reported: false,
         last_moderated_at: new Date()
       },
       $push: { moderation_log: logEntry }
@@ -147,21 +154,39 @@ export async function PATCH(req) {
       updateDoc.$set.is_removed = true;
 
       try {
+        const token = extractToken(req);
         const GATEWAY_URI = process.env.GATEWAY_URI;
         await fetch(`${GATEWAY_URI}/image/${post.image_id}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${extractToken(req)}` 
+            "Authorization": `Bearer ${token}`
           },
           body: JSON.stringify({ is_public: false })
         });
       } catch (err) { console.error("Gateway Sync Failed", err); }
 
+      // Notify the post owner that their post was removed
+      if (post.user_id && post.user_id !== adminUserId) {
+        try {
+          await recordCollapsedNotification(db, {
+            recipient_user_id: post.user_id,
+            actor_user_id: adminUserId,
+            post_id: post.post_id,
+            type: "moderation",
+            moderation_action: "removed",
+            moderation_reason: note || "Content policy violation",
+            image_id: post.image_id || null,
+          });
+        } catch (notifyErr) {
+          console.error("Failed to create moderation notification:", notifyErr);
+        }
+      }
+
     } else if (action === "dismiss") {
       updateDoc.$set.moderation_status = "cleared";
       updateDoc.$set.is_removed = false;
-    } 
+    }
 
     await postsCol.updateOne({ post_id }, updateDoc);
     return NextResponse.json({ message: `Post ${action}ed.` });
@@ -174,15 +199,15 @@ export async function GET(req) {
   try {
     const db = await getDb();
     const postsCol = db.collection(POSTS_COLLECTION);
-    const imagesCol = db.collection("images"); 
+    const imagesCol = db.collection("images");
 
     const reportedPosts = await postsCol
-      .find({ 
-        is_reported: true, 
-        is_removed: { $ne: true }, 
-        is_deleted: { $ne: true } 
+      .find({
+        is_reported: true,
+        is_removed: { $ne: true },
+        is_deleted: { $ne: true }
       })
-      .sort({ report_count: -1, last_reported_at: -1 }) 
+      .sort({ report_count: -1, last_reported_at: -1 })
       .toArray();
 
     if (reportedPosts.length === 0) {
@@ -204,7 +229,7 @@ export async function GET(req) {
 
     const items = reportedPosts.map(post => ({
       ...post,
-      url: imageMap[post.image_id] || null 
+      url: imageMap[post.image_id] || null
     }));
 
     return NextResponse.json({ items }, { status: 200 });

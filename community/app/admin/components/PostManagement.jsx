@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@heroui/react";
-import PostCreator from "./PostCreator"; 
-import ReportedPostsList from "./ReportedPostsList"; 
+import PostCreator from "./PostCreator";
+import ReportedPostsList from "./ReportedPostsList";
 
 export default function PostManagement() {
   const [activeView, setActiveView] = useState("creator");
@@ -15,29 +15,27 @@ export default function PostManagement() {
           <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
             {activeView === "creator" ? "Post Creator" : "Moderation Queue"}
           </h2>
-          <p className="text-gray-500 font-bold uppercase text-[10px] tracking-[0.2em]">
-            {activeView === "creator" 
-              ? "Upload authenticated images to train the community." 
+          <p className="text-gray-400 font-semibold uppercase text-sm tracking-wide">
+            {activeView === "creator"
+              ? "Upload authenticated images to train the community."
               : "Review and resolve community reports."}
           </p>
         </div>
 
         <div className="flex bg-black/40 p-2 rounded-3xl border border-white/5 shadow-xl">
-          <Button 
+          <Button
             size="sm"
             onPress={() => setActiveView("creator")}
-            className={`font-black px-10 rounded-2xl transition-all uppercase text-[10px] tracking-widest h-12 ${
-              activeView === "creator" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
-            }`}
+            className={`font-black px-10 rounded-2xl transition-all uppercase text-sm tracking-wide h-12 ${activeView === "creator" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
+              }`}
           >
             Create
           </Button>
-          <Button 
+          <Button
             size="sm"
             onPress={() => setActiveView("reports")}
-            className={`font-black px-10 rounded-2xl transition-all uppercase text-[10px] tracking-widest h-12 ${
-              activeView === "reports" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
-            }`}
+            className={`font-black px-10 rounded-2xl transition-all uppercase text-sm tracking-wide h-12 ${activeView === "reports" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
+              }`}
           >
             Reports
           </Button>

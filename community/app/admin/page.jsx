@@ -6,11 +6,10 @@ import PostManagement from "./components/PostManagement";
 export default function AdminPage() {
   const [activeView, setActiveView] = useState("model_management");
 
-  const getLinkClass = (viewName) => 
-    `p-4 rounded-2xl cursor-pointer transition-all text-left font-black uppercase text-[10px] tracking-[0.2em] ${
-      activeView === viewName 
-        ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" 
-        : "text-gray-500 hover:bg-white/5 hover:text-[#CFB87C]"
+  const getLinkClass = (viewName) =>
+    `p-4 rounded-2xl cursor-pointer transition-all text-left font-black uppercase text-sm tracking-wide ${activeView === viewName
+      ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10"
+      : "text-gray-500 hover:bg-white/5 hover:text-[#CFB87C]"
     }`;
 
   return (
@@ -18,11 +17,11 @@ export default function AdminPage() {
       {/* SIDEBAR: No white, rounded and floating from bottom */}
       <aside className="w-72 bg-[#1a1a1a] border border-white/5 p-8 flex flex-col h-full rounded-[2.5rem] shadow-2xl">
         <div className="mb-12 px-2">
-           <h2 className="text-2xl font-black text-white italic tracking-tighter">
-             Admin<span className="text-[#CFB87C]">.</span>
-           </h2>
+          <h2 className="text-2xl font-black text-white italic tracking-tighter">
+            Admin<span className="text-[#CFB87C]">.</span>
+          </h2>
         </div>
-        
+
         <nav className="flex flex-col gap-1 flex-1">
           <button className={getLinkClass("model_management")} onClick={() => setActiveView("model_management")}>
             Model Management
@@ -33,9 +32,9 @@ export default function AdminPage() {
         </nav>
 
         <div className="mt-auto pt-6 border-t border-white/5">
-           <a href="/" className="flex items-center gap-2 p-3 rounded-xl hover:bg-red-500/10 text-gray-500 hover:text-red-500 transition-all text-[10px] font-black uppercase tracking-widest">
-             ← Exit System
-           </a>
+          <a href="/" className="flex items-center gap-2 p-3 rounded-xl hover:bg-red-500/10 text-gray-500 hover:text-red-500 transition-all text-sm font-black uppercase tracking-wide">
+            ← Exit System
+          </a>
         </div>
       </aside>
 

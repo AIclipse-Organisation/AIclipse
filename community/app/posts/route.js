@@ -69,7 +69,7 @@ function createdAtToUnixSeconds(created_at) {
 // Helper function to extract and verify JWT token from Authorization header or cookie
 function getAuthenticatedUserId(req) {
   let token = null;
-  
+
   // Try Authorization header first
   const authHeader = req.headers.get("authorization");
   if (authHeader) {
@@ -78,7 +78,7 @@ function getAuthenticatedUserId(req) {
       token = parts[1];
     }
   }
-  
+
   // Fallback to cookie if no Authorization header
   if (!token) {
     const cookieHeader = req.headers.get("cookie");
@@ -92,19 +92,19 @@ function getAuthenticatedUserId(req) {
       token = cookies.access_token;
     }
   }
-  
+
   if (!token) {
     throw new Error("Missing authentication token");
   }
-  
+
   try {
     // Decode without verification to get the user_id
     const decoded = jwt.decode(token);
-    
+
     if (!decoded || !decoded.sub) {
       throw new Error("Invalid token payload");
     }
-    
+
     return decoded.sub; // user_id is stored in 'sub' claim
   } catch (err) {
     throw new Error("Invalid or expired token");
@@ -121,7 +121,7 @@ function extractToken(req) {
       return parts[1];
     }
   }
-  
+
   // Fallback to cookie
   const cookieHeader = req.headers.get("cookie");
   if (cookieHeader) {
@@ -133,7 +133,7 @@ function extractToken(req) {
     );
     return cookies.access_token || null;
   }
-  
+
   return null;
 }
 
@@ -161,9 +161,9 @@ export async function POST(req) {
     const image_id = body?.image_id || null;
     const description = (body?.description || "").trim();
     const result = body?.result ?? null;
-    
+
     // Admin specific fields
-    const ground_truth = body?.ground_truth || null; 
+    const ground_truth = body?.ground_truth || null;
     const is_admin_post = body?.is_admin_post || false;
 
     // 3. Basic validation
@@ -233,7 +233,7 @@ export async function POST(req) {
     try {
       const GATEWAY_URI = process.env.GATEWAY_URI
       const imageUpdateUrl = `${GATEWAY_URI}/image/${safeImageId}`;
-      
+
       await fetch(imageUpdateUrl, {
         method: "PATCH",
         headers: {
@@ -424,14 +424,14 @@ export async function DELETE(req) {
     // Proceed with deletion/tombstone
     await col.updateOne(
       { post_id: safePostId },
-      { 
-        $set: { 
-          is_deleted: true, 
+      {
+        $set: {
+          is_deleted: true,
           image_id: null,
           deleted_at: new Date(),
           moderation_status: "deleted",
-          deleted_by: isAdmin ? "admin" : "owner" 
-        } 
+          deleted_by: isAdmin ? "admin" : "owner"
+        }
       }
     );
 
@@ -451,9 +451,9 @@ export async function DELETE(req) {
       }
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: isAdmin ? "Admin override successful." : "Post deleted.",
-      post_id: safePostId 
+      post_id: safePostId
     });
 
   } catch (err) {
@@ -495,15 +495,15 @@ export async function GET(req) {
     const publicImageIds = publicImages.map((img) => img.image_id);
 
     // 2) posts for public images
-   const posts = await col
-              .find({ 
-                image_id: { $in: publicImageIds },
-                is_deleted: { $ne: true }, // Filter out tombstoned posts ( posts kept, but user data removed )
-                is_removed: { $ne: true }  // Filter out posts hidden by admins due to reports
-              }, { projection: { _id: 0 } })
-              .sort({ created_at: -1 })
-              .limit(100) 
-              .toArray();
+    const posts = await col
+      .find({
+        image_id: { $in: publicImageIds },
+        is_deleted: { $ne: true }, // Filter out tombstoned posts ( posts kept, but user data removed )
+        is_removed: { $ne: true }  // Filter out posts hidden by admins due to reports
+      }, { projection: { _id: 0 } })
+      .sort({ created_at: -1 })
+      .limit(100)
+      .toArray();
 
     if (!posts.length) {
       return NextResponse.json({ items: [] }, { status: 200 });
@@ -601,7 +601,7 @@ export async function GET(req) {
       let score = engagement / timeFactor;
 
       if (post.user_vote) {
-        score *= 0.001; 
+        score *= 0.001;
       }
 
       // demo boosts`
@@ -622,9 +622,9 @@ export async function GET(req) {
 
     const paginatedItems = ranked.slice(skip, skip + limit);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       items: paginatedItems,
-      hasMore: ranked.length > skip + limit 
+      hasMore: ranked.length > skip + limit
     }, { status: 200 });
 
   } catch (err) {

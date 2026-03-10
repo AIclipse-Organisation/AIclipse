@@ -84,6 +84,8 @@ export async function recordCollapsedNotification(db, payload) {
     type,
     vote_value = null,
     image_id = null,
+    moderation_action = null,
+    moderation_reason = null,
   } = payload;
 
   if (!recipient_user_id || !actor_user_id || !post_id || !type) return;
@@ -115,6 +117,10 @@ export async function recordCollapsedNotification(db, payload) {
     filter.vote_value = vote_value;
   }
 
+  if (type === "moderation" && moderation_action) {
+    filter.moderation_action = moderation_action;
+  }
+
   const setOnInsert = {
     notification_id: makeNotificationId(),
     recipient_user_id,
@@ -131,6 +137,11 @@ export async function recordCollapsedNotification(db, payload) {
 
   if (type === "vote" && vote_value) {
     setOnInsert.vote_value = vote_value;
+  }
+
+  if (type === "moderation") {
+    if (moderation_action) setOnInsert.moderation_action = moderation_action;
+    if (moderation_reason) setOnInsert.moderation_reason = moderation_reason;
   }
 
   if (image_id) {
