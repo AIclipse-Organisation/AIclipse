@@ -8,7 +8,7 @@ body {
   ;
   padding: 0;
   min-height: 100vh;
-  background: white;
+  background: #000;
 }
 
 header {
@@ -281,7 +281,7 @@ body.app main {
 /* Responsive: keep phone width centered on large screens */
 @media (min-width: 768px) {
   body.app {
-    background: #f5f5f5;
+    background: #000;
     /* optional: subtle contrast outside phone shell */
   }
 }
