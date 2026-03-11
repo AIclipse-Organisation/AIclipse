@@ -200,7 +200,7 @@ body {
 /* Responsive: subtle contrast outside phone shell */
 @media (min-width: 768px) {
   .app {
-    background: #f5f5f5;
+    background: #000;
   }
 }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
 import jwt from "jsonwebtoken";
 import { validateUserId, validateImageId, validatePostId } from "./validation.js";
+import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 
 import { getRedis } from "@/lib/redis/redis";
 
@@ -69,7 +70,7 @@ function createdAtToUnixSeconds(created_at) {
 // Helper function to extract and verify JWT token from Authorization header or cookie
 function getAuthenticatedUserId(req) {
   let token = null;
-  
+
   // Try Authorization header first
   const authHeader = req.headers.get("authorization");
   if (authHeader) {
@@ -78,7 +79,7 @@ function getAuthenticatedUserId(req) {
       token = parts[1];
     }
   }
-  
+
   // Fallback to cookie if no Authorization header
   if (!token) {
     const cookieHeader = req.headers.get("cookie");
@@ -92,19 +93,19 @@ function getAuthenticatedUserId(req) {
       token = cookies.access_token;
     }
   }
-  
+
   if (!token) {
     throw new Error("Missing authentication token");
   }
-  
+
   try {
     // Decode without verification to get the user_id
     const decoded = jwt.decode(token);
-    
+
     if (!decoded || !decoded.sub) {
       throw new Error("Invalid token payload");
     }
-    
+
     return decoded.sub; // user_id is stored in 'sub' claim
   } catch (err) {
     throw new Error("Invalid or expired token");
@@ -121,7 +122,7 @@ function extractToken(req) {
       return parts[1];
     }
   }
-  
+
   // Fallback to cookie
   const cookieHeader = req.headers.get("cookie");
   if (cookieHeader) {
@@ -133,7 +134,7 @@ function extractToken(req) {
     );
     return cookies.access_token || null;
   }
-  
+
   return null;
 }
 
@@ -161,9 +162,9 @@ export async function POST(req) {
     const image_id = body?.image_id || null;
     const description = (body?.description || "").trim();
     const result = body?.result ?? null;
-    
+
     // Admin specific fields
-    const ground_truth = body?.ground_truth || null; 
+    const ground_truth = body?.ground_truth || null;
     const is_admin_post = body?.is_admin_post || false;
 
     // 3. Basic validation
@@ -221,6 +222,9 @@ export async function POST(req) {
       controversial_since: null,
       created_at: new Date(),
       is_reported: false,
+      report_count: 0,
+      reporter_ids: [],      // Array of unique user_ids who reported
+      report_history: []
     };
 
     const col = db.collection(POSTS_COLLECTION);
@@ -230,7 +234,7 @@ export async function POST(req) {
     try {
       const GATEWAY_URI = process.env.GATEWAY_URI
       const imageUpdateUrl = `${GATEWAY_URI}/image/${safeImageId}`;
-      
+
       await fetch(imageUpdateUrl, {
         method: "PATCH",
         headers: {
@@ -363,136 +367,116 @@ export async function PATCH(req) {
 // Allows a user to delete their own post
 export async function DELETE(req) {
   try {
-    // Verify authentication and get authenticated user_id from JWT token
-    let authenticatedUserId;
-    try {
-      authenticatedUserId = getAuthenticatedUserId(req);
-    } catch (authErr) {
-      return NextResponse.json(
-        { error: "Unauthorized", detail: String(authErr) },
-        { status: 401 }
-      );
+    // 1. Get the token from the request
+    const token = extractToken(req);
+    if (!token) {
+      return NextResponse.json({ error: "Missing token" }, { status: 401 });
     }
 
-    // Get post_id from query parameters
+    // FETCH USER STATUS FROM GATEWAY
+    const GATEWAY_URI = process.env.GATEWAY_URI;
+    const meRes = await fetch(`${GATEWAY_URI}/auth/me`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+
+    if (!meRes.ok) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const currentUser = await meRes.json();
+    const authenticatedUserId = currentUser.user_id;
+    const isAdmin = currentUser.is_admin === true;
+
+    // Extract and validate post_id
     const { searchParams } = new URL(req.url);
     const post_id = searchParams.get("post_id");
-
     if (!post_id) {
-      return NextResponse.json(
-        { error: "Missing required parameter: post_id" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing post_id" }, { status: 400 });
     }
 
-    // Validate post_id format
     const postIdValidation = validatePostId(post_id);
     if (!postIdValidation.valid) {
-      return NextResponse.json(
-        { error: postIdValidation.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: postIdValidation.error }, { status: 400 });
     }
     const safePostId = postIdValidation.value;
 
     const db = await getDb();
     const col = db.collection(POSTS_COLLECTION);
-
-    // First, find the post to verify ownership
     const post = await col.findOne({ post_id: safePostId });
 
     if (!post) {
-      return NextResponse.json(
-        { error: "Post not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
-    // Security check: ensure the authenticated user owns this post
-    if (post.user_id !== authenticatedUserId) {
+    // Check if Owner OR Admin
+    const isOwner = post.user_id === authenticatedUserId;
+
+    if (!isOwner && !isAdmin) {
       return NextResponse.json(
-        { error: "Forbidden: You can only delete your own posts" },
+        { error: "Forbidden: Elevated permissions required" },
         { status: 403 }
       );
     }
 
-    // Delete the post
-    const deleteResult = await col.deleteOne({ post_id: safePostId });
-
-    if (deleteResult.deletedCount === 0) {
-      // The post was likely deleted by a concurrent request
-      return NextResponse.json(
-        { error: "Post not found or already deleted" },
-        { status: 404 }
-      );
-    }
-
-    // Delete associated comments and votes
-    const COMMENTS_COLLECTION = "community.comments";
-    const VOTES_COLLECTION = "community.votes";
-    
-    const commentsResult = await db.collection(COMMENTS_COLLECTION).deleteMany({ post_id: safePostId });
-    const votesResult = await db.collection(VOTES_COLLECTION).deleteMany({ post_id: safePostId });
-    
-    console.log(`Deleted ${commentsResult.deletedCount} comments and ${votesResult.deletedCount} votes for post ${safePostId}`);
-
-    // Delete the associated image via gateway
-    const image_id = post.image_id;
-    let imageDeleted = false;
-    if (image_id) {
-      // Validate image_id to prevent SSRF
-      const validation = validateImageId(image_id);
-      if (!validation.valid) {
-        console.warn(`Invalid image_id format: ${image_id}`);
-        // Continue with post deletion even if image_id is invalid - don't attempt image deletion
-      } else {
-        // Use the validated value from the validation result to break taint chain
-        const safeImageId = validation.value;
-        
-        try {
-          const token = extractToken(req);
-
-          if (token) {
-            // Call gateway which will authenticate and forward to media service
-            const GATEWAY_URI = process.env.GATEWAY_URI;
-            const gatewayUrl = `${GATEWAY_URI}/image/${safeImageId}`;
-            const gatewayResponse = await fetch(gatewayUrl, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-              },
-            });
-
-            if (gatewayResponse.ok) {
-              console.log(`Successfully deleted image ${safeImageId} via gateway`);
-              imageDeleted = true;
-            } else {
-              const errorText = await gatewayResponse.text().catch(() => 'Unknown error');
-              console.warn(`Failed to delete image ${safeImageId} from gateway: ${gatewayResponse.status} - ${errorText}`);
-            }
-          } else {
-            console.warn('No authentication token available to delete image');
-          }
-        } catch (gatewayError) {
-          console.error(`Error calling gateway to delete image ${safeImageId}:`, gatewayError);
+    // Proceed with deletion/tombstone
+    await col.updateOne(
+      { post_id: safePostId },
+      {
+        $set: {
+          is_deleted: true,
+          image_id: null,
+          deleted_at: new Date(),
+          moderation_status: "deleted",
+          deleted_by: isAdmin ? "admin" : "owner"
         }
+      }
+    );
+
+    // Notify post owner if admin deleted their post
+    if (isAdmin && !isOwner && post.user_id) {
+      try {
+        await recordCollapsedNotification(db, {
+          recipient_user_id: post.user_id,
+          actor_user_id: authenticatedUserId,
+          post_id: post.post_id,
+          type: "moderation",
+          moderation_action: "deleted",
+          moderation_reason: "Content permanently deleted by moderation team",
+          image_id: post.image_id || null,
+        });
+      } catch (notifyErr) {
+        console.error("Failed to create deletion notification:", notifyErr);
       }
     }
 
-    return NextResponse.json(
-      { 
-        message: imageDeleted 
-          ? "Post deleted successfully (including comments, votes, and image)" 
-          : "Post deleted successfully (comments and votes removed; image deletion was attempted)",
-        post_id: safePostId 
-      },
-      { status: 200 }
-    );
+    // Cleanup Comments/Votes
+    await db.collection("community.comments").deleteMany({ post_id: safePostId });
+    await db.collection("community.votes").deleteMany({ post_id: safePostId });
+
+    // Delete from S3/Gateway if image_id exists
+    if (post.image_id) {
+      try {
+        await fetch(`${GATEWAY_URI}/image/${post.image_id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+      } catch (e) {
+        console.error("Gateway cleanup failed", e);
+      }
+    }
+
+    return NextResponse.json({
+      message: isAdmin ? "Admin override successful." : "Post deleted.",
+      post_id: safePostId
+    });
+
   } catch (err) {
-    return NextResponse.json(
-      { error: "Failed to delete post", detail: String(err) },
-      { status: 500 }
-    );
+    console.error("DELETE ERROR:", err);
+    return NextResponse.json({ error: "Server error", detail: String(err) }, { status: 500 });
   }
 }
 
@@ -530,10 +514,14 @@ export async function GET(req) {
 
     // 2) posts for public images
     const posts = await col
-          .find({ image_id: { $in: publicImageIds } }, { projection: { _id: 0 } })
-          .sort({ created_at: -1 })
-          .limit(100) 
-          .toArray();
+      .find({
+        image_id: { $in: publicImageIds },
+        is_deleted: { $ne: true }, // Filter out tombstoned posts ( posts kept, but user data removed )
+        is_removed: { $ne: true }  // Filter out posts hidden by admins due to reports
+      }, { projection: { _id: 0 } })
+      .sort({ created_at: -1 })
+      .limit(100)
+      .toArray();
 
     if (!posts.length) {
       return NextResponse.json({ items: [] }, { status: 200 });
@@ -631,7 +619,7 @@ export async function GET(req) {
       let score = engagement / timeFactor;
 
       if (post.user_vote) {
-        score *= 0.001; 
+        score *= 0.001;
       }
 
       // demo boosts`
@@ -652,9 +640,9 @@ export async function GET(req) {
 
     const paginatedItems = ranked.slice(skip, skip + limit);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       items: paginatedItems,
-      hasMore: ranked.length > skip + limit 
+      hasMore: ranked.length > skip + limit
     }, { status: 200 });
 
   } catch (err) {

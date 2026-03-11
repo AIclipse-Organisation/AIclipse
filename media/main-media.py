@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
+from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Query
 from pymongo import MongoClient
 from bson import ObjectId
 
@@ -28,6 +28,14 @@ def sanitize_for_log(value: str | None) -> str:
         return ""
     # Strip carriage returns and newlines; keep other characters unchanged.
     return value.replace("\r", "").replace("\n", "")
+
+
+def can_manage_image(doc: dict, user_id: str | None, is_admin: bool) -> bool:
+    if is_admin:
+        return True
+    if user_id is None:
+        return False
+    return doc.get("user_id") == user_id
 
 
 # ---- env ----
@@ -75,6 +83,7 @@ s3_public = boto3.client(
     region_name="us-east-1",
     config=_s3_cfg,
 )
+
 
 async def fetch_current_model_version() -> str:
     """
@@ -289,10 +298,15 @@ def get_image(image_id: str, user_id: str | None = None):
 
 
 @app.patch("/image/{image_id}")
-def update_image(image_id: str, user_id: str | None = Query(None), is_public: bool | None = Query(None)):
+def update_image(
+    image_id: str,
+    user_id: str | None = Query(None),
+    is_public: bool | None = Query(None),
+    x_is_admin: bool = Header(False, alias="X-Is-Admin"),
+):
     """
     Update an image's is_public field.
-    Only the owner (user_id) can update their image.
+    Only the owner or admin can update the image.
     """
     if images is None:
         raise HTTPException(status_code=404, detail="Not found")
@@ -302,8 +316,7 @@ def update_image(image_id: str, user_id: str | None = Query(None), is_public: bo
     if not doc:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    # Security check: only owner can update
-    if user_id is not None and doc.get("user_id") != user_id:
+    if not can_manage_image(doc, user_id, x_is_admin):
         raise HTTPException(status_code=403, detail="Forbidden: You can only update your own images")
 
     # Build update document
@@ -329,18 +342,23 @@ def update_image(image_id: str, user_id: str | None = Query(None), is_public: bo
         raise HTTPException(status_code=404, detail="Image not found after update")
 
     logging.info(
-        "Successfully updated image %s (user: %s)",
+        "Successfully updated image %s (user: %s, admin: %s)",
         sanitize_for_log(str(image_id)),
-        sanitize_for_log(str(user_id) if user_id else ""),
+        sanitize_for_log(user_id),
+        sanitize_for_log(str(x_is_admin)),
     )
     return attach_url(updated_doc)
 
 
 @app.delete("/image/{image_id}")
-def delete_image(image_id: str, user_id: str | None = None):
+def delete_image(
+    image_id: str,
+    user_id: str | None = Query(None),
+    x_is_admin: bool = Header(False, alias="X-Is-Admin"),
+):
     """
     Delete an image from both MinIO storage and MongoDB.
-    Only the owner (user_id) can delete their image.
+    Only the owner or admin can delete the image.
     """
     if images is None:
         raise HTTPException(status_code=404, detail="Not found")
@@ -350,8 +368,7 @@ def delete_image(image_id: str, user_id: str | None = None):
     if not doc:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    # Security check only owner can delete
-    if user_id is not None and doc.get("user_id") != user_id:
+    if not can_manage_image(doc, user_id, x_is_admin):
         raise HTTPException(status_code=403, detail="Forbidden: You can only delete your own images")
 
     # Delete from MinIO/S3 storage
@@ -364,7 +381,6 @@ def delete_image(image_id: str, user_id: str | None = None):
             logging.exception("Failed to delete image from MinIO: %s", sanitize_for_log(str(s3_key)))
             raise HTTPException(status_code=500, detail="Failed to delete image from storage") from e
 
-    # Delete from MongoDB
     result = images.delete_one({"image_id": image_id})
     if result.deleted_count == 0:
         logging.warning(
@@ -374,9 +390,10 @@ def delete_image(image_id: str, user_id: str | None = None):
         raise HTTPException(status_code=404, detail="Image not found in database")
 
     logging.info(
-        "Successfully deleted image %s (user: %s)",
+        "Successfully deleted image %s (user: %s, admin: %s)",
         sanitize_for_log(str(image_id)),
-        sanitize_for_log(str(user_id) if user_id else ""),
+        sanitize_for_log(user_id),
+        sanitize_for_log(str(x_is_admin)),
     )
     return {"message": "Image deleted successfully", "image_id": image_id}
 

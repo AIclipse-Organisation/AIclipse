@@ -98,14 +98,14 @@ export async function GET(req) {
       .toArray();
 
     // Fetch the name of the person who performed the action in one query and map by actor id.
-    const actorIds = [...new Set(rawItems.map((x) => x.actor_user_id).filter(Boolean))];
+    const actorIds = [...new Set(rawItems.map((x) => x.actor_user_id).filter(id => id))];
     const actorDocs = actorIds.length
       ? await usersCol
-          .find(
-            { user_id: { $in: actorIds } },
-            { projection: { _id: 0, user_id: 1, user_name: 1, email: 1 } },
-          )
-          .toArray()
+        .find(
+          { user_id: { $in: actorIds } },
+          { projection: { _id: 0, user_id: 1, user_name: 1, email: 1 } },
+        )
+        .toArray()
       : [];
 
     const actorMap = new Map(

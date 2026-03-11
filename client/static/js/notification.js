@@ -22,6 +22,15 @@ function buildActionLine(item) {
     return `voted ${vote} on your post${suffix}.`;
   }
 
+  if (item?.type === "moderation") {
+    const action = item?.moderation_action || "removed";
+    const reason = item?.moderation_reason || "content policy violation";
+    if (action === "deleted") {
+      return `permanently deleted your post for ${reason}.`;
+    }
+    return `removed your post for ${reason}.`;
+  }
+
   return `commented on your post${suffix}.`;
 }
 
@@ -50,7 +59,7 @@ function makeNotificationCard(item) {
     }
   });
 
- // Avatar icon with user initials fallback when name is missing.
+  // Avatar icon with user initials fallback when name is missing.
   const avatarWrap = document.createElement("div");
   avatarWrap.className = "notification-avatar";
   const avatarInitials = document.createElement("span");
@@ -82,7 +91,7 @@ function makeNotificationCard(item) {
   icon.alt = "";
   icon.setAttribute("aria-hidden", "true");
 
-  // Vote notifications show up/down icon; comments show comment icon.
+  // Vote notifications show up/down icon; comments show comment icon; moderation shows warning.
   if (item?.type === "vote") {
     const vote = String(item?.vote_value || "").toLowerCase();
     if (vote === "real") {
@@ -90,6 +99,9 @@ function makeNotificationCard(item) {
     } else {
       icon.src = "/static/images/downvote.png";
     }
+  } else if (item?.type === "moderation") {
+    icon.src = "/static/images/lock.png";
+    icon.style.opacity = "0.8";
   } else {
     icon.src = "/static/images/comment.png";
   }

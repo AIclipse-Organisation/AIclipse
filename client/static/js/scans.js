@@ -71,17 +71,17 @@ function makeEl(tag, className, text) {
 function createEmptyState() {
   const wrapper = makeEl("div", "scans-empty-state");
   const box = makeEl("div", "scans-empty-box");
-  
+
   const iconEl = document.createElement("img");
   iconEl.className = "scans-empty-icon";
   iconEl.src = "/static/images/upload_icon.png";
   iconEl.alt = "Upload icon";
 
   const text = makeEl("p", "scans-empty-text", "No scans yet.");
-  
+
   box.appendChild(iconEl);
   box.appendChild(text);
-  
+
   // Appending box just once now
   wrapper.appendChild(box);
 
@@ -135,15 +135,22 @@ function createScanCard(img, index) {
 
   // --- ADD VISIBILITY BADGE ---
   const visibility = getVisibility(img);
-  
- if (visibility === "private") {
+
+  if (visibility === "private") {
     const badge = makeEl("div", "scan-visibility-badge");
     badge.title = "Private Scan";
     badge.innerHTML = `<svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>`;
-    
     left.appendChild(badge);
   }
-  
+
+  // --- ADD MODERATION BADGE ---
+  if (img.moderation_status === "removed") {
+    const modBadge = makeEl("div", "scan-moderation-badge");
+    modBadge.title = img.moderation_reason || "Removed by moderation";
+    modBadge.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
+    left.appendChild(modBadge);
+  }
+
 
   return card;
 }
@@ -194,8 +201,41 @@ async function loadScans() {
 
     const data = await res.json();
     allScans = data.items || [];
-    statusEl.textContent = "";
 
+    // Fetch moderation status from community service
+    if (allScans.length > 0) {
+      try {
+        const imageIds = allScans.map(img => img.image_id).filter(Boolean);
+
+        const modRes = await fetch("/community/posts/moderation-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ image_ids: imageIds })
+        });
+
+        if (modRes.ok) {
+          const modData = await modRes.json();
+
+          const modMap = {};
+          (modData.items || []).forEach(item => {
+            modMap[item.image_id] = item;
+          });
+
+          // Enrich scans with moderation data
+          allScans.forEach(img => {
+            if (modMap[img.image_id]) {
+              img.moderation_status = modMap[img.image_id].moderation_status;
+              img.moderation_reason = modMap[img.image_id].moderation_reason;
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to fetch moderation status:", err);
+      }
+    }
+
+    statusEl.textContent = "";
     renderScans();
   } catch (err) {
     clearEl(containerEl);

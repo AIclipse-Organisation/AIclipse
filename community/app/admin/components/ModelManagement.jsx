@@ -1,86 +1,51 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { 
-  Card, CardHeader, CardBody, CardFooter,
-  Divider, Chip, Button, Spinner, Progress, Input
+import {
+  Card, CardHeader, CardBody, CardFooter, Chip, Button,
+  Spinner, Progress, Input, ScrollShadow, Divider
 } from "@heroui/react";
 import { adminService } from "@/admin/admin.js";
 import TrainingImagesTable from "./TrainingImagesTable";
 
 export default function ModelManagement() {
+  const [activeView, setActiveView] = useState("models");
+
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // Upload State
   const [isUploading, setIsUploading] = useState(false);
   const [uploadVersion, setUploadVersion] = useState("");
   const fileInputRef = useRef(null);
 
-  // 1. Load Models
+  useEffect(() => { loadModels(); }, []);
+
   const loadModels = async () => {
     try {
       setLoading(true);
       const data = await adminService.getModels();
       setModels(data || []);
-      setError(null);
     } catch (err) {
-      setError(err.message);
+      console.error("Failed to load models:", err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadModels();
-  }, []);
-
-  // 2. Handle Trigger Training
-  const handleTrain = async () => {
-    try {
-      await adminService.triggerTraining();
-      alert("Training signal sent successfully!");
-    } catch (err) {
-      alert(`Training failed: ${err.message}`);
-    }
-  };
-
-  // 3. Handle Delete
-  const handleDelete = async (version) => {
-    if (!confirm(`Are you sure you want to delete model ${version}?`)) return;
-    try {
-      await adminService.deleteModel(version);
-      loadModels(); // Refresh list
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  // 4. Handle Upload
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
     const file = fileInputRef.current?.files[0];
-    
-    if (!file || !uploadVersion) {
-      alert("Please provide a version and a file.");
-      return;
-    }
+    if (!file || !uploadVersion) return alert("Please provide a tag and a file.");
 
     try {
       setIsUploading(true);
       const formData = new FormData();
       formData.append("file", file);
       formData.append("version", uploadVersion);
-      
       formData.append("NewImagesCount", "0");
-      formData.append("ValidationAccuracy", "0.0"); 
+      formData.append("ValidationAccuracy", "0.0");
 
       await adminService.uploadModel(formData);
-      
-      // Reset and refresh
       setUploadVersion("");
-      if(fileInputRef.current) fileInputRef.current.value = "";
-      alert("Model uploaded successfully!");
+      if (fileInputRef.current) fileInputRef.current.value = "";
       loadModels();
     } catch (err) {
       alert(`Upload failed: ${err.message}`);
@@ -89,179 +54,216 @@ export default function ModelManagement() {
     }
   };
 
-  if (loading && models.length === 0) return <div className="p-10 flex justify-center"><Spinner size="lg" /></div>;
-  if (error) return <div className="p-4 text-red-500 bg-red-50 rounded-lg">Error: {error}</div>;
+  const handleDelete = async (version) => {
+    if (!confirm(`Are you sure you want to delete ${version}?`)) return;
+    try {
+      await adminService.deleteModel(version);
+      loadModels();
+    } catch (err) {
+      alert(`Delete failed: ${err.message}`);
+    }
+  };
+
+  if (loading && models.length === 0) return (
+    <div className="flex justify-center h-full items-center">
+      <Spinner size="lg" color="warning" label="Loading..." />
+    </div>
+  );
 
   return (
-    <div className="flex flex-col gap-6 h-full overflow-y-auto pr-2 pb-10">
-      
-      {/* Header Actions */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div>
-          <h3 className="text-xl font-bold">Model Versions</h3>
-          <p className="text-small text-gray-500">{models.length} versions available</p>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* UNIFIED HEADER SECTION WITH TABS */}
+      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
+            {activeView === "models" ? "Model Versions" : "Training Data"}
+          </h2>
+          <p className="text-gray-400 font-semibold uppercase text-sm tracking-wide">
+            {activeView === "models"
+              ? "Manage and deploy model versions"
+              : "Review accumulating dataset candidates"}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            variant="flat" 
-            color="warning"
-            onPress={handleTrain}
-          >
-            Trigger Training Job
-          </Button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex bg-black/40 p-2 rounded-3xl border border-white/5 shadow-xl">
+            <Button
+              size="sm"
+              onPress={() => setActiveView("models")}
+              className={`font-black px-8 rounded-2xl transition-all uppercase text-sm tracking-wide h-12 ${activeView === "models" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
+                }`}
+            >
+              Models
+            </Button>
+            <Button
+              size="sm"
+              onPress={() => setActiveView("data")}
+              className={`font-black px-8 rounded-2xl transition-all uppercase text-sm tracking-wide h-12 ${activeView === "data" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
+                }`}
+            >
+              Data
+            </Button>
+          </div>
         </div>
       </div>
 
-      <Card className="border-none shadow-sm bg-gray-50 shrink-0">
-        <CardBody>
-          <form onSubmit={handleUploadSubmit} className="flex gap-4 items-end">
-            <div className="flex-1">
-               <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">New Version Tag (e.g. v1.2)</label>
-               <Input 
-                 placeholder="v2.0.0" 
-                 value={uploadVersion}
-                 onChange={(e) => setUploadVersion(e.target.value)}
-                 size="sm"
-                 className="bg-white"
-               />
+      <div className="flex-grow overflow-hidden relative">
+        <ScrollShadow className="h-full pr-4 scrollbar-hide" size={40}>
+
+          {activeView === "models" && (
+            <div className="flex flex-col gap-8 pb-12">
+              <Card className="border border-white/5 shadow-2xl bg-[#1a1a1a] rounded-[2.5rem] overflow-hidden flex-shrink-0">
+                <CardBody className="p-8 text-white">
+                  <form onSubmit={handleUploadSubmit} className="flex flex-col md:flex-row gap-8 items-center justify-between">
+                    <div className="flex flex-col gap-2 w-full md:w-1/3">
+                      <label className="text-sm font-black text-gray-400 uppercase tracking-wide px-2">Version</label>
+                      <Input
+                        placeholder="E.G. V2.0.1"
+                        value={uploadVersion}
+                        onChange={(e) => setUploadVersion(e.target.value)}
+                        variant="flat"
+                        classNames={{
+                          base: "h-12",
+                          inputWrapper: "h-full bg-black/40 data-[hover=true]:bg-black/40 data-[focus=true]:bg-black/40 rounded-2xl border border-white/5 focus-within:ring-2 focus-within:ring-[#CFB87C]/20 transition-all",
+                          input: "font-black text-white text-center uppercase placeholder:text-gray-500"
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-2 w-full md:w-1/3 items-center">
+                      <label className="text-sm font-black text-gray-400 uppercase tracking-wide">Model File</label>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="block text-sm font-black uppercase text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-white/10 file:text-[#CFB87C] cursor-pointer"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      isLoading={isUploading}
+                      className={`font-black uppercase text-sm tracking-wide h-12 px-10 rounded-2xl transition-all ${uploadVersion ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-white/5 text-gray-400"
+                        }`}
+                    >
+                      Upload Model
+                    </Button>
+                  </form>
+                </CardBody>
+              </Card>
+
+              {/* VERSION GRID */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {models.map((model) => (
+                  <Card key={model.id} className="border border-white/5 bg-[#1a1a1a] shadow-xl rounded-[2.5rem] p-4 text-white">
+                    <CardHeader className="p-4 pb-0 flex justify-between items-start">
+                      <div>
+                        <h4 className="text-2xl font-black text-white italic tracking-tighter">{model.version}</h4>
+                        <p className="text-sm font-bold text-gray-400 uppercase tracking-wide mt-1">{new Date(model.createdAt).toLocaleString()}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {model.isDeployed ? (
+                          <Chip className="bg-[#CFB87C] text-[#222222] font-black uppercase text-xs tracking-wide px-3 border-none shadow-lg shadow-[#CFB87C]/10">ACTIVE</Chip>
+                        ) : model.rejectionReason ? (
+                          <Chip className="bg-danger/20 text-danger font-black uppercase text-xs tracking-wide px-3 border border-danger/20">REJECTED</Chip>
+                        ) : (
+                          <Chip className="bg-white/5 text-gray-400 font-black uppercase text-xs tracking-wide px-3 border border-white/5">ARCHIVED</Chip>
+                        )}
+                      </div>
+                    </CardHeader>
+
+                    <CardBody className="gap-6 p-4 py-6 flex flex-col">
+                      {/* GOLDEN TEST SET SECTION */}
+                      <div className="p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-sm font-black text-blue-400 uppercase tracking-wide">Golden Test Set</span>
+                          <span className="text-lg font-black text-blue-400">
+                            {(model.goldenTestAccuracy * 100).toFixed(1)}%
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-3">
+                          <div className="flex flex-col">
+                            <span className="text-xs text-gray-400 font-black uppercase">F1 Score</span>
+                            <span className="text-base font-black text-white">{(model.goldenTestF1Score).toFixed(3)}</span>
+                          </div>
+                          <div className="flex flex-col text-right">
+                            <span className="text-xs text-gray-400 font-black uppercase">Recall</span>
+                            <span className="text-base font-black text-white">{(model.goldenTestRecall).toFixed(3)}</span>
+                          </div>
+                        </div>
+
+                        <Divider className="my-3 bg-white/10" />
+
+                        <div className="flex justify-between text-xs font-bold italic">
+                          <div className="text-gray-300">
+                            Fake → <span className="text-danger">Real</span>: {model.goldenFakeToRealMisclassifications}
+                          </div>
+                          <div className="text-gray-300">
+                            Real → <span className="text-danger">Fake</span>: {model.goldenRealToFakeMisclassifications}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* SECONDARY STAT: VALIDATION */}
+                      <div>
+                        <div className="flex justify-between items-end mb-2 px-1 text-sm font-black uppercase tracking-wide">
+                          <span className="text-gray-400">Validation Accuracy</span>
+                          <span className="text-[#CFB87C]">{(model.validationAccuracy * 100).toFixed(1)}%</span>
+                        </div>
+                        <Progress
+                          size="sm"
+                          value={model.validationAccuracy * 100}
+                          classNames={{ track: "bg-white/10", indicator: "bg-[#CFB87C]" }}
+                        />
+                      </div>
+
+                      {/* TRAINING DATA LINEAGE */}
+                      <div className="flex justify-between items-center pt-3 border-t border-white/10">
+                        <div className="flex gap-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs text-gray-400 font-black uppercase">New Data</span>
+                            <span className="text-sm font-black text-white">{model.newImagesCount} <span className="text-xs text-gray-400">IMG</span></span>
+                          </div>
+                          <div className="flex flex-col border-l border-white/10 pl-4">
+                            <span className="text-xs text-gray-400 font-black uppercase">Replay</span>
+                            <span className="text-sm font-black text-white">{model.replayBufferCount} <span className="text-xs text-gray-400">IMG</span></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* REJECTION REASON */}
+                      {model.rejectionReason && (
+                        <div className="text-xs text-danger bg-danger/5 p-3 rounded-xl border border-danger/10 italic font-medium mt-2">
+                          Reason: {model.rejectionReason}
+                        </div>
+                      )}
+                    </CardBody>
+
+                    <CardFooter className="justify-end p-4 pt-0">
+                      <Button
+                        size="sm"
+                        variant="light"
+                        className="font-black uppercase text-xs tracking-wide text-gray-400 hover:text-danger hover:bg-danger/10 transition-colors"
+                        onPress={() => handleDelete(model.version)}
+                        isDisabled={model.isDeployed}
+                      >
+                        Delete Version
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
             </div>
+          )}
 
-            <div className="flex-1">
-               <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">Model File (.pt / .onnx)</label>
-               <input 
-                 type="file" 
-                 ref={fileInputRef} 
-                 className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-               />
+          {activeView === "data" && (
+            <div className="pb-12">
+              <TrainingImagesTable />
             </div>
+          )}
 
-            <Button 
-              type="submit" 
-              color="primary" 
-              isLoading={isUploading}
-            >
-              Upload & Deploy
-            </Button>
-          </form>
-        </CardBody>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {models.map((model) => (
-            <Card key={model.id} className="border-none bg-white shadow-sm hover:shadow-md transition-all" radius="lg">
-              <CardHeader className="flex justify-between items-start pb-0">
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-gray-800">{model.version}</span>
-                    {model.isDeployed ? (
-                      <Chip color="success" variant="flat" size="sm">Active</Chip>
-                    ) : model.rejectionReason ? (
-                      <Chip color="danger" variant="flat" size="sm">Rejected</Chip>
-                    ) : (
-                      <Chip color="default" variant="flat" size="sm">Archived</Chip>
-                    )}
-                  </div>
-                  <p className="text-tiny text-default-400">
-                    {new Date(model.createdAt).toLocaleString()}
-                  </p>
-                </div>
-              </CardHeader>
-              
-              <CardBody className="gap-4 py-4">
-                <div className="space-y-4">
-                  
-                  {/* PRIMARY STAT: GOLDEN TEST */}
-                  <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-bold text-blue-700 uppercase">Golden Test Set</span>
-                      <span className="text-sm font-bold text-blue-800">
-                        {(model.goldenTestAccuracy * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 uppercase">F1 Score</span>
-                        <span className="text-xs font-semibold">{(model.goldenTestF1Score).toFixed(3)}</span>
-                      </div>
-                      <div className="flex flex-col text-right">
-                        <span className="text-[10px] text-gray-500 uppercase">Recall</span>
-                        <span className="text-xs font-semibold">{(model.goldenTestRecall).toFixed(3)}</span>
-                      </div>
-                    </div>
-
-                    <Divider className="my-2 bg-blue-100" />
-
-                    {/* Confusion Matrix Logic */}
-                    <div className="flex justify-between text-[10px]">
-                      <div className="text-gray-600">
-                        Fake → <span className="text-danger font-bold">Real</span>: {model.goldenFakeToRealMisclassifications}
-                      </div>
-                      <div className="text-gray-600">
-                        Real → <span className="text-danger font-bold">Fake</span>: {model.goldenRealToFakeMisclassifications}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SECONDARY STAT: VALIDATION (From training) */}
-                  <div className="space-y-1 px-1">
-                    <div className="flex justify-between text-[10px] uppercase font-bold text-gray-400">
-                      <span>Validation Accuracy</span>
-                      <span>{(model.validationAccuracy * 100).toFixed(1)}%</span>
-                    </div>
-                    <Progress 
-                      size="sm" 
-                      value={model.validationAccuracy * 100} 
-                      color={model.validationAccuracy > 0.9 ? "success" : "warning"}
-                      className="h-1.5"
-                    />
-                  </div>
-
-                  {/* TRAINING DATA LINEAGE */}
-                  <div className="flex justify-between items-center pt-2 border-t border-gray-50">
-                    <div className="flex gap-3">
-                      <div className="flex flex-col">
-                          <span className="text-[9px] text-gray-400 uppercase">New Data</span>
-                          <span className="text-xs font-medium">{model.newImagesCount} img</span>
-                      </div>
-                      <div className="flex flex-col border-l pl-3">
-                          <span className="text-[9px] text-gray-400 uppercase">Replay</span>
-                          <span className="text-xs font-medium">{model.replayBufferCount} img</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* REJECTION REASON (If applicable) */}
-                  {model.rejectionReason && (
-                    <div className="text-tiny text-danger bg-danger-50 p-2 rounded italic">
-                      Reason: {model.rejectionReason}
-                    </div>
-                  )}
-
-                </div>
-              </CardBody>
-              
-              <Divider className="opacity-50"/>
-              
-              <CardFooter className="justify-end gap-2 bg-gray-50/50">
-                <Button 
-                  size="sm" 
-                  variant="light" 
-                  color="danger" 
-                  onPress={() => handleDelete(model.version)}
-                  isDisabled={model.isDeployed}
-                >
-                  Delete
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-
-      <Divider className="my-6" />
-
-      <TrainingImagesTable />
+        </ScrollShadow>
+      </div>
     </div>
   );
 }

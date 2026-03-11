@@ -36,9 +36,7 @@ export default function BottomNav() {
   }, []);
 
   return (
-    <nav className="navbar" id="bottom-nav" aria-label="Bottom navigation"
-
-    >
+    <nav className="navbar" id="bottom-nav" aria-label="Bottom navigation">
       <a href="/community" aria-label="Home">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -93,7 +91,7 @@ export default function BottomNav() {
       </a>
 
       <a href="/notification" aria-label="Notifications">
-        <span className="nav-icon-wrap">
+        <span className="nav-icon-wrap" style={{ position: "relative", display: "inline-block" }}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
@@ -128,8 +126,6 @@ export default function BottomNav() {
           <path d="M2 9h20"></path>
         </svg>
       </a>
-
-      {/* <a href="/dev">For Devs</a> */}
     </nav>
   );
 }
