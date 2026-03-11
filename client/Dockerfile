@@ -10,5 +10,4 @@ COPY . .
 
 ENV APP_ENV=prod
 
-CMD ["python", "main-client.py"]
-
+CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "2", "--access-logfile", "-", "--error-logfile", "-", "--logger-class", "gunicorn_logger.HealthLogger", "wsgi:app"]
