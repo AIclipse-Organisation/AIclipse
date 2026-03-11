@@ -57,6 +57,7 @@ class UserAccuracy(BaseModel):
 class SignupRequest(BaseModel):
     user_name: str = Field(..., min_length=1)
     email: EmailStr
+    age: int = Field(..., ge=18, le=120)
     password: str
 
 
@@ -184,7 +185,7 @@ async def signup(request: Request, payload: SignupRequest):
         "is_admin": False,
         "plan": 0,
         "created_at": _now_utc(),
-        "age": None,
+        "age": payload.age,
         "total_guesses": 0,
         "total_correct": 0,
         "acc_guessing_ai": 0,

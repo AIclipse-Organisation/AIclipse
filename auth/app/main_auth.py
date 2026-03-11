@@ -8,7 +8,7 @@ from app.core.cpu_pool import CpuPool
 from app.core.keys import build_keys
 from app.core.settings import Settings
 from app.db.mongo import mongo_lifespan
-from app.db.repos import UserRepo, ApiKeyRepo
+from app.db.repos import UserRepo, ApiKeyRepo, UserDeletionLogRepo
 from app.routers.public import router as public_router
 from app.routers.admin import router as admin_router
 from app.routers.api_keys import router as api_keys_router
@@ -38,14 +38,19 @@ async def lifespan(app: FastAPI):
     async with mongo_lifespan(settings) as db:
         user_repo = UserRepo(db)
         api_repo = ApiKeyRepo(db)
+        deletion_log_repo = UserDeletionLogRepo(db)
         await user_repo.ensure_indexes()
         await api_repo.ensure_indexes()
+        await deletion_log_repo.ensure_indexes()
+        # Backfill legacy users so all documents have an explicit age field.
+        await user_repo.users.update_many({"age": {"$exists": False}}, {"$set": {"age": None}})
 
         app.state.settings = settings
         app.state.keys = keys
         app.state.cpu = cpu
         app.state.user_repo = user_repo
         app.state.api_repo = api_repo
+        app.state.deletion_log_repo = deletion_log_repo
 
         yield
 

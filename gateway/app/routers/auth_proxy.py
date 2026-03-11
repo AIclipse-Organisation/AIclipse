@@ -98,14 +98,26 @@ async def gateway_auth_me_delete(request: Request, user: UserContext = Depends(g
 @router.get("/auth/admin/users")
 async def gateway_admin_list_users(
     request: Request,
-    user_name: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    is_admin: Optional[bool] = Query(None),
+    sort: str = Query("created_at"),
+    order: str = Query("desc"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=200),
     admin: UserContext = Depends(get_current_admin),
 ):
     auth_uri = _auth_base_url(request)
 
-    params: dict = {}
-    if user_name:
-        params["user_name"] = user_name
+    params: dict = {
+        "page": page,
+        "page_size": page_size,
+        "sort": sort,
+        "order": order,
+    }
+    if search:
+        params["search"] = search
+    if is_admin is not None:
+        params["is_admin"] = is_admin
 
     return await proxy_json(
         request,
@@ -114,6 +126,24 @@ async def gateway_admin_list_users(
         "/admin/users",
         headers={"Authorization": f"Bearer {admin.token}"},
         params=params,
+        timeout_s=_timeout(request),
+    )
+
+
+@router.post("/auth/admin/users")
+async def gateway_admin_create_user(
+    request: Request,
+    payload: dict = Body(...),
+    admin: UserContext = Depends(get_current_admin),
+):
+    auth_uri = _auth_base_url(request)
+    return await proxy_json(
+        request,
+        "POST",
+        auth_uri,
+        "/admin/users",
+        json_body=payload,
+        headers={"Authorization": f"Bearer {admin.token}"},
         timeout_s=_timeout(request),
     )
 
@@ -158,6 +188,7 @@ async def gateway_admin_update_user(
 async def gateway_admin_delete_user(
     request: Request,
     user_id: str = Path(...),
+    payload: dict = Body(...),
     admin: UserContext = Depends(get_current_admin),
 ):
     auth_uri = _auth_base_url(request)
@@ -166,7 +197,29 @@ async def gateway_admin_delete_user(
         "DELETE",
         auth_uri,
         f"/admin/user/{user_id}",
+        json_body=payload,
         headers={"Authorization": f"Bearer {admin.token}"},
+        timeout_s=_timeout(request),
+    )
+
+
+@router.get("/auth/admin/user-deletion-logs")
+async def gateway_admin_deletion_logs(
+    request: Request,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    admin: UserContext = Depends(get_current_admin),
+):
+    auth_uri = _auth_base_url(request)
+    params = {"page": page, "page_size": page_size}
+
+    return await proxy_json(
+        request,
+        "GET",
+        auth_uri,
+        "/admin/user-deletion-logs",
+        headers={"Authorization": f"Bearer {admin.token}"},
+        params=params,
         timeout_s=_timeout(request),
     )
 

@@ -234,6 +234,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const signupPasswordInput = document.getElementById("signup-password");
   const signupPolicyRoot = document.getElementById("signup-password-policy");
+  const signupAgeInput = document.getElementById("signup-age");
 
   const signupTerms = document.getElementById("signup-terms");
   const btnSignup = document.getElementById("btn-signup");
@@ -250,6 +251,17 @@ window.addEventListener("DOMContentLoaded", () => {
   if (signupTerms) {
     signupTerms.addEventListener("change", syncSignupButtonState);
     syncSignupButtonState();
+  }
+
+  if (signupAgeInput) {
+    signupAgeInput.addEventListener("input", () => {
+      signupAgeInput.value = (signupAgeInput.value || "").replace(/\D/g, "");
+    });
+    signupAgeInput.addEventListener("keydown", (event) => {
+      if (["e", "E", "+", "-", ".", ","].includes(event.key)) {
+        event.preventDefault();
+      }
+    });
   }
 
   function updateSignupPolicyUI() {
@@ -293,6 +305,7 @@ window.addEventListener("DOMContentLoaded", () => {
     btnSignupEl.addEventListener("click", async () => {
       const user_name = document.getElementById("signup-username")?.value.trim();
       const email = document.getElementById("signup-email")?.value.trim();
+      const ageRaw = document.getElementById("signup-age")?.value;
       const password = document.getElementById("signup-password")?.value;
 
       const termsAccepted = document.getElementById("signup-terms")?.checked;
@@ -305,9 +318,20 @@ window.addEventListener("DOMContentLoaded", () => {
 
       activateSignupPolicyIfNeeded();
 
-      if (!user_name || !email || !password) {
-        setStatus(accountStatus, "error", "Please fill username, email and password.");
+      if (!user_name || !email || !password || !String(ageRaw || "").trim()) {
+        setStatus(accountStatus, "error", "Please fill username, email, age and password.");
         updateSignupPolicyUI();
+        return;
+      }
+
+      if (!/^\d+$/.test(String(ageRaw))) {
+        setStatus(accountStatus, "error", "Age must contain numbers only.");
+        return;
+      }
+
+      const age = Number(ageRaw);
+      if (!Number.isInteger(age) || age < 18 || age > 120) {
+        setStatus(accountStatus, "error", "Age must be a whole number between 18 and 120.");
         return;
       }
 
@@ -331,6 +355,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const { res, data } = await jsonFetch("POST", "/auth/signup", {
           user_name,
           email,
+          age,
           password,
         });
 
