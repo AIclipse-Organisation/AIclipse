@@ -287,6 +287,7 @@ export default function PostBox({
 
       <div className="comm_body"><div className="comm_description">{description}</div></div>
 
+
       {/* MEDIA SECTION */}
       <div className="comm_postImageWrap">
         <img className="comm_postImage" src={image?.url} alt={image?.label || "Community image"} onClick={handleClick} />
