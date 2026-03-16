@@ -148,7 +148,49 @@ async def test_admin_update_user_ok(client, users_coll, auth_mod):
 
 
 @pytest.mark.asyncio
-async def test_admin_delete_user_ok(client, users_coll, auth_mod, event_redis):
+async def test_admin_create_user_hides_manual_password(client, users_coll, auth_mod):
+    admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
+
+    r = await client.post(
+        "/admin/users",
+        json={
+            "user_name": "Manual User",
+            "email": "manual@example.com",
+            "password": "StrongPass1!",
+            "age": 21,
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert r.status_code == 201
+    body = r.json()
+    assert body["user"]["email"] == "manual@example.com"
+    assert body["temporary_password"] is None
+
+
+@pytest.mark.asyncio
+async def test_admin_create_user_returns_generated_password(client, users_coll, auth_mod):
+    admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
+
+    r = await client.post(
+        "/admin/users",
+        json={
+            "user_name": "Auto User",
+            "email": "auto@example.com",
+            "age": 21,
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert r.status_code == 201
+    body = r.json()
+    assert body["user"]["email"] == "auto@example.com"
+    assert isinstance(body["temporary_password"], str)
+    assert len(body["temporary_password"]) >= 8
+
+
+@pytest.mark.asyncio
+async def test_admin_delete_user_ok(client, users_coll, auth_mod, event_redis, deletion_logs_coll):
     await users_coll.insert_one(
         {
             "user_id": "u_del2",
@@ -182,6 +224,9 @@ async def test_admin_delete_user_ok(client, users_coll, auth_mod, event_redis):
 
     doc = await users_coll.find_one({"user_id": "u_del2"})
     assert doc is None
+
+    assert len(deletion_logs_coll.docs) == 1
+    assert deletion_logs_coll.docs[0]["deleted_user_id"] == "u_del2"
 
     # Check event was published for email-worker.
     assert len(event_redis.calls) == 1

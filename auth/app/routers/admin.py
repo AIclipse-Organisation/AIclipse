@@ -22,8 +22,7 @@ from app.routers.public import (
     UserAccuracyRequest,
     _now_utc,
 )
-from app.services.passwords import PasswordService
-from app.services.passwords import PasswordValidationError
+from app.services.passwords import PasswordService, PasswordValidationError
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -66,7 +65,7 @@ class AdminCreateUserRequest(BaseModel):
 
 class AdminCreateUserResponse(BaseModel):
     user: UserPublic
-    temporary_password: str
+    temporary_password: Optional[str] = None
 
 
 class AdminUpdateUserRequest(BaseModel):
@@ -159,6 +158,7 @@ async def admin_create_user(
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
+    generated_password = body.password is None
     raw_password = body.password or _generate_password()
     try:
         hashed = await pwd.hash_password(raw_password)
@@ -196,7 +196,10 @@ async def admin_create_user(
 
     await users.insert_one(user_doc)
 
-    return AdminCreateUserResponse(user=build_user_public(user_doc), temporary_password=raw_password)
+    return AdminCreateUserResponse(
+        user=build_user_public(user_doc),
+        temporary_password=raw_password if generated_password else None,
+    )
 
 
 # Called from model-cycle so removed the admin requirement.
@@ -293,7 +296,8 @@ async def admin_delete_user(
     users = request.app.state.user_repo.users
     logs = request.app.state.deletion_log_repo.logs
 
-    user_doc = await users.find_one({"user_id": user_id})
+    # Delete first so audit logs only represent successful deletions.
+    user_doc = await users.find_one_and_delete({"user_id": user_id})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -315,10 +319,6 @@ async def admin_delete_user(
     }
 
     await logs.insert_one(log_doc)
-    # Only send event if delete really happened (deleted_count must be 1).
-    delete_result = await users.delete_one({"user_id": user_id})
-    if getattr(delete_result, "deleted_count", 0) != 1:
-        raise HTTPException(status_code=500, detail="Failed to delete user")
 
     # Keep log_id in event so workers can trace it. Example: find same log in audit logs.
     event_payload = {

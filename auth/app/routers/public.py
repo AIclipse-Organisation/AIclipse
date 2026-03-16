@@ -170,8 +170,6 @@ async def signup(request: Request, payload: SignupRequest):
         raise HTTPException(status_code=400, detail="Email is required")
     if age is None:
         raise HTTPException(status_code=400, detail="Age is required")
-    if age < 18:
-        raise HTTPException(status_code=400, detail="Must be older than 18")
     if not password:
         raise HTTPException(status_code=400, detail="Password is required")
 

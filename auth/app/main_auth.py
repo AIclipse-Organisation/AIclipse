@@ -1,3 +1,4 @@
+import os
 import logging
 from contextlib import asynccontextmanager
 
@@ -45,8 +46,14 @@ async def lifespan(app: FastAPI):
         await user_repo.ensure_indexes()
         await api_repo.ensure_indexes()
         await deletion_log_repo.ensure_indexes()
-        # Old users may not have age so this will update them to be consistent with the schema. 
-        await user_repo.users.update_many({"age": {"$exists": False}}, {"$set": {"age": None}})
+        # Old users may not have age so this will update them to be consistent with the schema.
+        # This can be disabled after one-time migration to avoid repeated full-collection work.
+        run_legacy_age_migration = os.getenv("RUN_LEGACY_AGE_MIGRATION", "true").lower() == "true"
+        if run_legacy_age_migration:
+            await user_repo.users.update_many(
+                {"age": {"$exists": False}},
+                {"$set": {"age": None}},
+            )
 
         app.state.settings = settings
         app.state.keys = keys
