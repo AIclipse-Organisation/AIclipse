@@ -99,6 +99,7 @@ async def gateway_auth_me_delete(request: Request, user: UserContext = Depends(g
 async def gateway_admin_list_users(
     request: Request,
     search: Optional[str] = Query(None),
+    user_name: Optional[str] = Query(None),
     is_admin: Optional[bool] = Query(None),
     sort: str = Query("created_at"),
     order: str = Query("desc"),
@@ -107,6 +108,7 @@ async def gateway_admin_list_users(
     admin: UserContext = Depends(get_current_admin),
 ):
     auth_uri = _auth_base_url(request)
+    normalized_search = search if search is not None else user_name
 
     params: dict = {
         "page": page,
@@ -114,8 +116,10 @@ async def gateway_admin_list_users(
         "sort": sort,
         "order": order,
     }
-    if search:
-        params["search"] = search
+    if normalized_search:
+        params["search"] = normalized_search
+    if user_name:
+        params["user_name"] = user_name
     if is_admin is not None:
         params["is_admin"] = is_admin
 

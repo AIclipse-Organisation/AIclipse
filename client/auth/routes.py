@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import time
 from typing import Callable
 
@@ -8,6 +7,21 @@ from flask import Blueprint, jsonify, make_response, redirect, request, session
 
 from .core import clear_access_cookie, get_access_token, set_access_cookie
 from .gateway import GatewayClient
+
+
+def _is_valid_email_address(value: str) -> bool:
+    if not value or any(char.isspace() for char in value):
+        return False
+
+    local_part, separator, domain = value.partition("@")
+    if separator != "@" or not local_part or not domain:
+        return False
+
+    if "@" in domain or domain.startswith(".") or domain.endswith("."):
+        return False
+
+    labels = domain.split(".")
+    return len(labels) >= 2 and all(label for label in labels)
 
 
 def _extract_payload() -> dict:
@@ -50,8 +64,7 @@ def build_auth_blueprint(gateway: GatewayClient, *, is_signup_enabled: Callable[
         if age < 18 :
             return jsonify({"detail": "You must be at least 18 years old to sign up."}), 400
 
-        email_ok = re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email)
-        if not email_ok:
+        if not _is_valid_email_address(email):
             return jsonify({"detail": "Please enter a valid email address."}), 400
 
         data, status = gateway.signup(user_name, email, age, password)

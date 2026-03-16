@@ -57,25 +57,84 @@ const GOLD_BUTTON_BASE = "font-black uppercase tracking-wide rounded-2xl bg-[#CF
 const GOLD_BUTTON_SM = `${GOLD_BUTTON_BASE} h-9 px-4 text-xs`;
 const GOLD_BUTTON_MD = `${GOLD_BUTTON_BASE} h-10 px-5 text-sm`;
 const BUTTON_INACTIVE = "h-12 rounded-xl font-black uppercase tracking-wide text-white/70 bg-transparent border border-white/10";
+const LOWERCASE_CHARS = "abcdefghjkmnpqrstuvwxyz";
+const UPPERCASE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ";
+const NUMBER_CHARS = "23456789";
+const SYMBOL_CHARS = "!@#";
+const PASSWORD_CHARS = `${LOWERCASE_CHARS}${UPPERCASE_CHARS}${NUMBER_CHARS}${SYMBOL_CHARS}`;
 
 function formatDate(value) {
     if (!value) return "-";
     return new Date(value).toLocaleString();
 }
 
+function secureRandomInt(maxExclusive) {
+    if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
+        throw new Error("maxExclusive must be a positive integer");
+    }
+
+    const cryptoApi = globalThis.crypto;
+    if (!cryptoApi?.getRandomValues) {
+        throw new Error("Secure random generation is unavailable in this environment");
+    }
+
+    const limit = Math.floor(0x100000000 / maxExclusive) * maxExclusive;
+    const buffer = new Uint32Array(1);
+
+    do {
+        cryptoApi.getRandomValues(buffer);
+    } while (buffer[0] >= limit);
+
+    return buffer[0] % maxExclusive;
+}
+
 function randomFrom(list) {
-    return list[Math.floor(Math.random() * list.length)];
+    return list[secureRandomInt(list.length)];
+}
+
+function secureShuffle(list) {
+    const shuffled = [...list];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const swapIndex = secureRandomInt(index + 1);
+        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled;
+}
+
+function generatePassword(length = 14) {
+    const chars = [
+        randomFrom(LOWERCASE_CHARS),
+        randomFrom(UPPERCASE_CHARS),
+        randomFrom(NUMBER_CHARS),
+        randomFrom(SYMBOL_CHARS),
+    ];
+
+    while (chars.length < length) {
+        chars.push(randomFrom(PASSWORD_CHARS));
+    }
+
+    return secureShuffle(chars).join("");
 }
 
 function generateAutoUser() {
-    const first = randomFrom(["Ava", "Noah", "Liam", "Mia", "Eli", "Nova", "Zoe", "Kai"]);
-    const last = randomFrom(["Stone", "River", "Blake", "Hayes", "Hart", "Lane", "Wynn", "Lee"]);
+    const first = randomFrom([
+    "Ava", "Noah", "Liam", "Mia", "Eli", "Nova", "Zoe", "Kai",
+    "Luca", "Aria", "Ezra", "Ivy", "Leo", "Mila", "Theo", "Luna",
+    "Jade", "Axel", "Ruby", "Finn", "Iris", "Silas", "Nina", "Rowan",
+    "Sage", "Eden", "Zara", "Milo"
+    ]);
+
+const last = randomFrom([
+    "Stone", "River", "Blake", "Hayes", "Hart", "Lane", "Wynn", "Lee",
+    "Brooks", "Vale", "Reed", "Shaw", "Cruz", "Drake", "Fox", "Quinn",
+    "Ridge", "Snow", "Voss", "West", "Clarke", "Blaire", "Sloane", "Pierce",
+    "Hale", "Knox", "Rowe", "Sterling"
+    ]);
     const name = `${first} ${last}`;
     const slug = `${first}${last}`.toLowerCase();
-    const id = Math.floor(Math.random() * 9000 + 1000);
+    const id = secureRandomInt(9000) + 1000;
     const email = `${slug}${id}@example.com`;
-    const password = Array.from({ length: 14 }, () => randomFrom("abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#"))
-        .join("");
+    const password = generatePassword();
     return { user_name: name, email, password };
 }
 

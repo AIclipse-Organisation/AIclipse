@@ -23,6 +23,7 @@ from app.routers.public import (
     _now_utc,
 )
 from app.services.passwords import PasswordService
+from app.services.passwords import PasswordValidationError
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -39,8 +40,20 @@ REASON_CODES = (
 
 
 def _generate_password(length: int = 16) -> str:
+    if length < 4:
+        raise ValueError("Password length must be at least 4")
+
+    required_chars = [
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%^&*?"),
+    ]
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*?"
-    return "".join(secrets.choice(alphabet) for _ in range(length))
+    remaining_chars = [secrets.choice(alphabet) for _ in range(length - len(required_chars))]
+    password_chars = required_chars + remaining_chars
+    secrets.SystemRandom().shuffle(password_chars)
+    return "".join(password_chars)
 
 
 class AdminCreateUserRequest(BaseModel):
@@ -147,7 +160,20 @@ async def admin_create_user(
         raise HTTPException(status_code=409, detail="Email already registered")
 
     raw_password = body.password or _generate_password()
-    hashed = await pwd.hash_password(raw_password)
+    try:
+        hashed = await pwd.hash_password(raw_password)
+    except PasswordValidationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "weak_password",
+                "message": str(e),
+                "checks": e.checks,
+                "failed": e.failed,
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     user_doc = {
         "user_id": f"u_{uuid4()}",
