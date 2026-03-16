@@ -111,7 +111,8 @@
                   </label>
                 </div>
 
-                <button id="btn-signup" disabled>Sign up</button>
+                <!-- type="button" stops browser auto-submit; JS handles signup click. -->
+                <button id="btn-signup" type="button" disabled>Sign up</button>
               </div>
               {% endif %}
 
@@ -129,7 +130,7 @@
                     placeholder="Password"
                   />
 
-                  <button id="btn-login">Log in</button>
+                  <button id="btn-login" type="button">Log in</button>
                 </div>
 
                 <div id="login-spinner-container" style="display: none">

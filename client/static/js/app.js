@@ -194,6 +194,17 @@ function applyPasswordPolicyUI(rootEl, password, checks) {
 function normalizeApiErrorDetail(data) {
   const detail = data && data.detail;
 
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] || {};
+    const loc = Array.isArray(first.loc) ? first.loc.join(".") : null;
+    const msg = typeof first.msg === "string" ? first.msg : "Validation error";
+    return {
+      message: loc ? `${loc}: ${msg}` : msg,
+      checks: null,
+      code: null,
+    };
+  }
+
   if (typeof detail === "string") {
     return { message: detail, checks: null };
   }
@@ -302,7 +313,9 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   onEl("btn-signup", (btnSignupEl) => {
-    btnSignupEl.addEventListener("click", async () => {
+    btnSignupEl.addEventListener("click", async (event) => {
+      // Stop browser form submit.Without it, browser may submit form and refresh page before our async signup flow finishes.
+      event.preventDefault();
       const user_name = document.getElementById("signup-username")?.value.trim();
       const email = document.getElementById("signup-email")?.value.trim();
       const ageRaw = document.getElementById("signup-age")?.value;
@@ -331,7 +344,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
       const age = Number(ageRaw);
       if (!Number.isInteger(age) || age < 18 || age > 120) {
-        setStatus(accountStatus, "error", "Age must be a whole number between 18 and 120.");
+        setStatus(accountStatus, "error", "Must be 18 or older.");
         return;
       }
 
@@ -416,7 +429,9 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   onEl("btn-login", (btnLogin) => {
-    btnLogin.addEventListener("click", async () => {
+    btnLogin.addEventListener("click", async (event) => {
+      // Same rule for login: click should call fetch, not submit the form.
+      event.preventDefault();
       const email = document.getElementById("login-email")?.value.trim();
       const password = document.getElementById("login-password")?.value;
 

@@ -161,21 +161,42 @@ class FakeUsersColl:
 
         return None
 
+    def _matches_filter(self, doc: dict, flt: dict) -> bool:
+        # Small matcher for tests that call list/search without real Mongo.
+        if not flt:
+            return True
+
+        if "is_admin" in flt and doc.get("is_admin") is not flt["is_admin"]:
+            return False
+
+        if "$or" in flt:
+            matched = False
+            for clause in flt["$or"]:
+                if "user_name" in clause:
+                    pattern = str(clause["user_name"].get("$regex", ""))
+                    if pattern.lower() in str(doc.get("user_name", "")).lower():
+                        matched = True
+                if "email" in clause:
+                    pattern = str(clause["email"].get("$regex", "")).replace("^[^@]*", "").replace("[^@]*@", "")
+                    local_part = str(doc.get("email", "")).split("@", 1)[0].lower()
+                    if pattern.lower() in local_part:
+                        matched = True
+            if not matched:
+                return False
+
+        return True
+
     def find(self, flt: Optional[dict] = None) -> _FakeCursor:
         flt = flt or {}
         docs = list(self.docs.values())
 
-        if "user_name" in flt and isinstance(flt["user_name"], dict):
-            rx = str(flt["user_name"].get("$regex", ""))
-            opt = str(flt["user_name"].get("$options", ""))
-            case_ins = "i" in opt.lower()
-            if case_ins:
-                rx_l = rx.lower()
-                docs = [d for d in docs if rx_l in str(d.get("user_name", "")).lower()]
-            else:
-                docs = [d for d in docs if rx in str(d.get("user_name", ""))]
+        docs = [d for d in docs if self._matches_filter(d, flt)]
 
         return _FakeCursor([dict(d) for d in docs])
+
+    async def count_documents(self, flt: Optional[dict] = None) -> int:
+        flt = flt or {}
+        return sum(1 for d in self.docs.values() if self._matches_filter(d, flt))
 
     async def find_one_and_update(self, flt: dict, update: dict, return_document=None):
         doc = await self.find_one(flt)
@@ -193,6 +214,49 @@ class FakeUsersColl:
             return None
         self.docs.pop(doc["user_id"], None)
         return dict(doc)
+
+    async def delete_one(self, flt: dict):
+        doc = await self.find_one(flt)
+
+        class _Res:
+            deleted_count: int = 0
+
+        res = _Res()
+        if not doc:
+            return res
+        self.docs.pop(doc["user_id"], None)
+        res.deleted_count = 1
+        return res
+
+
+class FakeDeletionLogsColl:
+    def __init__(self):
+        # Keeps deletion logs in memory for assertions.
+        self.docs: List[dict] = []
+
+    async def create_index(self, *args, **kwargs):
+        return None
+
+    async def insert_one(self, doc: dict):
+        self.docs.append(dict(doc))
+
+        class _Res:
+            inserted_id = doc.get("log_id")
+
+        return _Res()
+
+    def find(self, flt: Optional[dict] = None) -> _FakeCursor:
+        return _FakeCursor([dict(d) for d in self.docs])
+
+
+class FakeEventRedis:
+    def __init__(self):
+        # Records xadd calls. Example: assert event type after admin delete.
+        self.calls: List[dict] = []
+
+    async def xadd(self, stream: str, payload: dict):
+        self.calls.append({"stream": stream, "payload": payload})
+        return "1-0"
 
 
 class FakeApiKeysColl:
@@ -308,13 +372,25 @@ def api_keys_coll() -> FakeApiKeysColl:
 
 
 @pytest.fixture()
-def app_state(auth_mod, users_coll, api_keys_coll):
+def deletion_logs_coll() -> FakeDeletionLogsColl:
+    return FakeDeletionLogsColl()
+
+
+@pytest.fixture()
+def event_redis() -> FakeEventRedis:
+    return FakeEventRedis()
+
+
+@pytest.fixture()
+def app_state(auth_mod, users_coll, api_keys_coll, deletion_logs_coll, event_redis):
     keys = make_test_rsa_keys()
 
+    # Only include settings fields these tests need.
     settings = SimpleNamespace(
         INTERNAL_AUTH_TOKEN="internal-test-token",
         API_KEY_PEPPER="pepper-test",
         API_KEY_SALT="salt-test",
+        AUTH_EVENT_STREAM="auth-events",
     )
 
     st = auth_mod.app.state
@@ -322,6 +398,8 @@ def app_state(auth_mod, users_coll, api_keys_coll):
     st.keys = keys
     st.user_repo = SimpleNamespace(users=users_coll)
     st.api_repo = SimpleNamespace(keys=api_keys_coll)
+    st.deletion_log_repo = SimpleNamespace(logs=deletion_logs_coll)
+    st.event_redis = event_redis
     st.settings = settings
 
     # якщо десь у коді/тестах читають з модуля напряму

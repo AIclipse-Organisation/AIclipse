@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email-worker-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: email-worker }
+  template:
+    metadata:
+      labels: { app: email-worker }
+    spec:
+      containers:
+        - name: email-worker
+          image: aiclipse/email-worker
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_URI
+              valueFrom: { secretKeyRef: { name: redis-sec, key: REDIS_URI } }
+            - name: EMAIL_STREAM
+              value: "auth-events"
+            - name: EMAIL_GROUP
+              value: "email-workers"
+            - name: EMAIL_DLQ_STREAM
+              value: "auth-events-dlq"
+            - name: SMTP_HOST
+              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_HOST } }
+            - name: SMTP_PORT
+              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_PORT } }
+            - name: SMTP_USERNAME
+              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_USERNAME } }
+            - name: SMTP_APP_PASSWORD
+              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_APP_PASSWORD } }
+            - name: SMTP_FROM_EMAIL
+              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_FROM_EMAIL } }
+            - name: SUPPORT_EMAIL
+              valueFrom: { secretKeyRef: { name: email-sec, key: SUPPORT_EMAIL } }
+            - name: SMTP_USE_SSL
+              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_USE_SSL } }
+            - name: SMTP_TIMEOUT_S
+              value: "15"
+            - name: INTERNAL_AUTH_TOKEN
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
+          ports:
+            - { name: http, containerPort: 3000 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            timeoutSeconds: 1
+            failureThreshold: 3
+          startupProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 1
+            failureThreshold: 60
+          resources:
+            requests: { cpu: "25m", memory: "64Mi" }
+            limits: { cpu: "200m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: email-worker-srv
+spec:
+  type: ClusterIP
+  selector: { app: email-worker }
+  ports:
+    - { name: http, port: 3000, targetPort: 3000 }

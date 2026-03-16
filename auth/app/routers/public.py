@@ -5,6 +5,7 @@ from typing import Optional, List
 from uuid import uuid4
 
 import jwt
+from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from pymongo import ReturnDocument
@@ -157,13 +158,35 @@ async def signup(request: Request, payload: SignupRequest):
     users = request.app.state.user_repo.users
     pwd = PasswordService(request.app.state.cpu)
 
-    email_norm = payload.email.strip().lower()
+    # Clean inputs first. Example: " Alice@EXAMPLE.com " -> "alice@example.com".
+    user_name = (payload.user_name).strip()
+    email_raw = (payload.email).strip()
+    password = (payload.password).strip()
+    age = payload.age
+
+    if not user_name:
+        raise HTTPException(status_code=400, detail="Username is required")
+    if not email_raw:
+        raise HTTPException(status_code=400, detail="Email is required")
+    if age is None:
+        raise HTTPException(status_code=400, detail="Age is required")
+    if age < 18:
+        raise HTTPException(status_code=400, detail="Must be older than 18")
+    if not password:
+        raise HTTPException(status_code=400, detail="Password is required")
+
+    try:
+        # Validate email format quickly (no MX lookup) to keep signup fast.
+        email_norm = validate_email(email_raw, check_deliverability=False).normalized.lower()
+    except EmailNotValidError:
+        raise HTTPException(status_code=400, detail="Please provide a valid email address")
+
     existing = await users.find_one({"email": email_norm})
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
     try:
-        hashed = await pwd.hash_password(payload.password)
+        hashed = await pwd.hash_password(password)
     except PasswordValidationError as e:
         raise HTTPException(
             status_code=400,
@@ -179,13 +202,14 @@ async def signup(request: Request, payload: SignupRequest):
 
     user_doc = {
         "user_id": f"u_{uuid4()}",
-        "user_name": payload.user_name.strip(),
+        # Save cleaned values, not raw input.
+        "user_name": user_name.strip(),
         "email": email_norm,
         "password": hashed,
         "is_admin": False,
         "plan": 0,
         "created_at": _now_utc(),
-        "age": payload.age,
+        "age": age,
         "total_guesses": 0,
         "total_correct": 0,
         "acc_guessing_ai": 0,

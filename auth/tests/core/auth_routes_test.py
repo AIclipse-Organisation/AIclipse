@@ -53,7 +53,7 @@ async def test_jwks(client):
 
 @pytest.mark.asyncio
 async def test_signup_success(client, users_coll):
-    payload = {"user_name": " Alice  ", "email": "  Alice@Example.com ", "password": "Secret123!"}
+    payload = {"user_name": " Alice  ", "email": "  Alice@Example.com ", "age": 21, "password": "Secret123!"}
     r = await client.post("/signup", json=payload)
     assert r.status_code == 201
 
@@ -95,7 +95,7 @@ async def test_signup_conflict(client, users_coll):
 
     r = await client.post(
         "/signup",
-        json={"user_name": "Y", "email": "X@EXAMPLE.COM", "password": "Secret123!"},
+        json={"user_name": "Y", "email": "X@EXAMPLE.COM", "age": 21, "password": "Secret123!"},
     )
     assert r.status_code == 409
     assert r.json()["detail"] == "Email already registered"

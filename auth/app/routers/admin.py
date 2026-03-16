@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import re
 import secrets
 import string
@@ -24,6 +26,7 @@ from app.services.passwords import PasswordService
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+logger = logging.getLogger(__name__)
 
 
 REASON_CODES = (
@@ -286,7 +289,41 @@ async def admin_delete_user(
     }
 
     await logs.insert_one(log_doc)
-    await users.delete_one({"user_id": user_id})
+    # Only send event if delete really happened (deleted_count must be 1).
+    delete_result = await users.delete_one({"user_id": user_id})
+    if getattr(delete_result, "deleted_count", 0) != 1:
+        raise HTTPException(status_code=500, detail="Failed to delete user")
+
+    # Keep log_id in event so workers can trace it. Example: find same log in audit logs.
+    event_payload = {
+        "event_type": "auth.user.deleted.admin",
+        "log_id": log_doc["log_id"],
+        "deleted_user_id": user_doc.get("user_id"),
+        "deleted_user_email": user_doc.get("email"),
+        "deleted_user_name": user_doc.get("user_name"),
+        "deleted_by_user_id": admin.user_id,
+        "deleted_by_email": admin.email,
+        "reason_code": body.reason_code,
+        "reason_detail": body.reason_detail,
+        "deleted_at": log_doc["deleted_at"].isoformat(),
+    }
+
+    try:
+        # Push event to Redis stream. Email worker handles it later.
+        await request.app.state.event_redis.xadd(
+            request.app.state.settings.AUTH_EVENT_STREAM,
+            {
+                "type": "auth.user.deleted.admin",
+                "data": json.dumps(event_payload),
+            },
+        )
+    except Exception:
+        # Deletion should remain successful even if event publication fails
+        logger.exception(
+            "failed_to_publish_admin_delete_event log_id=%s user_id=%s",
+            log_doc["log_id"],
+            user_doc.get("user_id"),
+        )
 
     return {
         "deleted": True,

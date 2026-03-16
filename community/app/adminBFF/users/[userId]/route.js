@@ -32,9 +32,10 @@ export async function DELETE(req, { params }) {
   try {
     const token = await getToken();
     if (!token) return buildError(401, "Unauthorized");
+    const { userId } = await params;
 
     const body = await req.json();
-    const res = await fetch(`${GATEWAY_URL}/auth/admin/user/${params.userId}`, {
+    const res = await fetch(`${GATEWAY_URL}/auth/admin/user/${userId}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -57,9 +58,10 @@ export async function PATCH(req, { params }) {
   try {
     const token = await getToken();
     if (!token) return buildError(401, "Unauthorized");
+    const { userId } = await params;
 
     const body = await req.json();
-    const res = await fetch(`${GATEWAY_URL}/auth/admin/user/${params.userId}`, {
+    const res = await fetch(`${GATEWAY_URL}/auth/admin/user/${userId}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",

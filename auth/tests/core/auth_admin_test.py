@@ -73,7 +73,7 @@ async def test_admin_list_users_filters_by_user_name(client, users_coll, auth_mo
     )
 
     admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
-    r = await client.get("/admin/users?user_name=ali", headers={"Authorization": f"Bearer {admin_token}"})
+    r = await client.get("/admin/users?search=ali", headers={"Authorization": f"Bearer {admin_token}"})
     assert r.status_code == 200
     data = r.json()
     assert "items" in data
@@ -148,7 +148,7 @@ async def test_admin_update_user_ok(client, users_coll, auth_mod):
 
 
 @pytest.mark.asyncio
-async def test_admin_delete_user_ok(client, users_coll, auth_mod):
+async def test_admin_delete_user_ok(client, users_coll, auth_mod, event_redis):
     await users_coll.insert_one(
         {
             "user_id": "u_del2",
@@ -167,7 +167,13 @@ async def test_admin_delete_user_ok(client, users_coll, auth_mod):
     )
     admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
 
-    r = await client.delete("/admin/user/u_del2", headers={"Authorization": f"Bearer {admin_token}"})
+    # Delete request must include reason fields.
+    r = await client.request(
+        "DELETE",
+        "/admin/user/u_del2",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"reason_code": "user_request", "reason_detail": "Requested account removal"},
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["deleted"] is True
@@ -176,3 +182,34 @@ async def test_admin_delete_user_ok(client, users_coll, auth_mod):
 
     doc = await users_coll.find_one({"user_id": "u_del2"})
     assert doc is None
+
+    # Check event was published for email-worker.
+    assert len(event_redis.calls) == 1
+    call = event_redis.calls[0]
+    assert call["stream"] == "auth-events"
+    assert call["payload"]["type"] == "auth.user.deleted.admin"
+
+
+@pytest.mark.asyncio
+async def test_admin_delete_user_requires_reason_payload(client, users_coll, auth_mod):
+    await users_coll.insert_one(
+        {
+            "user_id": "u_del3",
+            "user_name": "Del",
+            "email": "del3@example.com",
+            "password": _bcrypt_hash("x"),
+            "is_admin": False,
+            "plan": 0,
+            "created_at": _now_utc(),
+            "age": None,
+            "total_guesses": 0,
+            "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
+        }
+    )
+    admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
+
+    # No body -> FastAPI schema error.
+    r = await client.delete("/admin/user/u_del3", headers={"Authorization": f"Bearer {admin_token}"})
+    assert r.status_code == 422
