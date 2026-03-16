@@ -119,10 +119,19 @@ def build_auth_blueprint(gateway: GatewayClient, *, is_signup_enabled: Callable[
         if data is None:
             data = {"detail": "Invalid JSON from gateway on delete"}
 
-        session.clear()
-        resp = make_response(jsonify(data), status)
-        clear_access_cookie(resp, request)
-        return resp
+        if status == 200:
+            session.clear()
+            resp = make_response(jsonify(data), 200)
+            clear_access_cookie(resp, request)
+            return resp
+
+        if status == 401:
+            session.clear()
+            resp = make_response(jsonify(data), 401)
+            clear_access_cookie(resp, request)
+            return resp
+
+        return jsonify(data), status
 
     @bp.get("/auth/api-key")
     def auth_api_key_get():
