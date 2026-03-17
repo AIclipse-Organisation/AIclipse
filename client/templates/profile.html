@@ -1,94 +1,132 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>AIclipse</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/css/styles.css" />
-    <link rel="stylesheet" href="/static/css/profile.css" />
-    <link rel="stylesheet" href="/static/css/scans.css" />
-  </head>
 
-  <body class="app">
-    <div class="app-container">
+<head>
+  <meta charset="utf-8" />
+  <title>AIclipse</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <link rel="stylesheet" href="/static/css/profile.css" />
+  <link rel="stylesheet" href="/static/css/scans.css" />
+</head>
 
-      {% set page_title = 'Profile' %}
-      {% include 'partials/topbar.html' %}
+<body class="app">
+  <div class="app-container">
 
-      <div class="profileScreen">
-        <!-- <section class="page-header" aria-label="Page title">
-          <h1 id="page-title" class="page-title">Profile</h1>
-          <div class="page-underline" role="presentation"></div>
-        </section> -->
+    {% set page_title = 'Profile' %}
+    {% include 'partials/topbar.html' %}
 
-        <!-- PROFILE SUMMARY (top) -->
-        <section class="profile-summary" aria-label="Profile summary">
-          <div class="profile-avatar">
-            <img
-              src="/static/images/profile.png"
-              alt="Profile"
-              class="profile-avatar-img"
-            />
+    <div class="profileScreen">
+      <section class="profile-summary" aria-label="Profile summary">
+        <div class="profile-avatar">
+          <img src="/static/images/profile.png" alt="Profile" class="profile-avatar-img" />
+        </div>
+
+        <div class="profile-identity">
+          <div class="profile-name-row">
+            <div id="detail-username" class="profile-username">-</div>
+            <span id="detail-plan" class="plan-badge">-</span>
           </div>
 
-          <div class="profile-identity">
-            <div class="profile-name-row">
-              <div id="detail-username" class="profile-username">-</div>
-              <span id="detail-plan" class="plan-badge">-</span>
+          <div id="detail-email" class="profile-email">-</div>
+
+          <div class="profile-meta-row">
+            Member since <span id="detail-created">-</span> &bull; Monthly
+            Usage: <span id="detail-monthly-usage">-</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="profile-actions" aria-label="Profile actions">
+        <button id="btn-delete-account" class="profile-danger-btn" type="button">
+          Delete account
+        </button>
+      </section>
+
+      <div id="user-details-status" class="status-message"></div>
+
+      <section class="user-details-section" aria-label="User stats">
+        <div id="user-details-container" style="display: none">
+          <div class="user-details-container">
+            <div class="user-detail-item">
+              <span class="detail-label">Guesses</span>
+              <span id="detail-total-guesses" class="detail-value">-</span>
             </div>
 
-            <div id="detail-email" class="profile-email">-</div>
+            <div class="user-detail-item">
+              <span class="detail-label">Level</span>
+              <span id="detail-accuracy-level" class="detail-value">-</span>
+            </div>
 
-            <div class="profile-meta-row">
-              Member since <span id="detail-created">-</span> &bull; Monthly
-              Usage: <span id="detail-monthly-usage">-</span>
+            <div class="user-detail-item">
+              <span class="detail-label">AI Acc.</span>
+              <span id="detail-acc-ai" class="detail-value">-</span>
+            </div>
+
+            <div class="user-detail-item">
+              <span class="detail-label">Real Acc.</span>
+              <span id="detail-acc-real" class="detail-value">-</span>
             </div>
           </div>
-        </section>
-
-        <div id="user-details-status" class="status-message"></div>
-
-        <section class="user-details-section" aria-label="User stats">
-          <div id="user-details-container" style="display: none">
-            <div class="user-details-container">
-              <div class="user-detail-item">
-                <span class="detail-label">Guesses</span>
-                <span id="detail-total-guesses" class="detail-value">-</span>
-              </div>
-
-              <div class="user-detail-item">
-                <span class="detail-label">Level</span>
-                <span id="detail-accuracy-level" class="detail-value">-</span>
-              </div>
-
-              <div class="user-detail-item">
-                <span class="detail-label">AI Acc.</span>
-                <span id="detail-acc-ai" class="detail-value">-</span>
-              </div>
-
-              <div class="user-detail-item">
-                <span class="detail-label">Real Acc.</span>
-                <span id="detail-acc-real" class="detail-value">-</span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div class="scansScreen">
-   
-
-        <div id="scans-status" class="status-message"></div>
-        <div id="scans-container" class="scans-grid"></div>
-      </div>
-
-      {% include 'partials/navbar.html' %}
+        </div>
+      </section>
     </div>
 
-    <script src="/static/js/include.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/main.js"></script>
-    <script src="/static/js/profile.js"></script>
-    <script src="/static/js/scans.js"></script>
-  </body>
+    <div class="scansScreen">
+      <div id="scans-status" class="status-message"></div>
+      <div id="scans-container" class="scans-grid"></div>
+    </div>
+
+    {% include 'partials/navbar.html' %}
+  </div>
+
+  <!-- Delete Account Modal -->
+  <div
+    id="delete-account-modal"
+    class="delete-modal-overlay"
+    hidden
+    aria-hidden="true"
+  >
+    <div
+      class="delete-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-account-title"
+      aria-describedby="delete-account-text"
+    >
+      <h2 id="delete-account-title" class="delete-modal-title">
+        Delete account?
+      </h2>
+
+      <p id="delete-account-text" class="delete-modal-text">
+        This action is permanent. Your account and related access will be removed.
+      </p>
+
+      <div class="delete-modal-actions">
+        <button
+          id="cancel-delete-account"
+          type="button"
+          class="delete-modal-btn delete-modal-btn-secondary"
+        >
+          Cancel
+        </button>
+
+        <button
+          id="confirm-delete-account"
+          type="button"
+          class="delete-modal-btn delete-modal-btn-danger"
+        >
+          Yes, delete permanently
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/include.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/main.js"></script>
+  <script src="/static/js/profile.js"></script>
+  <script src="/static/js/scans.js"></script>
+</body>
+
 </html>
