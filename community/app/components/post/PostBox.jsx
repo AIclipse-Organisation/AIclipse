@@ -233,9 +233,9 @@ export default function PostBox({
   function bucketFromRealPct(realPct) {
     const r = Math.max(0, Math.min(100, Number(realPct) || 0));
     if (r >= 40 && r <= 60) return { text: "Not sure", type: "neutral" };
-    if (r > 60) return { text: r >= 86 ? "Most Likely Real" : "Likely Real", type: "safe" };
+    if (r > 60) return { text: r >= 86 ? "Highly Unlikely Fake" : "Unlikely Fake", type: "safe" };
     const pctAI = 100 - r;
-    return { text: pctAI >= 86 ? "Most Likely AI" : "Likely AI", type: "risk" };
+    return { text: pctAI >= 86 ? "Highly Likely Fake" : "Likely Fake", type: "risk" };
   }
   function setWidthStyle(pct) {
     const p = Math.max(0, Math.min(100, Number(pct) || 0));
@@ -245,9 +245,14 @@ export default function PostBox({
 
   const analysisRealPct = computeRealPctFromModel(image);
   const analysisBucket = bucketFromRealPct(analysisRealPct);
+
+  const analysisAiPct = 100 - analysisRealPct;
+
   const totalVotes = up + down;
   const communityRealPct = totalVotes > 0 ? (up / totalVotes) * 100 : null;
   const communityBucket = communityRealPct === null ? null : bucketFromRealPct(communityRealPct);
+
+  const communityAiPct = communityRealPct !== null ? 100 - communityRealPct : null;
 
   return (
     <div className={`comm_postBox ${isOfficial && userHasVoted ? "is-revealed-benchmark" : ""}`}>
@@ -303,23 +308,39 @@ export default function PostBox({
       </div>
 
       {/* RESULT BARS */}
+      {/* RESULT BARS */}
       <div className="comm_bars_wrapper">
         {!userHasVoted && <div className="comm_vote_prompt">Vote to see results</div>}
         <div className={`comm_bars ${!userHasVoted ? "is-hidden" : "is-revealed"}`}>
+          
+          {/* AICLIPSE BAR */}
           <div className={`comm_barBlock is-${analysisBucket.type}`}>
-            <div className="comm_barHead"><div className="comm_barTitle">Aiclipse</div><div className="comm_barVerdict">{analysisBucket.text}</div></div>
+            <div className="comm_barHead">
+              <div className="comm_barTitle" title="AI probability">Aiclipse</div>
+              <div className="comm_barVerdict">{analysisBucket.text}</div>
+            </div>
             <div className="comm_progressBar">
-              <div className="comm_progressFill" style={{ width: setWidthStyle(analysisRealPct) }} />
-              <div className="comm_barPercent">{analysisRealPct.toFixed(2)}%</div>
+              {/* UPDATED to use AiPct */}
+              <div className="comm_progressFill" style={{ width: setWidthStyle(analysisAiPct) }} />
+              <div className="comm_barPercent">{analysisAiPct.toFixed(2)}%</div>
             </div>
           </div>
+          
+          {/* COMMUNITY BAR */}
           <div className="comm_barBlock comm_communityBar">
-            <div className="comm_barHead"><div className="comm_barTitle">Community</div><div className="comm_barVerdict">{communityBucket?.text || "No votes"}</div></div>
+            <div className="comm_barHead">
+              <div className="comm_barTitle" title="Community AI share">Community</div>
+              <div className="comm_barVerdict">{communityBucket?.text || "No community votes"}</div>
+            </div>
             <div className="comm_progressBar">
-              <div className="comm_progressFill" style={{ width: setWidthStyle(communityRealPct || 0) }} />
-              <div className="comm_barPercent">{communityRealPct !== null ? communityRealPct.toFixed(2) + "%" : "—"}</div>
+              {/* UPDATED to use AiPct and handle the empty state with a dash */}
+              <div className="comm_progressFill" style={{ width: setWidthStyle(communityAiPct || 0) }} />
+              <div className="comm_barPercent">
+                {communityAiPct !== null ? communityAiPct.toFixed(2) + "%" : "—"}
+              </div>
             </div>
           </div>
+
         </div>
 
         {/* INTERACTION ROW */}

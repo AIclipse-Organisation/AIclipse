@@ -13,9 +13,9 @@ def get_confidence_label(verdict: str, confidence: float) -> str:
     is_fake = verdict.upper() == "FAKE"
 
     if pct < 15 or pct > 85:
-        label = "Most Likely AI" if is_fake else "Most Likely Real"
+        label = "Highly Likely Fake" if is_fake else "Highly Unlikely Fake"
     elif 15 <= pct < 40 or 60 < pct <= 85:
-        label = "Likely AI" if is_fake else "Likely Real"
+        label = "Likely Fake" if is_fake else "Unlikely Fake"
     else:  # 40–60 range
         label = "Not Sure"
 
