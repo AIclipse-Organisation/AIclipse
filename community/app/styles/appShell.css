@@ -283,6 +283,65 @@ body {
   cursor: pointer;
 }
 
+/* XP Toast — floating, portal-rendered */
+/* XP Toast — floating, portal-rendered */
+.xp-toast {
+  position: fixed;
+  top: 72px;
+  transform: translateX(-50%);
+  z-index: 9000;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  background: #1a1a1a;
+  border: 1px solid rgba(207, 184, 124, 0.35);
+  border-radius: 999px;
+  padding: 6px 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(207, 184, 124, 0.12);
+
+  width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.xp-toast-gained {
+  font-size: 12px;
+  font-weight: 800;
+  color: #CFB87C;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.xp-toast-mid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.xp-toast-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.xp-toast-fill {
+  height: 100%;
+  background: #CFB87C;
+  border-radius: 999px;
+}
+
+.xp-toast-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(207, 184, 124, 0.7);
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
 .home_tab_bottomNav {
   color: #CFB87C;
   stroke-width: 2;

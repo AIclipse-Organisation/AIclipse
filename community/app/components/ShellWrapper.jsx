@@ -5,6 +5,8 @@ import BottomNav from "./BottomNav";
 import { HeroUIProvider } from "@heroui/react";
 import { useState } from "react";
 import TutorialModal from "./modals/TutorialModal";
+import { XpProvider } from "../lib/xpContext";
+import XpBar from "./common/XpBar";
 
 export default function ShellWrapper({ children, user }) {
   const pathname = usePathname();
@@ -32,6 +34,7 @@ export default function ShellWrapper({ children, user }) {
   }
 
   return (
+    <XpProvider>
     <div className="app">
       <div className="app-container">
         <Topbar
@@ -53,11 +56,13 @@ export default function ShellWrapper({ children, user }) {
           {children}
         </main>
         <BottomNav />
+        <XpBar />
         <TutorialModal
           open={showTutorial}
           onClose={() => setShowTutorial(false)}
         />
       </div>
     </div>
+    </XpProvider>
   );
 }

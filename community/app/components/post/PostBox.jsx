@@ -1,7 +1,7 @@
 "use client";
 
 import "../../styles/postBox.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   voteOnPost,
   fetchComments,
@@ -14,7 +14,9 @@ import {
 } from "./postBoxActions";
 
 import { useDisclosure } from "@heroui/react";
-import ReportModal from "../modals/ReportModal"; 
+import ReportModal from "../modals/ReportModal";
+import { useXp } from "../../lib/xpContext";
+import { useXpFloat, XpFloatLayer } from "../common/XpFloat";
 
 export default function PostBox({
   image,
@@ -56,6 +58,12 @@ export default function PostBox({
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
 
   const isOwner = currentUserId && image?.user_id === currentUserId;
+
+  const xp = useXp();
+  const { triggerFloat, floats } = useXpFloat();
+  const voteUpRef = useRef(null);
+  const voteDownRef = useRef(null);
+  const commentBtnRef = useRef(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -114,6 +122,9 @@ export default function PostBox({
       setUp(result.up_vote_count);
       setDown(result.down_vote_count);
       setUserVote(result.user_vote);
+      xp?.addXp(result.points_awarded);
+      const ref = direction === "up" ? voteUpRef : voteDownRef;
+      triggerFloat(ref, result.points_awarded);
       if (onVoteUpdate) {
         onVoteUpdate(postId, result.up_vote_count, result.down_vote_count);
       }
@@ -184,6 +195,8 @@ export default function PostBox({
       const data = await submitCommentAPI(postId, currentUserId, currentUserName, text);
       setComments((arr) => [data, ...arr]);
       setCommentText("");
+      xp?.addXp(1);
+      triggerFloat(commentBtnRef, 1);
     } catch (err) {
       setCommentError(err.message || "Network error while posting comment.");
     } finally {
@@ -324,17 +337,17 @@ export default function PostBox({
         {/* INTERACTION ROW */}
         <div className="comm_bottomRow">
           <div className="comm_actionsLeft">
-            <button type="button" onClick={() => vote("up")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteUp">
+            <button ref={voteUpRef} type="button" onClick={() => vote("up")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteUp">
               <img className="comm_icon" src="/static/images/upvote.png" alt="" />
               <span className="comm_actionText">Real {userHasVoted ? `(${up})` : ""}</span>
             </button>
-            <button type="button" onClick={() => vote("down")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteDown">
+            <button ref={voteDownRef} type="button" onClick={() => vote("down")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteDown">
               <img className="comm_icon" src="/static/images/downvote.png" alt="" />
               <span className="comm_actionText">AI {userHasVoted ? `(${down})` : ""}</span>
             </button>
           </div>
           <div className="comm_actionsRight">
-            <button type="button" onClick={() => setShowComments((v) => !v)} className="comm_actionBtn comm_commentBtn">
+            <button ref={commentBtnRef} type="button" onClick={() => setShowComments((v) => !v)} className="comm_actionBtn comm_commentBtn">
               <img className="comm_icon" src="/static/images/comment.png" alt="" />
               <span className="comm_actionText">({comments.length})</span>
             </button>
@@ -372,6 +385,7 @@ export default function PostBox({
         onSubmit={submitReport}
         isSubmitting={busy}
       />
+      <XpFloatLayer floats={floats} />
     </div>
   );
 }
