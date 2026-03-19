@@ -1,94 +1,99 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>AIclipse</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/css/styles.css" />
-    <link rel="stylesheet" href="/static/css/profile.css" />
-    <link rel="stylesheet" href="/static/css/scans.css" />
-  </head>
 
-  <body class="app">
-    <div class="app-container">
+<head>
+  <meta charset="utf-8" />
+  <title>AIclipse</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <link rel="stylesheet" href="/static/css/profile.css" />
+  <link rel="stylesheet" href="/static/css/scans.css" />
+</head>
 
-      {% set page_title = 'Profile' %}
-      {% include 'partials/topbar.html' %}
+<body class="app">
+  <div class="app-container">
 
-      <div class="profileScreen">
-        <!-- <section class="page-header" aria-label="Page title">
+    {% set page_title = 'Profile' %}
+    {% include 'partials/topbar.html' %}
+
+    <div class="profileScreen">
+      <!-- <section class="page-header" aria-label="Page title">
           <h1 id="page-title" class="page-title">Profile</h1>
           <div class="page-underline" role="presentation"></div>
         </section> -->
 
-        <!-- PROFILE SUMMARY (top) -->
-        <section class="profile-summary" aria-label="Profile summary">
-          <div class="profile-avatar">
-            <img
-              src="/static/images/profile.png"
-              alt="Profile"
-              class="profile-avatar-img"
-            />
-          </div>
+      <!-- PROFILE SUMMARY (top) -->
+      <section class="profile-summary" aria-label="Profile summary">
+        <div class="profile-avatar">
+          <img src="/static/images/profile.png" alt="Profile" class="profile-avatar-img" />
+        </div>
 
-          <div class="profile-identity">
-            <div class="profile-name-row">
-              <div id="detail-username" class="profile-username">-</div>
-              <span id="detail-plan" class="plan-badge">-</span>
-            </div>
-
-            <div id="detail-email" class="profile-email">-</div>
-
-            <div class="profile-meta-row">
-              Member since <span id="detail-created">-</span> &bull; Monthly
-              Usage: <span id="detail-monthly-usage">-</span>
-            </div>
-          </div>
-        </section>
-
-        <div id="user-details-status" class="status-message"></div>
-
-        <section class="user-details-section" aria-label="User stats">
-          <div id="user-details-container" style="display: none">
-            <div class="user-details-container">
-              <div class="user-detail-item">
-                <span class="detail-label">Guesses</span>
-                <span id="detail-total-guesses" class="detail-value">-</span>
+        <div class="profile-identity">
+          <div class="profile-name-row">
+            <div id="detail-username" class="profile-username">-</div>
+            <span id="detail-plan" class="profile-badge plan-badge">-</span>
+            <div class="gamification-badges">
+              <div id="streak-badge" class="profile-badge streak-badge" style="display: none;">
+                <img src="/static/images/fire.png" alt="Streak" class="badge-icon badge-icon-img">
+                <span id="badge-streak-value" class="badge-value">0</span>
               </div>
-
-              <div class="user-detail-item">
-                <span class="detail-label">Level</span>
-                <span id="detail-accuracy-level" class="detail-value">-</span>
-              </div>
-
-              <div class="user-detail-item">
-                <span class="detail-label">AI Acc.</span>
-                <span id="detail-acc-ai" class="detail-value">-</span>
-              </div>
-
-              <div class="user-detail-item">
-                <span class="detail-label">Real Acc.</span>
-                <span id="detail-acc-real" class="detail-value">-</span>
+              <div id="score-badge" class="profile-badge score-badge" style="display: none;">
+                <img src="/static/images/Star.png" alt="Score" class="badge-icon badge-icon-img">
+                <span id="badge-score-value" class="badge-value">0</span>
               </div>
             </div>
           </div>
-        </section>
-      </div>
 
-      <div class="scansScreen">
-   
+          <div id="detail-email" class="profile-email">-</div>
 
-        <div id="scans-status" class="status-message"></div>
-        <div id="scans-container" class="scans-grid"></div>
-      </div>
+          <div class="profile-meta-row">
+            Member since <span id="detail-created">-</span> &bull; Monthly
+            Usage: <span id="detail-monthly-usage">-</span>
+          </div>
+        </div>
+      </section>
 
-      {% include 'partials/navbar.html' %}
+      <div id="user-details-status" class="status-message"></div>
+
+      <section class="user-details-section" aria-label="User stats">
+        <div id="user-details-container" style="display: none">
+          <div class="profile-xp-bar">
+            <span id="profile-xp-level-label" class="profile-xp-label">Lv.1</span>
+            <div class="profile-xp-track">
+              <div id="profile-xp-fill" class="profile-xp-fill"></div>
+            </div>
+            <span id="profile-xp-next-label" class="profile-xp-label">Lv.2</span>
+          </div>
+          <div class="user-details-container">
+            <div class="user-detail-item">
+              <span class="detail-label">Guesses</span>
+              <span id="detail-total-guesses" class="detail-value">-</span>
+            </div>
+
+            <div class="user-detail-item">
+              <span class="detail-label">Level</span>
+              <span id="detail-accuracy-level" class="detail-value">-</span>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <script src="/static/js/include.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/main.js"></script>
-    <script src="/static/js/profile.js"></script>
-    <script src="/static/js/scans.js"></script>
-  </body>
+    <div class="scansScreen">
+
+
+      <div id="scans-status" class="status-message"></div>
+      <div id="scans-container" class="scans-grid"></div>
+    </div>
+
+    {% include 'partials/navbar.html' %}
+  </div>
+
+  <script src="/static/js/include.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/main.js"></script>
+  <script src="/static/js/profile.js"></script>
+  <script src="/static/js/scans.js"></script>
+</body>
+
 </html>

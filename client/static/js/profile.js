@@ -19,20 +19,18 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     const user = await response.json();
 
-    const aiAccuracy =
-      user.acc_guessing_ai != null ? user.acc_guessing_ai * 100 : 0;
-    const realAccuracy =
-      user.acc_guessing_real != null ? user.acc_guessing_real * 100 : 0;
-
-    const avgAcc = (aiAccuracy + realAccuracy) / 2;
+    // Calculate accuracy based on admin post guesses (ground truth data)
+    const adminCorrect = (user.admin_guesses_correct || 0);
+    const adminTotal = (user.admin_guesses_total || 0);
+    const adminAccuracy = adminTotal > 0 ? (adminCorrect / adminTotal) * 100 : 0;
 
     let accuracyLevel;
 
-    if (avgAcc >= 75) {
+    if (adminAccuracy >= 75) {
       accuracyLevel = "Expert";
-    } else if (avgAcc >= 50) {
+    } else if (adminAccuracy >= 50) {
       accuracyLevel = "Advanced";
-    } else if (avgAcc >= 25) {
+    } else if (adminAccuracy >= 25) {
       accuracyLevel = "Intermediate";
     } else {
       accuracyLevel = "Novice";
@@ -56,18 +54,47 @@ window.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("detail-total-guesses").textContent =
       user.total_guesses !== undefined ? user.total_guesses : 0;
 
-    // document.getElementById("detail-total-correct").textContent =
-    //   user.total_correct !== undefined ? user.total_correct : 0;
+    // Display streak and score badges next to username
+    const currentStreak = user.current_streak || 0;
+    const communityScore = user.community_score || 0;
 
-    // document.getElementById('detail-acc-ai').textContent =
-    //   (user.acc_guessing_ai !== undefined && user.acc_guessing_ai !== null)
-    //     ? (user.acc_guessing_ai * 100).toFixed(1) + '%'
-    //     : '0.0%';
+    // Show streak badge if user has any streak
+    const streakBadge = document.getElementById("streak-badge");
+    const streakValue = document.getElementById("badge-streak-value");
+    if (streakBadge && streakValue) {
+      if (currentStreak > 0) {
+        streakValue.textContent = currentStreak;
+        streakBadge.style.display = "inline-flex";
 
-    // document.getElementById('detail-acc-real').textContent =
-    //   (user.acc_guessing_real !== undefined && user.acc_guessing_real !== null)
-    //     ? (user.acc_guessing_real * 100).toFixed(1) + '%'
-    //     : '0.0%';
+        // Add active class for streaks 3+ days
+        if (currentStreak >= 3) {
+          streakBadge.classList.add("active");
+        }
+      }
+    }
+
+    // XP bar labels (set immediately; fill animates after container is shown)
+    const xpLevel = Math.floor(communityScore / 50) + 1;
+    const xpProgress = (communityScore % 50) / 50;
+    const profileXpLevelLabel = document.getElementById("profile-xp-level-label");
+    const profileXpNextLabel = document.getElementById("profile-xp-next-label");
+    if (profileXpLevelLabel) profileXpLevelLabel.textContent = `Lv.${xpLevel}`;
+    if (profileXpNextLabel) profileXpNextLabel.textContent = `Lv.${xpLevel + 1}`;
+
+    // Show score badge if user has any score
+    const scoreBadge = document.getElementById("score-badge");
+    const scoreValue = document.getElementById("badge-score-value");
+    if (scoreBadge && scoreValue) {
+      if (communityScore > 0) {
+        scoreValue.textContent = communityScore;
+        scoreBadge.style.display = "inline-flex";
+
+        // Add high-score class for scores 50+
+        if (communityScore >= 50) {
+          scoreBadge.classList.add("high-score");
+        }
+      }
+    }
 
     document.getElementById("detail-monthly-usage").textContent =
       user.monthly_usage_count !== undefined ? user.monthly_usage_count : 0;
@@ -76,6 +103,14 @@ window.addEventListener("DOMContentLoaded", async () => {
     statusEl.textContent = "";
     statusEl.className = "status-message";
     containerEl.style.display = "block";
+
+    // Animate profile XP fill after container is visible (two frames to guarantee transition fires)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const profileXpFill = document.getElementById("profile-xp-fill");
+        if (profileXpFill) profileXpFill.style.width = `${xpProgress * 100}%`;
+      });
+    });
   } catch (error) {
     console.error("Error loading user details:", error);
     statusEl.textContent = "Failed to load user details. Please log in.";
