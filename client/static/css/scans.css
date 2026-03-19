@@ -4,6 +4,7 @@
 
 .scansScreen {
   padding: 0;
+  padding-bottom: 80px;
 }
 
 .scans-grid {
