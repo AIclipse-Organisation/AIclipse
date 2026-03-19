@@ -18,6 +18,8 @@ lib/
 !community/lib/
 !community/lib/notifications/
 !community/lib/notifications/notifications.js
+!community/app/lib/
+!community/app/lib/**
 lib64/
 parts/
 sdist/
