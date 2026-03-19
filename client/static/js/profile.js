@@ -51,27 +51,15 @@ window.addEventListener("DOMContentLoaded", async () => {
       ? new Date(user.created_at).toLocaleDateString()
       : "-";
 
-    document.getElementById("detail-total-guesses").textContent =
-      user.total_guesses !== undefined ? user.total_guesses : 0;
-
-    // Display streak and score badges next to username
     const currentStreak = user.current_streak || 0;
     const communityScore = user.community_score || 0;
 
-    // Show streak badge if user has any streak
-    const streakBadge = document.getElementById("streak-badge");
-    const streakValue = document.getElementById("badge-streak-value");
-    if (streakBadge && streakValue) {
-      if (currentStreak > 0) {
-        streakValue.textContent = currentStreak;
-        streakBadge.style.display = "inline-flex";
-
-        // Add active class for streaks 3+ days
-        if (currentStreak >= 3) {
-          streakBadge.classList.add("active");
-        }
-      }
-    }
+    // Populate new stat elements
+    const el = id => document.getElementById(id);
+    if (el('detail-streak')) el('detail-streak').textContent = currentStreak;
+    if (el('detail-score'))  el('detail-score').textContent  = communityScore;
+    if (el('detail-accuracy')) el('detail-accuracy').textContent = adminTotal > 0
+      ? adminAccuracy.toFixed(0) + '%' : '—';
 
     // XP bar labels (set immediately; fill animates after container is shown)
     const xpLevel = Math.floor(communityScore / 50) + 1;
@@ -80,21 +68,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     const profileXpNextLabel = document.getElementById("profile-xp-next-label");
     if (profileXpLevelLabel) profileXpLevelLabel.textContent = `Lv.${xpLevel}`;
     if (profileXpNextLabel) profileXpNextLabel.textContent = `Lv.${xpLevel + 1}`;
-
-    // Show score badge if user has any score
-    const scoreBadge = document.getElementById("score-badge");
-    const scoreValue = document.getElementById("badge-score-value");
-    if (scoreBadge && scoreValue) {
-      if (communityScore > 0) {
-        scoreValue.textContent = communityScore;
-        scoreBadge.style.display = "inline-flex";
-
-        // Add high-score class for scores 50+
-        if (communityScore >= 50) {
-          scoreBadge.classList.add("high-score");
-        }
-      }
-    }
 
     document.getElementById("detail-monthly-usage").textContent =
       user.monthly_usage_count !== undefined ? user.monthly_usage_count : 0;
@@ -211,6 +184,30 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   // =========================
+  // Settings bottom sheet
+  // =========================
+  const btnSettings     = document.getElementById('btn-settings');
+  const settingsOverlay = document.getElementById('settings-sheet-overlay');
+
+  function openSheet() {
+    settingsOverlay.hidden = false;
+    settingsOverlay.setAttribute('aria-hidden', 'false');
+  }
+  function closeSheet() {
+    settingsOverlay.hidden = true;
+    settingsOverlay.setAttribute('aria-hidden', 'true');
+  }
+
+  btnSettings?.addEventListener('click', openSheet);
+  document.getElementById('btn-close-settings')?.addEventListener('click', closeSheet);
+  settingsOverlay?.addEventListener('click', e => {
+    if (e.target === settingsOverlay) closeSheet();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && settingsOverlay && !settingsOverlay.hidden) closeSheet();
+  });
+
+  // =========================
   // Delete account confirm modal logic
   // =========================
   const btnDeleteAccount = document.getElementById("btn-delete-account");
@@ -240,6 +237,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     btnDeleteAccount.addEventListener("click", (e) => {
       e.preventDefault();
+      closeSheet();
       openDeleteAccountModal();
     });
 

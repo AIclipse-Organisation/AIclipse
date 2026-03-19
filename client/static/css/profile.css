@@ -204,11 +204,32 @@
    PROFILE XP BAR (static, inline)
    ========================= */
 
+.profile-settings-btn {
+  margin-left: auto;
+  background: none; border: none;
+  color: rgba(255,255,255,0.4); font-size: 20px;
+  cursor: pointer; padding: 4px; line-height: 1;
+  transition: color 160ms ease;
+  align-self: flex-start;
+}
+.profile-settings-btn:hover { color: rgba(255,255,255,0.85); }
+
+.detail-icon {
+  width: 28px; height: 28px;
+  object-fit: contain;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+.detail-icon-emoji {
+  font-size: 22px; line-height: 1;
+  flex-shrink: 0;
+}
+
 .profile-xp-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 0 4px;
+  padding: 4px 0 14px;
 }
 
 .profile-xp-track {
@@ -255,55 +276,59 @@
   margin: 14px 0 10px;
 }
 
+/* Wrapper so XP bar sits inside the bottom border */
+.stats-xp-wrapper {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
 /* Container is NOT a card anymore */
 .user-details-container {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  /* 2 across */
-  padding: 16px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
-  /* Bottom line before post grid */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 12px 0 8px;
 }
 
 /* Each stat becomes its own “stat box” */
 .user-detail-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   border-right: 1px solid rgba(255, 255, 255, 0.10);
-  /* Vertical separators */
-  text-align: center;
 }
 
 .user-detail-item:last-child {
   border-right: none;
 }
 
+/* Value + label stacked, centered */
+.detail-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
 .detail-label {
-  order: 2;
   font-size: 11px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.55);
+  text-align: center;
 }
 
 .detail-value {
-  order: 1;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.95);
   line-height: 1;
+  text-align: center;
 }
 
-/* Small screens: stack boxes */
+/* Small screens */
 @media (max-width: 420px) {
-  .user-details-container {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .detail-value {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .detail-label {
@@ -335,7 +360,7 @@
   padding: 0;
   padding-left: 2vh;
   padding-right: 2vh;
-  padding-bottom: 2vh;
+  padding-bottom: 8px;
 }
 
 /* =========================
@@ -629,42 +654,10 @@
   }
 }
 
-/* =========================
-   PROFILE ACTIONS
-   ========================= */
-
-.profile-actions {
-  margin-top: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
-}
-
-.profile-danger-btn {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 12px 14px;
-  border-radius: 10px;
-  cursor: pointer;
-
-  font: inherit;
-  font-weight: 700;
-  font-size: 14px;
-
-  border: 1px solid #e04646;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.92);
-
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, opacity 160ms ease;
-}
-
-.profile-danger-btn:hover {
-  background: #e04646;
-  color: #111;
-}
-
-.profile-danger-btn:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+/* Settings modal — buttons stacked vertically */
+.settings-modal-actions {
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* =========================
