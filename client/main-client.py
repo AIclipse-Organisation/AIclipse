@@ -21,6 +21,9 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 current_env = os.getenv("APP_ENV", "dev")
 
+# Reload templates on every request in dev; cache them in prod
+app.config["TEMPLATES_AUTO_RELOAD"] = current_env not in ("prod", "production")
+
 print(f"[*] Starting Client Service in {current_env} mode")
 
 GATEWAY_URI = os.getenv("GATEWAY_URI")

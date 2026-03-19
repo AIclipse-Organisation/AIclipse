@@ -66,6 +66,10 @@ build:
             dest: .
           - src: "**/*.html"
             dest: .
+          - src: "static/**/*.css"
+            dest: .
+          - src: "static/**/*.js"
+            dest: .
     # - image: aiclipse/observer
     #   context: observer
     #   docker: { dockerfile: Dockerfile }
@@ -79,10 +83,6 @@ build:
       sync:
         manual:
           - src: "**/*.{js,jsx,ts,tsx,json,css,scss,html}"
-            dest: .
-          - src: 'tailwind.config.js'  
-            dest: .
-          - src: 'postcss.config.js'   
             dest: .
 
 manifests:

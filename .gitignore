@@ -244,5 +244,6 @@ packages/
 *.sln
 *.user
 model-cycle/Folder.DotSettings.user
+.claude*
 
 
