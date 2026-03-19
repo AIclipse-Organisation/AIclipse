@@ -43,8 +43,6 @@ body {
   overflow: hidden;
   margin: 0 auto;
   max-width: 480px;
-  border-left: 1px solid #2c2c2c;
-  border-right: 1px solid #2c2c2c;
 }
 
 /* Top bar */
@@ -129,7 +127,7 @@ body {
 /* Screen content area (pad bottom so it doesn't hide under navbar) */
 .app .screen {
   padding: 20px;
-  padding-bottom: 100px;
+  padding-bottom: 80px;
   /* space for bottom nav */
 }
 
@@ -148,9 +146,15 @@ body {
 
   display: flex;
   justify-content: space-around;
-  padding: 20px 0;
+  padding: 16px 0 12px 0;
 
   z-index: 1000;
+
+  /* Force consistent rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 .app .navbar a {
@@ -158,6 +162,16 @@ body {
   color: #f3f3f3;
   font-size: 0.9rem;
   font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 40px;
+
+  /* Force consistent rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .app .navbar a:hover {
@@ -169,14 +183,18 @@ body {
   color: #CFB87C;
 }
 
-.app .navbar a.active::after {
+.app .navbar a::after {
   content: "";
   display: block;
   width: 20px;
   height: 2px;
   margin: 6px auto 0;
-  background: currentColor;
+  background: transparent;
   border-radius: 999px;
+}
+
+.app .navbar a.active::after {
+  background: currentColor;
 }
 
 .app .nav-icon-wrap {
@@ -194,6 +212,7 @@ body {
   height: 8px;
   border-radius: 999px;
   background: #CFB87C;
+  border: 1px solid #222222;
   border: 1px solid #222222;
 }
 

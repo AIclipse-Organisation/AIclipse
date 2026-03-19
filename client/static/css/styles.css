@@ -1,3 +1,7 @@
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -215,9 +219,15 @@ body.app .navbar {
 
   display: flex;
   justify-content: space-around;
-  padding: 20px 0;
+  padding: 16px 0 12px 0;
 
   z-index: 1000;
+
+  /* Force consistent rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 body.app .navbar a {
@@ -225,6 +235,16 @@ body.app .navbar a {
   color: #f3f3f3;
   font-size: 0.9rem;
   font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 40px;
+
+  /* Force consistent rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body.app .navbar a:hover {
@@ -235,14 +255,18 @@ body.app .navbar a.active {
   color: #CFB87C;
 }
 
-body.app .navbar a.active::after {
+body.app .navbar a::after {
   content: "";
   display: block;
   width: 20px;
   height: 2px;
   margin: 6px auto 0;
-  background: currentColor;
+  background: transparent;
   border-radius: 999px;
+}
+
+body.app .navbar a.active::after {
+  background: currentColor;
 }
 
 body.app .nav-icon-wrap {

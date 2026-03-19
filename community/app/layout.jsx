@@ -7,7 +7,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getLoginUrlFromHeaders } from "../externalOrigin";
 
-const GATEWAY_URI = process.env.GATEWAY_URI ;
+const GATEWAY_URI = process.env.GATEWAY_URI;
 
 async function getUser(token) {
   if (!token) return null;
