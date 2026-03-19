@@ -38,10 +38,22 @@ class UserPublic(BaseModel):
     total_correct: Optional[int] = 0
     acc_guessing_ai: Optional[int] = 0
     acc_guessing_real: Optional[int] = 0
+    # Admin post accuracy tracking
+    admin_guesses_total: Optional[int] = 0
+    admin_guesses_correct: Optional[int] = 0
+    admin_fake_correct: Optional[int] = 0
+    admin_fake_total: Optional[int] = 0
+    admin_real_correct: Optional[int] = 0
+    admin_real_total: Optional[int] = 0
     monthly_usage_count: Optional[int] = 0
     usage_reset_date: Optional[datetime] = None
     stripe_customer_id: Optional[str] = None
     do_not_show_disclaimer_again: bool = False
+    # Gamification fields
+    community_score: Optional[int] = 0
+    current_streak: Optional[int] = 0
+    longest_streak: Optional[int] = 0
+    last_activity_date: Optional[datetime] = None
 
 
 FREE_TIER_LIMIT = 10
@@ -97,10 +109,22 @@ def build_user_public(doc: dict) -> UserPublic:
         total_correct=doc.get("total_correct", 0),
         acc_guessing_ai=doc.get("acc_guessing_ai", 0),
         acc_guessing_real=doc.get("acc_guessing_real", 0),
+        # Admin post accuracy
+        admin_guesses_total=doc.get("admin_guesses_total", 0),
+        admin_guesses_correct=doc.get("admin_guesses_correct", 0),
+        admin_fake_correct=doc.get("admin_fake_correct", 0),
+        admin_fake_total=doc.get("admin_fake_total", 0),
+        admin_real_correct=doc.get("admin_real_correct", 0),
+        admin_real_total=doc.get("admin_real_total", 0),
         monthly_usage_count=doc.get("monthly_usage_count", 0),
         usage_reset_date=doc.get("usage_reset_date"),
         stripe_customer_id=doc.get("stripe_customer_id"),
         do_not_show_disclaimer_again=bool(doc.get("do_not_show_disclaimer_again", False)),
+        # Gamification fields
+        community_score=doc.get("community_score", 0),
+        current_streak=doc.get("current_streak", 0),
+        longest_streak=doc.get("longest_streak", 0),
+        last_activity_date=doc.get("last_activity_date"),
     )
 
 
