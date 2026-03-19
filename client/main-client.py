@@ -6,6 +6,7 @@ import time
 
 import requests
 from flask import Flask, jsonify, make_response, redirect, render_template, request, session
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.serving import WSGIRequestHandler
 
 from config import cfg
@@ -20,6 +21,7 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 current_env = os.getenv("APP_ENV", "dev")
+is_prod = current_env == "prod"
 
 # Reload templates on every request in dev; cache them in prod
 app.config["TEMPLATES_AUTO_RELOAD"] = current_env not in ("prod", "production")
@@ -27,10 +29,15 @@ app.config["TEMPLATES_AUTO_RELOAD"] = current_env not in ("prod", "production")
 print(f"[*] Starting Client Service in {current_env} mode")
 
 GATEWAY_URI = os.getenv("GATEWAY_URI")
+COMMUNITY_URI = os.getenv("COMMUNITY_URI")
+
+
+if is_prod:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = current_env in ("prod", "production")
+app.config["SESSION_COOKIE_SECURE"] = is_prod
 
 gateway = GatewayClient(GATEWAY_URI or "")
 
@@ -445,8 +452,7 @@ def create_community_post():
 
 @app.get("/community/posts")
 def get_community_posts():
-    community_url = os.getenv("COMMUNITY_URI")
-    url = f"{community_url}/community/posts"
+    url = f"{COMMUNITY_URI}/community/posts"
 
     headers = {"Accept": "application/json"}
 
@@ -475,8 +481,7 @@ def community_vote():
     except Exception:
         return jsonify({"error": "Invalid JSON"}), 400
 
-    community_url = os.getenv("COMMUNITY_URI")
-    url = f"{community_url}/community/posts/vote"
+    url = f"{COMMUNITY_URI}/community/posts/vote"
 
     headers = {
         "Content-Type": "application/json",
@@ -507,8 +512,7 @@ def get_community_comments():
     if not re.fullmatch(r"[A-Za-z0-9_-]+", post_id):
         return jsonify({"error": "Invalid post_id parameter"}), 400
 
-    community_url = os.getenv("COMMUNITY_URI")
-    url = f"{community_url}/community/posts/comments"
+    url = f"{COMMUNITY_URI}/community/posts/comments"
 
     headers = {"Accept": "application/json"}
 
@@ -537,8 +541,7 @@ def create_community_comment():
     except Exception:
         return jsonify({"error": "Invalid JSON"}), 400
 
-    community_url = os.getenv("COMMUNITY_URI")
-    url = f"{community_url}/community/posts/comments"
+    url = f"{COMMUNITY_URI}/community/posts/comments"
 
     headers = {
         "Content-Type": "application/json",
@@ -567,8 +570,7 @@ def community_click():
     except Exception:
         return jsonify({"error": "Invalid JSON"}), 400
 
-    community_url = os.getenv("COMMUNITY_URI")
-    url = f"{community_url}/community/posts/click"
+    url = f"{COMMUNITY_URI}/community/posts/click"
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
@@ -593,8 +595,7 @@ def community_report():
     except Exception:
         return jsonify({"error": "Invalid JSON"}), 400
 
-    community_url = os.getenv("COMMUNITY_URI")
-    url = f"{community_url}/community/posts/report"
+    url = f"{COMMUNITY_URI}/community/posts/report"
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
@@ -619,8 +620,7 @@ def community_notifications():
     if not token:
         return jsonify({"error": "Unauthorized", "detail": "Missing auth token"}), 401
 
-    community_url = os.getenv("COMMUNITY_URI")
-    url = f"{community_url}/community/notifications"
+    url = f"{COMMUNITY_URI}/community/notifications"
 
     headers = {
         "Accept": "application/json",
@@ -653,8 +653,7 @@ def community_notifications_unread_count():
     if not token:
         return jsonify({"error": "Unauthorized", "detail": "Missing auth token"}), 401
 
-    community_url = os.getenv("COMMUNITY_URI")
-    url = f"{community_url}/community/notifications/unread-count"
+    url = f"{COMMUNITY_URI}/community/notifications/unread-count"
 
     headers = {
         "Accept": "application/json",
@@ -687,8 +686,7 @@ def community_notifications_read():
     except Exception:
         return jsonify({"error": "Invalid JSON"}), 400
 
-    community_url = os.getenv("COMMUNITY_URI")
-    url = f"{community_url}/community/notifications/read"
+    url = f"{COMMUNITY_URI}/community/notifications/read"
 
     headers = {
         "Content-Type": "application/json",

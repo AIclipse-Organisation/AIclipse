@@ -16,6 +16,8 @@ spec:
           env:
             - name: GATEWAY_URI
               value: "http://gateway-srv:8080"
+            - name: COMMUNITY_URI
+              value: "http://community-srv:3000"
             - name: CENTRAL_CONFIG_URL
               valueFrom:
                 configMapKeyRef:

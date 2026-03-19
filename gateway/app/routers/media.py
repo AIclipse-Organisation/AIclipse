@@ -14,6 +14,12 @@ from app.models import UpdateImageRequest, UserContext
 router = APIRouter()
 
 
+def _media_admin_headers(user: UserContext) -> dict[str, str]:
+    return {
+        "X-Is-Admin": "true" if user.is_admin else "false",
+    }
+
+
 @router.post("/upload/image")
 async def gateway_upload_image(
     request: Request,
@@ -175,12 +181,17 @@ async def gateway_update_image(
     url = build_media_image_url(request, image_id)
     params = {"user_id": user.user_id}
 
-    if body and body.is_public is not None:
+    if body.is_public is not None:
         params["is_public"] = "true" if body.is_public else "false"
+
+    headers = {
+        "X-Request-Id": str(uuid.uuid4()),
+        **_media_admin_headers(user),
+    }
 
     client: httpx.AsyncClient = request.app.state.http
     try:
-        resp = await client.patch(url, params=params, timeout=10.0)
+        resp = await client.patch(url, params=params, headers=headers, timeout=10.0)
     except httpx.RequestError:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
 
@@ -195,7 +206,7 @@ async def gateway_update_image(
     if resp.status_code == 403:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: You can only update your own images",
+            detail="Forbidden: You can only update your own images unless you are an admin",
         )
 
     raise HTTPException(status_code=resp.status_code, detail=f"Media service error: {resp.status_code}")
@@ -238,10 +249,14 @@ async def gateway_delete_image(
 
     url = build_media_image_url(request, image_id)
     params = {"user_id": user.user_id}
+    headers = {
+        "X-Request-Id": str(uuid.uuid4()),
+        **_media_admin_headers(user),
+    }
 
     client: httpx.AsyncClient = request.app.state.http
     try:
-        resp = await client.delete(url, params=params, timeout=10.0)
+        resp = await client.delete(url, params=params, headers=headers, timeout=10.0)
     except httpx.RequestError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
@@ -254,6 +269,9 @@ async def gateway_delete_image(
     if resp.status_code == 404:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     if resp.status_code == 403:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own images")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own images unless you are an admin",
+        )
 
     raise HTTPException(status_code=resp.status_code, detail=f"Media service error: {resp.status_code}")

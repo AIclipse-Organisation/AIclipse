@@ -833,19 +833,24 @@ textarea {
   all: unset;
   box-sizing: border-box;
   padding: 18px;
-  background: #CFB87C; 
-  color: #111;
+  background: transparent; 
+  color: #CFB87C;
   border-radius: 999px;
-  font-weight: 800;
+  font-weight: 700;
   text-align: center;
-  font-size: 16px;
+  font-size: 15px;
   cursor: pointer;
   transition: transform 100ms ease, opacity 160ms ease;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  border: 1px solid #CFB87C;
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+
 }
 
 .btn-save-final:hover:not(:disabled) {
   opacity: 0.95;
+  background: #CFB87C; 
+  color:#0f0f0f;
 }
 
 .btn-save-final:active:not(:disabled) {
@@ -868,18 +873,36 @@ textarea {
 }
 
 .btn-delete-link {
-  all: unset;
-  color: #e04646; /* Red for deletion */
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: underline;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 18px;
+  border-radius: 999px;
+  font-size:15px;
+
+  font-weight: 700;
+  color: #e04646;
+
+  background: transparent;
   cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 160ms ease;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+
+}
+
+.btn-delete-link {
+  --btn-outline-color: #e04646;
+  --btn-hover-color: #e04646;
+  border: 1px solid var(--btn-outline-color);
 }
 
 .btn-delete-link:hover {
-  opacity: 1;
+  background: var(--btn-hover-color);
+  color: #111;
 }
 
 /* =========================

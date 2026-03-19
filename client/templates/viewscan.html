@@ -12,6 +12,7 @@
 
   <body class="app">
     <div class="app-container">
+      {% set page_title = 'View Scan' %}
       {% include 'partials/topbar.html' %}
 
       <main class="screen">
@@ -24,7 +25,7 @@
 
         <section id="viewscan-card" class="viewscan-card" hidden>
           <!-- Back button ABOVE the image (not overlay) -->
-          <a href="/scans" class="back-to-scans-btn">Back to Scans</a>
+          <!-- <a href="/scans" class="back-to-scans-btn">Back to Scans</a> -->
 
           <div class="viewscan-image-wrap">
             <img

@@ -209,4 +209,100 @@ window.addEventListener("DOMContentLoaded", async () => {
       });
     }
   }
+
+  // =========================
+  // Delete account confirm modal logic
+  // =========================
+  const btnDeleteAccount = document.getElementById("btn-delete-account");
+  const deleteAccountModal = document.getElementById("delete-account-modal");
+  const cancelDeleteAccount = document.getElementById("cancel-delete-account");
+  const confirmDeleteAccount = document.getElementById("confirm-delete-account");
+  const deleteModalCard = deleteAccountModal?.querySelector(".delete-modal");
+
+  const openDeleteAccountModal = () => {
+    if (!deleteAccountModal) return;
+    deleteAccountModal.hidden = false;
+    deleteAccountModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+  };
+
+  const closeDeleteAccountModal = () => {
+    if (!deleteAccountModal) return;
+    deleteAccountModal.hidden = true;
+    deleteAccountModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+    confirmDeleteAccount.disabled = false;
+  };
+
+  if (btnDeleteAccount && deleteAccountModal && cancelDeleteAccount && confirmDeleteAccount) {
+    deleteAccountModal.hidden = true;
+    deleteAccountModal.setAttribute("aria-hidden", "true");
+
+    btnDeleteAccount.addEventListener("click", (e) => {
+      e.preventDefault();
+      openDeleteAccountModal();
+    });
+
+    cancelDeleteAccount.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeDeleteAccountModal();
+    });
+
+    deleteAccountModal.addEventListener("click", (e) => {
+      if (e.target === deleteAccountModal) {
+        closeDeleteAccountModal();
+      }
+    });
+
+    if (deleteModalCard) {
+      deleteModalCard.addEventListener("click", (e) => {
+        e.stopPropagation();
+      });
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !deleteAccountModal.hidden) {
+        closeDeleteAccountModal();
+      }
+    });
+
+    confirmDeleteAccount.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      confirmDeleteAccount.disabled = true;
+
+      try {
+        const response = await fetch("/auth/me", {
+          method: "DELETE",
+          headers: { Accept: "application/json" },
+          credentials: "include",
+        });
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (_) {
+          data = null;
+        }
+
+        if (response.ok) {
+          window.location.href = "/";
+          return;
+        }
+
+        const message =
+          data?.detail ||
+          data?.message ||
+          "Failed to delete account. Please try again.";
+
+        alert(message);
+        closeDeleteAccountModal();
+      } catch (error) {
+        console.error("Error deleting account:", error);
+        alert("Network error during account deletion.");
+        closeDeleteAccountModal();
+      }
+    });
+  }
 });
