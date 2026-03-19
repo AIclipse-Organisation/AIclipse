@@ -220,6 +220,9 @@
   opacity: 0.85;
   flex-shrink: 0;
 }
+.detail-icon-invert {
+  filter: invert(1);
+}
 .detail-icon-emoji {
   font-size: 22px; line-height: 1;
   flex-shrink: 0;
