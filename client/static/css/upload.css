@@ -383,7 +383,23 @@ textarea {
 }
 
 .progress-panel .ai-fill {
-  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  
+  /* Choose your color: */
+  background-color: rgba(207, 184, 124, 0.95); /* Red/Coral for "Fake" warning */
+  /* background-color: #e5c07b; */ /* Uncomment this line instead if you want the original Gold */
+  
+  border-radius: inherit; /* Keeps the rounded corners matching the container */
+  transition: width 0.4s ease-out;
+  z-index: 1; /* Ensures it sits below the text but above the background */
+}
+
+.progress-panel .bar-percent {
+  position: relative;
+  z-index: 2;
 }
 
 .progress-panel .progress-bar .bar-percent {

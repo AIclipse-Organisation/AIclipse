@@ -27,7 +27,8 @@ function renderDetection(resp) {
   const realFill = document.querySelector(".progress-panel .real-fill");
   const aiFill = document.querySelector(".progress-panel .ai-fill");
 
-  const realPercentEl = document.getElementById("real-percent");
+  // Changed from real-percent to ai-percent to match updated HTML
+  const aiPercentEl = document.getElementById("ai-percent");
 
   if (!resp || typeof resp !== "object") {
     if (detectCard) detectCard.hidden = true;
@@ -36,7 +37,7 @@ function renderDetection(resp) {
 
   const rawLabel = (resp.label || resp.result || "Unknown").toString();
 
-  // Strip "87.74%" if present
+  // Strip "87.74%" if present in the raw string
   const cleanLabel = rawLabel.replace(/^\s*\d+(\.\d+)?%\s*/i, "").trim();
 
   const confidenceRaw = Number.isFinite(resp.confidence)
@@ -54,16 +55,19 @@ function renderDetection(resp) {
 
   const isReal = labelLower.includes("real") && !isAi;
 
-  // REAL% rules:
-  // - If verdict is AI: confidence is AI% => REAL = 1 - confidence
-  // - If verdict is REAL: confidence is REAL% => REAL = confidence
-  // - Otherwise: treat confidence as AI% => REAL = 1 - confidence
-  let realProb = isReal ? confidence : (1 - confidence);
+  /**
+   * AI% (Fake) logic:
+   * - If verdict is AI: AI% = confidence
+   * - If verdict is REAL: AI% = 1 - confidence
+   * - Otherwise: treat confidence as AI%
+   */
+  let aiProb = isAi ? confidence : (1 - confidence);
 
-  realProb = Math.max(0, Math.min(1, realProb));
-  const realPct = realProb * 100;
+  aiProb = Math.max(0, Math.min(1, aiProb));
+  const aiPct = aiProb * 100;
 
-  window.__lastRealPct = realPct;
+  // Store globally if needed for saving
+  window.__lastAiPct = aiPct;
 
   const labelClass = "label-gold";
 
@@ -76,13 +80,19 @@ function renderDetection(resp) {
     confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
   }
 
-  setFillPercent(realFill, realPct);
+  // Visuals: Empty the "Real" bar and fill the "AI" bar
+  setFillPercent(realFill, 0);
+  setFillPercent(aiFill, aiPct);
 
-  setFillPercent(aiFill, 0);
+  // Update text display
+  if (aiPercentEl) {
+    aiPercentEl.textContent = `${aiPct.toFixed(2)}%`;
+  }
 
-  if (realPercentEl) realPercentEl.textContent = `${realPct.toFixed(2)}%`;
-
-  if (panel) panel.classList.toggle("is-risk", isAi);
+  // Toggle warning styles if the image is likely AI
+  if (panel) {
+    panel.classList.toggle("is-risk", aiPct > 50);
+  }
 
   if (detectCard) detectCard.hidden = false;
 }

@@ -14,15 +14,15 @@ def test_get_confidence_label():
 
     # low confidence
     label = get_confidence_label(verdict_fake, 0.1)
-    assert "Most Likely AI" in label
+    assert "Highly Likely Fake" in label
     label = get_confidence_label(verdict_real, 0.1)
-    assert "Most Likely Real" in label
+    assert "Highly Unlikely Fake" in label
 
     # high confidence
     label = get_confidence_label(verdict_fake, 0.9)
-    assert "Most Likely AI" in label
+    assert "Highly Likely Fake" in label
     label = get_confidence_label(verdict_real, 0.9)
-    assert "Most Likely Real" in label
+    assert "Highly Unlikely Fake" in label
 
     # middle confidence
     label = get_confidence_label(verdict_fake, 0.5)
@@ -32,13 +32,13 @@ def test_get_confidence_label():
 
     # boundary conditions
     label = get_confidence_label(verdict_fake, 0.14)
-    assert "Most Likely AI" in label
+    assert "Highly Likely Fake" in label
     label = get_confidence_label(verdict_real, 0.86)
-    assert "Most Likely Real" in label
+    assert "Highly Unlikely Fake" in label
     label = get_confidence_label(verdict_fake, 0.16)
-    assert "Likely AI" in label
+    assert "Likely Fake" in label
     label = get_confidence_label(verdict_real, 0.84)
-    assert "Likely Real" in label
+    assert "Unlikely Fake" in label
     label = get_confidence_label(verdict_fake, 0.45)
     assert "Not Sure" in label
     label = get_confidence_label(verdict_real, 0.55)

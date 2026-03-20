@@ -43,34 +43,30 @@ export default function Page() {
       const postItems = posts.items || [];
 
       // Build lookup table: image_id -> image data (for getting S3 URLs)
+    // Build lookup table: image_id -> image data (for getting S3 URLs)
       const imageById = new Map(images.map((img) => [img.image_id, img]));
 
-      // Start with posts (which are already filtered to public images)
-      // and enrich with image data if available
-      const merged = postItems.map((post) => {
+      // Start with posts and enrich with image data
+      const merged = postItems.map((post, index) => {
         const img = imageById.get(post.image_id) || {};
-        return { ...img, ...post }; // Post fields override image fields
+        
+        // --- MVP TRENDING FIX ---
+        // 1. Check if the post has actual engagement (score > 0.5, or at least 1 vote/comment)
+       const hasEngagement = 
+        (Number(post.up_vote_count) > 0) || 
+        (Number(post.comment_count) > 0);
+
+        // 2. It is trending ONLY IF it's in the top 3 of Page 1 AND has engagement
+       const isTrending = pageNum === 1 && index < 3 && hasEngagement;
+
+      return { ...img, ...post, isTrending };
       });
 
-      // --- SORTING & TRENDING LOGIC ---
-      // 1. Sort by score descending 
-      const sorted = merged.sort(
-        (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0),
-      );
-
-      // 2. Identify trending items (top 15%)
-      const trendingCount = Math.floor(sorted.length * 0.15);
-      const enriched = sorted.map((item, index) => ({
-        ...item,
-        isTrending: trendingCount > 0 && index < trendingCount,
-      }));
-
       // Append items if page > 1, replace if page 1
-      setItems(prev => pageNum === 1 ? enriched : [...prev, ...enriched]);
+      setItems(prev => pageNum === 1 ? merged : [...prev, ...merged]);
       
       // Determine if there are more items to load
-      // Using the flag sent from the backend
-      setHasMore(posts.hasMore ?? enriched.length >= 12);
+      setHasMore(posts.hasMore ?? merged.length >= 12);
 
     } catch (e) {
       if (e.name !== "AbortError") {
