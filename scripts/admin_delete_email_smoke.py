@@ -107,7 +107,7 @@ def main() -> None:
     if not sent:
         raise RuntimeError(
             "Timed out waiting for email sent signal key. "
-            "Check email-worker logs and Gmail API credentials."
+            "Check email-worker logs and Gmail API OAuth credentials."
         )
     print("   Email worker send signal detected.")
 

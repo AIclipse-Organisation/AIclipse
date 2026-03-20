@@ -20,28 +20,28 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
 
 REDIS_URI = os.getenv("REDIS_URI")
-STREAM = os.getenv("EMAIL_STREAM", "auth-events")
-GROUP = os.getenv("EMAIL_GROUP", "email-workers")
+STREAM = "auth-events"
+GROUP = "email-workers"
 CONSUMER = os.getenv("HOSTNAME", "email-worker")
-DLQ_STREAM = os.getenv("EMAIL_DLQ_STREAM", "auth-events-dlq")
-DEDUPE_TTL_S = int(os.getenv("EMAIL_DEDUPE_TTL_S", "86400"))
+DLQ_STREAM = "auth-events-dlq"
+DEDUPE_TTL_S = 86400
 # Temporary lock while one worker is actively sending one email event.
-SEND_LOCK_TTL_S = int(os.getenv("EMAIL_SEND_LOCK_TTL_S", "300"))
-MAX_RETRIES = int(os.getenv("EMAIL_MAX_RETRIES", "3"))
-RETRY_BACKOFF_S = float(os.getenv("EMAIL_RETRY_BACKOFF_S", "1.5"))
-REDIS_CONNECT_TIMEOUT_S = float(os.getenv("REDIS_CONNECT_TIMEOUT_S", "3"))
-REDIS_SOCKET_TIMEOUT_S = float(os.getenv("REDIS_SOCKET_TIMEOUT_S", "8"))
+SEND_LOCK_TTL_S = 300
+MAX_RETRIES = 3
+RETRY_BACKOFF_S = 1.5
+REDIS_CONNECT_TIMEOUT_S = 3.0
+REDIS_SOCKET_TIMEOUT_S = 8.0
 
 # Gmail API settings.
-GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID", "")
-GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET", "")
-GMAIL_REFRESH_TOKEN = os.getenv("GMAIL_REFRESH_TOKEN", "")
-GMAIL_SENDER_EMAIL = os.getenv("GMAIL_SENDER_EMAIL", "")
-GMAIL_TOKEN_URL = os.getenv("GMAIL_TOKEN_URL", "https://oauth2.googleapis.com/token")
-GMAIL_API_BASE = os.getenv("GMAIL_API_BASE", "https://gmail.googleapis.com/gmail/v1")
-GMAIL_TIMEOUT_S = float(os.getenv("GMAIL_TIMEOUT_S", "15"))
-SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", GMAIL_SENDER_EMAIL)
-INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN", "")
+GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID")
+GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET")
+GMAIL_REFRESH_TOKEN = os.getenv("GMAIL_REFRESH_TOKEN")
+GMAIL_SENDER_EMAIL = os.getenv("GMAIL_SENDER_EMAIL")
+GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1"
+GMAIL_TIMEOUT_S = 15.0
+SUPPORT_EMAIL = GMAIL_SENDER_EMAIL
+INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN")
 
 # Redis client is initialized on startup and reused by worker + endpoints.
 r: redis.Redis | None = None

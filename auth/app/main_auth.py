@@ -51,9 +51,9 @@ async def lifespan(app: FastAPI):
         await user_repo.ensure_indexes()
         await api_repo.ensure_indexes()
         await deletion_log_repo.ensure_indexes()
-        # Old users may have age field; migrate to date_of_birth if needed.
-        # This can be disabled after one-time migration to avoid repeated full-collection work.
-        run_legacy_dob_migration = os.getenv("RUN_LEGACY_DOB_MIGRATION", "true").lower() == "true"
+        # Old users may have age field; migrate to date_of_birth only when explicitly requested.
+        # Keep default off so startup avoids repeated full-collection scans on large datasets.
+        run_legacy_dob_migration = os.getenv("RUN_LEGACY_DOB_MIGRATION", "false").lower() == "true"
         if run_legacy_dob_migration:
             await user_repo.users.update_many(
                 {"date_of_birth": {"$exists": False}},

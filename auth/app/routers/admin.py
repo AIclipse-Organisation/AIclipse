@@ -60,7 +60,12 @@ def _generate_password(length: int = 16) -> str:
 class AdminCreateUserRequest(BaseModel):
     user_name: str = Field(..., min_length=1, max_length=120)
     email: EmailStr
-    password: Optional[str] = Field(None, min_length=8, max_length=128)
+    password: Optional[str] = Field(
+        None,
+        min_length=8,
+        max_length=72,
+        description="Password policy is max 72 UTF-8 bytes. Multi-byte characters may reduce the effective character limit.",
+    )
     is_admin: bool = False
     date_of_birth: str = Field(..., pattern=r"^\d{2}-\d{2}-\d{4}$")
 
@@ -73,7 +78,12 @@ class AdminCreateUserResponse(BaseModel):
 class AdminUpdateUserRequest(BaseModel):
     user_name: Optional[str] = None
     email: Optional[EmailStr] = None
-    password: Optional[str] = None
+    password: Optional[str] = Field(
+        None,
+        min_length=8,
+        max_length=72,
+        description="Password policy is max 72 UTF-8 bytes. Multi-byte characters may reduce the effective character limit.",
+    )
     date_of_birth: Optional[str] = Field(None, pattern=r"^\d{2}-\d{2}-\d{4}$")
     is_admin: Optional[bool] = None
 

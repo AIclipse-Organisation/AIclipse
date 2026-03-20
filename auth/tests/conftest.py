@@ -391,6 +391,7 @@ def app_state(auth_mod, users_coll, api_keys_coll, deletion_logs_coll, event_red
         API_KEY_PEPPER="pepper-test",
         API_KEY_SALT="salt-test",
         AUTH_EVENT_STREAM="auth-events",
+        AUTH_EVENT_PUBLISH_TIMEOUT_S=1.5,
     )
 
     st = auth_mod.app.state
