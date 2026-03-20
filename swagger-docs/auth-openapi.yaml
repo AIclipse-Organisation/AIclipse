@@ -42,10 +42,10 @@ components:
         created_at:
           type: string
           format: date-time
-        age:
-          type: integer
-          format: int32
-          minimum: 0
+        date_of_birth:
+          type: string
+          pattern: '^\\d{2}-\\d{2}-\\d{4}$'
+          description: Date of birth in DD-MM-YYYY format.
           nullable: true
         total_guesses:
           type: integer
@@ -70,7 +70,7 @@ components:
 
     SignupRequest:
       type: object
-      required: [user_name, email, password]
+      required: [user_name, email, date_of_birth, password]
       properties:
         user_name:
           type: string
@@ -80,6 +80,10 @@ components:
           type: string
           format: email
           description: Unique email address.
+        date_of_birth:
+          type: string
+          pattern: '^\\d{2}-\\d{2}-\\d{4}$'
+          description: Date of birth in DD-MM-YYYY format.
         password:
           type: string
           format: password
@@ -129,10 +133,9 @@ components:
         password:
           type: string
           format: password
-        age:
-          type: integer
-          format: int32
-          minimum: 0
+        date_of_birth:
+          type: string
+          pattern: '^\\d{2}-\\d{2}-\\d{4}$'
         is_admin:
           type: boolean
 
@@ -420,7 +423,7 @@ paths:
 
     patch:
       summary: Update user (admin)
-      description: Admin-only endpoint to update a user's info (name, email, password, age, is_admin).
+      description: Admin-only endpoint to update a user's info (name, email, password, date_of_birth, is_admin).
       security:
         - bearerAuth: []
       parameters:

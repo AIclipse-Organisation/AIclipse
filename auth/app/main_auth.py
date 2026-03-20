@@ -46,13 +46,13 @@ async def lifespan(app: FastAPI):
         await user_repo.ensure_indexes()
         await api_repo.ensure_indexes()
         await deletion_log_repo.ensure_indexes()
-        # Old users may not have age so this will update them to be consistent with the schema.
+        # Old users may have age field; migrate to date_of_birth if needed.
         # This can be disabled after one-time migration to avoid repeated full-collection work.
-        run_legacy_age_migration = os.getenv("RUN_LEGACY_AGE_MIGRATION", "true").lower() == "true"
-        if run_legacy_age_migration:
+        run_legacy_dob_migration = os.getenv("RUN_LEGACY_DOB_MIGRATION", "true").lower() == "true"
+        if run_legacy_dob_migration:
             await user_repo.users.update_many(
-                {"age": {"$exists": False}},
-                {"$set": {"age": None}},
+                {"date_of_birth": {"$exists": False}},
+                {"$set": {"date_of_birth": None}},
             )
 
         app.state.settings = settings
@@ -80,7 +80,7 @@ app.include_router(api_keys_router)
 
 @app.exception_handler(RequestValidationError)
 async def request_validation_exception_handler(request, exc: RequestValidationError):
-    # Log validation errors with path. Example: missing "age" in /signup.
+    # Log validation errors with path. Example: missing "date_of_birth" in /signup.
     logging.getLogger("uvicorn.error").warning(
         "request_validation_error path=%s errors=%s",
         request.url.path,

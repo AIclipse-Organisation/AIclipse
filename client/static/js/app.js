@@ -221,6 +221,40 @@ function normalizeApiErrorDetail(data) {
   return { message: (data && data.message) || "Request failed", checks: null };
 }
 
+function parseDobDayMonthYear(dobString) {
+  const raw = String(dobString || "").trim();
+  const match = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const dob = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(dob.getTime()) ||
+    dob.getFullYear() !== year ||
+    dob.getMonth() !== month - 1 ||
+    dob.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return dob;
+}
+
+function ageFromDobString(dobString) {
+  const dob = parseDobDayMonthYear(dobString);
+  if (!dob) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const hasBirthdayPassed =
+    today.getMonth() > dob.getMonth() ||
+    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+  if (!hasBirthdayPassed) age -= 1;
+  return age;
+}
+
 window.lastFile = window.lastFile ?? null;
 window.lastDetectionToken = window.lastDetectionToken ?? null;
 window._lastObjectUrl = window._lastObjectUrl ?? null;
@@ -245,7 +279,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const signupPasswordInput = document.getElementById("signup-password");
   const signupPolicyRoot = document.getElementById("signup-password-policy");
-  const signupAgeInput = document.getElementById("signup-age");
+  const signupDobInput = document.getElementById("signup-date-of-birth");
 
   const signupTerms = document.getElementById("signup-terms");
   const btnSignup = document.getElementById("btn-signup");
@@ -264,14 +298,14 @@ window.addEventListener("DOMContentLoaded", () => {
     syncSignupButtonState();
   }
 
-  if (signupAgeInput) {
-    signupAgeInput.addEventListener("input", () => {
-      signupAgeInput.value = (signupAgeInput.value || "").replace(/\D/g, "");
-    });
-    signupAgeInput.addEventListener("keydown", (event) => {
-      if (["e", "E", "+", "-", ".", ","].includes(event.key)) {
-        event.preventDefault();
-      }
+  if (signupDobInput) {
+    signupDobInput.addEventListener("input", () => {
+      const digits = String(signupDobInput.value || "").replace(/\D/g, "").slice(0, 8);
+      const parts = [];
+      if (digits.length > 0) parts.push(digits.slice(0, Math.min(2, digits.length)));
+      if (digits.length > 2) parts.push(digits.slice(2, Math.min(4, digits.length)));
+      if (digits.length > 4) parts.push(digits.slice(4, 8));
+      signupDobInput.value = parts.join("-");
     });
   }
 
@@ -318,7 +352,7 @@ window.addEventListener("DOMContentLoaded", () => {
       event.preventDefault();
       const user_name = document.getElementById("signup-username")?.value.trim();
       const email = document.getElementById("signup-email")?.value.trim();
-      const ageRaw = document.getElementById("signup-age")?.value;
+      const dateOfBirthRaw = document.getElementById("signup-date-of-birth")?.value;
       const password = document.getElementById("signup-password")?.value;
 
       const termsAccepted = document.getElementById("signup-terms")?.checked;
@@ -331,20 +365,28 @@ window.addEventListener("DOMContentLoaded", () => {
 
       activateSignupPolicyIfNeeded();
 
-      if (!user_name || !email || !password || !String(ageRaw || "").trim()) {
-        setStatus(accountStatus, "error", "Please fill username, email, age and password.");
+      if (!user_name || !email || !password || !String(dateOfBirthRaw || "").trim()) {
+        setStatus(accountStatus, "error", "Please fill username, email, date of birth and password.");
         updateSignupPolicyUI();
         return;
       }
 
-      if (!/^\d+$/.test(String(ageRaw))) {
-        setStatus(accountStatus, "error", "Age must contain numbers only.");
+      if (!/^\d{2}-\d{2}-\d{4}$/.test(String(dateOfBirthRaw))) {
+        setStatus(accountStatus, "error", "Date of birth must be in DD-MM-YYYY format.");
         return;
       }
 
-      const age = Number(ageRaw);
-      if (!Number.isInteger(age) || age < 18 || age > 120) {
+      const age = ageFromDobString(String(dateOfBirthRaw));
+      if (!Number.isInteger(age)) {
+        setStatus(accountStatus, "error", "Please provide a valid date of birth.");
+        return;
+      }
+      if (age < 18) {
         setStatus(accountStatus, "error", "Must be 18 or older.");
+        return;
+      }
+      if (age > 150) {
+        setStatus(accountStatus, "error", "Please provide a valid date of birth.");
         return;
       }
 
@@ -368,7 +410,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const { res, data } = await jsonFetch("POST", "/auth/signup", {
           user_name,
           email,
-          age,
+          date_of_birth: dateOfBirthRaw,
           password,
         });
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional, List
 from uuid import uuid4
 
@@ -34,7 +34,7 @@ class UserPublic(BaseModel):
     is_admin: bool = False
     plan: int = 0
     created_at: datetime
-    age: Optional[int] = None
+    date_of_birth: Optional[str] = None
     total_guesses: Optional[int] = 0
     total_correct: Optional[int] = 0
     acc_guessing_ai: Optional[int] = 0
@@ -46,6 +46,8 @@ class UserPublic(BaseModel):
 
 
 FREE_TIER_LIMIT = 10
+MIN_USER_AGE = 18
+MAX_USER_AGE = 150
     
 class UserAccuracy(BaseModel):
     user_id: str
@@ -58,7 +60,7 @@ class UserAccuracy(BaseModel):
 class SignupRequest(BaseModel):
     user_name: str = Field(..., min_length=1)
     email: EmailStr
-    age: int = Field(..., ge=18, le=120)
+    date_of_birth: str = Field(..., pattern=r"^\d{2}-\d{2}-\d{4}$")
     password: str
 
 
@@ -94,7 +96,7 @@ def build_user_public(doc: dict) -> UserPublic:
         is_admin=bool(doc.get("is_admin", False)),
         plan=int(doc.get("plan", 0)),
         created_at=doc.get("created_at", _now_utc()),
-        age=doc.get("age"),
+        date_of_birth=doc.get("date_of_birth"),
         total_guesses=doc.get("total_guesses", 0),
         total_correct=doc.get("total_correct", 0),
         acc_guessing_ai=doc.get("acc_guessing_ai", 0),
@@ -116,6 +118,30 @@ def _normalize_utc(dt: Optional[datetime]) -> Optional[datetime]:
 
 def _next_month_start(now: datetime) -> datetime:
     return (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=32)).replace(day=1)
+
+
+def _calculate_age(dob: date, today: date) -> int:
+    return (today.year - dob.year) - ((today.month, today.day) < (dob.month, dob.day))
+
+
+def validate_date_of_birth(date_of_birth: Optional[str], *, required: bool = False) -> Optional[str]:
+    if date_of_birth is None or str(date_of_birth).strip() == "":
+        if required:
+            raise HTTPException(status_code=400, detail="Date of birth is required")
+        return None
+
+    try:
+        dob = datetime.strptime(str(date_of_birth).strip(), "%d-%m-%Y").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Date of birth must be in DD-MM-YYYY format")
+
+    age = _calculate_age(dob, datetime.now(timezone.utc).date())
+    if age < MIN_USER_AGE:
+        raise HTTPException(status_code=400, detail="You must be at least 18 years old")
+    if age > MAX_USER_AGE:
+        raise HTTPException(status_code=400, detail="Please provide a valid date of birth")
+
+    return dob.strftime("%d-%m-%Y")
 
 
 def _parse_bearer_token(authorization: Optional[str]) -> str:
@@ -162,14 +188,12 @@ async def signup(request: Request, payload: SignupRequest):
     user_name = (payload.user_name).strip()
     email_raw = (payload.email).strip()
     password = (payload.password).strip()
-    age = payload.age
+    date_of_birth = validate_date_of_birth(payload.date_of_birth, required=True)
 
     if not user_name:
         raise HTTPException(status_code=400, detail="Username is required")
     if not email_raw:
         raise HTTPException(status_code=400, detail="Email is required")
-    if age is None:
-        raise HTTPException(status_code=400, detail="Age is required")
     if not password:
         raise HTTPException(status_code=400, detail="Password is required")
 
@@ -207,7 +231,7 @@ async def signup(request: Request, payload: SignupRequest):
         "is_admin": False,
         "plan": 0,
         "created_at": _now_utc(),
-        "age": age,
+        "date_of_birth": date_of_birth,
         "total_guesses": 0,
         "total_correct": 0,
         "acc_guessing_ai": 0,

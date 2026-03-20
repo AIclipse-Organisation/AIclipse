@@ -21,6 +21,7 @@ from app.routers.public import (
     UserAccuracy,
     UserAccuracyRequest,
     _now_utc,
+    validate_date_of_birth,
 )
 from app.services.passwords import PasswordService, PasswordValidationError
 
@@ -60,7 +61,7 @@ class AdminCreateUserRequest(BaseModel):
     email: EmailStr
     password: Optional[str] = Field(None, min_length=8, max_length=128)
     is_admin: bool = False
-    age: Optional[int] = Field(None, ge=18, le=120)
+    date_of_birth: str = Field(..., pattern=r"^\d{2}-\d{2}-\d{4}$")
 
 
 class AdminCreateUserResponse(BaseModel):
@@ -72,7 +73,7 @@ class AdminUpdateUserRequest(BaseModel):
     user_name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
-    age: Optional[int] = Field(None, ge=18, le=120)
+    date_of_birth: Optional[str] = Field(None, pattern=r"^\d{2}-\d{2}-\d{4}$")
     is_admin: Optional[bool] = None
 
 
@@ -183,7 +184,7 @@ async def admin_create_user(
         "is_admin": bool(body.is_admin),
         "plan": 0,
         "created_at": _now_utc(),
-        "age": body.age,
+        "date_of_birth": validate_date_of_birth(body.date_of_birth),
         "total_guesses": 0,
         "total_correct": 0,
         "acc_guessing_ai": 0,
@@ -264,8 +265,8 @@ async def admin_update_user(
         update_doc["email"] = raw["email"].strip().lower()
     if "password" in raw and raw["password"]:
         update_doc["password"] = await pwd.hash_password(raw["password"])
-    if "age" in raw and raw["age"] is not None:
-        update_doc["age"] = raw["age"]
+    if "date_of_birth" in raw and raw["date_of_birth"] is not None:
+        update_doc["date_of_birth"] = validate_date_of_birth(raw["date_of_birth"])
     if "is_admin" in raw and raw["is_admin"] is not None:
         update_doc["is_admin"] = bool(raw["is_admin"])
 

@@ -40,7 +40,7 @@ const MANUAL_FORM_DEFAULT = {
     user_name: "",
     email: "",
     password: "",
-    age: "",
+    date_of_birth: "",
 };
 
 const PASSWORD_POLICY_RULES = [
@@ -116,6 +116,52 @@ function generatePassword(length = 14) {
     return secureShuffle(chars).join("");
 }
 
+function calculateAgeFromDateString(dateString) {
+    const match = String(dateString || "").trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (!match) return null;
+
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const dob = new Date(year, month - 1, day);
+
+    if (
+        Number.isNaN(dob.getTime()) ||
+        dob.getFullYear() !== year ||
+        dob.getMonth() !== month - 1 ||
+        dob.getDate() !== day
+    ) {
+        return null;
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const hasBirthdayPassed =
+        today.getMonth() > dob.getMonth() ||
+        (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+    if (!hasBirthdayPassed) age -= 1;
+    return age;
+}
+
+function randomDateOfBirth() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const latestDob = new Date(today);
+    latestDob.setFullYear(today.getFullYear() - 18);
+
+    const earliestDob = new Date(today);
+    earliestDob.setFullYear(today.getFullYear() - 150);
+
+    const daysRange = Math.floor((latestDob.getTime() - earliestDob.getTime()) / 86400000);
+    const dayOffset = secureRandomInt(daysRange + 1);
+    const dob = new Date(earliestDob.getTime() + dayOffset * 86400000);
+    const dd = String(dob.getDate()).padStart(2, "0");
+    const mm = String(dob.getMonth() + 1).padStart(2, "0");
+    const yyyy = String(dob.getFullYear());
+    return `${dd}-${mm}-${yyyy}`;
+}
+
 function generateAutoUser() {
     const first = randomFrom([
     "Ava", "Noah", "Liam", "Mia", "Eli", "Nova", "Zoe", "Kai",
@@ -135,7 +181,8 @@ const last = randomFrom([
     const id = secureRandomInt(9000) + 1000;
     const email = `${slug}${id}@example.com`;
     const password = generatePassword();
-    return { user_name: name, email, password };
+    const date_of_birth = randomDateOfBirth();
+    return { user_name: name, email, password, date_of_birth };
 }
 
 function checkPasswordStrength(password) {
@@ -256,18 +303,26 @@ export default function UserManagement() {
     }
 
     async function handleCreateUser() {
-        if (createMode === "manual" && !String(manualForm.age || "").trim()) {
-            setCreateError("Age is required for manual user creation.");
+        if (createMode === "manual" && !String(manualForm.date_of_birth || "").trim()) {
+            setCreateError("Date of birth is required for manual user creation.");
             return;
         }
-        if (createMode === "manual" && !/^\d+$/.test(String(manualForm.age || ""))) {
-            setCreateError("Age must contain numbers only.");
+        if (createMode === "manual" && !/^\d{2}-\d{2}-\d{4}$/.test(String(manualForm.date_of_birth || ""))) {
+            setCreateError("Date of birth must be in DD-MM-YYYY format.");
             return;
         }
         if (createMode === "manual") {
-            const parsedAge = Number(manualForm.age);
-            if (!Number.isInteger(parsedAge) || parsedAge < 18 || parsedAge > 120) {
-                setCreateError("User must be between 18 or older");
+            const parsedAge = calculateAgeFromDateString(manualForm.date_of_birth);
+            if (!Number.isInteger(parsedAge)) {
+                setCreateError("Please provide a valid date of birth.");
+                return;
+            }
+            if (parsedAge < 18) {
+                setCreateError("User must be 18 or older.");
+                return;
+            }
+            if (parsedAge > 150) {
+                setCreateError("Please provide a valid date of birth.");
                 return;
             }
         }
@@ -286,12 +341,13 @@ export default function UserManagement() {
                         email: manualForm.email.trim(),
                         password: manualForm.password.trim() || undefined,
                         is_admin: false,
-                        age: Number(manualForm.age),
+                        date_of_birth: manualForm.date_of_birth,
                     }
                 : {
                         user_name: autoUser.user_name,
                         email: autoUser.email,
                         password: autoUser.password,
+                        date_of_birth: autoUser.date_of_birth,
                         is_admin: false,
                     };
 
@@ -599,17 +655,21 @@ export default function UserManagement() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-black uppercase tracking-wide text-white/50 mb-2">Age</label>
+                                            <label className="block text-xs font-black uppercase tracking-wide text-white/50 mb-2">Date of birth</label>
                                             <Input
                                                 type="text"
                                                 inputMode="numeric"
-                                                pattern="[0-9]*"
-                                                value={manualForm.age}
-                                                onChange={(e) => handleManualChange("age", String(e.target.value || "").replace(/\D/g, ""))}
-                                                onKeyDown={(e) => {
-                                                    if (["e", "E", "+", "-", ".", ","].includes(e.key)) e.preventDefault();
+                                                pattern="\\d{2}-\\d{2}-\\d{4}"
+                                                value={manualForm.date_of_birth}
+                                                onChange={(e) => {
+                                                    const digits = String(e.target.value || "").replace(/\D/g, "").slice(0, 8);
+                                                    const parts = [];
+                                                    if (digits.length > 0) parts.push(digits.slice(0, Math.min(2, digits.length)));
+                                                    if (digits.length > 2) parts.push(digits.slice(2, Math.min(4, digits.length)));
+                                                    if (digits.length > 4) parts.push(digits.slice(4, 8));
+                                                    handleManualChange("date_of_birth", parts.join("-"));
                                                 }}
-                                                placeholder="18+"
+                                                placeholder="DD-MM-YYYY"
                                                 isRequired
                                                 variant="bordered"
                                                 classNames={{
@@ -657,6 +717,10 @@ export default function UserManagement() {
                                             <div className="p-3 rounded-xl bg-black/40 border border-white/10 md:col-span-2">
                                                 <div className="text-xs text-white/50 uppercase">Password</div>
                                                 <div className="font-mono text-xs break-all">{autoUser.password}</div>
+                                            </div>
+                                            <div className="p-3 rounded-xl bg-black/40 border border-white/10 md:col-span-2">
+                                                <div className="text-xs text-white/50 uppercase">Date of birth</div>
+                                                <div className="font-semibold">{autoUser.date_of_birth}</div>
                                             </div>
                                         </div>
                                         <Button className={GOLD_BUTTON_SM} onPress={() => setAutoUser(generateAutoUser())}>Regenerate</Button>

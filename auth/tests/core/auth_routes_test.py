@@ -53,7 +53,7 @@ async def test_jwks(client):
 
 @pytest.mark.asyncio
 async def test_signup_success(client, users_coll):
-    payload = {"user_name": " Alice  ", "email": "  Alice@Example.com ", "age": 21, "password": "Secret123!"}
+    payload = {"user_name": " Alice  ", "email": "  Alice@Example.com ", "date_of_birth": "15-01-2000", "password": "Secret123!"}
     r = await client.post("/signup", json=payload)
     assert r.status_code == 201
 
@@ -85,7 +85,7 @@ async def test_signup_conflict(client, users_coll):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -95,7 +95,7 @@ async def test_signup_conflict(client, users_coll):
 
     r = await client.post(
         "/signup",
-        json={"user_name": "Y", "email": "X@EXAMPLE.COM", "age": 21, "password": "Secret123!"},
+        json={"user_name": "Y", "email": "X@EXAMPLE.COM", "date_of_birth": "15-01-2000", "password": "Secret123!"},
     )
     assert r.status_code == 409
     assert r.json()["detail"] == "Email already registered"
@@ -112,7 +112,7 @@ async def test_login_success(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 1,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -151,7 +151,7 @@ async def test_login_invalid_password(client, users_coll):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -181,7 +181,7 @@ async def test_get_me_ok(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": 25,
+            "date_of_birth": "15-01-2000",
             "total_guesses": 3,
             "total_correct": 2,
             "acc_guessing_ai": 0,
@@ -195,7 +195,7 @@ async def test_get_me_ok(client, users_coll, auth_mod):
     body = r.json()
     assert body["user_id"] == "u_me"
     assert body["email"] == "me@example.com"
-    assert body["age"] == 25
+    assert body["date_of_birth"] == "15-01-2000"
     assert body["total_guesses"] == 3
     assert body["total_correct"] == 2
     assert body["do_not_show_disclaimer_again"] is False
@@ -212,7 +212,7 @@ async def test_update_me_no_changes_returns_current(client, users_coll, auth_mod
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -236,7 +236,7 @@ async def test_update_me_updates_fields(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -267,7 +267,7 @@ async def test_update_me_disclaimer_preference(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -301,7 +301,7 @@ async def test_update_me_password_changes_hash(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -334,7 +334,7 @@ async def test_delete_me_ok(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,

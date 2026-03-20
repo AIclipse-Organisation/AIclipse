@@ -47,12 +47,12 @@ class GatewayClient:
 
         return data, resp.status_code
 
-    def signup(self, user_name: str, email: str, age: int, password: str) -> tuple[dict[str, Any] | None, int]:
+    def signup(self, user_name: str, email: str, date_of_birth: str, password: str) -> tuple[dict[str, Any] | None, int]:
         url = f"{self.base_url}/auth/signup"
         try:
             resp = requests.post(
                 url,
-                json={"user_name": user_name, "email": email, "age": age, "password": password},
+                json={"user_name": user_name, "email": email, "date_of_birth": date_of_birth, "password": password},
                 timeout=self.timeout_seconds,
             )
         except requests.RequestException:

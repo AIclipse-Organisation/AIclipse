@@ -50,24 +50,28 @@ def build_auth_blueprint(gateway: GatewayClient, *, is_signup_enabled: Callable[
         payload = _extract_payload()
         user_name = (payload.get("user_name") or "").strip()
         email = (payload.get("email") or "").strip()
-        age_raw = payload.get("age")
+        date_of_birth_raw = payload.get("date_of_birth")
         password = payload.get("password") or ""
 
-        if not user_name or not email or not password or age_raw is None:
-            return jsonify({"detail": "Please fill username, email, age and password."}), 400
+        if not user_name or not email or not password or date_of_birth_raw is None:
+            return jsonify({"detail": "Please fill username, email, date of birth and password."}), 400
 
         try:
-            age = int(age_raw)
-        except (TypeError, ValueError):
-            return jsonify({"detail": "Age must be a valid number."}), 400
-
-        if age < 18 :
-            return jsonify({"detail": "You must be at least 18 years old to sign up."}), 400
+            from datetime import datetime
+            dob = datetime.strptime(date_of_birth_raw, "%d-%m-%Y").date()
+            today = datetime.now().date()
+            age = (today.year - dob.year) - ((today.month, today.day) < (dob.month, dob.day))
+            if age < 18:
+                return jsonify({"detail": "You must be at least 18 years old to sign up."}), 400
+            if age > 150:
+                return jsonify({"detail": "Please provide a valid date of birth."}), 400
+        except ValueError:
+            return jsonify({"detail": "Date of birth must be in DD-MM-YYYY format."}), 400
 
         if not _is_valid_email_address(email):
             return jsonify({"detail": "Please enter a valid email address."}), 400
 
-        data, status = gateway.signup(user_name, email, age, password)
+        data, status = gateway.signup(user_name, email, date_of_birth_raw, password)
         if data is None:
             data = {"detail": "Signup failed"}
         return jsonify(data), status

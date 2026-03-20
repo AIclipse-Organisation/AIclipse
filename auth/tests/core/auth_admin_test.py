@@ -48,7 +48,7 @@ async def test_admin_list_users_filters_by_user_name(client, users_coll, auth_mo
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -64,7 +64,7 @@ async def test_admin_list_users_filters_by_user_name(client, users_coll, auth_mo
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -100,7 +100,7 @@ async def test_admin_get_user_ok(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": 30,
+            "date_of_birth": "10-06-1994",
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -111,7 +111,7 @@ async def test_admin_get_user_ok(client, users_coll, auth_mod):
     r = await client.get("/admin/user/u_x", headers={"Authorization": f"Bearer {admin_token}"})
     assert r.status_code == 200
     assert r.json()["email"] == "x@example.com"
-    assert r.json()["age"] == 30
+    assert r.json()["date_of_birth"] == "10-06-1994"
 
 
 @pytest.mark.asyncio
@@ -125,7 +125,7 @@ async def test_admin_update_user_ok(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -136,14 +136,14 @@ async def test_admin_update_user_ok(client, users_coll, auth_mod):
 
     r = await client.patch(
         "/admin/user/u_upd",
-        json={"user_name": "  New  ", "email": "  NEW@Example.com ", "age": 22, "is_admin": True},
+        json={"user_name": "  New  ", "email": "  NEW@Example.com ", "date_of_birth": "05-12-1999", "is_admin": True},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert r.status_code == 200
     body = r.json()
     assert body["user_name"] == "New"
     assert body["email"] == "new@example.com"
-    assert body["age"] == 22
+    assert body["date_of_birth"] == "05-12-1999"
     assert body["is_admin"] is True
 
 
@@ -157,7 +157,7 @@ async def test_admin_create_user_hides_manual_password(client, users_coll, auth_
             "user_name": "Manual User",
             "email": "manual@example.com",
             "password": "StrongPass1!",
-            "age": 21,
+            "date_of_birth": "20-08-2001",
         },
         headers={"Authorization": f"Bearer {admin_token}"},
     )
@@ -177,7 +177,7 @@ async def test_admin_create_user_returns_generated_password(client, users_coll, 
         json={
             "user_name": "Auto User",
             "email": "auto@example.com",
-            "age": 21,
+            "date_of_birth": "20-08-2001",
         },
         headers={"Authorization": f"Bearer {admin_token}"},
     )
@@ -200,7 +200,7 @@ async def test_admin_delete_user_ok(client, users_coll, auth_mod, event_redis, d
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -246,7 +246,7 @@ async def test_admin_delete_user_requires_reason_payload(client, users_coll, aut
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
