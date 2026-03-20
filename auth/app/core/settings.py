@@ -23,6 +23,7 @@ class Settings:
     REDIS_URI: str
     # Lets each environment use its own stream. Example: auth-events-dev.
     AUTH_EVENT_STREAM: str = "auth-events"
+    AUTH_EVENT_PUBLISH_TIMEOUT_S: float = 1.5
     CPU_POOL_CONCURRENCY: int = 8
 
     @classmethod
@@ -37,5 +38,6 @@ class Settings:
             REDIS_URI=require_setting("REDIS_URI", os.getenv("REDIS_URI")),
             # Example: if unset, this stays "auth-events".
             AUTH_EVENT_STREAM=os.getenv("AUTH_EVENT_STREAM", "auth-events"),
+            AUTH_EVENT_PUBLISH_TIMEOUT_S=float(os.getenv("AUTH_EVENT_PUBLISH_TIMEOUT_S", "1.5")),
             CPU_POOL_CONCURRENCY=int(os.getenv("CPU_POOL_CONCURRENCY", "8")),
         )

@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-import smtplib
+import base64
 import threading
 import time
 from datetime import datetime, timezone
@@ -9,6 +9,7 @@ from email.message import EmailMessage
 from typing import Any
 
 import redis
+import requests
 from fastapi import FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -23,27 +24,29 @@ STREAM = os.getenv("EMAIL_STREAM", "auth-events")
 GROUP = os.getenv("EMAIL_GROUP", "email-workers")
 CONSUMER = os.getenv("HOSTNAME", "email-worker")
 DLQ_STREAM = os.getenv("EMAIL_DLQ_STREAM", "auth-events-dlq")
-# Dedupe key lifetime; example: if same log_id + recipient is seen within 24 hours, skip sending again.
-DEDUPE_TTL_S = int( "86400" )  # 24 hours in seconds
+DEDUPE_TTL_S = int(os.getenv("EMAIL_DEDUPE_TTL_S", "86400"))
 # Temporary lock while one worker is actively sending one email event.
 SEND_LOCK_TTL_S = int(os.getenv("EMAIL_SEND_LOCK_TTL_S", "300"))
-# Retry policy 
-MAX_RETRIES = int (3)
-RETRY_BACKOFF_S = float( "1.5")
+MAX_RETRIES = int(os.getenv("EMAIL_MAX_RETRIES", "3"))
+RETRY_BACKOFF_S = float(os.getenv("EMAIL_RETRY_BACKOFF_S", "1.5"))
+REDIS_CONNECT_TIMEOUT_S = float(os.getenv("REDIS_CONNECT_TIMEOUT_S", "3"))
+REDIS_SOCKET_TIMEOUT_S = float(os.getenv("REDIS_SOCKET_TIMEOUT_S", "8"))
 
-# SMTP settings (Gmail by default).
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
-SMTP_APP_PASSWORD = os.getenv("SMTP_APP_PASSWORD", "")
-SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME)
-SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", SMTP_FROM_EMAIL)
-SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "true").strip().lower() in {"1", "true", "yes", "on"}
-SMTP_TIMEOUT_S = float(os.getenv("SMTP_TIMEOUT_S", "15"))
+# Gmail API settings.
+GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID", "")
+GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET", "")
+GMAIL_REFRESH_TOKEN = os.getenv("GMAIL_REFRESH_TOKEN", "")
+GMAIL_SENDER_EMAIL = os.getenv("GMAIL_SENDER_EMAIL", "")
+GMAIL_TOKEN_URL = os.getenv("GMAIL_TOKEN_URL", "https://oauth2.googleapis.com/token")
+GMAIL_API_BASE = os.getenv("GMAIL_API_BASE", "https://gmail.googleapis.com/gmail/v1")
+GMAIL_TIMEOUT_S = float(os.getenv("GMAIL_TIMEOUT_S", "15"))
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", GMAIL_SENDER_EMAIL)
 INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN", "")
 
 # Redis client is initialized on startup and reused by worker + endpoints.
 r: redis.Redis | None = None
+_gmail_access_token: str | None = None
+_gmail_access_token_expiry_s: float = 0.0
 
 
 def _require_redis() -> redis.Redis:
@@ -83,7 +86,12 @@ def _require_internal_token(x_internal_token: str | None) -> None:
 
 def _connect_redis() -> redis.Redis:
     # decode_responses=True gives str values instead of bytes.
-    return redis.Redis.from_url(REDIS_URI, decode_responses=True)
+    return redis.Redis.from_url(
+        REDIS_URI,
+        decode_responses=True,
+        socket_connect_timeout=REDIS_CONNECT_TIMEOUT_S,
+        socket_timeout=REDIS_SOCKET_TIMEOUT_S,
+    )
 
 
 def _ensure_group() -> None:
@@ -99,6 +107,38 @@ def _ensure_group() -> None:
             raise
 
 
+def _get_gmail_access_token() -> str:
+    global _gmail_access_token
+    global _gmail_access_token_expiry_s
+
+    now = time.time()
+    if _gmail_access_token and now < (_gmail_access_token_expiry_s - 30):
+        return _gmail_access_token
+
+    response = requests.post(
+        GMAIL_TOKEN_URL,
+        data={
+            "client_id": GMAIL_CLIENT_ID,
+            "client_secret": GMAIL_CLIENT_SECRET,
+            "refresh_token": GMAIL_REFRESH_TOKEN,
+            "grant_type": "refresh_token",
+        },
+        timeout=(5, GMAIL_TIMEOUT_S),
+    )
+    if response.status_code < 200 or response.status_code >= 300:
+        raise RuntimeError(f"Gmail token refresh failed status={response.status_code} body={response.text}")
+
+    payload = response.json()
+    token = payload.get("access_token")
+    expires_in = int(payload.get("expires_in", 3600))
+    if not token:
+        raise RuntimeError(f"Gmail token refresh missing access_token payload={payload}")
+
+    _gmail_access_token = str(token)
+    _gmail_access_token_expiry_s = now + expires_in
+    return _gmail_access_token
+
+
 def _build_email(payload: dict[str, Any]) -> EmailMessage:
     # Plain text email works across most inbox clients.
     # Required event fields come from auth admin-delete payload.
@@ -108,7 +148,7 @@ def _build_email(payload: dict[str, Any]) -> EmailMessage:
 
     msg = EmailMessage()
     msg["Subject"] = "Your AIclipse account has been deleted"
-    msg["From"] = SMTP_FROM_EMAIL
+    msg["From"] = GMAIL_SENDER_EMAIL
     msg["To"] = recipient
     msg.set_content(
         "Hello,\n\n"
@@ -125,18 +165,36 @@ def _build_email(payload: dict[str, Any]) -> EmailMessage:
 
 
 def _send_email(msg: EmailMessage) -> None:
-    # Support both authenticated SSL SMTP (e.g., Gmail) and local unauthenticated SMTP.
-    if SMTP_USE_SSL:
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT_S) as server:
-            if SMTP_USERNAME and SMTP_APP_PASSWORD:
-                server.login(SMTP_USERNAME, SMTP_APP_PASSWORD)
-            server.send_message(msg)
-        return
+    global _gmail_access_token
+    global _gmail_access_token_expiry_s
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT_S) as server:
-        if SMTP_USERNAME and SMTP_APP_PASSWORD:
-            server.login(SMTP_USERNAME, SMTP_APP_PASSWORD)
-        server.send_message(msg)
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+    url = f"{GMAIL_API_BASE.rstrip('/')}/users/me/messages/send"
+
+    def _post(token: str):
+        return requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            json={"raw": raw},
+            timeout=(5, GMAIL_TIMEOUT_S),
+        )
+
+    token = _get_gmail_access_token()
+    response = _post(token)
+
+    # If token expired unexpectedly, refresh once and retry.
+    if response.status_code == 401:
+        _gmail_access_token = None
+        _gmail_access_token_expiry_s = 0.0
+        token = _get_gmail_access_token()
+        response = _post(token)
+
+    if response.status_code < 200 or response.status_code >= 300:
+        raise RuntimeError(f"Gmail send failed status={response.status_code} body={response.text}")
 
 
 def _dedupe_key(log_id: str, email: str) -> str:
@@ -177,7 +235,7 @@ def _process_event(fields: dict[str, str]) -> None:
     message = _build_email(payload)
     try:
         _send_email(message)
-        # Mark as sent for dedupe window after successful SMTP handoff.
+        # Mark as sent for dedupe window after successful Gmail API handoff.
         redis_client.set(key, "sent", ex=DEDUPE_TTL_S)
     except Exception:
         # Release lock so retry loop can attempt again.
@@ -252,8 +310,10 @@ def startup() -> None:
     # Fail fast if required settings are missing.
     if not REDIS_URI:
         raise RuntimeError("REDIS_URI is required")
-    if not SMTP_HOST or not SMTP_PORT or not SMTP_FROM_EMAIL:
-        raise RuntimeError("SMTP_HOST, SMTP_PORT, and SMTP_FROM_EMAIL are required")
+    if not GMAIL_CLIENT_ID or not GMAIL_CLIENT_SECRET or not GMAIL_REFRESH_TOKEN or not GMAIL_SENDER_EMAIL:
+        raise RuntimeError(
+            "GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, and GMAIL_SENDER_EMAIL are required"
+        )
 
     global r
     while True:
@@ -309,7 +369,6 @@ def replay_dlq(
     x_internal_token: str | None = Header(default=None, alias="X-Internal-Token"),
 ) -> dict[str, Any]:
     # Put failed DLQ items back on main stream for another try.
-    # Example use: after fixing SMTP credentials.
     _require_internal_token(x_internal_token)
 
     redis_client = _require_redis_http()

@@ -23,22 +23,26 @@ spec:
               value: "email-workers"
             - name: EMAIL_DLQ_STREAM
               value: "auth-events-dlq"
-            - name: SMTP_HOST
-              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_HOST } }
-            - name: SMTP_PORT
-              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_PORT } }
-            - name: SMTP_USERNAME
-              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_USERNAME } }
-            - name: SMTP_APP_PASSWORD
-              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_APP_PASSWORD } }
-            - name: SMTP_FROM_EMAIL
-              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_FROM_EMAIL } }
+            - name: GMAIL_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: email-sec, key: GMAIL_CLIENT_ID } }
+            - name: GMAIL_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: email-sec, key: GMAIL_CLIENT_SECRET } }
+            - name: GMAIL_REFRESH_TOKEN
+              valueFrom: { secretKeyRef: { name: email-sec, key: GMAIL_REFRESH_TOKEN } }
+            - name: GMAIL_SENDER_EMAIL
+              valueFrom: { secretKeyRef: { name: email-sec, key: GMAIL_SENDER_EMAIL } }
+            - name: GMAIL_TOKEN_URL
+              value: "https://oauth2.googleapis.com/token"
+            - name: GMAIL_API_BASE
+              value: "https://gmail.googleapis.com/gmail/v1"
+            - name: GMAIL_TIMEOUT_S
+              value: "15"
             - name: SUPPORT_EMAIL
               valueFrom: { secretKeyRef: { name: email-sec, key: SUPPORT_EMAIL } }
-            - name: SMTP_USE_SSL
-              valueFrom: { secretKeyRef: { name: email-sec, key: SMTP_USE_SSL } }
-            - name: SMTP_TIMEOUT_S
-              value: "15"
+            - name: REDIS_CONNECT_TIMEOUT_S
+              value: "3"
+            - name: REDIS_SOCKET_TIMEOUT_S
+              value: "8"
             - name: INTERNAL_AUTH_TOKEN
               valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
           ports:

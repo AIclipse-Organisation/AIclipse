@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -337,12 +338,15 @@ async def admin_delete_user(
 
     try:
         # Push event to Redis stream. Email worker handles it later.
-        await request.app.state.event_redis.xadd(
-            request.app.state.settings.AUTH_EVENT_STREAM,
-            {
-                "type": "auth.user.deleted.admin",
-                "data": json.dumps(event_payload),
-            },
+        await asyncio.wait_for(
+            request.app.state.event_redis.xadd(
+                request.app.state.settings.AUTH_EVENT_STREAM,
+                {
+                    "type": "auth.user.deleted.admin",
+                    "data": json.dumps(event_payload),
+                },
+            ),
+            timeout=request.app.state.settings.AUTH_EVENT_PUBLISH_TIMEOUT_S,
         )
     except Exception:
         # Deletion should remain successful even if event publication fails

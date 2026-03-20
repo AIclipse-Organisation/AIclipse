@@ -37,7 +37,12 @@ async def lifespan(app: FastAPI):
     settings = Settings.from_env()
     keys = build_keys(settings.JWT_KEY)
     cpu = CpuPool.from_max_concurrency(settings.CPU_POOL_CONCURRENCY)
-    event_redis = redis_async.Redis.from_url(settings.REDIS_URI, decode_responses=True)
+    event_redis = redis_async.Redis.from_url(
+        settings.REDIS_URI,
+        decode_responses=True,
+        socket_connect_timeout=2,
+        socket_timeout=2,
+    )
 
     async with mongo_lifespan(settings) as db:
         user_repo = UserRepo(db)
