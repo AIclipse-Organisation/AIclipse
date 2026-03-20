@@ -5,7 +5,6 @@ body {
   padding: 0;
   background: #141414;
   color: #222;
-  ;
   padding: 0;
   min-height: 100vh;
   background: #000;
@@ -342,20 +341,57 @@ body.app main {
 }
 
 .drawer-links a,
-.logout-button {
+.drawer-links .logout-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
   padding: 15px 25px;
   text-decoration: none;
   color: #f3f3f3;
   font-size: 1rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
 }
 
-.drawer-links a:hover {
+.drawer-links a:hover,
+.drawer-links .logout-button:hover {
   background: #2c2c2c;
   color: #CFB87C;
 }
 
+.drawer-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  color: inherit;
+}
+
+.drawer-link-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+}
+
+.drawer-links a span:last-child,
+.drawer-links .logout-button span:last-child {
+  line-height: 1.2;
+}
+
 .admin-link {
   color: #ff4444 !important;
+  font-weight: bold;
+}
+
+.drawer-links .admin-link:hover {
+  color: #ff6b6b !important;
 }
 
 .drawer-separator {
