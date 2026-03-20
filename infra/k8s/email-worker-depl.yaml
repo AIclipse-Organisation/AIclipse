@@ -17,12 +17,6 @@ spec:
           env:
             - name: REDIS_URI
               valueFrom: { secretKeyRef: { name: redis-sec, key: REDIS_URI } }
-            - name: EMAIL_STREAM
-              value: "auth-events"
-            - name: EMAIL_GROUP
-              value: "email-workers"
-            - name: EMAIL_DLQ_STREAM
-              value: "auth-events-dlq"
             - name: GMAIL_CLIENT_ID
               valueFrom: { secretKeyRef: { name: email-sec, key: GMAIL_CLIENT_ID } }
             - name: GMAIL_CLIENT_SECRET
@@ -31,18 +25,6 @@ spec:
               valueFrom: { secretKeyRef: { name: email-sec, key: GMAIL_REFRESH_TOKEN } }
             - name: GMAIL_SENDER_EMAIL
               valueFrom: { secretKeyRef: { name: email-sec, key: GMAIL_SENDER_EMAIL } }
-            - name: GMAIL_TOKEN_URL
-              value: "https://oauth2.googleapis.com/token"
-            - name: GMAIL_API_BASE
-              value: "https://gmail.googleapis.com/gmail/v1"
-            - name: GMAIL_TIMEOUT_S
-              value: "15"
-            - name: SUPPORT_EMAIL
-              valueFrom: { secretKeyRef: { name: email-sec, key: SUPPORT_EMAIL } }
-            - name: REDIS_CONNECT_TIMEOUT_S
-              value: "3"
-            - name: REDIS_SOCKET_TIMEOUT_S
-              value: "8"
             - name: INTERNAL_AUTH_TOKEN
               valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
           ports:
