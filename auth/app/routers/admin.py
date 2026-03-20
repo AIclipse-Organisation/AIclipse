@@ -333,6 +333,7 @@ async def admin_delete_user(
         "deleted_by_email": admin.email,
         "reason_code": body.reason_code,
         "reason_detail": body.reason_detail,
+        "additional_context": body.reason_detail,
         "deleted_at": log_doc["deleted_at"].isoformat(),
     }
 

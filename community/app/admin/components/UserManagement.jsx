@@ -208,7 +208,7 @@ function checkPasswordStrength(password) {
 export default function UserManagement() {
     const [users, setUsers] = useState([]);
     const [page, setPage] = useState(1);
-    const [pageSize] = useState(25);
+    const pageSize = 20;
     const [total, setTotal] = useState(0);
     const [search, setSearch] = useState("");
     const [sort, setSort] = useState("created_at_desc");
@@ -232,6 +232,9 @@ export default function UserManagement() {
 
     const [auditLogs, setAuditLogs] = useState([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
+    const [logPage, setLogPage] = useState(1);
+    const [logsHasMore, setLogsHasMore] = useState(false);
+    const [activeTab, setActiveTab] = useState("users");
 
     const sortParams = useMemo(() => {
         const parts = sort.split("_");
@@ -274,11 +277,14 @@ export default function UserManagement() {
         }
     }
 
-    async function loadLogs() {
+    async function loadLogs(nextPage = 1) {
         setLoadingLogs(true);
         try {
-            const data = await adminService.getDeletionLogs({ page: 1, page_size: 20 });
-            setAuditLogs(data || []);
+            const data = await adminService.getDeletionLogs({ page: nextPage, page_size: pageSize });
+            const items = Array.isArray(data) ? data : [];
+            setAuditLogs(items);
+            setLogPage(nextPage);
+            setLogsHasMore(items.length === pageSize);
         } catch (err) {
             console.warn("Failed to load audit logs", err);
         } finally {
@@ -385,7 +391,7 @@ export default function UserManagement() {
             setDeleteModalOpen(false);
             setTargetUser(null);
             setDeleteError("");
-            await Promise.all([loadUsers(page), loadLogs()]);
+            await Promise.all([loadUsers(page), loadLogs(logPage)]);
         } catch (err) {
             setDeleteError(err?.message || "Failed to delete user");
         } finally {
@@ -436,133 +442,192 @@ export default function UserManagement() {
     return (
         <div className="flex flex-col gap-6 h-full overflow-y-scroll px-4 md:px-8 pb-10 bg-[#0f0f0f] text-white [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <div className="flex flex-col items-center gap-4 pt-4 text-center">
-                <div className="w-full">
+                <div className="w-full flex items-center justify-between gap-4">
                     <h2 className="text-2xl font-black tracking-tight text-[#CFB87C]">User Management</h2>
+                    <div className="flex bg-black/40 p-1 rounded-2xl border border-white/10">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("users")}
+                            className={`h-9 px-4 rounded-xl font-black uppercase tracking-wide text-xs transition-all ${
+                                activeTab === "users"
+                                    ? "bg-[#CFB87C] text-[#111]"
+                                    : "text-white/70 hover:text-white"
+                            }`}
+                        >
+                            Users
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setActiveTab("deleted");
+                                loadLogs(1);
+                            }}
+                            className={`h-9 px-4 rounded-xl font-black uppercase tracking-wide text-xs transition-all ${
+                                activeTab === "deleted"
+                                    ? "bg-[#CFB87C] text-[#111]"
+                                    : "text-white/70 hover:text-white"
+                            }`}
+                        >
+                            Deleted Users
+                        </button>
+                    </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 w-full justify-center items-center">
-                    <Input
-                        placeholder="Search name or email"
-                        size="sm"
-                        className="w-full md:w-72"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        variant="flat"
-                        color="default"
-                        classNames={{
-                            inputWrapper: "h-9 min-h-9 bg-[#0b0b0b] border border-white/20 shadow-sm data-[hover=true]:border-white/30 group-data-[focus=true]:border-[#CFB87C] group-data-[focus=true]:shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:outline-none group-data-[focus=true]:ring-0 group-data-[focus=true]:outline-none",
-                            input: "text-white placeholder:text-white/45",
-                        }}
-                    />
-                    <Select
-                        size="sm"
-                        className="w-[180px]"
-                        selectedKeys={new Set([sort])}
-                        onSelectionChange={(keys) => {
-                            const val = Array.from(keys)?.[0] || "created_at_desc";
-                            setSort(val);
-                        }}
-                        aria-label="Sort users"
-                        variant="flat"
-                        classNames={SELECT_DROPDOWN_CLASSES}
-                        listboxProps={{
-                            itemClasses: {
-                                base: "text-white data-[hover=true]:bg-white/10 data-[selectable=true]:focus:bg-white/10 data-[selected=true]:bg-[#CFB87C]/20",
-                            },
-                        }}
-                    >
-                        <SelectItem key="created_at_desc">
-                            Newest first
-                        </SelectItem>
-                        <SelectItem key="created_at_asc">
-                            Oldest first
-                        </SelectItem>
-                        <SelectItem key="user_name_asc">
-                            Name A → Z
-                        </SelectItem>
-                        <SelectItem key="user_name_desc">
-                            Name Z → A
-                        </SelectItem>
-                    </Select>
+                {activeTab === "users" && (
+                    <div className="flex flex-wrap gap-2 w-full justify-center items-center">
+                        <Input
+                            placeholder="Search name or email"
+                            size="sm"
+                            className="w-full md:w-72"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            variant="flat"
+                            color="default"
+                            classNames={{
+                                inputWrapper: "h-9 min-h-9 bg-[#0b0b0b] border border-white/20 shadow-sm data-[hover=true]:border-white/30 group-data-[focus=true]:border-[#CFB87C] group-data-[focus=true]:shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:outline-none group-data-[focus=true]:ring-0 group-data-[focus=true]:outline-none",
+                                input: "text-white placeholder:text-white/45",
+                            }}
+                        />
+                        <Select
+                            size="sm"
+                            className="w-[180px]"
+                            selectedKeys={new Set([sort])}
+                            onSelectionChange={(keys) => {
+                                const val = Array.from(keys)?.[0] || "created_at_desc";
+                                setSort(val);
+                            }}
+                            aria-label="Sort users"
+                            variant="flat"
+                            classNames={SELECT_DROPDOWN_CLASSES}
+                            listboxProps={{
+                                itemClasses: {
+                                    base: "text-white data-[hover=true]:bg-white/10 data-[selectable=true]:focus:bg-white/10 data-[selected=true]:bg-[#CFB87C]/20",
+                                },
+                            }}
+                        >
+                            <SelectItem key="created_at_desc">
+                                Newest first
+                            </SelectItem>
+                            <SelectItem key="created_at_asc">
+                                Oldest first
+                            </SelectItem>
+                            <SelectItem key="user_name_asc">
+                                Name A → Z
+                            </SelectItem>
+                            <SelectItem key="user_name_desc">
+                                Name Z → A
+                            </SelectItem>
+                        </Select>
 
-                    <Button
-                        size="sm"
-                        className={GOLD_BUTTON_SM}
-                        onPress={() => {
-                            setCreateError("");
-                            setCreateModalOpen(true);
-                        }}
-                    >
-                        Add User
-                    </Button>
-                </div>
+                        <Button
+                            size="sm"
+                            className={GOLD_BUTTON_SM}
+                            onPress={() => {
+                                setCreateError("");
+                                setCreateModalOpen(true);
+                            }}
+                        >
+                            Add User
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {error && <div className="text-sm text-red-400">{error}</div>}
 
-            <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
-                <CardBody className="p-0">
-                    <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
-                        <div className="col-span-5">User</div>
-                        <div className="col-span-2">Role</div>
-                        <div className="col-span-2">Plan</div>
-                        <div className="col-span-2">Usage</div>
-                        <div className="col-span-1 text-right">Actions</div>
-                    </div>
-
-                    {loading ? (
-                        <div className="flex items-center justify-center py-10">
-                            <Spinner size="sm" color="warning" />
+            {activeTab === "users" && (
+                <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
+                    <CardBody className="p-0">
+                        <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
+                            <div className="col-span-5">User</div>
+                            <div className="col-span-2">Role</div>
+                            <div className="col-span-2">Plan</div>
+                            <div className="col-span-2">Usage</div>
+                            <div className="col-span-1 text-right">Actions</div>
                         </div>
-                    ) : (
-                        <div className="divide-y divide-white/5">{rows}</div>
-                    )}
-                </CardBody>
 
-                <div className="p-4 border-t border-white/10 flex items-center justify-between text-sm text-white/70">
-                    <span>
-                        Page {page} of {totalPages} · {total} users
-                    </span>
-                    <div className="flex gap-2">
-                        <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={page === 1} onPress={() => loadUsers(page - 1)}>
-                            Previous
-                        </Button>
-                        <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={page >= totalPages} onPress={() => loadUsers(page + 1)}>
-                            Next
-                        </Button>
-                    </div>
-                </div>
-            </Card>
-
-            <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
-                <CardBody className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-semibold text-white">Recent deletion log</h3>
-                        {loadingLogs && <Spinner size="sm" color="warning" />}
-                    </div>
-                    {auditLogs.length === 0 && !loadingLogs && (
-                        <div className="text-sm text-white/60">No deletions in the last 30 days.</div>
-                    )}
-                    <div className="space-y-3">
-                        {auditLogs.map((log) => (
-                            <div key={log.log_id} className="border border-white/10 rounded-lg p-3 bg-[#161616]">
-                                <div className="flex flex-wrap gap-3 text-sm text-white/80">
-                                    <span className="font-semibold text-white">{log.deleted_user_email || log.deleted_user_id}</span>
-                                    <span>Deleted by: {log.deleted_by_email || log.deleted_by_user_id}</span>
-                                    <span>Reason: {log.reason_code}</span>
-                                    <span>{formatDate(log.deleted_at)}</span>
-                                </div>
-                                <details className="mt-2 text-xs text-white/60">
-                                    <summary className="cursor-pointer font-semibold text-white/80">User snapshot</summary>
-                                    <pre className="mt-2 bg-[#0f0f0f] border border-white/5 rounded p-2 overflow-auto text-[11px] leading-tight text-white/80">
-                                        {JSON.stringify(log.user_snapshot, null, 2)}
-                                    </pre>
-                                </details>
+                        {loading ? (
+                            <div className="flex items-center justify-center py-10">
+                                <Spinner size="sm" color="warning" />
                             </div>
-                        ))}
+                        ) : (
+                            <div className="divide-y divide-white/5">{rows}</div>
+                        )}
+                    </CardBody>
+
+                    <div className="p-4 border-t border-white/10 flex items-center justify-between text-sm text-white/70">
+                        <span>
+                            Page {page} of {totalPages} · {total} users
+                        </span>
+                        <div className="flex gap-2">
+                            <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={page === 1} onPress={() => loadUsers(page - 1)}>
+                                Previous
+                            </Button>
+                            <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={page >= totalPages} onPress={() => loadUsers(page + 1)}>
+                                Next
+                            </Button>
+                        </div>
                     </div>
-                </CardBody>
-            </Card>
+                </Card>
+            )}
+
+            {activeTab === "deleted" && (
+                <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
+                    <CardBody className="p-0">
+                        <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
+                            <div className="col-span-4">Deleted User</div>
+                            <div className="col-span-3">Deleted By</div>
+                            <div className="col-span-2">Reason</div>
+                            <div className="col-span-2">Deleted At</div>
+                            <div className="col-span-1 text-right">Details</div>
+                        </div>
+
+                        {loadingLogs ? (
+                            <div className="flex items-center justify-center py-10">
+                                <Spinner size="sm" color="warning" />
+                            </div>
+                        ) : auditLogs.length === 0 ? (
+                            <div className="p-4 text-sm text-white/60">No deleted users found.</div>
+                        ) : (
+                            <div className="divide-y divide-white/5">
+                                {auditLogs.map((log) => (
+                                    <div key={log.log_id} className="p-3">
+                                        <div className="grid grid-cols-12 gap-4 items-center">
+                                            <div className="col-span-4">
+                                                <div className="text-sm font-semibold text-white leading-tight">{log.deleted_user_name || "-"}</div>
+                                                <div className="text-xs text-white/60 leading-tight">{log.deleted_user_email || log.deleted_user_id}</div>
+                                            </div>
+                                            <div className="col-span-3 text-sm text-white/80">{log.deleted_by_email || log.deleted_by_user_id}</div>
+                                            <div className="col-span-2 text-sm text-white/80">{log.reason_code}</div>
+                                            <div className="col-span-2 text-sm text-white/70">{formatDate(log.deleted_at)}</div>
+                                            <div className="col-span-1 text-right">
+                                                <details className="text-xs text-white/70 inline-block text-left">
+                                                    <summary className="cursor-pointer font-semibold text-white/80 list-none">View</summary>
+                                                    <pre className="mt-2 w-[420px] max-w-[70vw] bg-[#0f0f0f] border border-white/10 rounded p-2 overflow-auto text-[11px] leading-tight text-white/80">
+                                                        {JSON.stringify(log.user_snapshot, null, 2)}
+                                                    </pre>
+                                                </details>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardBody>
+
+                    <div className="p-4 border-t border-white/10 flex items-center justify-between text-sm text-white/70">
+                        <span>Page {logPage}</span>
+                        <div className="flex gap-2">
+                            <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={loadingLogs || logPage === 1} onPress={() => loadLogs(logPage - 1)}>
+                                Previous
+                            </Button>
+                            <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={loadingLogs || !logsHasMore} onPress={() => loadLogs(logPage + 1)}>
+                                Next
+                            </Button>
+                        </div>
+                    </div>
+                </Card>
+            )}
 
             <Modal
                 isOpen={createModalOpen}

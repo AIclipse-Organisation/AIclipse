@@ -145,22 +145,38 @@ def _build_email(payload: dict[str, Any]) -> EmailMessage:
     recipient = payload.get("deleted_user_email") # This is the email address of the deleted user, which is the recipient of this notification email
     deleted_at = payload.get("deleted_at") or datetime.now(timezone.utc).isoformat()
     admin_email = payload.get("deleted_by_email") # This is the email address of the administrator who performed the deletion, which is included in the email content for context.
+    reason_detail_raw = (
+        payload.get("reason_detail")
+        or payload.get("additional_context")
+        or payload.get("additionalContext")
+        or ""
+    )
+    reason_detail = str(reason_detail_raw).strip()
 
     msg = EmailMessage()
     msg["Subject"] = "Your AIclipse account has been deleted"
     msg["From"] = GMAIL_SENDER_EMAIL
     msg["To"] = recipient
-    msg.set_content(
-        "Hello,\n\n"
-        "This is a confirmation that your AIclipse account has been deleted by an administrator.\n\n"
-        f"Deletion time (UTC): {deleted_at}\n"
-        f"Performed by: {admin_email}\n"
-        f"Reason code: {payload.get('reason_code', 'unspecified')}\n\n"
-        "If you believe this was a mistake, contact support immediately.\n"
-        f"Support: {SUPPORT_EMAIL}\n\n"
-        "Regards,\n"
-        "AIclipse"
-    )
+    lines = [
+        "Hello,",
+        "",
+        "This is a confirmation that your AIclipse account has been deleted by an administrator.",
+        "",
+        f"Deletion time (UTC): {deleted_at}",
+        f"Performed by: {admin_email}",
+        f"Reason code: {payload.get('reason_code', 'unspecified')}",
+    ]
+    if reason_detail:
+        lines.append(f"Additional context: {reason_detail}")
+    lines.extend([
+        "",
+        "If you believe this was a mistake, contact support immediately.",
+        f"Support: {SUPPORT_EMAIL}",
+        "",
+        "Regards,",
+        "AIclipse",
+    ])
+    msg.set_content("\n".join(lines))
     return msg
 
 

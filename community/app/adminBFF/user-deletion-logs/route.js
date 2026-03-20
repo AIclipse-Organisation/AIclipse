@@ -35,7 +35,7 @@ export async function GET(req) {
 
     const searchParams = new URL(req.url).searchParams;
     const page = searchParams.get("page") || "1";
-    const pageSize = searchParams.get("page_size") || "50";
+    const pageSize = searchParams.get("page_size") || "20";
 
     const res = await fetch(`${GATEWAY_URL}/auth/admin/user-deletion-logs?page=${page}&page_size=${pageSize}`, {
       headers: { Authorization: `Bearer ${token}` },
