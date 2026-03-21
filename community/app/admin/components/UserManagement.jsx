@@ -875,14 +875,22 @@ export default function UserManagement() {
                                     </label>
                                     <Textarea
                                         minRows={3}
+                                        disableAutosize
                                         value={deleteDetail}
                                         onChange={(e) => setDeleteDetail(e.target.value)}
                                         isRequired={deleteReason === "other"}
                                         placeholder="Add details for audit history"
                                         variant="bordered"
+                                        className="w-full"
                                         classNames={{
-                                            inputWrapper: "bg-black/40 border-white/10",
-                                            input: "text-white",
+                                            base: "w-full",
+                                            inputWrapper:
+                                                "min-h-[96px] bg-black border border-white/10 rounded-md shadow-none " +
+                                                "data-[hover=true]:border-white/20 group-data-[focus=true]:border-[#CFB87C] " +
+                                                "group-data-[focus=true]:shadow-none",
+                                            input:
+                                                "text-white placeholder:text-white/40 resize-none !bg-transparent " +
+                                                "focus:outline-none",
                                         }}
                                     />
                                 </div>

@@ -19,6 +19,20 @@ logger = logging.getLogger("email_worker")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
 
+class _HealthzOnceFilter(logging.Filter):
+    """Allow the first /healthz access-log line through; drop all subsequent ones."""
+
+    _logged = False
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if "/healthz" in record.getMessage():
+            if not _HealthzOnceFilter._logged:
+                _HealthzOnceFilter._logged = True
+                return True
+            return False
+        return True
+
+
 REDIS_URI = os.getenv("REDIS_URI")
 STREAM = "auth-events"
 GROUP = "email-workers"
@@ -343,6 +357,9 @@ def startup() -> None:
             # Keep retrying so service recovers when Redis comes up later.
             logger.warning("startup_retry err=%s", err)
             time.sleep(1)
+
+    # Suppress repeated /healthz probe noise — only log it once.
+    logging.getLogger("uvicorn.access").addFilter(_HealthzOnceFilter())
 
     logger.info("email_worker_started stream=%s group=%s", STREAM, GROUP)
     # Start worker in background so API endpoints stay responsive.
