@@ -59,13 +59,13 @@ class UserAccuracy(BaseModel):
 
 class SignupRequest(BaseModel):
     user_name: str = Field(..., min_length=1)
-    email: EmailStr
+    email: str
     date_of_birth: str = Field(..., pattern=r"^\d{2}-\d{2}-\d{4}$")
     password: str
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -76,7 +76,7 @@ class LoginResponse(BaseModel):
 
 class UpdateMeRequest(BaseModel):
     user_name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     password: Optional[str] = None
     do_not_show_disclaimer_again: Optional[bool] = None
 
@@ -144,6 +144,24 @@ def validate_date_of_birth(date_of_birth: Optional[str], *, required: bool = Fal
     return dob.strftime("%d-%m-%Y")
 
 
+def normalize_email_or_400(email: Optional[str], *, required: bool = False) -> Optional[str]:
+    if email is None:
+        if required:
+            raise HTTPException(status_code=400, detail="Email is required")
+        return None
+
+    email_raw = str(email).strip()
+    if not email_raw:
+        if required:
+            raise HTTPException(status_code=400, detail="Email is required")
+        return None
+
+    try:
+        return validate_email(email_raw, check_deliverability=False).normalized.lower()
+    except EmailNotValidError:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+
+
 def _parse_bearer_token(authorization: Optional[str]) -> str:
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
@@ -197,11 +215,7 @@ async def signup(request: Request, payload: SignupRequest):
     if not password:
         raise HTTPException(status_code=400, detail="Password is required")
 
-    try:
-        # Validate email format quickly (no MX lookup) to keep signup fast.
-        email_norm = validate_email(email_raw, check_deliverability=False).normalized.lower()
-    except EmailNotValidError:
-        raise HTTPException(status_code=400, detail="Please provide a valid email address")
+    email_norm = normalize_email_or_400(email_raw, required=True)
 
     existing = await users.find_one({"email": email_norm})
     if existing:
@@ -252,7 +266,7 @@ async def login(request: Request, payload: LoginRequest):
     pwd = PasswordService(request.app.state.cpu)
     tokens = TokenService(request.app.state.cpu, request.app.state.keys)
 
-    email_norm = payload.email.strip().lower()
+    email_norm = normalize_email_or_400(payload.email, required=True)
     user_doc = await users.find_one({"email": email_norm})
     if not user_doc:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -287,7 +301,7 @@ async def update_me(request: Request, body: UpdateMeRequest, user: TokenUser = D
     if "user_name" in raw and raw["user_name"] is not None:
         update_doc["user_name"] = raw["user_name"].strip()
     if "email" in raw and raw["email"] is not None:
-        update_doc["email"] = raw["email"].strip().lower()
+        update_doc["email"] = normalize_email_or_400(raw["email"])
     if "password" in raw and raw["password"]:
         try:
             update_doc["password"] = await pwd.hash_password(raw["password"])
