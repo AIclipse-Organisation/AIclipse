@@ -7,6 +7,7 @@ import {
   validatePostId,
 } from "./validation.js";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
+import { recordActivity, SCORES } from "@/lib/gamification/scoring.js";
 
 import { getRedis } from "@/lib/redis/redis";
 
@@ -232,6 +233,9 @@ export async function POST(req) {
 
     const col = db.collection(POSTS_COLLECTION);
     await col.insertOne(doc);
+
+    // Award points for creating a post
+    await recordActivity(db, authenticatedUserId, SCORES.CREATE_POST, "create_post");
 
     // 8. Mark the image as public via Gateway
     try {
@@ -653,6 +657,9 @@ export async function GET(req) {
         if (ageHours < 24) score *= 1.2;
 
         if (isControversial(post, nowSec)) score *= 2.5;
+
+        // Vote penalty last — deprioritize posts the user has already voted on
+        if (post.user_vote) score *= 0.001;
 
         return {
           ...post,

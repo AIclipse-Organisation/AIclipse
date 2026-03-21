@@ -43,8 +43,6 @@ body {
   overflow: hidden;
   margin: 0 auto;
   max-width: 480px;
-  border-left: 1px solid #2c2c2c;
-  border-right: 1px solid #2c2c2c;
 }
 
 /* Top bar */
@@ -154,7 +152,7 @@ body {
 /* Screen content area (pad bottom so it doesn't hide under navbar) */
 .app .screen {
   padding: 20px;
-  padding-bottom: 100px;
+  padding-bottom: 80px;
   /* space for bottom nav */
 }
 
@@ -173,9 +171,15 @@ body {
 
   display: flex;
   justify-content: space-around;
-  padding: 20px 0;
+  padding: 16px 0 12px 0;
 
   z-index: 1000;
+
+  /* Force consistent rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 .app .navbar a {
@@ -183,6 +187,16 @@ body {
   color: #f3f3f3;
   font-size: 0.9rem;
   font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 40px;
+
+  /* Force consistent rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .app .navbar a:hover {
@@ -194,14 +208,18 @@ body {
   color: #CFB87C;
 }
 
-.app .navbar a.active::after {
+.app .navbar a::after {
   content: "";
   display: block;
   width: 20px;
   height: 2px;
   margin: 6px auto 0;
-  background: currentColor;
+  background: transparent;
   border-radius: 999px;
+}
+
+.app .navbar a.active::after {
+  background: currentColor;
 }
 
 .app .nav-icon-wrap {
@@ -219,6 +237,7 @@ body {
   height: 8px;
   border-radius: 999px;
   background: #CFB87C;
+  border: 1px solid #222222;
   border: 1px solid #222222;
 }
 
@@ -332,6 +351,65 @@ body {
   color: #CFB87C;
   font-size: 2rem;
   cursor: pointer;
+}
+
+/* XP Toast — floating, portal-rendered */
+/* XP Toast — floating, portal-rendered */
+.xp-toast {
+  position: fixed;
+  top: 72px;
+  transform: translateX(-50%);
+  z-index: 9000;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  background: #1a1a1a;
+  border: 1px solid rgba(207, 184, 124, 0.35);
+  border-radius: 999px;
+  padding: 6px 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(207, 184, 124, 0.12);
+
+  width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.xp-toast-gained {
+  font-size: 12px;
+  font-weight: 800;
+  color: #CFB87C;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.xp-toast-mid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.xp-toast-track {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.xp-toast-fill {
+  height: 100%;
+  background: #CFB87C;
+  border-radius: 999px;
+}
+
+.xp-toast-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(207, 184, 124, 0.7);
+  white-space: nowrap;
+  letter-spacing: 0.03em;
 }
 
 .home_tab_bottomNav {

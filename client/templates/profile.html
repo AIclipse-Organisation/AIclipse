@@ -25,8 +25,9 @@
         <div class="profile-identity">
           <div class="profile-name-row">
             <div id="detail-username" class="profile-username">-</div>
-            <span id="detail-plan" class="plan-badge">-</span>
+            <span id="detail-plan" class="profile-badge plan-badge">-</span>
           </div>
+
 
           <div id="detail-email" class="profile-email">-</div>
 
@@ -35,37 +36,52 @@
             Usage: <span id="detail-monthly-usage">-</span>
           </div>
         </div>
-      </section>
-
-      <section class="profile-actions" aria-label="Profile actions">
-        <button id="btn-delete-account" class="profile-danger-btn" type="button">
-          Delete account
-        </button>
+        <button id="btn-settings" class="profile-settings-btn">⚙</button>
       </section>
 
       <div id="user-details-status" class="status-message"></div>
 
       <section class="user-details-section" aria-label="User stats">
         <div id="user-details-container" style="display: none">
-          <div class="user-details-container">
-            <div class="user-detail-item">
-              <span class="detail-label">Guesses</span>
-              <span id="detail-total-guesses" class="detail-value">-</span>
-            </div>
+          <div class="stats-xp-wrapper">
+            <div class="user-details-container">
+              <div class="user-detail-item">
+                <div class="detail-text">
+                  <span id="detail-accuracy-level" class="detail-value">-</span>
+                  <span class="detail-label">Level</span>
+                </div>
+              </div>
 
-            <div class="user-detail-item">
-              <span class="detail-label">Level</span>
-              <span id="detail-accuracy-level" class="detail-value">-</span>
-            </div>
+              <div class="user-detail-item">
+                <img src="/static/images/flame-black.png" alt="" class="detail-icon" aria-hidden="true">
+                <div class="detail-text">
+                  <span id="detail-streak" class="detail-value">0</span>
+                  <span class="detail-label">Streak</span>
+                </div>
+              </div>
 
-            <div class="user-detail-item">
-              <span class="detail-label">AI Acc.</span>
-              <span id="detail-acc-ai" class="detail-value">-</span>
-            </div>
+              <div class="user-detail-item">
+                <img src="/static/images/star-black.png" alt="" class="detail-icon" aria-hidden="true">
+                <div class="detail-text">
+                  <span id="detail-score" class="detail-value">0</span>
+                  <span class="detail-label">Score</span>
+                </div>
+              </div>
 
-            <div class="user-detail-item">
-              <span class="detail-label">Real Acc.</span>
-              <span id="detail-acc-real" class="detail-value">-</span>
+              <div class="user-detail-item">
+                <img src="/static/images/accuracy-black.png" alt="" class="detail-icon" aria-hidden="true">
+                <div class="detail-text">
+                  <span id="detail-accuracy" class="detail-value">—</span>
+                  <span class="detail-label">Accuracy</span>
+                </div>
+              </div>
+            </div>
+            <div class="profile-xp-bar">
+              <span id="profile-xp-level-label" class="profile-xp-label">Lv.1</span>
+              <div class="profile-xp-track">
+                <div id="profile-xp-fill" class="profile-xp-fill"></div>
+              </div>
+              <span id="profile-xp-next-label" class="profile-xp-label">Lv.2</span>
             </div>
           </div>
         </div>
@@ -117,6 +133,20 @@
           class="delete-modal-btn delete-modal-btn-danger"
         >
           Yes, delete permanently
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-sheet-overlay" class="delete-modal-overlay" hidden aria-hidden="true">
+    <div class="delete-modal" role="dialog" aria-label="Account settings">
+      <h2 class="delete-modal-title">Account</h2>
+      <div class="delete-modal-actions settings-modal-actions">
+        <button id="btn-delete-account" class="delete-modal-btn delete-modal-btn-danger" type="button">
+          🗑 Delete account
+        </button>
+        <button id="btn-close-settings" class="delete-modal-btn delete-modal-btn-secondary" type="button">
+          Cancel
         </button>
       </div>
     </div>

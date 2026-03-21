@@ -1,7 +1,8 @@
 "use client";
 
 import "../../styles/postBox.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   voteOnPost,
   fetchComments,
@@ -14,7 +15,9 @@ import {
 } from "./postBoxActions";
 
 import { useDisclosure } from "@heroui/react";
-import ReportModal from "../modals/ReportModal"; 
+import ReportModal from "../modals/ReportModal";
+import { useXp } from "../../lib/xpContext";
+import { useXpFloat, XpFloatLayer } from "../common/XpFloat";
 
 export default function PostBox({
   image,
@@ -32,6 +35,13 @@ export default function PostBox({
   const userHasVoted = !!userVote;
 
   const isOfficial = !!(image?.is_admin_post || image?.is_official);
+
+  // 'idle' | 'showing' | 'text-fading' | 'icon-moving' | 'settled' | 'pre-existing'
+  const [revealPhase, setRevealPhase] = useState(() => {
+    if (!(image?.is_admin_post || image?.is_official)) return 'idle';
+    if (image?.user_vote) return 'pre-existing';
+    return 'idle';
+  });
   const groundTruth = image?.ground_truth;
 
   // MODAL STATE
@@ -56,6 +66,12 @@ export default function PostBox({
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
 
   const isOwner = currentUserId && image?.user_id === currentUserId;
+
+  const xp = useXp();
+  const { triggerFloat, floats } = useXpFloat();
+  const voteUpRef = useRef(null);
+  const voteDownRef = useRef(null);
+  const commentBtnRef = useRef(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -83,6 +99,23 @@ export default function PostBox({
   useEffect(() => {
     setUserVote(image?.user_vote || null);
   }, [image?.user_vote]);
+
+  // Sync reveal phase when post changes (e.g. feed reload)
+  useEffect(() => {
+    const official = !!(image?.is_admin_post || image?.is_official);
+    if (!official) return;
+    setRevealPhase(prev => {
+      if (prev === 'idle' && image?.user_vote) return 'pre-existing';
+      return prev;
+    });
+  }, [image?.user_vote]);
+
+  function startRevealAnimation() {
+    setRevealPhase('showing');
+    setTimeout(() => setRevealPhase('text-fading'), 2500);
+    setTimeout(() => setRevealPhase('icon-moving'), 3050);
+    setTimeout(() => setRevealPhase('settled'), 3700);
+  }
 
   const posterName = image?.user_name || "Unknown";
 
@@ -114,6 +147,10 @@ export default function PostBox({
       setUp(result.up_vote_count);
       setDown(result.down_vote_count);
       setUserVote(result.user_vote);
+      xp?.addXp(result.points_awarded);
+      const ref = direction === "up" ? voteUpRef : voteDownRef;
+      triggerFloat(ref, result.points_awarded);
+      if (isOfficial) startRevealAnimation();
       if (onVoteUpdate) {
         onVoteUpdate(postId, result.up_vote_count, result.down_vote_count);
       }
@@ -184,6 +221,8 @@ export default function PostBox({
       const data = await submitCommentAPI(postId, currentUserId, currentUserName, text);
       setComments((arr) => [data, ...arr]);
       setCommentText("");
+      xp?.addXp(1);
+      triggerFloat(commentBtnRef, 1);
     } catch (err) {
       setCommentError(err.message || "Network error while posting comment.");
     } finally {
@@ -296,15 +335,82 @@ export default function PostBox({
       {/* MEDIA SECTION */}
       <div className="comm_postImageWrap">
         <img className="comm_postImage" src={image?.url} alt={image?.label || "Community image"} onClick={handleClick} />
-        {isOfficial && userHasVoted && (
-          <div className={`comm_truthReveal ${isUserCorrect ? "is-correct" : "is-incorrect"}`}>
-            <div className="comm_truthIcon">{isUserCorrect ? "✅" : "❌"}</div>
-            <div className="comm_truthText">
-              <span className="comm_truthTitle">{isUserCorrect ? "Nice Work!" : "Nice Try!"}</span>
-              <span className="comm_truthSub">Truth: {groundTruth}</span>
+
+        {/* Full overlay — visible during 'showing' and 'text-fading' phases */}
+        <AnimatePresence>
+          {(revealPhase === 'showing' || revealPhase === 'text-fading') && (
+            <div className="comm_truthOverlayWrap">
+            <motion.div
+              className="comm_truthOverlay"
+              initial={{ opacity: 0, scale: 0.78, y: 6 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.28 } }}
+              transition={{ type: 'spring', stiffness: 360, damping: 26 }}
+            >
+              <div className={`comm_truthOverlayIcon ${isUserCorrect ? 'is-correct' : 'is-incorrect'}`}>
+                {isUserCorrect ? (
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                )}
+              </div>
+              <motion.div
+                className="comm_truthOverlayText"
+                animate={{ opacity: revealPhase === 'text-fading' ? 0 : 1 }}
+                transition={{ duration: 0.38 }}
+              >
+                <span className={`comm_truthTitle ${isUserCorrect ? 'is-correct' : 'is-incorrect'}`}>
+                  {isUserCorrect ? 'Correct!' : 'Nice Try!'}
+                </span>
+                <span className="comm_truthSub">This was {groundTruth}</span>
+              </motion.div>
+            </motion.div>
             </div>
-          </div>
-        )}
+          )}
+        </AnimatePresence>
+
+        {/* Truth label — fades in after badge settles, or already visible for pre-existing */}
+        <AnimatePresence>
+          {(revealPhase === 'settled' || revealPhase === 'pre-existing') && (
+            <motion.div
+              className={`comm_truthLabel ${groundTruth === 'Real' ? 'is-real' : 'is-fake'}`}
+              initial={revealPhase === 'pre-existing' ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.55, ease: 'easeIn' }}
+            >
+              {groundTruth === 'Real' ? 'REAL' : 'FAKE'}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Corner badge — appears after overlay, or immediately for pre-existing votes */}
+        <AnimatePresence>
+          {(revealPhase === 'icon-moving' || revealPhase === 'settled' || revealPhase === 'pre-existing') && (
+            <motion.div
+              className={`comm_truthCornerBadge ${isUserCorrect ? 'is-correct' : 'is-incorrect'}`}
+              initial={revealPhase === 'pre-existing'
+                ? false
+                : { opacity: 0, scale: 2.4, x: -62, y: -52 }
+              }
+              animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+              transition={{ type: 'spring', stiffness: 80, damping: 18 }}
+            >
+              {isUserCorrect ? (
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* RESULT BARS */}
@@ -346,17 +452,17 @@ export default function PostBox({
         {/* INTERACTION ROW */}
         <div className="comm_bottomRow">
           <div className="comm_actionsLeft">
-            <button type="button" onClick={() => vote("up")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteUp">
+            <button ref={voteUpRef} type="button" onClick={() => vote("up")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteUp">
               <img className="comm_icon" src="/static/images/upvote.png" alt="" />
               <span className="comm_actionText">Real {userHasVoted ? `(${up})` : ""}</span>
             </button>
-            <button type="button" onClick={() => vote("down")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteDown">
+            <button ref={voteDownRef} type="button" onClick={() => vote("down")} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteDown">
               <img className="comm_icon" src="/static/images/downvote.png" alt="" />
               <span className="comm_actionText">AI {userHasVoted ? `(${down})` : ""}</span>
             </button>
           </div>
           <div className="comm_actionsRight">
-            <button type="button" onClick={() => setShowComments((v) => !v)} className="comm_actionBtn comm_commentBtn">
+            <button ref={commentBtnRef} type="button" onClick={() => setShowComments((v) => !v)} className="comm_actionBtn comm_commentBtn">
               <img className="comm_icon" src="/static/images/comment.png" alt="" />
               <span className="comm_actionText">({comments.length})</span>
             </button>
@@ -394,6 +500,7 @@ export default function PostBox({
         onSubmit={submitReport}
         isSubmitting={busy}
       />
+      <XpFloatLayer floats={floats} />
     </div>
   );
 }

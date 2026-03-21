@@ -19,20 +19,18 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     const user = await response.json();
 
-    const aiAccuracy =
-      user.acc_guessing_ai != null ? user.acc_guessing_ai * 100 : 0;
-    const realAccuracy =
-      user.acc_guessing_real != null ? user.acc_guessing_real * 100 : 0;
-
-    const avgAcc = (aiAccuracy + realAccuracy) / 2;
+    // Calculate accuracy based on admin post guesses (ground truth data)
+    const adminCorrect = (user.admin_guesses_correct || 0);
+    const adminTotal = (user.admin_guesses_total || 0);
+    const adminAccuracy = adminTotal > 0 ? (adminCorrect / adminTotal) * 100 : 0;
 
     let accuracyLevel;
 
-    if (avgAcc >= 75) {
+    if (adminAccuracy >= 75) {
       accuracyLevel = "Expert";
-    } else if (avgAcc >= 50) {
+    } else if (adminAccuracy >= 50) {
       accuracyLevel = "Advanced";
-    } else if (avgAcc >= 25) {
+    } else if (adminAccuracy >= 25) {
       accuracyLevel = "Intermediate";
     } else {
       accuracyLevel = "Novice";
@@ -53,21 +51,23 @@ window.addEventListener("DOMContentLoaded", async () => {
       ? new Date(user.created_at).toLocaleDateString()
       : "-";
 
-    document.getElementById("detail-total-guesses").textContent =
-      user.total_guesses !== undefined ? user.total_guesses : 0;
+    const currentStreak = user.current_streak || 0;
+    const communityScore = user.community_score || 0;
 
-    // document.getElementById("detail-total-correct").textContent =
-    //   user.total_correct !== undefined ? user.total_correct : 0;
+    // Populate new stat elements
+    const el = id => document.getElementById(id);
+    if (el('detail-streak')) el('detail-streak').textContent = currentStreak;
+    if (el('detail-score'))  el('detail-score').textContent  = communityScore;
+    if (el('detail-accuracy')) el('detail-accuracy').textContent = adminTotal > 0
+      ? adminAccuracy.toFixed(0) + '%' : '—';
 
-    // document.getElementById('detail-acc-ai').textContent =
-    //   (user.acc_guessing_ai !== undefined && user.acc_guessing_ai !== null)
-    //     ? (user.acc_guessing_ai * 100).toFixed(1) + '%'
-    //     : '0.0%';
-
-    // document.getElementById('detail-acc-real').textContent =
-    //   (user.acc_guessing_real !== undefined && user.acc_guessing_real !== null)
-    //     ? (user.acc_guessing_real * 100).toFixed(1) + '%'
-    //     : '0.0%';
+    // XP bar labels (set immediately; fill animates after container is shown)
+    const xpLevel = Math.floor(communityScore / 50) + 1;
+    const xpProgress = (communityScore % 50) / 50;
+    const profileXpLevelLabel = document.getElementById("profile-xp-level-label");
+    const profileXpNextLabel = document.getElementById("profile-xp-next-label");
+    if (profileXpLevelLabel) profileXpLevelLabel.textContent = `Lv.${xpLevel}`;
+    if (profileXpNextLabel) profileXpNextLabel.textContent = `Lv.${xpLevel + 1}`;
 
     document.getElementById("detail-monthly-usage").textContent =
       user.monthly_usage_count !== undefined ? user.monthly_usage_count : 0;
@@ -76,6 +76,14 @@ window.addEventListener("DOMContentLoaded", async () => {
     statusEl.textContent = "";
     statusEl.className = "status-message";
     containerEl.style.display = "block";
+
+    // Animate profile XP fill after container is visible (two frames to guarantee transition fires)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const profileXpFill = document.getElementById("profile-xp-fill");
+        if (profileXpFill) profileXpFill.style.width = `${xpProgress * 100}%`;
+      });
+    });
   } catch (error) {
     console.error("Error loading user details:", error);
     statusEl.textContent = "Failed to load user details. Please log in.";
@@ -176,6 +184,30 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   // =========================
+  // Settings bottom sheet
+  // =========================
+  const btnSettings     = document.getElementById('btn-settings');
+  const settingsOverlay = document.getElementById('settings-sheet-overlay');
+
+  function openSheet() {
+    settingsOverlay.hidden = false;
+    settingsOverlay.setAttribute('aria-hidden', 'false');
+  }
+  function closeSheet() {
+    settingsOverlay.hidden = true;
+    settingsOverlay.setAttribute('aria-hidden', 'true');
+  }
+
+  btnSettings?.addEventListener('click', openSheet);
+  document.getElementById('btn-close-settings')?.addEventListener('click', closeSheet);
+  settingsOverlay?.addEventListener('click', e => {
+    if (e.target === settingsOverlay) closeSheet();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && settingsOverlay && !settingsOverlay.hidden) closeSheet();
+  });
+
+  // =========================
   // Delete account confirm modal logic
   // =========================
   const btnDeleteAccount = document.getElementById("btn-delete-account");
@@ -205,6 +237,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     btnDeleteAccount.addEventListener("click", (e) => {
       e.preventDefault();
+      closeSheet();
       openDeleteAccountModal();
     });
 

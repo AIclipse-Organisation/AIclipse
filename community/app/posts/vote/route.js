@@ -3,8 +3,8 @@ import { getDb } from "@/lib/mongo/mongo.js";
 import jwt from "jsonwebtoken";
 import { validateUserId, validatePostId } from "../validation.js";
 import { getRedis } from "@/lib/redis/redis";
-// Shared helper: saves smaller notification data and merges repeats.
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
+import { recordActivity, awardPoints, SCORES } from "@/lib/gamification/scoring.js";
 
 export const runtime = "nodejs";
 
@@ -117,8 +117,8 @@ export async function POST(req) {
           image_id: 1,
           up_vote_count: 1,
           down_vote_count: 1,
-          is_admin_post: 1, 
-          ground_truth: 1,  
+          is_admin_post: 1,
+          ground_truth: 1,
         },
       },
     );
@@ -155,11 +155,12 @@ export async function POST(req) {
 
     const incQuery = { total_guesses: 1 };
     const isAdmin = Boolean(postDoc.is_admin_post);
+    let wasCorrectAdminVote = false;
 
     if (isAdmin && postDoc.ground_truth) {
       const truth = String(postDoc.ground_truth).toLowerCase();
       const isRealGT = truth === "real";
-      const isFakeGT =  truth === "ai" ;
+      const isFakeGT = truth === "ai";
 
       incQuery.admin_guesses_total = 1;
 
@@ -168,12 +169,14 @@ export async function POST(req) {
         if (vote === "up") { // Correct guess
           incQuery.admin_guesses_correct = 1;
           incQuery.admin_real_correct = 1;
+          wasCorrectAdminVote = true;
         }
       } else if (isFakeGT) {
         incQuery.admin_fake_total = 1;
         if (vote === "down") { // Correct guess
           incQuery.admin_guesses_correct = 1;
           incQuery.admin_fake_correct = 1;
+          wasCorrectAdminVote = true;
         }
       }
     }
@@ -182,6 +185,15 @@ export async function POST(req) {
       { user_id: safeUserId },
       { $inc: incQuery }
     );
+
+    // Award points for voting
+    const votePoints = wasCorrectAdminVote ? SCORES.CORRECT_ADMIN_VOTE : SCORES.VOTE;
+    await recordActivity(db, safeUserId, votePoints, wasCorrectAdminVote ? "correct_admin_vote" : "vote");
+
+    // Award points to post owner for receiving engagement
+    if (postDoc.user_id && postDoc.user_id !== safeUserId) {
+      await awardPoints(db, postDoc.user_id, SCORES.RECEIVE_ENGAGEMENT, "receive_vote");
+    }
 
     if (postDoc.user_id && postDoc.user_id !== safeUserId) {
       try {
@@ -219,7 +231,7 @@ export async function POST(req) {
       const flushAtSec = Math.min(debounceAtSec, hardDeadlineSec);
 
       const pipe = redis.pipeline();
-      
+
       if (deltaUp !== 0) pipe.hincrby(deltaKey, "up", deltaUp);
       if (deltaDown !== 0) pipe.hincrby(deltaKey, "down", deltaDown);
 
@@ -227,7 +239,7 @@ export async function POST(req) {
 
       pipe.zadd(FLUSH_ZSET, flushAtSec, safePostId);
       pipe.expire(deltaKey, DELTA_TTL_SECONDS);
-      pipe.expire(choicesKey, DELTA_TTL_SECONDS); 
+      pipe.expire(choicesKey, DELTA_TTL_SECONDS);
       pipe.expire(firstKey, DELTA_TTL_SECONDS);
 
       await pipe.exec();
@@ -247,6 +259,7 @@ export async function POST(req) {
         up_vote_count: baseUp + pendingUp,
         down_vote_count: baseDown + pendingDown,
         user_vote: newUserVote,
+        points_awarded: votePoints,
       },
       { status: 200 },
     );

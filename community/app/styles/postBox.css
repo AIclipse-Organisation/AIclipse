@@ -843,73 +843,154 @@
   animation: comm_fadeIn 0.5s ease forwards;
 }
 
-.comm_truthReveal {
+/* ── Truth reveal: full overlay (new vote) ─────────────────────── */
+
+/* Static wrapper covers the image area and flex-centres the card */
+.comm_truthOverlayWrap {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0.8);
-
-  background: rgba(15, 15, 15, 0.9);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-
-  padding: 20px 28px;
-  border-radius: 24px;
+  inset: 0 12px 10px 12px; /* matches comm_postImageWrap padding */
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  justify-content: center;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.comm_truthOverlay {
+  background: rgba(18, 15, 10, 0.91);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(207, 184, 124, 0.30);
+  border-radius: 18px;
+
+  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(207, 184, 124, 0.07);
+
   z-index: 100;
   pointer-events: none;
-
-  opacity: 0;
-  animation: comm_truthPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  white-space: nowrap;
 }
 
-.comm_truthIcon {
-  font-size: 32px;
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
+.comm_truthOverlayIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.comm_truthText {
+.comm_truthOverlayIcon.is-correct {
+  background: rgba(207, 184, 124, 0.12);
+  border: 1.5px solid rgba(207, 184, 124, 0.55);
+  color: #CFB87C;
+  box-shadow: 0 0 18px rgba(207, 184, 124, 0.18);
+}
+
+.comm_truthOverlayIcon.is-incorrect {
+  background: rgba(210, 60, 60, 0.12);
+  border: 1.5px solid rgba(210, 60, 60, 0.45);
+  color: #d94040;
+}
+
+.comm_truthOverlayText {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .comm_truthTitle {
   font-weight: 900;
-  font-size: 18px;
+  font-size: 17px;
   letter-spacing: -0.2px;
   line-height: 1.1;
 }
 
+.comm_truthTitle.is-correct {
+  color: #CFB87C;
+}
+
+.comm_truthTitle.is-incorrect {
+  color: #CFB87C;
+}
+
 .comm_truthSub {
   font-size: 12px;
-  font-weight: 700;
-  opacity: 0.6;
-  color: #fff;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.50);
 }
 
-/* Success/Failure States */
-.is-correct .comm_truthTitle {
-  color: #18c46c;
+/* ── Truth label (REAL / FAKE) — to the left of the corner badge ── */
+.comm_truthLabel {
+  position: absolute;
+  bottom: 18px;
+  right: 62px; /* 20px badge margin + 36px badge + 6px gap */
+
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+
+  background: rgba(18, 15, 10, 0.88);
+
+  font-size: 15px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  line-height: 1;
+
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55);
 }
 
-.is-incorrect .comm_truthTitle {
-  color: #e04646;
+.comm_truthLabel.is-real {
+  color: #CFB87C;
+  border: 1.5px solid rgba(207, 184, 124, 0.65);
 }
 
-@keyframes comm_truthPop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.7);
-  }
+.comm_truthLabel.is-fake {
+  color: #d94040;
+  border: 1.5px solid rgba(210, 60, 60, 0.50);
+}
 
-  100% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
+/* ── Truth corner badge (settled state) ────────────────────────── */
+.comm_truthCornerBadge {
+  position: absolute;
+  bottom: 18px;
+  right: 20px;
+
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+
+  background: rgba(18, 15, 10, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 50;
+  pointer-events: none;
+}
+
+.comm_truthCornerBadge.is-correct {
+  border: 1.5px solid rgba(207, 184, 124, 0.65);
+  color: #CFB87C;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(207, 184, 124, 0.14);
+}
+
+.comm_truthCornerBadge.is-incorrect {
+  border: 1.5px solid rgba(210, 60, 60, 0.50);
+  color: #d94040;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55);
 }
 
 @keyframes comm_fadeIn {

@@ -37,7 +37,7 @@ export default function BottomNav() {
 
   return (
     <nav className="navbar" id="bottom-nav" aria-label="Bottom navigation">
-      <a href="/community" aria-label="Home">
+      <a href="/community" aria-label="Home" className="active">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="24"

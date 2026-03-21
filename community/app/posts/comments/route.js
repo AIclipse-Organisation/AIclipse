@@ -7,8 +7,8 @@ import {
   validateCommentId,
 } from "../validation.js";
 import { getRedis } from "@/lib/redis/redis";
-// Shared helper: saves smaller notification data and merges repeats.
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
+import { recordActivity, awardPoints, SCORES } from "@/lib/gamification/scoring.js";
 
 export const runtime = "nodejs";
 
@@ -231,7 +231,13 @@ export async function POST(req) {
 
     await commentsCol.insertOne(doc);
 
+    // Award points for commenting
+    await recordActivity(db, safeUserId, SCORES.COMMENT, "comment");
+
+    // Award points to post owner for receiving engagement
     if (postExists.user_id && postExists.user_id !== safeUserId) {
+      await awardPoints(db, postExists.user_id, SCORES.RECEIVE_ENGAGEMENT, "receive_comment");
+
       try {
         // Add notification for post owner; repeated same events are merged into one row.
         await recordCollapsedNotification(db, {
