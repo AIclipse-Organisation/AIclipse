@@ -322,78 +322,17 @@
 }
 
 /* =========================
-   Split Cards (Votes / Verdict+Confidence)
+   Split Cards (Vote)
    Diagonal split design with two sides
    ========================= */
 
 .split-card-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
   margin-top: 12px;
 }
 
-.split-card {
-  margin-top: 0;
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.10);
-  display: flex;
-  align-items: stretch;
-  height: 80px;
-  min-width: 0;
-}
-
-.split-card--gold {
-  border: 1px solid #cfb87c
-}
-
-.split-card--green {
-  border: 1px solid rgba(170, 120, 255, 0.55);
-}
-
-.split-card-left {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.12);
-  gap: 4px;
-}
-
-.split-card-right {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.08);
-  gap: 4px;
-}
-
-.split-divider {
-  width: 2px;
-  height: 100%;
-  background: linear-gradient(
-    135deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.20) 50%,
-    transparent 100%
-  );
-  position: relative;
-}
-
-.split-label {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.60);
-}
 
 .vote-icon {
   display: block;
@@ -410,7 +349,7 @@
 .split-value {
   margin: 0;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.2px;
   color: rgba(255, 255, 255, 0.95);
 }
@@ -419,6 +358,45 @@
   .split-card-row {
     grid-template-columns: 1fr;
   }
+}
+
+.votes-inline-row {
+  display: flex;
+  align-items: stretch;
+  margin-top: 12px;
+  min-width: 0;
+}
+
+.votes-inline-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.votes-inline-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.votes-inline-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #CFB87C;
+  text-align: center;
+}
+
+.votes-inline-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 /* =========================

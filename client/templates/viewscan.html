@@ -126,47 +126,38 @@
             </section>
 
             <div class="split-card-row">
-              <!-- VERDICT & CONFIDENCE CARD -->
-              <section
-                id="verdict-confidence-card"
-                class="split-card split-card--gold"
-                hidden
-              >
-                <div class="split-card-left">
-                  <p class="split-label">Verdict</p>
-                  <p id="card-verdict" class="split-value">—</p>
-                </div>
-                <div class="split-divider"></div>
-                <div class="split-card-right">
-                  <p class="split-label">Real</p>
-                  <p id="card-confidence" class="split-value">0%</p>
-                </div>
-              </section>
-
               <!-- VOTES CARD -->
               <section
-                id="votes-card"
-                class="split-card split-card--green"
-                hidden
-              >
-                <div class="split-card-left">
-                  <img
-                    class="vote-icon"
-                    src="/static/images/upvote.png"
-                    alt="Up votes"
-                  />
-                  <p id="card-upvotes" class="split-value">0</p>
-                </div>
-                <div class="split-divider"></div>
-                <div class="split-card-right">
-                  <img
-                    class="vote-icon"
-                    src="/static/images/downvote.png"
-                    alt="Down votes"
-                  />
-                  <p id="card-downvotes" class="split-value">0</p>
-                </div>
-              </section>
+                  id="votes-card"
+                  class="votes-inline-row"
+                  hidden
+                >
+                  <div class="votes-inline-side">
+                    <p class="votes-inline-label">Real Votes</p>
+                    <div class="votes-inline-value">
+                      <img
+                        class="vote-icon"
+                        src="/static/images/upvote.png"
+                        alt="Up votes"
+                      />
+                      <p id="card-upvotes" class="split-value">0</p>
+                    </div>
+                  </div>
+
+                  <div class="votes-inline-divider"></div>
+
+                  <div class="votes-inline-side">
+                    <p class="votes-inline-label">AI Votes</p>
+                    <div class="votes-inline-value">
+                      <img
+                        class="vote-icon"
+                        src="/static/images/downvote.png"
+                        alt="Down votes"
+                      />
+                      <p id="card-downvotes" class="split-value">0</p>
+                    </div>
+                  </div>
+                </section>
             </div>
           </div>
 
