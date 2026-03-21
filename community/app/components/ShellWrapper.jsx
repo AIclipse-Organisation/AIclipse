@@ -12,6 +12,7 @@ export default function ShellWrapper({ children, user }) {
   const pathname = usePathname();
   const [showTutorial, setShowTutorial] = useState(false);
   const isAdminRoute = pathname?.startsWith("/admin") || pathname?.startsWith("/community/admin");
+  const isProfileRoute = pathname?.startsWith("/profile/");
 
   if (isAdminRoute) {
     return (
@@ -40,19 +41,22 @@ export default function ShellWrapper({ children, user }) {
         <Topbar
           isAdmin={user?.role === "admin" || user?.is_admin === true}
           userName={user?.user_name || "Guest"}
+          showBack={isProfileRoute}
         />
-        <main className="screen">
-          <section className="page-header" aria-label="Page title">
-            <div className="how_to_spot_container">
-              <button
-                onClick={() => setShowTutorial(true)}
-                className="px-3 py-2 rounded-lg border border-[#2c2c2c] text-[#CFB87C] bg-transparent hover:bg-[#2c2c2c] text-sm font-semibold"
-              >
-                How to spot AI?
-              </button>
-            </div>
-            <div className="page-underline" role="presentation" />
-          </section>
+        <main className={`screen${isProfileRoute ? " screen--profile" : ""}`}>
+          {!isProfileRoute && (
+            <section className="page-header" aria-label="Page title">
+              <div className="how_to_spot_container">
+                <button
+                  onClick={() => setShowTutorial(true)}
+                  className="px-3 py-2 rounded-lg border border-[#2c2c2c] text-[#CFB87C] bg-transparent hover:bg-[#2c2c2c] text-sm font-semibold"
+                >
+                  How to spot AI?
+                </button>
+              </div>
+              <div className="page-underline" role="presentation" />
+            </section>
+          )}
           {children}
         </main>
         <BottomNav />

@@ -1,0 +1,75 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import PostBox from "../../components/post/PostBox";
+
+export default function ProfilePostsGrid({ userId }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [imgsRes, postsRes] = await Promise.all([
+          fetch("/community/images", { credentials: "include" }),
+          fetch(`/community/posts?user_id=${encodeURIComponent(userId)}&limit=50`, {
+            credentials: "include",
+          }),
+        ]);
+
+        if (!imgsRes.ok || !postsRes.ok) {
+          setError("Failed to load posts.");
+          return;
+        }
+
+        const imgsData = await imgsRes.json();
+        const postsData = await postsRes.json();
+
+        const imageMap = {};
+        for (const img of imgsData.items || []) {
+          imageMap[img.image_id] = img;
+        }
+
+        const merged = (postsData.items || [])
+          .map((post) => {
+            const img = imageMap[post.image_id];
+            if (!img) return null;
+            return { ...img, ...post };
+          })
+          .filter(Boolean);
+
+        setItems(merged);
+      } catch (err) {
+        setError("Failed to load posts.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, [userId]);
+
+  if (loading) {
+    return <div className="pub-profile-posts-status">Loading posts…</div>;
+  }
+
+  if (error) {
+    return <div className="pub-profile-posts-status">{error}</div>;
+  }
+
+  if (items.length === 0) {
+    return <div className="pub-profile-posts-status">No posts yet.</div>;
+  }
+
+  return (
+    <div className="pub-profile-posts-section">
+      <div className="pub-profile-posts-title">Posts</div>
+      <div className="comm_grid">
+        {items.map((item) => (
+          <PostBox key={item.post_id} image={item} />
+        ))}
+      </div>
+    </div>
+  );
+}

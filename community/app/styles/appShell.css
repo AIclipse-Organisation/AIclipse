@@ -48,14 +48,14 @@ body {
 /* Top bar */
 .app .topbar {
   position: relative;
-  height: 56px;
+  height: 76px;
   background: #222222;
   border-bottom: 1px solid #2c2c2c;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 10px 16px;
 }
 
 .app .topbar-center {
@@ -71,6 +71,24 @@ body {
   font-weight: 600;
   letter-spacing: 0.01em;
   color: #CFB87C;
+}
+
+/* Back button (shown in topbar on profile routes instead of hamburger) */
+.app .topbar-back-btn {
+  position: relative;
+  z-index: 10;
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.app .topbar-back-btn:hover {
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* Hamburger */
@@ -115,6 +133,22 @@ body {
   width: 100%;
 }
 
+.how_to_spot_back_btn {
+  margin-right: auto;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 4px 6px 4px 0;
+  display: flex;
+  align-items: center;
+  transition: color 160ms ease;
+}
+
+.how_to_spot_back_btn:hover {
+  color: rgba(255, 255, 255, 0.95);
+}
+
 /* Avatar */
 .app .topbar-avatar {
   display: inline-flex;
@@ -154,6 +188,15 @@ body {
   padding: 20px;
   padding-bottom: 80px;
   /* space for bottom nav */
+}
+
+.app .screen.screen--profile {
+  padding: 0;
+  padding-bottom: 80px;
+}
+
+.page-header.page-header--compact {
+  padding: 6px 2vh 0;
 }
 
 /* Bottom navbar */
