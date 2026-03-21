@@ -15,10 +15,33 @@
       {% set page_title = 'View Scan' %} {% include 'partials/topbar.html' %}
 
       <main class="screen">
-        <section class="page-header" aria-label="Page title">
-          <h1 id="viewscan-title" class="page-title">View Scan</h1>
+        <section class="page-header page-header--with-description" aria-label="Page title">
+          <div class="page-header-main">
+            <h1 id="viewscan-title" class="page-title">View Scan</h1>
+
+            <div
+              id="description-header-section"
+              class="page-header-description"
+              hidden
+            >
+              <p id="description-text" class="page-header-description-text"></p>
+            </div>
+          </div>
+
           <div class="page-underline" role="presentation"></div>
         </section>
+
+          <div id="scan-quick-meta" class="scan-quick-meta" hidden>
+              <div class="scan-quick-meta-item">
+                <span class="scan-quick-meta-label">Visibility</span>
+                <span id="scan-quick-visibility" class="scan-quick-meta-value">—</span>
+              </div>
+
+              <div class="scan-quick-meta-item">
+                <span class="scan-quick-meta-label">Uploaded</span>
+                <span id="scan-quick-uploaded" class="scan-quick-meta-value">—</span>
+              </div>
+            </div>
 
         <!-- <div id="viewscan-status" class="status-message"></div> -->
 
@@ -101,10 +124,54 @@
                 </div>
               </div>
             </section>
+
+            <div class="split-card-row">
+              <!-- VERDICT & CONFIDENCE CARD -->
+              <section
+                id="verdict-confidence-card"
+                class="split-card split-card--gold"
+                hidden
+              >
+                <div class="split-card-left">
+                  <p class="split-label">Verdict</p>
+                  <p id="card-verdict" class="split-value">—</p>
+                </div>
+                <div class="split-divider"></div>
+                <div class="split-card-right">
+                  <p class="split-label">Real</p>
+                  <p id="card-confidence" class="split-value">0%</p>
+                </div>
+              </section>
+
+              <!-- VOTES CARD -->
+              <section
+                id="votes-card"
+                class="split-card split-card--green"
+                hidden
+              >
+                <div class="split-card-left">
+                  <img
+                    class="vote-icon"
+                    src="/static/images/upvote.png"
+                    alt="Up votes"
+                  />
+                  <p id="card-upvotes" class="split-value">0</p>
+                </div>
+                <div class="split-divider"></div>
+                <div class="split-card-right">
+                  <img
+                    class="vote-icon"
+                    src="/static/images/downvote.png"
+                    alt="Down votes"
+                  />
+                  <p id="card-downvotes" class="split-value">0</p>
+                </div>
+              </section>
+            </div>
           </div>
 
           <div class="viewscan-meta">
-            <h2 class="viewscan-heading">Details</h2>
+            <h2 class="viewscan-heading"></h2>
 
             <!-- Populated from JS -->
             <dl class="meta-list" id="meta-list"></dl>

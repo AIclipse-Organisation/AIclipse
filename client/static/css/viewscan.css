@@ -51,6 +51,41 @@
 }
 
 /* =========================
+   Page header + left description
+   ========================= */
+
+.page-header--with-description {
+  margin-bottom: 0px;
+}
+
+.page-header-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 0 16px;
+}
+
+.page-header--with-description .page-title {
+  margin: 0;
+  white-space: normal;
+}
+
+.page-header-description {
+  width: 100%;
+  text-align: left;
+}
+
+.page-header-description-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+  word-break: break-word;
+}
+
+/* =========================
    Not-a-card layout (keep same classes/ids)
    ========================= */
 
@@ -108,6 +143,59 @@
 /* =========================
    NEW: Community-style bar cards
    ========================= */
+
+.scan-quick-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  row-gap: 8px;
+  align-items: start;
+  margin-top: 12px;
+  padding: 6px 16px 12px;
+  border-bottom: 1px solid rgba(207, 184, 124, 0.45);
+}
+
+.scan-quick-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.scan-quick-meta-label {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.1;
+  color: #cfb87c;
+}
+
+.scan-quick-meta-value {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.94);
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .scan-quick-meta {
+    column-gap: 16px;
+    row-gap: 6px;
+  }
+
+  .scan-quick-meta-label {
+    font-size: 15px;
+  }
+
+  .scan-quick-meta-value {
+    font-size: 14px;
+  }
+}
 
 .verdict-block {
   margin-top: 12px;
@@ -231,6 +319,106 @@
   z-index: 3;
   white-space: nowrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+}
+
+/* =========================
+   Split Cards (Votes / Verdict+Confidence)
+   Diagonal split design with two sides
+   ========================= */
+
+.split-card-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.split-card {
+  margin-top: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.10);
+  display: flex;
+  align-items: stretch;
+  height: 80px;
+  min-width: 0;
+}
+
+.split-card--gold {
+  border: 1px solid #cfb87c
+}
+
+.split-card--green {
+  border: 1px solid rgba(170, 120, 255, 0.55);
+}
+
+.split-card-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.12);
+  gap: 4px;
+}
+
+.split-card-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.08);
+  gap: 4px;
+}
+
+.split-divider {
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.20) 50%,
+    transparent 100%
+  );
+  position: relative;
+}
+
+.split-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.60);
+}
+
+.vote-icon {
+  display: block;
+  width: 24px;
+  min-width: 24px;
+  max-width: 24px;
+  height: 24px;
+  max-height: 24px;
+  object-fit: contain;
+  opacity: 0.9;
+  flex: 0 0 auto;
+}
+
+.split-value {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+@media (max-width: 720px) {
+  .split-card-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* =========================
