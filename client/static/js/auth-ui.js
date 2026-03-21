@@ -13,26 +13,27 @@
     return s;
   }
 
-  function applyName(name) {
+  function applyChipName(name) {
     const chip = getChip();
-    const drawer = getDrawerNameEl();
+    if (!chip) return;
+
     const n = normalizeName(name);
 
-    if (chip) {
-      if (n) {
-        chip.textContent = n;
-        chip.classList.remove("muted");
-        chip.classList.add("success");
-      } else {
-        chip.textContent = "Not signed in";
-        chip.classList.remove("success");
-        chip.classList.add("muted");
-      }
+    if (n) {
+      chip.textContent = n;
+      chip.classList.remove("muted");
+      chip.classList.add("success");
+    } else {
+      chip.textContent = "Not signed in";
+      chip.classList.remove("success");
+      chip.classList.add("muted");
     }
+  }
 
-    if (drawer) {
-      drawer.textContent = n || "Menu";
-    }
+  function applyDrawerLabel() {
+    const drawer = getDrawerNameEl();
+    if (!drawer) return;
+    drawer.textContent = "Menu";
   }
 
   function readNameFromDom() {
@@ -66,7 +67,8 @@
 
   function init() {
     const existing = readNameFromDom();
-    applyName(existing);
+    applyChipName(existing);
+    applyDrawerLabel();
     bindLogout();
   }
 
@@ -74,12 +76,16 @@
     init,
     setUser: (user) => {
       if (user && typeof user === "object") {
-        applyName(user.user_name || user.email || "");
+        applyChipName(user.user_name || user.email || "");
       } else {
-        applyName("");
+        applyChipName("");
       }
+      applyDrawerLabel();
     },
-    clear: () => applyName(""),
+    clear: () => {
+      applyChipName("");
+      applyDrawerLabel();
+    },
     logout: doLogout,
   };
 

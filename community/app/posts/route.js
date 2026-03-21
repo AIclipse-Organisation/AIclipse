@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
 import jwt from "jsonwebtoken";
-import { validateUserId, validateImageId, validatePostId } from "./validation.js";
+import {
+  validateUserId,
+  validateImageId,
+  validatePostId,
+} from "./validation.js";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 import { recordActivity, SCORES } from "@/lib/gamification/scoring.js";
 
 import { getRedis } from "@/lib/redis/redis";
-
 
 export const runtime = "nodejs"; // required for MongoDB driver
 
@@ -14,7 +17,6 @@ const POSTS_COLLECTION = "community.posts";
 
 // NEW: user collection to lookup poster name
 const USERS_COLLECTION = "auth.users";
-
 
 // COMA
 function safeNumber(n, fallback = 0) {
@@ -50,7 +52,7 @@ function isControversial(post, nowSec) {
 
   const timeDiff = nowSec - controversialSince;
   const boostStart = 48 * SECONDS_IN_HOUR; // 48h
-  const boostEnd = 96 * SECONDS_IN_HOUR;   // 96h
+  const boostEnd = 96 * SECONDS_IN_HOUR; // 96h
   if (timeDiff < boostStart || timeDiff >= boostEnd) return false;
 
   return true;
@@ -66,7 +68,6 @@ function createdAtToUnixSeconds(created_at) {
   const t = d.getTime();
   return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
 }
-
 
 // Helper function to extract and verify JWT token from Authorization header or cookie
 function getAuthenticatedUserId(req) {
@@ -86,10 +87,10 @@ function getAuthenticatedUserId(req) {
     const cookieHeader = req.headers.get("cookie");
     if (cookieHeader) {
       const cookies = Object.fromEntries(
-        cookieHeader.split("; ").map(c => {
+        cookieHeader.split("; ").map((c) => {
           const [key, ...v] = c.split("=");
           return [key, v.join("=")];
-        })
+        }),
       );
       token = cookies.access_token;
     }
@@ -128,10 +129,10 @@ function extractToken(req) {
   const cookieHeader = req.headers.get("cookie");
   if (cookieHeader) {
     const cookies = Object.fromEntries(
-      cookieHeader.split("; ").map(c => {
+      cookieHeader.split("; ").map((c) => {
         const [key, ...v] = c.split("=");
         return [key, v.join("=")];
-      })
+      }),
     );
     return cookies.access_token || null;
   }
@@ -153,7 +154,7 @@ export async function POST(req) {
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -172,7 +173,7 @@ export async function POST(req) {
     if (!image_id || !description) {
       return NextResponse.json(
         { error: "Missing required fields: image_id or description" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -181,7 +182,7 @@ export async function POST(req) {
     if (!imageIdValidation.valid) {
       return NextResponse.json(
         { error: imageIdValidation.error },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const safeImageId = imageIdValidation.value;
@@ -190,8 +191,10 @@ export async function POST(req) {
     const MAX_DESCRIPTION_LENGTH = 1000;
     if (description.length > MAX_DESCRIPTION_LENGTH) {
       return NextResponse.json(
-        { error: `Description too long (max ${MAX_DESCRIPTION_LENGTH} characters)` },
-        { status: 400 }
+        {
+          error: `Description too long (max ${MAX_DESCRIPTION_LENGTH} characters)`,
+        },
+        { status: 400 },
       );
     }
 
@@ -201,7 +204,7 @@ export async function POST(req) {
     // 6. Lookup user_name using the secure authenticatedUserId
     const userDoc = await usersCol.findOne(
       { user_id: authenticatedUserId },
-      { projection: { _id: 0, user_name: 1, email: 1 } }
+      { projection: { _id: 0, user_name: 1, email: 1 } },
     );
 
     const user_name = String(userDoc?.user_name || userDoc?.email || "Unknown");
@@ -214,8 +217,8 @@ export async function POST(req) {
       image_id: safeImageId,
       description,
       result,
-      ground_truth,                 // Stored for user accuracy auditing
-      is_admin_post,                // Identifies this as an Admin benchmark
+      ground_truth, // Stored for user accuracy auditing
+      is_admin_post, // Identifies this as an Admin benchmark
       clicks_count: 0,
       up_vote_count: 0,
       down_vote_count: 0,
@@ -224,8 +227,8 @@ export async function POST(req) {
       created_at: new Date(),
       is_reported: false,
       report_count: 0,
-      reporter_ids: [],      // Array of unique user_ids who reported
-      report_history: []
+      reporter_ids: [], // Array of unique user_ids who reported
+      report_history: [],
     };
 
     const col = db.collection(POSTS_COLLECTION);
@@ -236,7 +239,7 @@ export async function POST(req) {
 
     // 8. Mark the image as public via Gateway
     try {
-      const GATEWAY_URI = process.env.GATEWAY_URI
+      const GATEWAY_URI = process.env.GATEWAY_URI;
       const imageUpdateUrl = `${GATEWAY_URI}/image/${safeImageId}`;
 
       await fetch(imageUpdateUrl, {
@@ -246,20 +249,19 @@ export async function POST(req) {
         },
         body: JSON.stringify({
           user_id: authenticatedUserId,
-          is_public: true
-        })
+          is_public: true,
+        }),
       });
     } catch (imageUpdateErr) {
       console.error("Failed to mark image as public:", imageUpdateErr);
     }
 
     return NextResponse.json(doc, { status: 201 });
-
   } catch (err) {
     console.error("ERROR IN POST ROUTE:", err);
     return NextResponse.json(
       { error: "Failed to create post", detail: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -276,7 +278,7 @@ export async function PATCH(req) {
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -287,7 +289,7 @@ export async function PATCH(req) {
     if (!post_id) {
       return NextResponse.json(
         { error: "Missing required parameter: post_id" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -296,7 +298,7 @@ export async function PATCH(req) {
     if (!postIdValidation.valid) {
       return NextResponse.json(
         { error: postIdValidation.error },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const safePostId = postIdValidation.value;
@@ -308,7 +310,7 @@ export async function PATCH(req) {
     if (!description) {
       return NextResponse.json(
         { error: "Description cannot be empty" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -316,8 +318,10 @@ export async function PATCH(req) {
     const MAX_DESCRIPTION_LENGTH = 1000;
     if (description.length > MAX_DESCRIPTION_LENGTH) {
       return NextResponse.json(
-        { error: `Description too long (max ${MAX_DESCRIPTION_LENGTH} characters)` },
-        { status: 400 }
+        {
+          error: `Description too long (max ${MAX_DESCRIPTION_LENGTH} characters)`,
+        },
+        { status: 400 },
       );
     }
 
@@ -328,40 +332,40 @@ export async function PATCH(req) {
     const post = await col.findOne({ post_id: safePostId });
 
     if (!post) {
-      return NextResponse.json(
-        { error: "Post not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
     // Security check: ensure the authenticated user owns this post
     if (post.user_id !== authenticatedUserId) {
       return NextResponse.json(
         { error: "Forbidden: You can only edit your own posts" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     // Update the description (MongoDB may report modifiedCount=0 if values are unchanged)
     await col.updateOne(
       { post_id: safePostId },
-      { $set: { description, updated_at: new Date() } }
+      { $set: { description, updated_at: new Date() } },
     );
 
     // Note: modifiedCount can be 0 if the new description is the same as the old one
     // This is not an error, just a no-op update
 
     // Return the updated post
-    const updatedPost = await col.findOne({ post_id: safePostId }, { projection: { _id: 0 } });
+    const updatedPost = await col.findOne(
+      { post_id: safePostId },
+      { projection: { _id: 0 } },
+    );
 
     return NextResponse.json(
       { message: "Post updated successfully", post: updatedPost },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to update post", detail: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -404,7 +408,10 @@ export async function DELETE(req) {
 
     const postIdValidation = validatePostId(post_id);
     if (!postIdValidation.valid) {
-      return NextResponse.json({ error: postIdValidation.error }, { status: 400 });
+      return NextResponse.json(
+        { error: postIdValidation.error },
+        { status: 400 },
+      );
     }
     const safePostId = postIdValidation.value;
 
@@ -422,7 +429,7 @@ export async function DELETE(req) {
     if (!isOwner && !isAdmin) {
       return NextResponse.json(
         { error: "Forbidden: Elevated permissions required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -435,9 +442,9 @@ export async function DELETE(req) {
           image_id: null,
           deleted_at: new Date(),
           moderation_status: "deleted",
-          deleted_by: isAdmin ? "admin" : "owner"
-        }
-      }
+          deleted_by: isAdmin ? "admin" : "owner",
+        },
+      },
     );
 
     // Notify post owner if admin deleted their post
@@ -458,15 +465,17 @@ export async function DELETE(req) {
     }
 
     // Cleanup Comments/Votes
-    await db.collection("community.comments").deleteMany({ post_id: safePostId });
+    await db
+      .collection("community.comments")
+      .deleteMany({ post_id: safePostId });
     await db.collection("community.votes").deleteMany({ post_id: safePostId });
 
     // Delete from S3/Gateway if image_id exists
     if (post.image_id) {
       try {
         await fetch(`${GATEWAY_URI}/image/${post.image_id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` },
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
         });
       } catch (e) {
         console.error("Gateway cleanup failed", e);
@@ -475,12 +484,14 @@ export async function DELETE(req) {
 
     return NextResponse.json({
       message: isAdmin ? "Admin override successful." : "Post deleted.",
-      post_id: safePostId
+      post_id: safePostId,
     });
-
   } catch (err) {
     console.error("DELETE ERROR:", err);
-    return NextResponse.json({ error: "Server error", detail: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: "Server error", detail: String(err) },
+      { status: 500 },
+    );
   }
 }
 
@@ -501,12 +512,11 @@ export async function GET(req) {
     const limit = Math.max(1, parseInt(searchParams.get("limit") || "10"));
     const skip = (page - 1) * limit;
 
-
     let currentUserId = null;
     try {
       currentUserId = getAuthenticatedUserId(req);
     } catch (e) {
-      console.log("User not logged in :" + e)
+      console.log("User not logged in :" + e);
     }
 
     // 1) public image ids
@@ -518,13 +528,16 @@ export async function GET(req) {
 
     // 2) posts for public images
     const posts = await col
-      .find({
-        image_id: { $in: publicImageIds },
-        is_deleted: { $ne: true }, // Filter out tombstoned posts ( posts kept, but user data removed )
-        is_removed: { $ne: true }  // Filter out posts hidden by admins due to reports
-      }, { projection: { _id: 0 } })
+      .find(
+        {
+          image_id: { $in: publicImageIds },
+          is_deleted: { $ne: true }, // Filter out tombstoned posts ( posts kept, but user data removed )
+          is_removed: { $ne: true }, // Filter out posts hidden by admins due to reports
+        },
+        { projection: { _id: 0 } },
+      )
       .sort({ created_at: -1 })
-      .limit(100)
+      .limit(300)
       .toArray();
 
     if (!posts.length) {
@@ -535,12 +548,14 @@ export async function GET(req) {
     if (currentUserId && posts.length > 0) {
       const votesCol = db.collection("community.votes");
 
-      const userVotes = await votesCol.find({
-        user_id: currentUserId,
-        post_id: { $in: posts.map(p => p.post_id) }
-      }).toArray();
+      const userVotes = await votesCol
+        .find({
+          user_id: currentUserId,
+          post_id: { $in: posts.map((p) => p.post_id) },
+        })
+        .toArray();
 
-      userVotes.forEach(v => {
+      userVotes.forEach((v) => {
         userVotesMap[v.post_id] = v.vote;
       });
     }
@@ -578,12 +593,18 @@ export async function GET(req) {
     // 5) compute averages for normalization
     const n = items.length || 1;
 
-    const totalClicks = items.reduce((s, p) => s + safeNumber(p.clicks_count), 0);
+    const totalClicks = items.reduce(
+      (s, p) => s + safeNumber(p.clicks_count),
+      0,
+    );
     const totalVotes = items.reduce(
       (s, p) => s + safeNumber(p.up_vote_count) + safeNumber(p.down_vote_count),
-      0
+      0,
     );
-    const totalComments = items.reduce((s, p) => s + safeNumber(p.comment_count), 0);
+    const totalComments = items.reduce(
+      (s, p) => s + safeNumber(p.comment_count),
+      0,
+    );
 
     const avgClicks = totalClicks / n || 1;
     const avgVotes = totalVotes / n || 1;
@@ -600,58 +621,75 @@ export async function GET(req) {
     const nowSec = Math.floor(Date.now() / 1000);
 
     // 7) compute score per post
-    const ranked = items.map((post) => {
-      const numVotes = safeNumber(post.up_vote_count) + safeNumber(post.down_vote_count);
-      const numClicks = safeNumber(post.clicks_count);
-      const numComments = safeNumber(post.comment_count);
+    // 7) compute score per post
+      const ranked = items.map((post) => {
+        const numVotes = safeNumber(post.up_vote_count) + safeNumber(post.down_vote_count);
+        const numClicks = safeNumber(post.clicks_count);
+        const numComments = safeNumber(post.comment_count);
 
-      const votesNorm = safeDiv(numVotes, avgVotes);
-      const clicksNorm = safeDiv(numClicks, avgClicks);
-      const commentsNorm = safeDiv(numComments, avgComments);
+        const votesNorm = safeDiv(numVotes, avgVotes);
+        const clicksNorm = safeDiv(numClicks, avgClicks);
+        const commentsNorm = safeDiv(numComments, avgComments);
 
-      const engagement =
-        votesNorm * votesWeight +
-        clicksNorm * clicksWeight +
-        commentsNorm * commentsWeight;
+        const engagement =
+          votesNorm * votesWeight +
+          clicksNorm * clicksWeight +
+          commentsNorm * commentsWeight;
 
-      const createdAtSec = createdAtToUnixSeconds(post.created_at);
-      const ageSeconds = Math.max(nowSec - createdAtSec, 0);
-      const ageHours = ageSeconds / 3600;
+        const createdAtSec = createdAtToUnixSeconds(post.created_at);
+        const ageSeconds = Math.max(nowSec - createdAtSec, 0);
+        const ageHours = ageSeconds / 3600;
 
-      const timeFactor = Math.pow(ageHours + constantOffset, gravity);
+        const timeFactor = Math.pow(ageHours + constantOffset, gravity);
 
-      let score = engagement / timeFactor;
+        // --- THE FIX IS HERE ---
+        
+        // 1. Give ALL new posts a baseline score so they start on equal footing
+        let baseScore = 0;
+        if (ageHours < 24) {
+          baseScore = 0.5;
+        }
 
-      // demo boosts
-      if (engagement === 0 && ageHours < 24) score = Math.max(score, 0.5);
-      if (ageHours < 24) score *= 1.2;
+        // 2. Add the organic engagement ON TOP of the base score
+        let score = baseScore + (engagement / timeFactor);
 
-      if (isControversial(post, nowSec)) score *= 2.5;
+        // 3. Apply the newness multiplier
+        if (ageHours < 24) score *= 1.2;
 
-      // Vote penalty last — always wins
-      if (post.user_vote) score *= 0.001;
+        if (isControversial(post, nowSec)) score *= 2.5;
 
-      return {
-        ...post,
-        score,
-        debug: { votesNorm, clicksNorm, commentsNorm, engagement, ageHours },
-      };
+        // Vote penalty last — deprioritize posts the user has already voted on
+        if (post.user_vote) score *= 0.001;
+
+        return {
+          ...post,
+          score,
+          debug: { votesNorm, clicksNorm, commentsNorm, engagement, ageHours },
+        };
+      });
+
+    // 8) sort by score desc, use creation time to break ties
+    ranked.sort((a, b) => {
+      if (b.score !== a.score) {
+        return (b.score || 0) - (a.score || 0);
+      }
+      // If scores are exactly the same, newest wins
+      return new Date(b.created_at) - new Date(a.created_at);
     });
-
-    // 8) sort by score desc
-    ranked.sort((a, b) => (b.score || 0) - (a.score || 0));
 
     const paginatedItems = ranked.slice(skip, skip + limit);
 
-    return NextResponse.json({
-      items: paginatedItems,
-      hasMore: ranked.length > skip + limit
-    }, { status: 200 });
-
+    return NextResponse.json(
+      {
+        items: paginatedItems,
+        hasMore: ranked.length > skip + limit,
+      },
+      { status: 200 },
+    );
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to list posts", detail: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -12,8 +12,7 @@
 
   <body class="app">
     <div class="app-container">
-      {% set page_title = 'View Scan' %}
-      {% include 'partials/topbar.html' %}
+      {% set page_title = 'View Scan' %} {% include 'partials/topbar.html' %}
 
       <main class="screen">
         <section class="page-header" aria-label="Page title">
@@ -56,7 +55,7 @@
               <div
                 class="meter-panel"
                 aria-hidden="true"
-                title="Real probability"
+                title="AI probability"
               >
                 <div class="meter-bar">
                   <div
@@ -89,7 +88,7 @@
               <div
                 class="meter-panel meter-panel--purple"
                 aria-hidden="true"
-                title="Community real share"
+                title="Community AI share"
               >
                 <div class="meter-bar">
                   <div

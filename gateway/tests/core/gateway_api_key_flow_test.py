@@ -44,7 +44,7 @@ async def test_v1_checks_with_api_key_ok(client, patch_upstreams, auth_keypair):
         assert req.headers.get("content-type") == "application/octet-stream"
         assert req.headers.get("x-request-id")
         assert req.content == PNG_1X1_BLACK
-        return httpx.Response(200, json={"verdict": "FAKE", "label": "Most likely AI", "confidence": 0.77})
+        return httpx.Response(200, json={"verdict": "FAKE", "label": "Highly Likely Fake", "confidence": 0.77})
 
     patch_upstreams.add(host="auth", method="POST", path="/internal/api-key/exchange", handler=auth_exchange_handler)
     patch_upstreams.add(host="detector", method="POST", path="/v1.0.1/checks", handler=detector_handler)

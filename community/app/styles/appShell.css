@@ -47,6 +47,7 @@ body {
 
 /* Top bar */
 .app .topbar {
+  position: relative;
   height: 56px;
   background: #222222;
   border-bottom: 1px solid #2c2c2c;
@@ -57,8 +58,25 @@ body {
   padding: 10px 12px;
 }
 
+.app .topbar-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.app .topbar-screen-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #CFB87C;
+}
+
 /* Hamburger */
 .app .menu-button {
+  position: relative;
+  z-index: 10;
   background: transparent;
   border: none;
   padding: 6px 8px;
@@ -77,6 +95,13 @@ body {
 }
 
 /* Logo */
+.app .topbar-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+}
+
 .app .topbar-logo img {
   width: -webkit-fill-available;
   max-height: 2vh;
@@ -272,16 +297,42 @@ body {
 }
 
 .drawer-links a,
-.logout-button {
+.drawer-links .logout-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
   padding: 15px 25px;
   text-decoration: none;
   color: #f3f3f3;
   font-size: 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
 }
 
-.drawer-links a:hover {
+.drawer-links a:hover,
+.drawer-links .logout-button:hover {
   background: #2c2c2c;
   color: #CFB87C;
+}
+
+.drawer-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  color: inherit;
+}
+
+.drawer-link-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
 }
 
 .admin-link {

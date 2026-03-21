@@ -338,15 +338,16 @@ function renderAiclipseCard(img) {
 
   const isReal = labelLower.includes("real") && !isAi;
 
-  let realProb = isReal ? confidence : (1 - confidence);
-  realProb = clamp(realProb, 0, 1);
+  // INVERTED: Calculate AI (Fake) probability
+  let aiProb = isAi ? confidence : (1 - confidence);
+  aiProb = clamp(aiProb, 0, 1);
 
-  const realPct = realProb * 100;
+  const aiPct = aiProb * 100;
 
   verdictEl.textContent = rawLabel || "—";
-  pctEl.textContent = `${realPct.toFixed(2)}%`;
+  pctEl.textContent = `${aiPct.toFixed(2)}%`;
 
-  setFillPercent(fillEl, realPct);
+  setFillPercent(fillEl, aiPct);
 
   wrap.hidden = false;
   card.hidden = false;
@@ -362,13 +363,13 @@ function communityVerdictText(pctReal) {
   if (pctReal >= 40 && pctReal <= 60) return "Not sure";
 
   if (pctReal > 60) {
-    if (pctReal >= 86) return "Most Likely Real";
-    return "Likely Real";
+    if (pctReal >= 86) return "Highly Unlikely Fake";
+    return "Unlikely Fake";
   }
 
   const pctAI = 100 - pctReal;
-  if (pctAI >= 86) return "Most Likely AI";
-  return "Likely AI";
+  if (pctAI >= 86) return "Highly Likely Fake";
+  return "Likely Fake";
 }
 
 function renderCommunityCard(img) {
@@ -391,19 +392,21 @@ function renderCommunityCard(img) {
   const downN = Number.isFinite(down) ? down : 0;
   const total = upN + downN;
 
+  // FIX: When there are no votes, show "—" instead of "0.00%"
   if (total <= 0) {
     verdictEl.textContent = "No community votes";
-    pctEl.textContent = "0.00%";
+    pctEl.textContent = "—"; 
     setFillPercent(fillEl, 0);
     card.hidden = false;
     return;
   }
 
   const pctReal = clamp((upN / total) * 100, 0, 100);
+  const pctAi = 100 - pctReal;
 
   verdictEl.textContent = communityVerdictText(pctReal);
-  pctEl.textContent = `${pctReal.toFixed(2)}%`;
-  setFillPercent(fillEl, pctReal);
+  pctEl.textContent = `${pctAi.toFixed(2)}%`;
+  setFillPercent(fillEl, pctAi);
 
   card.hidden = false;
 }
@@ -451,13 +454,13 @@ function voteBucket(pctReal) {
   if (pctReal >= 40 && pctReal <= 60) return { text: "Not sure", type: "neutral" };
 
   if (pctReal > 60) {
-    if (pctReal >= 86) return { text: "Most Likely Real", type: "safe" };
-    return { text: "Likely Real", type: "safe" };
+    if (pctReal >= 86) return { text: "Highly Unlikely Fake", type: "safe" };
+    return { text: "Unlikely Fake", type: "safe" };
   }
 
   const pctAI = 100 - pctReal;
-  if (pctAI >= 86) return { text: "Most Likely AI", type: "risk" };
-  return { text: "Likely AI", type: "risk" };
+  if (pctAI >= 86) return { text: "Highly Likely Fake", type: "risk" };
+  return { text: "Likely Fake", type: "risk" };
 }
 
 function renderVotesBlock(img) {
@@ -539,7 +542,7 @@ function verdictLineText(img) {
   if (label) return label;
 
   const pct = toPercentNumber(img && img.confidence);
-  return `${pct.toFixed(2)}% ${verdictType(img) === "safe" ? "Likely Real" : "Likely AI"}`;
+  return `${pct.toFixed(2)}% ${verdictType(img) === "safe" ? "Likely Fake" : "Unlikely AI"}`;
 }
 
 function renderVerdictBlock(img) {

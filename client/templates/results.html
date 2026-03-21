@@ -11,11 +11,9 @@
 
   <body class="app">
     <div class="app-container">
-      {% set page_title = 'Results' %}
-      {% include 'partials/topbar.html' %}
+      {% set page_title = 'Results' %} {% include 'partials/topbar.html' %}
       <main class="screen">
         <div class="grid">
-
           <div class="results-imageFrame">
             <img id="preview-image" alt="Selected image preview" />
           </div>
@@ -25,19 +23,21 @@
               <div class="detection-main">
                 <div class="bar-head">
                   <span class="bar-title">Aiclipse</span>
-                  <p id="detect-verdict" class="verdict-text label-neutral">—</p>
+                  <p id="detect-verdict" class="verdict-text label-neutral">
+                    —
+                  </p>
                 </div>
 
                 <div
                   class="progress-panel"
                   aria-hidden="true"
-                  title="Real probability"
+                  title="AI probability"
                 >
                   <div class="progress-bar">
                     <div class="real-fill" style="--p: 0"></div>
                     <div class="ai-fill" style="--p: 0"></div>
 
-                    <span class="bar-percent" id="real-percent">0%</span>
+                    <span class="bar-percent" id="ai-percent">0%</span>
                   </div>
                 </div>
 
@@ -96,7 +96,11 @@
                     <h3 class="modal-title">Delete scan?</h3>
                     <p class="modal-text">This action cannot be undone.</p>
                     <div class="modal-actions">
-                      <button id="cancel-delete" class="secondary" type="button">
+                      <button
+                        id="cancel-delete"
+                        class="secondary"
+                        type="button"
+                      >
                         Cancel
                       </button>
                       <button id="confirm-delete" class="danger" type="button">
