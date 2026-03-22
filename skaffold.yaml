@@ -12,6 +12,13 @@ build:
         manual:
           - src: "**/*.py"
             dest: .
+    - image: aiclipse/email-worker
+      context: email-worker
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
     - image: aiclipse/gateway
       context: gateway
       docker: { dockerfile: Dockerfile.dev }
@@ -102,6 +109,9 @@ profiles:
         artifacts:
         - image: aiclipse/auth
           context: auth
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/email-worker
+          context: email-worker
           docker: { dockerfile: Dockerfile }
         - image: aiclipse/gateway
           context: gateway
