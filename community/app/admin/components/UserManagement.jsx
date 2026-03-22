@@ -360,6 +360,16 @@ export default function UserManagement() {
 
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const accessTotalPages = Math.max(1, Math.ceil(accessTotal / pageSize));
+    const userFoundUsCounts = useMemo(
+        () => Object.entries(
+            users.reduce((acc, u) => {
+                const key = u.how_did_you_find_us || "other";
+                acc[key] = (acc[key] || 0) + 1;
+                return acc;
+            }, {})
+        ).sort((a, b) => b[1] - a[1]),
+        [users]
+    );
     const passwordChecks = useMemo(() => checkPasswordStrength(manualForm.password || ""), [manualForm.password]);
     const hasTypedPassword = Boolean((manualForm.password || "").length);
     const isManualPasswordValid = Object.values(passwordChecks).every(Boolean);
@@ -680,6 +690,15 @@ export default function UserManagement() {
 
             {activeTab === "users" && (
                 <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
+                    {userFoundUsCounts.length > 0 && (
+                        <div className="flex flex-wrap gap-2 px-4 pt-4">
+                            {userFoundUsCounts.map(([key, count]) => (
+                                <span key={key} className="text-xs px-3 py-1 rounded-full bg-white/10 border border-white/15 text-white/70 font-semibold">
+                                    {FOUND_US_LABELS[key] ?? key} · <span className="text-white">{count}</span>
+                                </span>
+                            ))}
+                        </div>
+                    )}
                     <CardBody className="p-0">
                         <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
                             <div className="col-span-5">User</div>
@@ -774,21 +793,6 @@ export default function UserManagement() {
 
             {activeTab === "access-requests" && (
                 <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
-                    {accessRequests.length > 0 && (
-                        <div className="flex flex-wrap gap-2 px-4 pt-4">
-                            {Object.entries(
-                                accessRequests.reduce((acc, u) => {
-                                    const key = u.how_did_you_find_us || "other";
-                                    acc[key] = (acc[key] || 0) + 1;
-                                    return acc;
-                                }, {})
-                            ).sort((a, b) => b[1] - a[1]).map(([key, count]) => (
-                                <span key={key} className="text-xs px-3 py-1 rounded-full bg-white/10 border border-white/15 text-white/70 font-semibold">
-                                    {FOUND_US_LABELS[key] ?? key} · <span className="text-white">{count}</span>
-                                </span>
-                            ))}
-                        </div>
-                    )}
                     <CardBody className="p-0">
                         <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
                             <div className="col-span-4">Applicant</div>
