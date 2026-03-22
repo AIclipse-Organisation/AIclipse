@@ -6,6 +6,7 @@ resources:
   - k8s/redis-depl.yaml
   - k8s/s3-depl.yaml
   - k8s/auth-depl.yaml
+  - k8s/email-worker-depl.yaml
   - k8s/gateway-depl.yaml
   - k8s/media-depl.yaml
   #- k8s/jobs-depl.yaml

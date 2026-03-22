@@ -52,6 +52,9 @@
                 <label for="signup-email">Email</label>
                 <input id="signup-email" type="email" placeholder="Email" />
 
+                <label for="signup-date-of-birth">Date of Birth</label>
+                <input id="signup-date-of-birth" type="text" inputmode="numeric" pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY" required />
+
                 <label for="signup-password">Password</label>
                 <input
                   id="signup-password"
@@ -108,7 +111,8 @@
                   </label>
                 </div>
 
-                <button id="btn-signup" disabled>Sign up</button>
+                <!-- type="button" stops browser auto-submit; JS handles signup click. -->
+                <button id="btn-signup" type="button" disabled>Sign up</button>
               </div>
               {% endif %}
 
@@ -126,7 +130,7 @@
                     placeholder="Password"
                   />
 
-                  <button id="btn-login">Log in</button>
+                  <button id="btn-login" type="button">Log in</button>
                 </div>
 
                 <div id="login-spinner-container" style="display: none">

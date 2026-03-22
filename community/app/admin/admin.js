@@ -17,7 +17,18 @@ async function fetchLocal(endpoint, options = {}) {
     }
 
     const errorBody = await res.json().catch(() => ({}));
-    throw new Error(errorBody.error || `Error: ${res.status}`);
+    const detail = errorBody?.detail;
+    let detailText = "";
+    if (typeof detail === "string") detailText = detail;
+    else if (Array.isArray(detail)) {
+      detailText = detail
+        .map((d) => (typeof d?.msg === "string" ? d.msg : JSON.stringify(d)))
+        .join("; ");
+    } else if (detail && typeof detail === "object") {
+      detailText = detail.message || detail.code || JSON.stringify(detail);
+    }
+
+    throw new Error(detailText || errorBody.error || `Error: ${res.status}`);
   }
 
   if (res.status === 204) return null;
@@ -31,6 +42,37 @@ export const adminService = {
   triggerTraining: async () => fetchLocal("/models/train", { method: "POST" }),
   deleteModel: async (version) => fetchLocal(`/models/${version}`, { method: "DELETE" }),
   getStatistics: async () => fetchLocal("/stats"),
+  getUsers: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v === undefined || v === null || v === "") return;
+      searchParams.set(k, v);
+    });
+    return fetchLocal(`/users?${searchParams.toString()}`);
+  },
+
+  createUser: async (payload) =>
+    fetchLocal("/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+
+  deleteUser: async (userId, payload) =>
+    fetchLocal(`/users/${userId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+
+  getDeletionLogs: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v === undefined || v === null || v === "") return;
+      searchParams.set(k, v);
+    });
+    return fetchLocal(`/user-deletion-logs?${searchParams.toString()}`);
+  },
 
   scanImage: async (file) => {
     const formData = new FormData();

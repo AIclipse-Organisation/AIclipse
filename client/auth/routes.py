@@ -9,6 +9,36 @@ from .core import clear_access_cookie, get_access_token, set_access_cookie
 from .gateway import GatewayClient
 
 
+def _is_valid_email_address(value: str) -> bool:
+    if not value or any(char.isspace() for char in value):
+        return False
+
+    local_part, separator, domain = value.partition("@")
+    if separator != "@" or not local_part or not domain:
+        return False
+
+    if "@" in domain or domain.startswith(".") or domain.endswith("."):
+        return False
+
+    labels = domain.split(".")
+    return len(labels) >= 2 and all(label for label in labels)
+
+
+def _extract_payload() -> dict:
+    # Read JSON first, then fill missing keys from form data.
+    # Example: if JSON has email only, form can still provide password.
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+
+    if request.form:
+        for key, value in request.form.items():
+            if key not in payload:
+                payload[key] = value
+
+    return payload
+
+
 def build_auth_blueprint(gateway: GatewayClient, *, is_signup_enabled: Callable[[], bool]) -> Blueprint:
     bp = Blueprint("auth", __name__)
 
@@ -17,22 +47,38 @@ def build_auth_blueprint(gateway: GatewayClient, *, is_signup_enabled: Callable[
         if not is_signup_enabled():
             return jsonify({"detail": "Public registration is currently disabled"}), 403
 
-        payload = request.get_json(force=True, silent=True) or {}
+        payload = _extract_payload()
         user_name = (payload.get("user_name") or "").strip()
         email = (payload.get("email") or "").strip()
+        date_of_birth_raw = payload.get("date_of_birth")
         password = payload.get("password") or ""
 
-        if not user_name or not email or not password:
-            return jsonify({"detail": "Please fill username, email and password."}), 400
+        if not user_name or not email or not password or date_of_birth_raw is None:
+            return jsonify({"detail": "Please fill username, email, date of birth and password."}), 400
 
-        data, status = gateway.signup(user_name, email, password)
+        try:
+            from datetime import datetime
+            dob = datetime.strptime(date_of_birth_raw, "%d-%m-%Y").date()
+            today = datetime.now().date()
+            age = (today.year - dob.year) - ((today.month, today.day) < (dob.month, dob.day))
+            if age < 18:
+                return jsonify({"detail": "You must be at least 18 years old to sign up."}), 400
+            if age > 150:
+                return jsonify({"detail": "Please provide a valid date of birth."}), 400
+        except ValueError:
+            return jsonify({"detail": "Date of birth must be in DD-MM-YYYY format."}), 400
+
+        if not _is_valid_email_address(email):
+            return jsonify({"detail": "Please enter a valid email address."}), 400
+
+        data, status = gateway.signup(user_name, email, date_of_birth_raw, password)
         if data is None:
             data = {"detail": "Signup failed"}
         return jsonify(data), status
 
     @bp.post("/auth/login")
     def auth_login():
-        payload = request.get_json(force=True, silent=True) or {}
+        payload = _extract_payload()
         email = (payload.get("email") or "").strip()
         password = payload.get("password") or ""
 
@@ -99,7 +145,7 @@ def build_auth_blueprint(gateway: GatewayClient, *, is_signup_enabled: Callable[
         if not token:
             return jsonify({"detail": "Not authenticated"}), 401
 
-        payload = request.get_json(force=True, silent=True) or {}
+        payload = _extract_payload()
         data, status = gateway.call_json("PATCH", "/auth/me", token=token, json_data=payload)
         if status == 200 and isinstance(data, dict):
             session["current_user"] = data

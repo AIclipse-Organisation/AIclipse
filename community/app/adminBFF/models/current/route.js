@@ -6,7 +6,7 @@ const GATEWAY_URL = process.env.GATEWAY_URI
 
 export async function GET(req) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get("access_token")?.value;
 
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
