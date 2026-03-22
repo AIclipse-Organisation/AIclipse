@@ -137,6 +137,11 @@ def contact():
     return render_template("contact.html")
 
 
+@app.get("/tutorials")
+def tutorials():
+    return render_template("tutorials.html")
+
+
 @app.post("/usage/check")
 def usage_check():
     token = get_access_token(request)

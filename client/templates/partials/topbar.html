@@ -1,6 +1,10 @@
 {% set user_name = current_user.get('user_name') if current_user else '' %}
 {% set email = current_user.get('email') if current_user else '' %}
 {% set display_name = user_name or email %}
+{% set tutorial_user_id = current_user.get('user_id') if current_user else '' %}
+
+<link rel="stylesheet" href="/static/css/tutorial.css" />
+<div id="tutorial-user-scope" data-user-id="{{ tutorial_user_id }}" hidden></div>
 
 <div class="topbar">
   <button id="menu-toggle" class="menu-button" type="button" aria-label="Menu">
@@ -79,6 +83,17 @@
 
     <div class="drawer-separator"></div>
 
+    <a href="/tutorials">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3"></path>
+          <path d="M12 17h.01"></path>
+        </svg>
+      </span>
+      <span>Tutorials</span>
+    </a>
+
     <a href="/contact">
       <span class="drawer-link-icon" aria-hidden="true">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -126,3 +141,4 @@
 </aside>
 
 <script src="/static/js/auth-ui.js" defer></script>
+<script src="/static/js/tutorial-core.js" defer></script>

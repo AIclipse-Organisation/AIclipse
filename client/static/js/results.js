@@ -131,7 +131,7 @@ window.addEventListener("DOMContentLoaded", () => {
       preview: !!preview,
       token: !!token,
     });
-    window.location.href = "/imgProcessing";
+    window.location.href = "/upload";
     return;
   }
 
@@ -179,27 +179,39 @@ window.addEventListener("DOMContentLoaded", () => {
   const wrap = document.getElementById("public-desc-wrap");
 
   // NEW: Function to sync button states and UI visibility
-  function updateVisibility(isPublic) {
+  function updateVisibility(isPublic, options = {}) {
+    const fromUser = !!options.fromUser;
+
     if (publishCheck) publishCheck.checked = isPublic;
     if (wrap) wrap.hidden = !isPublic;
-    
-    // Update visual button selection state
+
     setSelected(modePublic, isPublic);
     setSelected(modePrivate, !isPublic);
-    
-    // Update main button text contextually
+
     if (btnSave) {
       btnSave.textContent = isPublic ? "Publish to Community" : "Confirm & Save";
+    }
+
+    if (fromUser && window.AIclipseTutorial && typeof window.AIclipseTutorial.emit === "function") {
+      window.AIclipseTutorial.emit("results-visibility-selected", {
+        isPublic,
+      });
+
+      if (isPublic) {
+        window.AIclipseTutorial.emit("results-public-selected", {
+          isPublic: true,
+        });
+      }
     }
   }
 
   // NEW: Listeners for Public/Private segmented toggle
   if (modePrivate && modePublic) {
-    modePrivate.addEventListener("click", () => updateVisibility(false));
-    modePublic.addEventListener("click", () => updateVisibility(true));
+    modePrivate.addEventListener("click", () => updateVisibility(false, { fromUser: true }));
+    modePublic.addEventListener("click", () => updateVisibility(true, { fromUser: true }));
   }
 
-  updateVisibility(!!publishCheck?.checked);
+  updateVisibility(!!publishCheck?.checked, { fromUser: false });
 
   const deleteBtn = document.getElementById("btn-delete");
   const modal = document.getElementById("delete-modal");
