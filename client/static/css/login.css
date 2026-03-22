@@ -41,10 +41,6 @@ body.app .app-container::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image:
-    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.10), rgba(0, 0, 0, 0) 55%),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.10), rgba(0, 0, 0, 0.95)),
-    url("https://img.freepik.com/free-photo/portrait-person-ai-robot_23-2151015315.jpg");
   background-size: cover;
   background-position: center;
   opacity: 0.65;
@@ -55,7 +51,6 @@ body.app .app-container::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.75) 100%);
   z-index: 0;
 }
 
