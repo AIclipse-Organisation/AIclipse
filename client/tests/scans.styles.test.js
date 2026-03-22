@@ -14,7 +14,7 @@ describe("scans CSS contract", () => {
   });
 
   // These selectors support loading skeletons and visibility/moderation badges.
-  test("has loading and badge selectors been used by scans script", () => {
+  test("has loading and badge selectors used by the scans script", () => {
     expect(css).toContain("@keyframes shimmer");
     expect(css).toContain(".skeleton-card");
     expect(css).toContain(".scan-visibility-badge");
