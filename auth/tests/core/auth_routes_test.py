@@ -146,6 +146,32 @@ async def test_login_success(client, users_coll, auth_mod):
 
 
 @pytest.mark.asyncio
+async def test_login_rejects_pending_user(client, users_coll):
+    await users_coll.insert_one(
+        {
+            "user_id": "u_pending",
+            "user_name": "Pending User",
+            "email": "pending@example.com",
+            "password": _bcrypt_hash("Secret123!"),
+            "is_admin": False,
+            "access_status": "pending",
+            "plan": 0,
+            "created_at": _now_utc(),
+            "date_of_birth": None,
+            "total_guesses": 0,
+            "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
+        }
+    )
+
+    r = await client.post("/login", json={"email": "pending@example.com", "password": "Secret123!"})
+
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Your account is pending admin approval."
+
+
+@pytest.mark.asyncio
 async def test_login_invalid_user(client):
     r = await client.post("/login", json={"email": "nope@example.com", "password": "Secret123!"})
     assert r.status_code == 401

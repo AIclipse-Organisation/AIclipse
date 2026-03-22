@@ -579,6 +579,7 @@ export default function UserManagement() {
                         <button
                             type="button"
                             onClick={() => {
+                                setSearch("");
                                 setActiveTab("access-requests");
                                 loadAccessRequests(1);
                             }}
