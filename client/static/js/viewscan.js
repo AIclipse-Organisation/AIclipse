@@ -1226,7 +1226,7 @@ function setupDeletePost(img) {
         sessionStorage.removeItem("selectedScanTitle");
 
         setTimeout(() => {
-          window.location.href = "/scans";
+          window.location.href = "/profile";
         }, 800);
       } catch (err) {
         setStatus(err?.message || "Failed to delete post.", "error");
@@ -1327,7 +1327,7 @@ function setupDeleteScan(img) {
         sessionStorage.removeItem("selectedScanTitle");
 
         setTimeout(() => {
-          window.location.href = "/scans";
+          window.location.href = "/profile";
         }, 800);
       } catch (err) {
         setStatus(err?.message || "Failed to delete scan.", "error");
