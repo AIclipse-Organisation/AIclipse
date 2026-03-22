@@ -31,18 +31,6 @@
           <div class="page-underline" role="presentation"></div>
         </section>
 
-          <div id="scan-quick-meta" class="scan-quick-meta" hidden>
-              <div class="scan-quick-meta-item">
-                <span class="scan-quick-meta-label">Visibility</span>
-                <span id="scan-quick-visibility" class="scan-quick-meta-value">—</span>
-              </div>
-
-              <div class="scan-quick-meta-item">
-                <span class="scan-quick-meta-label">Uploaded</span>
-                <span id="scan-quick-uploaded" class="scan-quick-meta-value">—</span>
-              </div>
-            </div>
-
         <!-- <div id="viewscan-status" class="status-message"></div> -->
 
         <section id="viewscan-card" class="viewscan-card" hidden>
@@ -126,8 +114,22 @@
             </section>
 
             <div class="split-card-row">
-              <!-- VOTES CARD -->
-              <section
+              <div class="scan-info-votes-row">
+                <!-- LEFT: stacked meta -->
+                <div id="scan-quick-meta" class="scan-quick-meta scan-quick-meta--inline" hidden>
+                  <div class="scan-quick-meta-item">
+                    <span class="scan-quick-meta-label">Visibility</span>
+                    <span id="scan-quick-visibility" class="scan-quick-meta-value">—</span>
+                  </div>
+
+                  <div class="scan-quick-meta-item">
+                    <span class="scan-quick-meta-label">Uploaded</span>
+                    <span id="scan-quick-uploaded" class="scan-quick-meta-value">—</span>
+                  </div>
+                </div>
+
+                <!-- RIGHT: votes -->
+                <section
                   id="votes-card"
                   class="votes-inline-row"
                   hidden
@@ -158,8 +160,8 @@
                     </div>
                   </div>
                 </section>
+              </div>
             </div>
-          </div>
 
           <div class="viewscan-meta">
             <h2 class="viewscan-heading"></h2>

@@ -54,6 +54,23 @@
    Page header + left description
    ========================= */
 
+body.app .page-header {
+  padding: 6px 0 10px;
+}
+
+body.app .page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #CFB87C;
+}
+
+body.app .page-underline {
+  margin-top: 0%;
+  background: #222222;
+}
+
 .page-header--with-description {
   margin-bottom: 0px;
 }
@@ -145,26 +162,27 @@
    ========================= */
 
 .scan-quick-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 24px;
-  row-gap: 8px;
-  align-items: start;
-  margin-top: 12px;
-  padding: 6px 16px 12px;
-  border-bottom: 1px solid rgba(207, 184, 124, 0.45);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  min-width: 128px;
+  max-width: 148px;
+  padding: 0;
+  margin: 0;
+  border: 0;
 }
 
 .scan-quick-meta-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
 }
 
 .scan-quick-meta-label {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.1;
@@ -175,7 +193,7 @@
   display: block;
   margin: 0;
   padding: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.25;
   color: rgba(255, 255, 255, 0.94);
@@ -184,16 +202,17 @@
 
 @media (max-width: 720px) {
   .scan-quick-meta {
-    column-gap: 16px;
-    row-gap: 6px;
+    gap: 12px;
+    min-width: 110px;
+    max-width: 125px;
   }
 
   .scan-quick-meta-label {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .scan-quick-meta-value {
-    font-size: 14px;
+    font-size: 12px;
   }
 }
 
@@ -333,6 +352,13 @@
   margin-top: 12px;
 }
 
+.scan-info-votes-row {
+  display: flex;
+  align-items: stretch;
+  gap: 18px;
+  min-width: 0;
+  padding: 8px 0;
+}
 
 .vote-icon {
   display: block;
@@ -358,12 +384,17 @@
   .split-card-row {
     grid-template-columns: 1fr;
   }
+
+  .scan-info-votes-row {
+    gap: 14px;
+  }
 }
 
 .votes-inline-row {
+  flex: 1;
   display: flex;
   align-items: stretch;
-  margin-top: 12px;
+  margin-top: 0;
   min-width: 0;
 }
 
@@ -378,10 +409,6 @@
   min-width: 0;
 }
 
-.votes-inline-divider {
-  width: 1px;
-  background: rgba(255, 255, 255, 0.14);
-}
 
 .votes-inline-label {
   margin: 0;
@@ -543,7 +570,6 @@
 
 .edit-desc-section,
 .make-public-section {
-  margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.10);
 }
