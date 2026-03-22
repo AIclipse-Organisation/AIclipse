@@ -345,6 +345,16 @@ body.app .page-underline {
    Diagonal split design with two sides
    ========================= */
 
+#votes-card[hidden],
+#private-votes-placeholder[hidden],
+#community-card[hidden],
+#aiclipse-card[hidden],
+#verdict-block[hidden],
+#description-header-section[hidden],
+#private-description-placeholder[hidden] {
+  display: none !important;
+}
+
 .split-card-row {
   display: grid;
   grid-template-columns: 1fr;
@@ -424,6 +434,32 @@ body.app .page-underline {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+/* =========================
+   Private scan placeholders
+   ========================= */
+
+.private-placeholder {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.private-placeholder--description {
+  margin-top: 6px;
+  text-align: left;
+}
+
+.private-placeholder--votes {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 84px;
+  padding: 12px 14px;
+  text-align: center;
 }
 
 /* =========================

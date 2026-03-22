@@ -677,15 +677,33 @@ function renderQuickMeta(img) {
 function renderDescriptionHeader(img) {
   const section = document.getElementById("description-header-section");
   const textEl = document.getElementById("description-text");
+  const privatePlaceholder = document.getElementById("private-description-placeholder");
 
-  if (!section) return;
+  if (!section || !textEl || !privatePlaceholder) return;
 
-  if (img.description) {
+  const isPrivate = isPrivateScan(img);
+  const hasDescription = !!(img && img.description);
+
+  if (hasDescription) {
     section.hidden = false;
+    textEl.hidden = false;
     textEl.textContent = String(img.description);
-  } else {
-    section.hidden = true;
+    privatePlaceholder.hidden = true;
+    return;
   }
+
+  if (isPrivate) {
+    section.hidden = false;
+    textEl.hidden = true;
+    textEl.textContent = "";
+    privatePlaceholder.hidden = false;
+    return;
+  }
+
+  section.hidden = true;
+  textEl.hidden = false;
+  textEl.textContent = "";
+  privatePlaceholder.hidden = true;
 }
 
 // Render verdict and confidence in split card
@@ -713,21 +731,24 @@ function renderVotesCard(img) {
   const card = document.getElementById("votes-card");
   const upvotesEl = document.getElementById("card-upvotes");
   const downvotesEl = document.getElementById("card-downvotes");
+  const privatePlaceholder = document.getElementById("private-votes-placeholder");
 
-  if (!card) return;
+  if (!card || !privatePlaceholder) return;
 
-  // Only show for public posts
   if (isPrivateScan(img)) {
     card.hidden = true;
+    privatePlaceholder.hidden = false;
     return;
   }
 
   const upVotes = img.up_vote_count !== undefined ? img.up_vote_count : 0;
   const downVotes = img.down_vote_count !== undefined ? img.down_vote_count : 0;
 
+  if (upvotesEl) upvotesEl.textContent = String(upVotes);
+  if (downvotesEl) downvotesEl.textContent = String(downVotes);
+
+  privatePlaceholder.hidden = true;
   card.hidden = false;
-  upvotesEl.textContent = String(upVotes);
-  downvotesEl.textContent = String(downVotes);
 }
 
 function renderScan(img, title) {
