@@ -525,10 +525,12 @@ async def admin_approve_access_request(
             timeout=request.app.state.settings.AUTH_EVENT_PUBLISH_TIMEOUT_S,
         )
     except Exception:
+        safe_user_id = str(result.get("user_id") or "").replace("\r", "").replace("\n", "")
+        safe_admin_user_id = str(admin.user_id or "").replace("\r", "").replace("\n", "")
         logger.exception(
             "failed_to_publish_access_approved_event user_id=%s approved_by=%s",
-            result.get("user_id"),
-            admin.user_id,
+            safe_user_id,
+            safe_admin_user_id,
         )
 
     return build_user_public(result)

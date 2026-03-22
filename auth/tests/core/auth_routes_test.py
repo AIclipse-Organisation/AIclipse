@@ -53,23 +53,29 @@ async def test_jwks(client):
 
 @pytest.mark.asyncio
 async def test_signup_success(client, users_coll):
-    payload = {"user_name": " Alice  ", "email": "  Alice@Example.com ", "date_of_birth": "15-01-2000", "password": "Secret123!"}
+    payload = {
+        "user_name": " Alice  ",
+        "email": "  Alice@Example.com ",
+        "date_of_birth": "15-01-2000",
+        "password": "Secret123!",
+        "how_did_you_find_us": "linkedin",
+    }
     r = await client.post("/signup", json=payload)
-    assert r.status_code == 201
+    assert r.status_code == 202
 
     body = r.json()
-    assert body["email"] == "alice@example.com"
-    assert body["user_name"] == "Alice"
-    assert body["is_admin"] is False
-    assert body["plan"] == 0
-    assert body["do_not_show_disclaimer_again"] is False
-    assert "password" not in body
-    assert "created_at" in body
+    assert body == {
+        "pending": True,
+        "message": "Thank you for your interest! An admin will review your request and get back to you shortly.",
+    }
 
     assert len(users_coll.inserted) == 1
     stored = users_coll.inserted[0]
     assert stored["email"] == "alice@example.com"
     assert stored["user_name"] == "Alice"
+    assert stored["access_status"] == "pending"
+    assert stored["how_did_you_find_us"] == "linkedin"
+    assert stored["how_did_you_find_us_detail"] is None
     assert stored["password"] != payload["password"]
     assert bcrypt.checkpw(payload["password"].encode("utf-8"), stored["password"].encode("utf-8")) is True
 
@@ -95,7 +101,13 @@ async def test_signup_conflict(client, users_coll):
 
     r = await client.post(
         "/signup",
-        json={"user_name": "Y", "email": "X@EXAMPLE.COM", "date_of_birth": "15-01-2000", "password": "Secret123!"},
+        json={
+            "user_name": "Y",
+            "email": "X@EXAMPLE.COM",
+            "date_of_birth": "15-01-2000",
+            "password": "Secret123!",
+            "how_did_you_find_us": "linkedin",
+        },
     )
     assert r.status_code == 409
     assert r.json()["detail"] == "Email already registered"
