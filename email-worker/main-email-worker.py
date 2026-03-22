@@ -153,7 +153,7 @@ def _get_gmail_access_token() -> str:
     return _gmail_access_token
 
 
-def _build_email(payload: dict[str, Any]) -> EmailMessage:
+def _build_deleted_email(payload: dict[str, Any]) -> EmailMessage:
     # Plain text email works across most inbox clients.
     # Required event fields come from auth admin-delete payload.
     recipient = payload.get("deleted_user_email") # This is the email address of the deleted user, which is the recipient of this notification email
@@ -194,6 +194,45 @@ def _build_email(payload: dict[str, Any]) -> EmailMessage:
     return msg
 
 
+def _build_access_approved_email(payload: dict[str, Any]) -> EmailMessage:
+    recipient = payload.get("approved_user_email")
+    approved_at = payload.get("approved_at") or datetime.now(timezone.utc).isoformat()
+    admin_email = payload.get("approved_by_email")
+    user_name = str(payload.get("approved_user_name") or "there").strip() or "there"
+
+    msg = EmailMessage()
+    msg["Subject"] = "Your AIclipse access request was approved"
+    msg["From"] = GMAIL_SENDER_EMAIL
+    msg["To"] = recipient
+    msg.set_content(
+        "\n".join(
+            [
+                f"Hello {user_name},",
+                "",
+                "Your AIclipse access request has been approved.",
+                "You can now log in using the email and password you registered with.",
+                "",
+                f"Approval time (UTC): {approved_at}",
+                f"Approved by: {admin_email or 'AIclipse admin'}",
+                "",
+                f"If you need help signing in, contact support: {SUPPORT_EMAIL}",
+                "",
+                "Regards,",
+                "AIclipse",
+            ]
+        )
+    )
+    return msg
+
+
+def _build_email(event_type: str, payload: dict[str, Any]) -> EmailMessage:
+    if event_type == "auth.user.deleted.admin":
+        return _build_deleted_email(payload)
+    if event_type == "auth.access_request.approved":
+        return _build_access_approved_email(payload)
+    raise ValueError(f"Unsupported event type: {event_type}")
+
+
 def _send_email(msg: EmailMessage) -> None:
     global _gmail_access_token
     global _gmail_access_token_expiry_s
@@ -227,15 +266,15 @@ def _send_email(msg: EmailMessage) -> None:
         raise RuntimeError(f"Gmail send failed status={response.status_code} body={response.text}")
 
 
-def _dedupe_key(log_id: str, email: str) -> str:
-    # Build one unique key per delete action + recipient email.
+def _dedupe_key(event_id: str, email: str) -> str:
+    # Build one unique key per email-triggering event + recipient email.
     # If the same event comes again, this key lets us skip duplicate sends.
-    return f"email_sent:{log_id}:{email.lower()}"
+    return f"email_sent:{event_id}:{email.lower()}"
 
 
 def _process_event(fields: dict[str, str]) -> None:
-    # Ignore events that are not admin-delete events.
-    if fields.get("type") != "auth.user.deleted.admin":
+    event_type = fields.get("type")
+    if event_type not in {"auth.user.deleted.admin", "auth.access_request.approved"}:
         return
 
     # Event payload is JSON stored as text in fields["data"].
@@ -244,25 +283,28 @@ def _process_event(fields: dict[str, str]) -> None:
         raise ValueError("Missing event data")
 
     payload = json.loads(raw)
-    log_id = str(payload.get("log_id") or "")
-    recipient = str(payload.get("deleted_user_email") or "").strip()
-    if not log_id or not recipient:
-        raise ValueError("Event missing log_id or deleted_user_email")
+    event_id = str(payload.get("event_id") or payload.get("log_id") or "").strip()
+    if event_type == "auth.user.deleted.admin":
+        recipient = str(payload.get("deleted_user_email") or "").strip()
+    else:
+        recipient = str(payload.get("approved_user_email") or "").strip()
+    if not event_id or not recipient:
+        raise ValueError("Event missing event_id/log_id or recipient email")
 
     redis_client = _require_redis()
-    key = _dedupe_key(log_id, recipient)
+    key = _dedupe_key(event_id, recipient)
     # Create short "inflight" lock so only one send attempt is active at a time.
     # This lock is removed on failure and replaced with "sent" on success.
     first_send = redis_client.set(key, "inflight", ex=SEND_LOCK_TTL_S, nx=True)
     if not first_send:
         state = redis_client.get(key)
         if state == "inflight":
-            logger.info("skip_inflight_send log_id=%s recipient=%s", log_id, recipient)
+            logger.info("skip_inflight_send event_id=%s recipient=%s", event_id, recipient)
         else:
-            logger.info("skip_duplicate_send log_id=%s recipient=%s", log_id, recipient)
+            logger.info("skip_duplicate_send event_id=%s recipient=%s", event_id, recipient)
         return
 
-    message = _build_email(payload)
+    message = _build_email(event_type, payload)
     try:
         _send_email(message)
         # Mark as sent for dedupe window after successful Gmail API handoff.
@@ -272,10 +314,10 @@ def _process_event(fields: dict[str, str]) -> None:
         try:
             redis_client.delete(key)
         except Exception:
-            logger.warning("dedupe_key_delete_failed log_id=%s recipient=%s", log_id, recipient)
+            logger.warning("dedupe_key_delete_failed event_id=%s recipient=%s", event_id, recipient)
         raise
 
-    logger.info("email_sent log_id=%s recipient=%s", log_id, recipient)
+    logger.info("email_sent event_type=%s event_id=%s recipient=%s", event_type, event_id, recipient)
 
 
 def _observe() -> None:

@@ -481,6 +481,7 @@ async def admin_approve_access_request(
     admin: TokenUser = Depends(get_current_admin),
 ):
     users = request.app.state.user_repo.users
+    reviewed_at = _now_utc()
     result = await users.find_one_and_update(
         {
             "user_id": user_id,
@@ -492,7 +493,7 @@ async def admin_approve_access_request(
         {
             "$set": {
                 "access_status": "approved",
-                "reviewed_at": _now_utc(),
+                "reviewed_at": reviewed_at,
                 "reviewed_by_user_id": admin.user_id,
             }
         },
@@ -500,6 +501,36 @@ async def admin_approve_access_request(
     )
     if not result:
         raise HTTPException(status_code=404, detail="Access request not found")
+
+    event_payload = {
+        "event_type": "auth.access_request.approved",
+        "event_id": f"access_approved_{uuid4()}",
+        "approved_user_id": result.get("user_id"),
+        "approved_user_email": result.get("email"),
+        "approved_user_name": result.get("user_name"),
+        "approved_at": reviewed_at.isoformat(),
+        "approved_by_user_id": admin.user_id,
+        "approved_by_email": admin.email,
+    }
+
+    try:
+        await asyncio.wait_for(
+            request.app.state.event_redis.xadd(
+                request.app.state.settings.AUTH_EVENT_STREAM,
+                {
+                    "type": "auth.access_request.approved",
+                    "data": json.dumps(event_payload),
+                },
+            ),
+            timeout=request.app.state.settings.AUTH_EVENT_PUBLISH_TIMEOUT_S,
+        )
+    except Exception:
+        logger.exception(
+            "failed_to_publish_access_approved_event user_id=%s approved_by=%s",
+            result.get("user_id"),
+            admin.user_id,
+        )
+
     return build_user_public(result)
 
 

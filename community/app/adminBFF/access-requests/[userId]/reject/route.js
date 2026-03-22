@@ -33,7 +33,7 @@ export async function DELETE(_req, { params }) {
     const token = await getToken();
     if (!token) return buildError(401, "Unauthorized");
 
-    const userId = params?.userId;
+    const { userId } = await params;
     if (!userId) return buildError(400, "Bad Request", "Missing userId");
 
     const res = await fetch(`${GATEWAY_URL}/auth/admin/access-requests/${userId}/reject`, {
