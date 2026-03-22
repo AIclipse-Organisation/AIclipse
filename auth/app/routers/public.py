@@ -33,6 +33,9 @@ class UserPublic(BaseModel):
     email: EmailStr
     is_admin: bool = False
     plan: int = 0
+    access_status: str = "approved"
+    reviewed_at: Optional[datetime] = None
+    reviewed_by_user_id: Optional[str] = None
     created_at: datetime
     date_of_birth: Optional[str] = None
     total_guesses: Optional[int] = 0
@@ -55,6 +58,8 @@ class UserPublic(BaseModel):
     current_streak: Optional[int] = 0
     longest_streak: Optional[int] = 0
     last_activity_date: Optional[datetime] = None
+    how_did_you_find_us: Optional[str] = None
+    how_did_you_find_us_detail: Optional[str] = None
 
 
 FREE_TIER_LIMIT = 10
@@ -69,11 +74,29 @@ class UserAccuracy(BaseModel):
     admin_real_total: Optional[int] = 0
 
 
+HOW_DID_YOU_FIND_US_OPTIONS = {
+    "social_media",
+    "browsing",
+    "friend_or_colleague",
+    "news_article",
+    "youtube",
+    "linkedin",
+    "other",
+}
+
+
 class SignupRequest(BaseModel):
     user_name: str = Field(..., min_length=1)
     email: str
     date_of_birth: str = Field(..., pattern=r"^\d{2}-\d{2}-\d{4}$")
     password: str
+    how_did_you_find_us: str
+    how_did_you_find_us_detail: Optional[str] = None
+
+
+class SignupPendingResponse(BaseModel):
+    pending: bool = True
+    message: str
 
 
 class LoginRequest(BaseModel):
@@ -101,11 +124,18 @@ class TokenUser(BaseModel):
 
 
 def build_user_public(doc: dict) -> UserPublic:
+    access_status = doc.get("access_status")
+    if access_status not in {"pending", "approved", "rejected"}:
+        access_status = "approved" if bool(doc.get("access_granted", True)) else "pending"
+
     return UserPublic(
         user_id=doc["user_id"],
         user_name=doc.get("user_name", ""),
         email=doc["email"],
         is_admin=bool(doc.get("is_admin", False)),
+        access_status=access_status,
+        reviewed_at=doc.get("reviewed_at"),
+        reviewed_by_user_id=doc.get("reviewed_by_user_id"),
         plan=int(doc.get("plan", 0)),
         created_at=doc.get("created_at", _now_utc()),
         date_of_birth=doc.get("date_of_birth"),
@@ -129,6 +159,8 @@ def build_user_public(doc: dict) -> UserPublic:
         current_streak=doc.get("current_streak", 0),
         longest_streak=doc.get("longest_streak", 0),
         last_activity_date=doc.get("last_activity_date"),
+        how_did_you_find_us=doc.get("how_did_you_find_us"),
+        how_did_you_find_us_detail=doc.get("how_did_you_find_us_detail"),
     )
 
 
@@ -195,6 +227,13 @@ def _parse_bearer_token(authorization: Optional[str]) -> str:
     return parts[1]
 
 
+def _is_user_approved(doc: dict) -> bool:
+    status_val = doc.get("access_status")
+    if status_val in {"pending", "approved", "rejected"}:
+        return status_val == "approved"
+    return bool(doc.get("access_granted", True))
+
+
 def decode_jwt_local(request: Request, token: str) -> TokenUser:
     public_key = request.app.state.keys.public_key
     try:
@@ -221,7 +260,7 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
     return decode_jwt_local(request, token)
 
 
-@router.post("/signup", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
+@router.post("/signup", response_model=SignupPendingResponse, status_code=status.HTTP_202_ACCEPTED)
 async def signup(request: Request, payload: SignupRequest):
     users = request.app.state.user_repo.users
     pwd = PasswordService(request.app.state.cpu)
@@ -231,6 +270,8 @@ async def signup(request: Request, payload: SignupRequest):
     email_raw = (payload.email).strip()
     password = (payload.password).strip()
     date_of_birth = validate_date_of_birth(payload.date_of_birth, required=True)
+    how_did_you_find_us = (payload.how_did_you_find_us or "").strip()
+    how_did_you_find_us_detail = (payload.how_did_you_find_us_detail or "").strip() or None
 
     if not user_name:
         raise HTTPException(status_code=400, detail="Username is required")
@@ -238,6 +279,10 @@ async def signup(request: Request, payload: SignupRequest):
         raise HTTPException(status_code=400, detail="Email is required")
     if not password:
         raise HTTPException(status_code=400, detail="Password is required")
+    if not how_did_you_find_us or how_did_you_find_us not in HOW_DID_YOU_FIND_US_OPTIONS:
+        raise HTTPException(status_code=400, detail="Please tell us how you found us.")
+    if how_did_you_find_us == "other" and not how_did_you_find_us_detail:
+        raise HTTPException(status_code=400, detail="Please elaborate on how you found us.")
 
     email_norm = normalize_email_or_400(email_raw, required=True)
 
@@ -267,6 +312,9 @@ async def signup(request: Request, payload: SignupRequest):
         "email": email_norm,
         "password": hashed,
         "is_admin": False,
+        "access_status": "pending",
+        "reviewed_at": None,
+        "reviewed_by_user_id": None,
         "plan": 0,
         "created_at": _now_utc(),
         "date_of_birth": date_of_birth,
@@ -278,10 +326,15 @@ async def signup(request: Request, payload: SignupRequest):
         "usage_reset_date": None,
         "stripe_customer_id": None,
         "do_not_show_disclaimer_again": False,
+        "how_did_you_find_us": how_did_you_find_us,
+        "how_did_you_find_us_detail": how_did_you_find_us_detail,
     }
 
     await users.insert_one(user_doc)
-    return build_user_public(user_doc)
+    return SignupPendingResponse(
+        pending=True,
+        message="Thank you for your interest! An admin will review your request and get back to you shortly.",
+    )
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -298,6 +351,9 @@ async def login(request: Request, payload: LoginRequest):
     ok = await pwd.verify_password(payload.password, user_doc["password"])
     if not ok:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not _is_user_approved(user_doc):
+        raise HTTPException(status_code=403, detail="Your account is pending admin approval.")
 
     token = await tokens.issue_user_token(user_doc)
     return LoginResponse(token=token, user=build_user_public(user_doc))

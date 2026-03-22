@@ -36,38 +36,13 @@ export async function GET(req) {
     const searchParams = new URL(req.url).searchParams;
     const params = new URLSearchParams();
 
-    for (const key of ["search", "is_admin", "access_status", "sort", "order", "page", "page_size"]) {
+    for (const key of ["search", "page", "page_size"]) {
       const val = searchParams.get(key);
       if (val !== null && val !== "") params.set(key, val);
     }
 
-    const res = await fetch(`${GATEWAY_URL}/auth/admin/users?${params.toString()}`, {
+    const res = await fetch(`${GATEWAY_URL}/auth/admin/access-requests?${params.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-
-    const text = await res.text();
-    const json = safeParse(text);
-    if (!res.ok) return buildError(res.status, "Gateway Error", json || text);
-    return NextResponse.json(json, { status: res.status });
-  } catch (err) {
-    return buildError(500, "Internal Error", err?.message || String(err));
-  }
-}
-
-export async function POST(req) {
-  try {
-    const token = await getToken();
-    if (!token) return buildError(401, "Unauthorized");
-
-    const body = await req.json();
-    const res = await fetch(`${GATEWAY_URL}/auth/admin/users`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
       cache: "no-store",
     });
 

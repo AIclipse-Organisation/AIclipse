@@ -183,7 +183,9 @@ label {
   color: rgba(255, 255, 255, 0.85);
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
   padding: 12px 14px;
   margin-bottom: 10px;
@@ -193,9 +195,26 @@ input {
   background: rgba(0, 0, 0, 0.45);
   color: rgba(255, 255, 255, 0.95);
   outline: none;
+  box-sizing: border-box;
 }
 
-input:focus {
+select {
+  appearance: auto;
+  cursor: pointer;
+}
+
+select option {
+  background: #1a1a1a;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+textarea {
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
   border-color: rgba(255, 255, 255, 0.55);
 }
 
