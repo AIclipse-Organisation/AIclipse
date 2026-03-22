@@ -7,16 +7,25 @@ export default function ProfilePostsGrid({ userId }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserName, setCurrentUserName] = useState(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [imgsRes, postsRes] = await Promise.all([
+        const [imgsRes, postsRes, meRes] = await Promise.all([
           fetch("/community/images", { credentials: "include" }),
           fetch(`/community/posts?user_id=${encodeURIComponent(userId)}&limit=50`, {
             credentials: "include",
           }),
+          fetch("/auth/me", { credentials: "include" }),
         ]);
+
+        if (meRes.ok) {
+          const me = await meRes.json().catch(() => null);
+          setCurrentUserId(me?.user_id || null);
+          setCurrentUserName(me?.user_name || me?.email || null);
+        }
 
         if (!imgsRes.ok || !postsRes.ok) {
           setError("Failed to load posts.");
@@ -67,7 +76,7 @@ export default function ProfilePostsGrid({ userId }) {
       <div className="pub-profile-posts-title">Posts</div>
       <div className="comm_grid">
         {items.map((item) => (
-          <PostBox key={item.post_id} image={item} />
+          <PostBox key={item.post_id} image={item} currentUserId={currentUserId} currentUserName={currentUserName} />
         ))}
       </div>
     </div>
