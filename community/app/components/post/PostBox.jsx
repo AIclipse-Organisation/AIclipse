@@ -294,6 +294,7 @@ export default function PostBox({
       <PostHeader
         initials={initials}
         posterName={posterName}
+        userId={image?.user_id}
         isOfficial={isOfficial}
         userHasVoted={userHasVoted}
         timeText={timeText}

@@ -100,6 +100,7 @@ body.app .app-container {
   scrollbar-width: none;
   display: flex;
   flex-direction: column;
+  clip-path: inset(0);
 }
 
 body.app .app-container::-webkit-scrollbar {
@@ -236,12 +237,9 @@ body.app .page-underline {
    Use "fixed" so it stays pinned even if content scrolls */
 body.app .navbar {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   bottom: 0;
-
-  width: 100%;
-  max-width: 480px;
 
   background: #222222;
   border-top: 1px solid #2c2c2c;
@@ -256,7 +254,13 @@ body.app .navbar {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   backface-visibility: hidden;
-  will-change: transform;
+}
+
+@media (min-width: 480px) {
+  body.app .navbar {
+    padding-left: calc((100% - 480px) / 2);
+    padding-right: calc((100% - 480px) / 2);
+  }
 }
 
 body.app .navbar a {

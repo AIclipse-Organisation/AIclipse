@@ -1,6 +1,9 @@
+import Link from "next/link";
+
 export default function PostHeader({
   initials,
   posterName,
+  userId,
   isOfficial,
   userHasVoted,
   timeText,
@@ -23,7 +26,11 @@ export default function PostHeader({
         </div>
         <div className="comm_headerMeta">
           <div className="comm_headerNameLine">
-            <div className="comm_headerName">{posterName}</div>
+            {userId ? (
+              <Link href={`/profile/${userId}`} className="comm_headerName comm_headerNameLink">{posterName}</Link>
+            ) : (
+              <div className="comm_headerName">{posterName}</div>
+            )}
             {isOfficial && userHasVoted && (
               <span className="comm_officialBadge">Official Post</span>
             )}
