@@ -285,7 +285,7 @@ export default function PostBox({
     console.error("❌ PostMedia received an empty URL for label:", label);
   }
 
-  console.log("Image: ", image)
+  console.log("Image: ", image);
 
   return (
     <div
