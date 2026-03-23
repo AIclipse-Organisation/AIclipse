@@ -1,6 +1,4 @@
 (function bootstrapAIclipseTutorial() {
-  const VERSION = 10;
-
   const PAGE_MAP = {
     "/upload": "upload",
     "/results": "results",
@@ -21,142 +19,17 @@
     tutorials: "/tutorials",
   };
 
-  const REGISTRY = {
-    version: VERSION,
-    modules: [
-      {
-        id: "quick_start",
-        title: "Quick start",
-        description: "Choose an image, run a scan, and save it privately.",
-        steps: [
-          {
-            id: "upload-pick-image",
-            pageId: "upload",
-            selector: "label.file-upload",
-            title: "Choose an image",
-            body: "Tap the highlighted Choose Image button and select a file.",
-            completeEvent: "upload-file-selected",
-          },
-          {
-            id: "upload-analyze",
-            pageId: "upload",
-            selector: "#btn-check",
-            title: "Run the scan",
-            body: "Now tap Analyze Image.",
-            completeEvent: "scan-analysis-success",
-          },
-          {
-            id: "results-save-private",
-            pageId: "results",
-            selector: "#btn-save",
-            title: "Save the result",
-            body: "This button saves the result. Leave it Private and tap Save.",
-            completeEvent: "private-save-success",
-          },
-        ],
-      },
-      {
-        id: "publish_public",
-        title: "Publish to Community",
-        description: "Switch the result to public and publish it.",
-        steps: [
-          {
-            id: "results-switch-public",
-            pageId: "results",
-            selector: "#mode-public",
-            title: "Switch to Public",
-            body: "Tap Public to prepare this result for Community.",
-            completeEvent: "results-public-selected",
-          },
-          {
-            id: "results-publish",
-            pageId: "results",
-            selector: "#btn-save",
-            title: "Publish the post",
-            body: "Add a short description, then tap Publish to Community.",
-            completeEvent: "publish-success",
-          },
-          {
-            id: "community-arrival",
-            pageId: "community-feed",
-            selector: ".comm_grid",
-            title: "Community feed",
-            body: "This is the Community feed where your public post appears.",
-          },
-        ],
-      },
-      {
-        id: "profile_basics",
-        title: "Profile and scans",
-        description: "Review your profile area and saved scans.",
-        steps: [
-          {
-            id: "profile-summary",
-            pageId: "profile",
-            selector: ".profile-summary",
-            title: "Profile summary",
-            body: "This block shows your account details and overview.",
-          },
-          {
-            id: "profile-scans",
-            pageId: "profile",
-            selector: "#scans-container",
-            title: "Saved scans",
-            body: "This area contains your saved scans.",
-          },
-        ],
-      },
-      {
-        id: "notifications_basics",
-        title: "Notifications",
-        description: "See post activity and moderation updates.",
-        steps: [
-          {
-            id: "notifications-list",
-            pageId: "notifications",
-            selector: "#notification-list",
-            title: "Notifications",
-            body: "This screen shows activity and moderation updates.",
-          },
-        ],
-      },
-      {
-        id: "plan_basics",
-        title: "Plan and usage",
-        description: "See usage and compare plans.",
-        steps: [
-          {
-            id: "plan-usage",
-            pageId: "plan",
-            selector: "#usage-info",
-            title: "Usage",
-            body: "This block shows your current usage.",
-          },
-          {
-            id: "plan-cards",
-            pageId: "plan",
-            selector: ".plans-container",
-            title: "Plans",
-            body: "This section shows available plans and upgrades.",
-          },
-        ],
-      },
-      {
-        id: "community_basics",
-        title: "Community basics",
-        description: "Understand the public Community feed.",
-        steps: [
-          {
-            id: "community-feed",
-            pageId: "community-feed",
-            selector: ".comm_grid",
-            title: "Community feed",
-            body: "Users browse, vote, comment, and report posts here.",
-          },
-        ],
-      },
-    ],
+  const registryApi = window.AIclipseTutorialRegistry || {
+    version: 1,
+    getModules() {
+      return [];
+    },
+    getModule() {
+      return null;
+    },
   };
+
+  const VERSION = Number(registryApi.version || 1);
 
   let refreshTimer = null;
   let uiSuspended = false;
@@ -164,6 +37,7 @@
   let trackedTarget = null;
   let renderedStepKey = "";
   let autoScrolledStepKey = "";
+  let hitboxMode = "hidden";
 
   function getUserScope() {
     const fromBody = document.body?.dataset?.tutorialUser;
@@ -251,18 +125,57 @@
     return PAGE_MAP[normalizePathname(window.location.pathname)] || normalizePathname(window.location.pathname);
   }
 
-  function getModule(moduleId) {
-    return REGISTRY.modules.find((module) => module.id === moduleId) || null;
+  function getRegistry() {
+    return {
+      version: VERSION,
+      modules: registryApi.getModules(),
+    };
   }
 
-  function getStep(runtime = getRuntime()) {
+  function getModule(moduleId) {
+    return registryApi.getModule(moduleId);
+  }
+
+  function getBaseStep(runtime = getRuntime()) {
     const module = getModule(runtime.moduleId);
     if (!module) return null;
     return module.steps[runtime.stepIndex] || null;
   }
 
-  function getStepKey(runtime = getRuntime()) {
-    return `${runtime.moduleId || "none"}:${runtime.stepIndex || 0}`;
+  function resolveStep(runtime = getRuntime()) {
+    const module = getModule(runtime.moduleId);
+    const baseStep = getBaseStep(runtime);
+
+    if (!module || !baseStep) return null;
+
+    if (typeof baseStep.beforeShow !== "function") {
+      return baseStep;
+    }
+
+    const override = baseStep.beforeShow({
+      runtime,
+      module,
+      step: baseStep,
+      api: API,
+    });
+
+    if (!override || typeof override !== "object") {
+      return baseStep;
+    }
+
+    return {
+      ...baseStep,
+      ...override,
+      id: override.id || baseStep.id,
+    };
+  }
+
+  function getStepKey(runtime = getRuntime(), step = null) {
+    const resolved = step || resolveStep(runtime);
+    const stepId = resolved?.id || "none";
+    const selectorKey = resolved?.selector || "no-selector";
+    const titleKey = resolved?.title || "untitled";
+    return `${runtime.moduleId || "none"}:${runtime.stepIndex || 0}:${stepId}:${selectorKey}:${titleKey}`;
   }
 
   function escapeHtml(value) {
@@ -272,6 +185,20 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+
+  function normalizeBody(body) {
+    if (Array.isArray(body)) return body.filter(Boolean).map(String);
+    if (body == null || body === "") return [];
+    return [String(body)];
+  }
+
+  function renderBodyHtml(body) {
+    const paragraphs = normalizeBody(body);
+    if (!paragraphs.length) return "";
+    return paragraphs
+      .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+      .join("");
   }
 
   function ensureDom() {
@@ -305,6 +232,10 @@
       hitbox.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+
+        if (hitboxMode !== "click") {
+          return;
+        }
 
         const target = trackedTarget;
         if (!target || !isVisibleElement(target)) return;
@@ -350,6 +281,12 @@
     }
   }
 
+  function setHitboxMode(nextMode) {
+    hitboxMode = nextMode;
+    const { hitbox } = ensureDom();
+    hitbox.classList.toggle("is-clickable", nextMode === "click");
+  }
+
   function clearOverlayStyles() {
     const { topShade, rightShade, bottomShade, leftShade, hitbox, card } = ensureDom();
 
@@ -367,6 +304,7 @@
     hitbox.style.width = "";
     hitbox.style.height = "";
     hitbox.style.borderRadius = "";
+    setHitboxMode("hidden");
 
     card.classList.remove("is-open");
     card.style.top = "";
@@ -485,14 +423,16 @@
     rightShade.style.height = `${rect.height}px`;
   }
 
-  function positionHitbox(rect, target) {
+  function positionHitbox(rect, target, mode = "hidden") {
     const { hitbox } = ensureDom();
 
-    if (!rect || rect.width <= 0 || rect.height <= 0 || !target) {
+    if (!rect || rect.width <= 0 || rect.height <= 0 || !target || mode === "hidden") {
       hitbox.classList.remove("is-open");
+      setHitboxMode("hidden");
       return;
     }
 
+    setHitboxMode(mode);
     hitbox.classList.add("is-open");
     hitbox.style.top = `${rect.top}px`;
     hitbox.style.left = `${rect.left}px`;
@@ -605,7 +545,7 @@
         ${kicker ? `<div class="aiclipse-tutorial-kicker">${escapeHtml(kicker)}</div>` : ""}
         <h3 class="aiclipse-tutorial-title">${escapeHtml(title)}</h3>
       </div>
-      <div class="aiclipse-tutorial-body">${escapeHtml(body)}</div>
+      <div class="aiclipse-tutorial-body">${renderBodyHtml(body)}</div>
       ${
         actions.length
           ? `
@@ -670,7 +610,9 @@
     renderCard({
       kicker: "Welcome",
       title: "Get started with AIclipse",
-      body: "Start the quick tour now or open Tutorials from the menu later.",
+      body: [
+        "Start the quick tour now or open Tutorials from the menu later.",
+      ],
       stepKey: "welcome",
       actions: [
         {
@@ -700,10 +642,17 @@
 
   function buildStepActions(module, step, runtime) {
     const actions = [];
+    const isFinalStep = runtime.stepIndex >= module.steps.length - 1;
 
-    if (!step.completeEvent) {
+    if (step.nextLabel) {
       actions.push({
-        label: runtime.stepIndex >= module.steps.length - 1 ? "Done" : "Continue",
+        label: step.nextLabel,
+        variant: "aiclipse-tutorial-btn--primary",
+        onClick: () => API.nextStep(),
+      });
+    } else if (!step.completeEvent) {
+      actions.push({
+        label: isFinalStep ? "Done" : "Continue",
         variant: "aiclipse-tutorial-btn--primary",
         onClick: () => API.nextStep(),
       });
@@ -745,7 +694,7 @@
     }
 
     const module = getModule(runtime.moduleId);
-    const step = getStep(runtime);
+    const step = resolveStep(runtime);
 
     if (!module || !step) {
       if (runtime.moduleId) {
@@ -769,13 +718,16 @@
       return;
     }
 
+    const stepNumber = runtime.stepIndex + 1;
+    const totalSteps = module.steps.length;
+
     renderCard({
-      kicker: module.title,
+      kicker: `${module.title} · Step ${stepNumber} of ${totalSteps}`,
       title: step.title,
       body: step.body,
       target,
       actions: buildStepActions(module, step, runtime),
-      stepKey: getStepKey(runtime),
+      stepKey: getStepKey(runtime, step),
     });
   }
 
@@ -795,18 +747,18 @@
       clearOverlayStyles();
       card.classList.add("is-open");
       positionShades(null);
-      positionHitbox(null, null);
+      positionHitbox(null, null, "hidden");
       positionCard(card, null);
       return;
     }
 
-    const step = getStep(runtime);
+    const step = resolveStep(runtime);
     if (!step || step.pageId !== pageId) {
       hideUi();
       return;
     }
 
-    const stepKey = getStepKey(runtime);
+    const stepKey = getStepKey(runtime, step);
     if (renderedStepKey !== stepKey) {
       renderActiveStep();
       return;
@@ -828,7 +780,7 @@
 
     applyTargetHighlight(target);
     positionShades(rect);
-    positionHitbox(rect, target);
+    positionHitbox(rect, target, target ? (step.allowTargetClick ? "click" : "block") : "hidden");
     positionCard(card, rect);
   }
 
@@ -858,13 +810,12 @@
       return;
     }
 
-    const nextIndex = runtime.stepIndex + 1;
-    runtime.stepIndex = nextIndex;
+    runtime.stepIndex = runtime.stepIndex + 1;
     runtime.paused = false;
     runtime.context = { ...(runtime.context || {}), ...detail };
     setRuntime(runtime);
 
-    const nextStep = module.steps[nextIndex] || null;
+    const nextStep = module.steps[runtime.stepIndex] || null;
 
     if (!nextStep) {
       markModuleCompleted(runtime.moduleId);
@@ -934,7 +885,7 @@
       runtime.paused = false;
       setRuntime(runtime);
 
-      const step = getStep(runtime);
+      const step = resolveStep(runtime);
       if (!step) {
         clearRuntime();
         hideUi();
@@ -971,9 +922,17 @@
       const runtime = getRuntime();
       if (!runtime.moduleId) return;
 
-      const step = getStep(runtime);
+      const step = resolveStep(runtime);
       if (!step || !step.completeEvent) return;
       if (step.completeEvent !== eventName) return;
+
+      if (step.advanceOnComplete === false) {
+        runtime.context = { ...(runtime.context || {}), ...detail };
+        setRuntime(runtime);
+        autoScrolledStepKey = "";
+        renderActiveStep();
+        return;
+      }
 
       advanceRuntime(detail, false);
     },
@@ -1007,7 +966,7 @@
     },
 
     getRegistry() {
-      return REGISTRY;
+      return getRegistry();
     },
 
     getProgress() {

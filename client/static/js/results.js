@@ -27,7 +27,6 @@ function renderDetection(resp) {
   const realFill = document.querySelector(".progress-panel .real-fill");
   const aiFill = document.querySelector(".progress-panel .ai-fill");
 
-  // Changed from real-percent to ai-percent to match updated HTML
   const aiPercentEl = document.getElementById("ai-percent");
 
   if (!resp || typeof resp !== "object") {
@@ -36,8 +35,6 @@ function renderDetection(resp) {
   }
 
   const rawLabel = (resp.label || resp.result || "Unknown").toString();
-
-  // Strip "87.74%" if present in the raw string
   const cleanLabel = rawLabel.replace(/^\s*\d+(\.\d+)?%\s*/i, "").trim();
 
   const confidenceRaw = Number.isFinite(resp.confidence)
@@ -53,20 +50,10 @@ function renderDetection(resp) {
     labelLower.includes("fake") ||
     labelLower.includes("deepfake");
 
-  const isReal = labelLower.includes("real") && !isAi;
-
-  /**
-   * AI% (Fake) logic:
-   * - If verdict is AI: AI% = confidence
-   * - If verdict is REAL: AI% = 1 - confidence
-   * - Otherwise: treat confidence as AI%
-   */
   let aiProb = isAi ? confidence : (1 - confidence);
-
   aiProb = Math.max(0, Math.min(1, aiProb));
   const aiPct = aiProb * 100;
 
-  // Store globally if needed for saving
   window.__lastAiPct = aiPct;
 
   const labelClass = "label-gold";
@@ -80,16 +67,13 @@ function renderDetection(resp) {
     confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
   }
 
-  // Visuals: Empty the "Real" bar and fill the "AI" bar
   setFillPercent(realFill, 0);
   setFillPercent(aiFill, aiPct);
 
-  // Update text display
   if (aiPercentEl) {
     aiPercentEl.textContent = `${aiPct.toFixed(2)}%`;
   }
 
-  // Toggle warning styles if the image is likely AI
   if (panel) {
     panel.classList.toggle("is-risk", aiPct > 50);
   }
@@ -114,7 +98,6 @@ function dataURLtoFile(dataUrl, filename = "upload.png") {
   return new File([bytes], filename, { type: mime });
 }
 
-// Button selection helpers
 function setSelected(btn, on) {
   if (!btn) return;
   btn.classList.toggle("is-selected", !!on);
@@ -172,13 +155,11 @@ window.addEventListener("DOMContentLoaded", () => {
   const btnBack = document.getElementById("btn-back");
   if (btnBack) btnBack.addEventListener("click", () => history.back());
 
-  // NEW: Visibility Toggle elements
   const modePrivate = document.getElementById("mode-private");
   const modePublic = document.getElementById("mode-public");
   const publishCheck = document.getElementById("save-public");
   const wrap = document.getElementById("public-desc-wrap");
 
-  // NEW: Function to sync button states and UI visibility
   function updateVisibility(isPublic, options = {}) {
     const fromUser = !!options.fromUser;
 
@@ -201,11 +182,14 @@ window.addEventListener("DOMContentLoaded", () => {
         window.AIclipseTutorial.emit("results-public-selected", {
           isPublic: true,
         });
+      } else {
+        window.AIclipseTutorial.emit("results-private-selected", {
+          isPublic: false,
+        });
       }
     }
   }
 
-  // NEW: Listeners for Public/Private segmented toggle
   if (modePrivate && modePublic) {
     modePrivate.addEventListener("click", () => updateVisibility(false, { fromUser: true }));
     modePublic.addEventListener("click", () => updateVisibility(true, { fromUser: true }));
