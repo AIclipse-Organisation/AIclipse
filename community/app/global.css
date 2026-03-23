@@ -31,12 +31,15 @@ body {
 .topbar {
   position: relative;
   display: flex;
-  height: 76px;
+  padding: 10px 160px;
+  background-color: #222222;
+  ;
+  height: 56px;
   background: #222222;
   border-bottom: 1px solid #2c2c2c;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 10px 12px;
 }
 
 /* Hamburger */
@@ -159,3 +162,5 @@ body {
   color: #CFB87C;
   letter-spacing: 0.01em;
 }
+
+
