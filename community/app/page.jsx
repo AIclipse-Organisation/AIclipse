@@ -20,46 +20,35 @@ export default function Page() {
   const observerTarget = useRef(null); // Sentinel ref for infinite scroll
 
 
-  const loadPosts = useCallback(async (pageNum, signal) => {
+ const loadPosts = useCallback(async (pageNum, signal) => {
     if (loading) return;
     setLoading(true);
 
     try {
-      // Fetch images + posts at the same time
-      // Added pagination params to the URL
-      const [imgsRes, postsRes] = await Promise.all([
-        fetch("/community/images", { credentials: "include", signal }),
-        fetch(`/community/posts?page=${pageNum}&limit=12`, { credentials: "include", signal }),
-      ]);
+      // Just fetch the posts! The backend now includes the image data automatically.
+      const postsRes = await fetch(`/community/posts?page=${pageNum}&limit=12`, { 
+        credentials: "include", 
+        signal 
+      });
 
-      if (!imgsRes.ok || !postsRes.ok) {
+      if (!postsRes.ok) {
         throw new Error("Failed to load data");
       }
 
-      const imgs = await imgsRes.json().catch(() => ({}));
       const posts = await postsRes.json().catch(() => ({}));
-
-      const images = imgs.items || [];
       const postItems = posts.items || [];
 
-      // Build lookup table: image_id -> image data (for getting S3 URLs)
-    // Build lookup table: image_id -> image data (for getting S3 URLs)
-      const imageById = new Map(images.map((img) => [img.image_id, img]));
-
-      // Start with posts and enrich with image data
       const merged = postItems.map((post, index) => {
-        const img = imageById.get(post.image_id) || {};
-        
         // --- MVP TRENDING FIX ---
-        // 1. Check if the post has actual engagement (score > 0.5, or at least 1 vote/comment)
-       const hasEngagement = 
-        (Number(post.up_vote_count) > 0) || 
-        (Number(post.comment_count) > 0);
+        // 1. Check if the post has actual engagement
+        const hasEngagement = 
+         (Number(post.up_vote_count) > 0) || 
+         (Number(post.comment_count) > 0);
 
         // 2. It is trending ONLY IF it's in the top 3 of Page 1 AND has engagement
-       const isTrending = pageNum === 1 && index < 3 && hasEngagement;
+        const isTrending = pageNum === 1 && index < 3 && hasEngagement;
 
-      return { ...img, ...post, isTrending };
+        return { ...post, isTrending };
       });
 
       // Append items if page > 1, replace if page 1
