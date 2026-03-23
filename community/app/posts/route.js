@@ -693,15 +693,23 @@ export async function GET(req) {
       .toArray();
 
     // Create a quick lookup map
-    const imageMap = new Map(imagesForPage.map((img) => [img.image_id, img]));
+    const imageMap = new Map(
+      imagesForPage.map((img) => [String(img.image_id).trim(), img]),
+    );
 
-    // Merge the image data directly into the post payload
     const finalItems = paginatedItems.map((post) => {
-      const imgData = imageMap.get(post.image_id) || {};
-      // We spread imgData first so the post data (like created_at) takes precedence
+      const postImgId = post.image_id ? String(post.image_id).trim() : null;
+      const imgData = imageMap.get(postImgId) || {};
+
+      // DEBUG: If you see this in your terminal, you know which post is failing
+      if (!imgData.url) {
+        console.log(
+          `⚠️ Match failed for Post: ${post.post_id} with ImageID: ${postImgId}`,
+        );
+      }
+
       return { ...imgData, ...post };
     });
-
     return NextResponse.json(
       {
         items: finalItems,

@@ -12,6 +12,7 @@ import {
   deleteCommentAPI,
 } from "./postBoxActions";
 
+import { timeAgo } from "./utils/timeAgo";
 import { useDisclosure } from "@heroui/react";
 import ReportModal from "../modals/ReportModal";
 import { useXp } from "../../lib/xpContext";
@@ -21,9 +22,7 @@ import PostHeader from "./PostHeader";
 import PostMedia from "./PostMedia";
 import PostResults from "./PostResults";
 import PostControls from "./PostControls";
-// import PostComments from "./PostComments";
 import PostCommentsDrawer from "./PostCommentsDrawer";
-import {timeAgo} from "./utils/timeAgo.js"
 
 export default function PostBox({
   image,
@@ -32,7 +31,6 @@ export default function PostBox({
   onVoteUpdate,
   onPostDelete,
 }) {
-  // --- STATE ---
   const [up, setUp] = useState(Number(image?.up_vote_count ?? 0));
   const [down, setDown] = useState(Number(image?.down_vote_count ?? 0));
   const [error, setError] = useState("");
@@ -45,17 +43,17 @@ export default function PostBox({
   const [menuOpen, setMenuOpen] = useState(false);
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
 
-const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
-const { 
-    isOpen: isCommentsOpen, 
-    onOpen: onCommentsOpen, 
-    onOpenChange: onCommentsChange 
+  const {
+    isOpen: isCommentsOpen,
+    onOpen: onCommentsOpen,
+    onOpenChange: onCommentsChange,
   } = useDisclosure();
 
   const xp = useXp();
   const { triggerFloat, floats } = useXpFloat();
-  
+
   const voteUpRef = useRef(null);
   const voteDownRef = useRef(null);
   const commentBtnRef = useRef(null);
@@ -79,7 +77,7 @@ const {
   }, [userHasVoted, userVote, groundTruth]);
 
   const posterName = image?.user_name || "Unknown";
-const timeText = useMemo(() => {
+  const timeText = useMemo(() => {
     const rawDate = image?.created_at || image?.uploaded_at;
     return timeAgo(rawDate);
   }, [image?.created_at, image?.uploaded_at]);
@@ -87,27 +85,41 @@ const timeText = useMemo(() => {
   const initials = useMemo(() => {
     const s = String(posterName || "").trim();
     if (!s) return "?";
-    return s.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
+    return (
+      s
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase())
+        .join("") || "?"
+    );
   }, [posterName]);
 
-  useEffect(() => { setMenuOpen(false); }, [postId]);
-  useEffect(() => { setIsReported(Boolean(image?.is_reported)); }, [image?.is_reported]);
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [postId]);
+  useEffect(() => {
+    setIsReported(Boolean(image?.is_reported));
+  }, [image?.is_reported]);
   useEffect(() => {
     setUp(Number(image?.up_vote_count ?? 0));
     setDown(Number(image?.down_vote_count ?? 0));
   }, [image?.up_vote_count, image?.down_vote_count]);
-  useEffect(() => { setUserVote(image?.user_vote || null); }, [image?.user_vote]);
+  useEffect(() => {
+    setUserVote(image?.user_vote || null);
+  }, [image?.user_vote]);
 
   useEffect(() => {
     if (!isOfficial) return;
-    setRevealPhase((prev) => (prev === "idle" && image?.user_vote ? "pre-existing" : prev));
+    setRevealPhase((prev) =>
+      prev === "idle" && image?.user_vote ? "pre-existing" : prev,
+    );
   }, [image?.user_vote, isOfficial]);
 
- useEffect(() => {
+  useEffect(() => {
     if (postId && isCommentsOpen && comments.length === 0) {
       loadComments();
     }
-  }, [postId, isCommentsOpen]);
+  }, [postId, isCommentsOpen, comments.length]);
 
   // --- HANDLERS ---
   function startRevealAnimation() {
@@ -127,9 +139,13 @@ const timeText = useMemo(() => {
       setDown(result.down_vote_count);
       setUserVote(result.user_vote);
       xp?.addXp(result.points_awarded);
-      triggerFloat(direction === "up" ? voteUpRef : voteDownRef, result.points_awarded);
+      triggerFloat(
+        direction === "up" ? voteUpRef : voteDownRef,
+        result.points_awarded,
+      );
       if (isOfficial) startRevealAnimation();
-      if (onVoteUpdate) onVoteUpdate(postId, result.up_vote_count, result.down_vote_count);
+      if (onVoteUpdate)
+        onVoteUpdate(postId, result.up_vote_count, result.down_vote_count);
     } catch (err) {
       setError(err.message || "Network error while voting.");
     } finally {
@@ -152,7 +168,12 @@ const timeText = useMemo(() => {
     if (!postId || !currentUserId || !commentText.trim()) return;
     setCommentsBusy(true);
     try {
-      const data = await submitCommentAPI(postId, currentUserId, currentUserName, commentText.trim());
+      const data = await submitCommentAPI(
+        postId,
+        currentUserId,
+        currentUserName,
+        commentText.trim(),
+      );
       setComments((arr) => [data, ...arr]);
       setCommentText("");
       xp?.addXp(1);
@@ -191,7 +212,8 @@ const timeText = useMemo(() => {
   };
 
   async function deletePost() {
-    if (!isOwner || !confirm("Delete this post? This cannot be undone.")) return;
+    if (!isOwner || !confirm("Delete this post? This cannot be undone."))
+      return;
     setBusy(true);
     try {
       await deletePostAPI(postId);
@@ -203,20 +225,47 @@ const timeText = useMemo(() => {
   }
 
   // --- MATH/UI HELPERS ---
-  function clamp01(n) { return Math.max(0, Math.min(1, Number(n) || 0)); }
-  function isAiLabel(lbl) { return lbl.includes("ai") || lbl.includes("fake") || lbl.includes("deepfake"); }
-  function isRealLabel(lbl) { return lbl.includes("real") && !isAiLabel(lbl); }
+  function clamp01(n) {
+    return Math.max(0, Math.min(1, Number(n) || 0));
+  }
+  function isAiLabel(lbl) {
+    return (
+      lbl.includes("ai") || lbl.includes("fake") || lbl.includes("deepfake")
+    );
+  }
+  function isRealLabel(lbl) {
+    return lbl.includes("real") && !isAiLabel(lbl);
+  }
   function computeRealPctFromModel(img) {
-    const rawLabel = String(img?.result?.label ?? img?.label ?? img?.result?.verdict ?? img?.verdict ?? "Unknown").toLowerCase();
-    const conf = clamp01(img?.result?.confidence ?? img?.confidence ?? img?.result?.score ?? img?.score ?? 0);
+    const rawLabel = String(
+      img?.result?.label ??
+        img?.label ??
+        img?.result?.verdict ??
+        img?.verdict ??
+        "Unknown",
+    ).toLowerCase();
+    const conf = clamp01(
+      img?.result?.confidence ??
+        img?.confidence ??
+        img?.result?.score ??
+        img?.score ??
+        0,
+    );
     const realProb = isRealLabel(rawLabel) ? conf : 1 - conf;
     return Math.max(0, Math.min(100, realProb * 100));
   }
   function bucketFromRealPct(r) {
     r = Math.max(0, Math.min(100, Number(r) || 0));
     if (r >= 40 && r <= 60) return { text: "Not sure", type: "neutral" };
-    if (r > 60) return { text: r >= 86 ? "Highly Unlikely Fake" : "Unlikely Fake", type: "safe" };
-    return { text: (100 - r) >= 86 ? "Highly Likely Fake" : "Likely Fake", type: "risk" };
+    if (r > 60)
+      return {
+        text: r >= 86 ? "Highly Unlikely Fake" : "Unlikely Fake",
+        type: "safe",
+      };
+    return {
+      text: 100 - r >= 86 ? "Highly Likely Fake" : "Likely Fake",
+      type: "risk",
+    };
   }
   function setWidthStyle(pct) {
     const p = Math.max(0, Math.min(100, Number(pct) || 0));
@@ -227,11 +276,21 @@ const timeText = useMemo(() => {
   const analysisBucket = bucketFromRealPct(analysisRealPct);
   const totalVotes = up + down;
   const communityRealPct = totalVotes > 0 ? (up / totalVotes) * 100 : null;
-  const communityBucket = communityRealPct === null ? null : bucketFromRealPct(communityRealPct);
+  const communityBucket =
+    communityRealPct === null ? null : bucketFromRealPct(communityRealPct);
+
+
+
+    if (!image) {
+    console.error("❌ PostMedia received an empty URL for label:", label);
+  }
+
+  console.log("Image: ", image)
 
   return (
-    <div className={`comm_postBox ${isOfficial && userHasVoted ? "is-revealed-benchmark" : ""}`}>
-      
+    <div
+      className={`comm_postBox ${isOfficial && userHasVoted ? "is-revealed-benchmark" : ""}`}
+    >
       <PostHeader
         initials={initials}
         posterName={posterName}
@@ -245,8 +304,14 @@ const timeText = useMemo(() => {
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
         closeMenu={() => setMenuOpen(false)}
-        onEdit={() => { setMenuOpen(false); window.location.href = "/viewscan"; }}
-        onOpenReport={() => { onOpen(); setMenuOpen(false); }}
+        onEdit={() => {
+          setMenuOpen(false);
+          window.location.href = "/viewscan";
+        }}
+        onOpenReport={() => {
+          onOpen();
+          setMenuOpen(false);
+        }}
         onDelete={deletePost}
       />
 
@@ -255,7 +320,7 @@ const timeText = useMemo(() => {
       </div>
 
       <PostMedia
-        url={image?.url}
+        url={image?.url || image?.image_url || image?.imageUrl || image?.s3_path}
         label={image?.label}
         onClick={() => trackPostClick(postId)}
         revealPhase={revealPhase}
@@ -268,7 +333,9 @@ const timeText = useMemo(() => {
         analysisBucket={analysisBucket}
         analysisAiPct={100 - analysisRealPct}
         communityBucket={communityBucket}
-        communityAiPct={communityRealPct !== null ? 100 - communityRealPct : null}
+        communityAiPct={
+          communityRealPct !== null ? 100 - communityRealPct : null
+        }
         setWidthStyle={setWidthStyle}
       />
 
@@ -300,7 +367,12 @@ const timeText = useMemo(() => {
 
       {error && <div className="muted mt-2">{error}</div>}
 
-      <ReportModal isOpen={isOpen} onClose={() => onOpenChange(false)} onSubmit={submitReport} isSubmitting={busy} />
+      <ReportModal
+        isOpen={isOpen}
+        onClose={() => onOpenChange(false)}
+        onSubmit={submitReport}
+        isSubmitting={busy}
+      />
       <XpFloatLayer floats={floats} />
     </div>
   );
