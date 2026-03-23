@@ -1,5 +1,5 @@
 (function bootstrapAIclipseTutorial() {
-  const VERSION = 9;
+  const VERSION = 10;
 
   const PAGE_MAP = {
     "/upload": "upload",
@@ -606,21 +606,27 @@
         <h3 class="aiclipse-tutorial-title">${escapeHtml(title)}</h3>
       </div>
       <div class="aiclipse-tutorial-body">${escapeHtml(body)}</div>
-      <div class="aiclipse-tutorial-actions">
-        ${actions
-          .map(
-            (action, index) => `
-              <button
-                type="button"
-                class="aiclipse-tutorial-btn ${escapeHtml(action.variant)}"
-                data-action-index="${index}"
-              >
-                ${escapeHtml(action.label)}
-              </button>
-            `,
-          )
-          .join("")}
-      </div>
+      ${
+        actions.length
+          ? `
+        <div class="aiclipse-tutorial-actions">
+          ${actions
+            .map(
+              (action, index) => `
+                <button
+                  type="button"
+                  class="aiclipse-tutorial-btn ${escapeHtml(action.variant)}"
+                  data-action-index="${index}"
+                >
+                  ${escapeHtml(action.label)}
+                </button>
+              `,
+            )
+            .join("")}
+        </div>
+      `
+          : ""
+      }
     `;
 
     card.querySelectorAll("[data-action-index]").forEach((btn) => {
@@ -644,9 +650,12 @@
     setProgress(progress);
   }
 
-  function markModuleSkipped(moduleId) {
+  function markModulePaused(moduleId) {
     const progress = getProgress();
-    progress.skipped[moduleId] = Date.now();
+    delete progress.skipped[moduleId];
+    if (!progress.completed[moduleId]) {
+      progress.dismissedAt = Date.now();
+    }
     setProgress(progress);
   }
 
@@ -676,7 +685,7 @@
         },
         {
           label: "Not now",
-          variant: "aiclipse-tutorial-btn--danger",
+          variant: "aiclipse-tutorial-btn--neutral",
           onClick: () => {
             const next = getProgress();
             next.welcomeSeenVersion = VERSION;
@@ -687,6 +696,26 @@
         },
       ],
     });
+  }
+
+  function buildStepActions(module, step, runtime) {
+    const actions = [];
+
+    if (!step.completeEvent) {
+      actions.push({
+        label: runtime.stepIndex >= module.steps.length - 1 ? "Done" : "Continue",
+        variant: "aiclipse-tutorial-btn--primary",
+        onClick: () => API.nextStep(),
+      });
+    }
+
+    actions.push({
+      label: "Not now",
+      variant: "aiclipse-tutorial-btn--neutral",
+      onClick: () => API.pause(),
+    });
+
+    return actions;
   }
 
   function renderActiveStep() {
@@ -740,33 +769,12 @@
       return;
     }
 
-    const actions = [
-      {
-        label: "Pause",
-        variant: "aiclipse-tutorial-btn--neutral",
-        onClick: () => API.pause(),
-      },
-      {
-        label: "Skip module",
-        variant: "aiclipse-tutorial-btn--danger",
-        onClick: () => API.skipModule(),
-      },
-    ];
-
-    if (!step.completeEvent) {
-      actions.push({
-        label: runtime.stepIndex >= module.steps.length - 1 ? "Finish" : "Next",
-        variant: "aiclipse-tutorial-btn--primary",
-        onClick: () => API.nextStep(),
-      });
-    }
-
     renderCard({
       kicker: module.title,
       title: step.title,
       body: step.body,
       target,
-      actions,
+      actions: buildStepActions(module, step, runtime),
       stepKey: getStepKey(runtime),
     });
   }
@@ -943,6 +951,7 @@
 
     pause() {
       const runtime = getRuntime();
+
       if (!runtime.moduleId) {
         hideUi();
         return;
@@ -950,15 +959,7 @@
 
       runtime.paused = true;
       setRuntime(runtime);
-      hideUi();
-    },
-
-    skipModule() {
-      const runtime = getRuntime();
-      if (runtime.moduleId) {
-        markModuleSkipped(runtime.moduleId);
-      }
-      clearRuntime();
+      markModulePaused(runtime.moduleId);
       hideUi();
     },
 

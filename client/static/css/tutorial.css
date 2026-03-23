@@ -101,21 +101,12 @@
 
 .aiclipse-tutorial-btn--neutral {
   border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .aiclipse-tutorial-btn--neutral:hover {
-  background: rgba(255, 255, 255, 0.9);
-  color: #111111;
-}
-
-.aiclipse-tutorial-btn--danger {
-  border-color: #e04646;
-  color: #ff4b4b;
-}
-
-.aiclipse-tutorial-btn--danger:hover {
-  background: #e04646;
-  color: #111111;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .aiclipse-tutorial-target {
