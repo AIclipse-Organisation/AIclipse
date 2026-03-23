@@ -319,9 +319,7 @@ body.app .notif-dot {
 /* Screen content area
    Add bottom padding so content doesn't hide behind navbar */
 body.app .screen {
-  flex: 1;
-  min-height: 0;
-  height: auto;
+  flex: 1 0 auto;
   padding: 20px;
   padding-top: 76px; /* 56px topbar + 20px spacing */
   padding-bottom: 80px;
