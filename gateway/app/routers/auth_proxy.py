@@ -92,6 +92,24 @@ async def gateway_auth_me_delete(request: Request, user: UserContext = Depends(g
     )
 
 
+# Public user profile (no auth required)
+
+
+@router.get("/auth/public/user/{user_id}")
+async def gateway_public_get_user(
+    request: Request,
+    user_id: str = Path(...),
+):
+    auth_uri = _auth_base_url(request)
+    return await proxy_json(
+        request,
+        "GET",
+        auth_uri,
+        f"/public/user/{user_id}",
+        timeout_s=_timeout(request),
+    )
+
+
 # Admin auth routes
 
 

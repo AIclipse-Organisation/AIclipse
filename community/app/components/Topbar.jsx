@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export default function Topbar({ isAdmin }) {
+export default function Topbar({ isAdmin, showBack }) {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
 
   const toggleMenu = () => setIsOpen((prev) => !prev);
   const closeMenu = () => setIsOpen(false);
@@ -21,16 +23,29 @@ export default function Topbar({ isAdmin }) {
   return (
     <>
       <div className="topbar">
-        <button
-          className="menu-button"
-          type="button"
-          aria-label="Menu"
-          onClick={toggleMenu}
-        >
-          <span className="hamburger-line"></span>
-          <span className="hamburger-line"></span>
-          <span className="hamburger-line"></span>
-        </button>
+        {showBack ? (
+          <button
+            className="topbar-back-btn"
+            type="button"
+            aria-label="Go back"
+            onClick={() => router.back()}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            className="menu-button"
+            type="button"
+            aria-label="Menu"
+            onClick={toggleMenu}
+          >
+            <span className="hamburger-line"></span>
+            <span className="hamburger-line"></span>
+            <span className="hamburger-line"></span>
+          </button>
+        )}
 
         <div className="topbar-center">
           <span className="topbar-screen-name">Community</span>

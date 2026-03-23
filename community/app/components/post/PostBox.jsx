@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import "../../styles/postBox.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -17,6 +18,7 @@ import {
 import { useDisclosure } from "@heroui/react";
 import ReportModal from "../modals/ReportModal";
 import { useXp } from "../../lib/xpContext";
+import { timeAgo } from "../../lib/timeAgo";
 import { useXpFloat, XpFloatLayer } from "../common/XpFloat";
 
 export default function PostBox({
@@ -120,9 +122,7 @@ export default function PostBox({
   const posterName = image?.user_name || "Unknown";
 
   const timeText = useMemo(() => {
-    const d = image?.uploaded_at ? new Date(image.uploaded_at) : null;
-    if (!d || Number.isNaN(d.getTime())) return "";
-    return d.toLocaleString();
+    return timeAgo(image?.uploaded_at);
   }, [image?.uploaded_at]);
 
   const initials = useMemo(() => {
@@ -301,7 +301,7 @@ export default function PostBox({
           <div className="comm_avatar" aria-hidden="true"><div className="comm_avatarInitials">{initials}</div></div>
           <div className="comm_headerMeta">
             <div className="comm_headerNameLine">
-              <div className="comm_headerName">{posterName}</div>
+              <Link href={`/profile/${image.user_id}`} className="comm_headerName comm_headerNameLink">{posterName}</Link>
               {isOfficial && userHasVoted && <span className="comm_officialBadge">Official Post</span>}
             </div>
             {timeText && <div className="comm_headerTime">{timeText}</div>}
@@ -480,7 +480,7 @@ export default function PostBox({
               {comments.map((c) => (
                 <div key={c.comment_id} className="comm_comment">
                   <div className="comm_commentMeta">
-                    {c.user_name} · {c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}
+                    <Link href={`/profile/${c.user_id}`} className="comm_headerNameLink">{c.user_name}</Link> · {c.created_at ? timeAgo(c.created_at) : ""}
                     {currentUserId && c.user_id === currentUserId && (
                       <button onClick={() => deleteComment(c.comment_id)} className="comm_deleteCommentButton">🗑️</button>
                     )}

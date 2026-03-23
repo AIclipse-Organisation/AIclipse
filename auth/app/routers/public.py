@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import jwt
 from email_validator import EmailNotValidError, validate_email
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from pymongo import ReturnDocument
 
@@ -359,6 +359,23 @@ async def update_me(request: Request, body: UpdateMeRequest, user: TokenUser = D
         raise HTTPException(status_code=404, detail="User not found")
 
     return build_user_public(result)
+
+
+@router.get("/public/user/{user_id}")
+async def get_public_user(request: Request, user_id: str = Path(...)):
+    users = request.app.state.user_repo.users
+    doc = await users.find_one({"user_id": user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "user_id": doc["user_id"],
+        "user_name": doc.get("user_name", ""),
+        "community_score": doc.get("community_score", 0),
+        "current_streak": doc.get("current_streak", 0),
+        "admin_guesses_correct": doc.get("admin_guesses_correct", 0),
+        "admin_guesses_total": doc.get("admin_guesses_total", 0),
+        "created_at": doc.get("created_at"),
+    }
 
 
 @router.delete("/me")

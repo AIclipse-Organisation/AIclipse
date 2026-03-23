@@ -7,7 +7,7 @@ build:
   artifacts:
     - image: aiclipse/auth
       context: auth
-      docker: { dockerfile: Dockerfile }
+      docker: { dockerfile: Dockerfile.dev }
       sync:
         manual:
           - src: "**/*.py"
@@ -21,7 +21,7 @@ build:
             dest: .
     - image: aiclipse/gateway
       context: gateway
-      docker: { dockerfile: Dockerfile }
+      docker: { dockerfile: Dockerfile.dev }
       sync:
         manual:
           - src: "**/*.py"
