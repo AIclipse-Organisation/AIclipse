@@ -243,7 +243,18 @@ async function loadScans() {
   }
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  // Setup tabs has been removed completely! Just load data.
-  loadScans();
-});
+if (typeof window !== "undefined") {
+  window.addEventListener("DOMContentLoaded", () => {
+    // Setup tabs has been removed completely! Just load data.
+    loadScans();
+  });
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    getVisibility,
+    clamp01,
+    cleanLabelText,
+    computeRealPct,
+  };
+}
