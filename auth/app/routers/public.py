@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional, List
 from uuid import uuid4
 
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from email_validator import EmailNotValidError, validate_email
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from pymongo import ReturnDocument
 
@@ -33,7 +34,7 @@ class UserPublic(BaseModel):
     is_admin: bool = False
     plan: int = 0
     created_at: datetime
-    age: Optional[int] = None
+    date_of_birth: Optional[str] = None
     total_guesses: Optional[int] = 0
     total_correct: Optional[int] = 0
     acc_guessing_ai: Optional[int] = 0
@@ -57,6 +58,8 @@ class UserPublic(BaseModel):
 
 
 FREE_TIER_LIMIT = 10
+MIN_USER_AGE = 18
+MAX_USER_AGE = 150
     
 class UserAccuracy(BaseModel):
     user_id: str
@@ -68,12 +71,13 @@ class UserAccuracy(BaseModel):
 
 class SignupRequest(BaseModel):
     user_name: str = Field(..., min_length=1)
-    email: EmailStr
+    email: str
+    date_of_birth: str = Field(..., pattern=r"^\d{2}-\d{2}-\d{4}$")
     password: str
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -84,7 +88,7 @@ class LoginResponse(BaseModel):
 
 class UpdateMeRequest(BaseModel):
     user_name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     password: Optional[str] = None
     do_not_show_disclaimer_again: Optional[bool] = None
 
@@ -104,7 +108,7 @@ def build_user_public(doc: dict) -> UserPublic:
         is_admin=bool(doc.get("is_admin", False)),
         plan=int(doc.get("plan", 0)),
         created_at=doc.get("created_at", _now_utc()),
-        age=doc.get("age"),
+        date_of_birth=doc.get("date_of_birth"),
         total_guesses=doc.get("total_guesses", 0),
         total_correct=doc.get("total_correct", 0),
         acc_guessing_ai=doc.get("acc_guessing_ai", 0),
@@ -138,6 +142,48 @@ def _normalize_utc(dt: Optional[datetime]) -> Optional[datetime]:
 
 def _next_month_start(now: datetime) -> datetime:
     return (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=32)).replace(day=1)
+
+
+def _calculate_age(dob: date, today: date) -> int:
+    return (today.year - dob.year) - ((today.month, today.day) < (dob.month, dob.day))
+
+
+def validate_date_of_birth(date_of_birth: Optional[str], *, required: bool = False) -> Optional[str]:
+    if date_of_birth is None or str(date_of_birth).strip() == "":
+        if required:
+            raise HTTPException(status_code=400, detail="Date of birth is required")
+        return None
+
+    try:
+        dob = datetime.strptime(str(date_of_birth).strip(), "%d-%m-%Y").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Date of birth must be in DD-MM-YYYY format")
+
+    age = _calculate_age(dob, datetime.now(timezone.utc).date())
+    if age < MIN_USER_AGE:
+        raise HTTPException(status_code=400, detail="You must be at least 18 years old")
+    if age > MAX_USER_AGE:
+        raise HTTPException(status_code=400, detail="Please provide a valid date of birth")
+
+    return dob.strftime("%d-%m-%Y")
+
+
+def normalize_email_or_400(email: Optional[str], *, required: bool = False) -> Optional[str]:
+    if email is None:
+        if required:
+            raise HTTPException(status_code=400, detail="Email is required")
+        return None
+
+    email_raw = str(email).strip()
+    if not email_raw:
+        if required:
+            raise HTTPException(status_code=400, detail="Email is required")
+        return None
+
+    try:
+        return validate_email(email_raw, check_deliverability=False).normalized.lower()
+    except EmailNotValidError:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
 
 
 def _parse_bearer_token(authorization: Optional[str]) -> str:
@@ -180,13 +226,27 @@ async def signup(request: Request, payload: SignupRequest):
     users = request.app.state.user_repo.users
     pwd = PasswordService(request.app.state.cpu)
 
-    email_norm = payload.email.strip().lower()
+    # Clean inputs first. Example: " Alice@EXAMPLE.com " -> "alice@example.com".
+    user_name = (payload.user_name).strip()
+    email_raw = (payload.email).strip()
+    password = (payload.password).strip()
+    date_of_birth = validate_date_of_birth(payload.date_of_birth, required=True)
+
+    if not user_name:
+        raise HTTPException(status_code=400, detail="Username is required")
+    if not email_raw:
+        raise HTTPException(status_code=400, detail="Email is required")
+    if not password:
+        raise HTTPException(status_code=400, detail="Password is required")
+
+    email_norm = normalize_email_or_400(email_raw, required=True)
+
     existing = await users.find_one({"email": email_norm})
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
     try:
-        hashed = await pwd.hash_password(payload.password)
+        hashed = await pwd.hash_password(password)
     except PasswordValidationError as e:
         raise HTTPException(
             status_code=400,
@@ -202,13 +262,14 @@ async def signup(request: Request, payload: SignupRequest):
 
     user_doc = {
         "user_id": f"u_{uuid4()}",
-        "user_name": payload.user_name.strip(),
+        # Save cleaned values, not raw input.
+        "user_name": user_name.strip(),
         "email": email_norm,
         "password": hashed,
         "is_admin": False,
         "plan": 0,
         "created_at": _now_utc(),
-        "age": None,
+        "date_of_birth": date_of_birth,
         "total_guesses": 0,
         "total_correct": 0,
         "acc_guessing_ai": 0,
@@ -229,7 +290,7 @@ async def login(request: Request, payload: LoginRequest):
     pwd = PasswordService(request.app.state.cpu)
     tokens = TokenService(request.app.state.cpu, request.app.state.keys)
 
-    email_norm = payload.email.strip().lower()
+    email_norm = normalize_email_or_400(payload.email, required=True)
     user_doc = await users.find_one({"email": email_norm})
     if not user_doc:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -264,7 +325,7 @@ async def update_me(request: Request, body: UpdateMeRequest, user: TokenUser = D
     if "user_name" in raw and raw["user_name"] is not None:
         update_doc["user_name"] = raw["user_name"].strip()
     if "email" in raw and raw["email"] is not None:
-        update_doc["email"] = raw["email"].strip().lower()
+        update_doc["email"] = normalize_email_or_400(raw["email"])
     if "password" in raw and raw["password"]:
         try:
             update_doc["password"] = await pwd.hash_password(raw["password"])
@@ -298,6 +359,23 @@ async def update_me(request: Request, body: UpdateMeRequest, user: TokenUser = D
         raise HTTPException(status_code=404, detail="User not found")
 
     return build_user_public(result)
+
+
+@router.get("/public/user/{user_id}")
+async def get_public_user(request: Request, user_id: str = Path(...)):
+    users = request.app.state.user_repo.users
+    doc = await users.find_one({"user_id": user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "user_id": doc["user_id"],
+        "user_name": doc.get("user_name", ""),
+        "community_score": doc.get("community_score", 0),
+        "current_streak": doc.get("current_streak", 0),
+        "admin_guesses_correct": doc.get("admin_guesses_correct", 0),
+        "admin_guesses_total": doc.get("admin_guesses_total", 0),
+        "created_at": doc.get("created_at"),
+    }
 
 
 @router.delete("/me")

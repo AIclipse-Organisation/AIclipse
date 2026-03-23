@@ -194,6 +194,17 @@ function applyPasswordPolicyUI(rootEl, password, checks) {
 function normalizeApiErrorDetail(data) {
   const detail = data && data.detail;
 
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] || {};
+    const loc = Array.isArray(first.loc) ? first.loc.join(".") : null;
+    const msg = typeof first.msg === "string" ? first.msg : "Validation error";
+    return {
+      message: loc ? `${loc}: ${msg}` : msg,
+      checks: null,
+      code: null,
+    };
+  }
+
   if (typeof detail === "string") {
     return { message: detail, checks: null };
   }
@@ -208,6 +219,40 @@ function normalizeApiErrorDetail(data) {
   }
 
   return { message: (data && data.message) || "Request failed", checks: null };
+}
+
+function parseDobDayMonthYear(dobString) {
+  const raw = String(dobString || "").trim();
+  const match = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const dob = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(dob.getTime()) ||
+    dob.getFullYear() !== year ||
+    dob.getMonth() !== month - 1 ||
+    dob.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return dob;
+}
+
+function ageFromDobString(dobString) {
+  const dob = parseDobDayMonthYear(dobString);
+  if (!dob) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const hasBirthdayPassed =
+    today.getMonth() > dob.getMonth() ||
+    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+  if (!hasBirthdayPassed) age -= 1;
+  return age;
 }
 
 window.lastFile = window.lastFile ?? null;
@@ -234,6 +279,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const signupPasswordInput = document.getElementById("signup-password");
   const signupPolicyRoot = document.getElementById("signup-password-policy");
+  const signupDobInput = document.getElementById("signup-date-of-birth");
 
   const signupTerms = document.getElementById("signup-terms");
   const btnSignup = document.getElementById("btn-signup");
@@ -250,6 +296,17 @@ window.addEventListener("DOMContentLoaded", () => {
   if (signupTerms) {
     signupTerms.addEventListener("change", syncSignupButtonState);
     syncSignupButtonState();
+  }
+
+  if (signupDobInput) {
+    signupDobInput.addEventListener("input", () => {
+      const digits = String(signupDobInput.value || "").replace(/\D/g, "").slice(0, 8);
+      const parts = [];
+      if (digits.length > 0) parts.push(digits.slice(0, Math.min(2, digits.length)));
+      if (digits.length > 2) parts.push(digits.slice(2, Math.min(4, digits.length)));
+      if (digits.length > 4) parts.push(digits.slice(4, 8));
+      signupDobInput.value = parts.join("-");
+    });
   }
 
   function updateSignupPolicyUI() {
@@ -290,9 +347,12 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   onEl("btn-signup", (btnSignupEl) => {
-    btnSignupEl.addEventListener("click", async () => {
+    btnSignupEl.addEventListener("click", async (event) => {
+      // Stop browser form submit.Without it, browser may submit form and refresh page before our async signup flow finishes.
+      event.preventDefault();
       const user_name = document.getElementById("signup-username")?.value.trim();
       const email = document.getElementById("signup-email")?.value.trim();
+      const dateOfBirthRaw = document.getElementById("signup-date-of-birth")?.value;
       const password = document.getElementById("signup-password")?.value;
 
       const termsAccepted = document.getElementById("signup-terms")?.checked;
@@ -305,9 +365,28 @@ window.addEventListener("DOMContentLoaded", () => {
 
       activateSignupPolicyIfNeeded();
 
-      if (!user_name || !email || !password) {
-        setStatus(accountStatus, "error", "Please fill username, email and password.");
+      if (!user_name || !email || !password || !String(dateOfBirthRaw || "").trim()) {
+        setStatus(accountStatus, "error", "Please fill username, email, date of birth and password.");
         updateSignupPolicyUI();
+        return;
+      }
+
+      if (!/^\d{2}-\d{2}-\d{4}$/.test(String(dateOfBirthRaw))) {
+        setStatus(accountStatus, "error", "Date of birth must be in DD-MM-YYYY format.");
+        return;
+      }
+
+      const age = ageFromDobString(String(dateOfBirthRaw));
+      if (!Number.isInteger(age)) {
+        setStatus(accountStatus, "error", "Please provide a valid date of birth.");
+        return;
+      }
+      if (age < 18) {
+        setStatus(accountStatus, "error", "Must be 18 or older.");
+        return;
+      }
+      if (age > 150) {
+        setStatus(accountStatus, "error", "Please provide a valid date of birth.");
         return;
       }
 
@@ -331,6 +410,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const { res, data } = await jsonFetch("POST", "/auth/signup", {
           user_name,
           email,
+          date_of_birth: dateOfBirthRaw,
           password,
         });
 
@@ -391,7 +471,9 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   onEl("btn-login", (btnLogin) => {
-    btnLogin.addEventListener("click", async () => {
+    btnLogin.addEventListener("click", async (event) => {
+      // Same rule for login: click should call fetch, not submit the form.
+      event.preventDefault();
       const email = document.getElementById("login-email")?.value.trim();
       const password = document.getElementById("login-password")?.value;
 

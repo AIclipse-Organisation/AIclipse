@@ -133,7 +133,7 @@ export default function Page() {
         // Initial load of first page
         await loadPosts(1, signal);
       } catch (err) {
-        console.error(err);
+        if (err?.name !== "AbortError") console.error(err);
       }
     }
 

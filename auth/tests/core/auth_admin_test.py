@@ -48,7 +48,7 @@ async def test_admin_list_users_filters_by_user_name(client, users_coll, auth_mo
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -64,7 +64,7 @@ async def test_admin_list_users_filters_by_user_name(client, users_coll, auth_mo
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -73,7 +73,7 @@ async def test_admin_list_users_filters_by_user_name(client, users_coll, auth_mo
     )
 
     admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
-    r = await client.get("/admin/users?user_name=ali", headers={"Authorization": f"Bearer {admin_token}"})
+    r = await client.get("/admin/users?search=ali", headers={"Authorization": f"Bearer {admin_token}"})
     assert r.status_code == 200
     data = r.json()
     assert "items" in data
@@ -100,7 +100,7 @@ async def test_admin_get_user_ok(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": 30,
+            "date_of_birth": "10-06-1994",
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -111,7 +111,7 @@ async def test_admin_get_user_ok(client, users_coll, auth_mod):
     r = await client.get("/admin/user/u_x", headers={"Authorization": f"Bearer {admin_token}"})
     assert r.status_code == 200
     assert r.json()["email"] == "x@example.com"
-    assert r.json()["age"] == 30
+    assert r.json()["date_of_birth"] == "10-06-1994"
 
 
 @pytest.mark.asyncio
@@ -125,7 +125,7 @@ async def test_admin_update_user_ok(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -136,19 +136,61 @@ async def test_admin_update_user_ok(client, users_coll, auth_mod):
 
     r = await client.patch(
         "/admin/user/u_upd",
-        json={"user_name": "  New  ", "email": "  NEW@Example.com ", "age": 22, "is_admin": True},
+        json={"user_name": "  New  ", "email": "  NEW@Example.com ", "date_of_birth": "05-12-1999", "is_admin": True},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert r.status_code == 200
     body = r.json()
     assert body["user_name"] == "New"
     assert body["email"] == "new@example.com"
-    assert body["age"] == 22
+    assert body["date_of_birth"] == "05-12-1999"
     assert body["is_admin"] is True
 
 
 @pytest.mark.asyncio
-async def test_admin_delete_user_ok(client, users_coll, auth_mod):
+async def test_admin_create_user_hides_manual_password(client, users_coll, auth_mod):
+    admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
+
+    r = await client.post(
+        "/admin/users",
+        json={
+            "user_name": "Manual User",
+            "email": "manual@example.com",
+            "password": "StrongPass1!",
+            "date_of_birth": "20-08-2001",
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert r.status_code == 201
+    body = r.json()
+    assert body["user"]["email"] == "manual@example.com"
+    assert body["temporary_password"] is None
+
+
+@pytest.mark.asyncio
+async def test_admin_create_user_returns_generated_password(client, users_coll, auth_mod):
+    admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
+
+    r = await client.post(
+        "/admin/users",
+        json={
+            "user_name": "Auto User",
+            "email": "auto@example.com",
+            "date_of_birth": "20-08-2001",
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert r.status_code == 201
+    body = r.json()
+    assert body["user"]["email"] == "auto@example.com"
+    assert isinstance(body["temporary_password"], str)
+    assert len(body["temporary_password"]) >= 8
+
+
+@pytest.mark.asyncio
+async def test_admin_delete_user_ok(client, users_coll, auth_mod, event_redis, deletion_logs_coll):
     await users_coll.insert_one(
         {
             "user_id": "u_del2",
@@ -158,7 +200,7 @@ async def test_admin_delete_user_ok(client, users_coll, auth_mod):
             "is_admin": False,
             "plan": 0,
             "created_at": _now_utc(),
-            "age": None,
+            "date_of_birth": None,
             "total_guesses": 0,
             "total_correct": 0,
             "acc_guessing_ai": 0,
@@ -167,7 +209,13 @@ async def test_admin_delete_user_ok(client, users_coll, auth_mod):
     )
     admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
 
-    r = await client.delete("/admin/user/u_del2", headers={"Authorization": f"Bearer {admin_token}"})
+    # Delete request must include reason fields.
+    r = await client.request(
+        "DELETE",
+        "/admin/user/u_del2",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"reason_code": "user_request", "reason_detail": "Requested account removal"},
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["deleted"] is True
@@ -176,3 +224,37 @@ async def test_admin_delete_user_ok(client, users_coll, auth_mod):
 
     doc = await users_coll.find_one({"user_id": "u_del2"})
     assert doc is None
+
+    assert len(deletion_logs_coll.docs) == 1
+    assert deletion_logs_coll.docs[0]["deleted_user_id"] == "u_del2"
+
+    # Check event was published for email-worker.
+    assert len(event_redis.calls) == 1
+    call = event_redis.calls[0]
+    assert call["stream"] == "auth-events"
+    assert call["payload"]["type"] == "auth.user.deleted.admin"
+
+
+@pytest.mark.asyncio
+async def test_admin_delete_user_requires_reason_payload(client, users_coll, auth_mod):
+    await users_coll.insert_one(
+        {
+            "user_id": "u_del3",
+            "user_name": "Del",
+            "email": "del3@example.com",
+            "password": _bcrypt_hash("x"),
+            "is_admin": False,
+            "plan": 0,
+            "created_at": _now_utc(),
+            "date_of_birth": None,
+            "total_guesses": 0,
+            "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
+        }
+    )
+    admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
+
+    # No body -> FastAPI schema error.
+    r = await client.delete("/admin/user/u_del3", headers={"Authorization": f"Bearer {admin_token}"})
+    assert r.status_code == 422

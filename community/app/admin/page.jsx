@@ -2,6 +2,7 @@
 import { useState } from "react";
 import ModelManagement from "./components/ModelManagement";
 import PostManagement from "./components/PostManagement";
+import UserManagement from "./components/UserManagement";
 
 export default function AdminPage() {
   const [activeView, setActiveView] = useState("model_management");
@@ -26,6 +27,9 @@ export default function AdminPage() {
           <button className={getLinkClass("model_management")} onClick={() => setActiveView("model_management")}>
             Model Management
           </button>
+          <button className={getLinkClass("user_management")} onClick={() => setActiveView("user_management")}>
+            User Management
+          </button>
           <button className={getLinkClass("post_management")} onClick={() => setActiveView("post_management")}>
             Post Management
           </button>
@@ -40,6 +44,7 @@ export default function AdminPage() {
 
       <main className="flex-1 min-w-0 h-full">
         {activeView === "model_management" && <ModelManagement />}
+        {activeView === "user_management" && <UserManagement />}
         {activeView === "post_management" && <PostManagement />}
       </main>
     </div>

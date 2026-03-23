@@ -109,6 +109,21 @@
   color: #CFB87C;
 }
 
+.comm_headerNameLink {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.comm_headerNameLink:hover {
+  text-decoration: underline;
+  color: #e8d49a;
+}
+
+.comm_commentMeta .comm_headerNameLink {
+  color: #CFB87C;
+  font-weight: 600;
+}
+
 .comm_headerTime {
   font-size: 12px;
   opacity: 0.55;

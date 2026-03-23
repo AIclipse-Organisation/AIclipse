@@ -31,15 +31,12 @@ body {
 .topbar {
   position: relative;
   display: flex;
-  padding: 10px 160px;
-  background-color: #222222;
-  ;
-  height: 56px;
+  height: 76px;
   background: #222222;
   border-bottom: 1px solid #2c2c2c;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 10px 16px;
 }
 
 /* Hamburger */

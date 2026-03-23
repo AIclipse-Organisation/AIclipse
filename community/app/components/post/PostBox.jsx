@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import "../../styles/postBox.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -15,15 +16,14 @@ import {
 import { useDisclosure } from "@heroui/react";
 import ReportModal from "../modals/ReportModal";
 import { useXp } from "../../lib/xpContext";
+import { timeAgo } from "../../lib/timeAgo";
 import { useXpFloat, XpFloatLayer } from "../common/XpFloat";
 
 import PostHeader from "./PostHeader";
 import PostMedia from "./PostMedia";
 import PostResults from "./PostResults";
 import PostControls from "./PostControls";
-// import PostComments from "./PostComments";
 import PostCommentsDrawer from "./PostCommentsDrawer";
-import {timeAgo} from "./utils/timeAgo.js"
 
 export default function PostBox({
   image,
@@ -45,9 +45,9 @@ export default function PostBox({
   const [menuOpen, setMenuOpen] = useState(false);
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
 
-const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
-const { 
+  const { 
     isOpen: isCommentsOpen, 
     onOpen: onCommentsOpen, 
     onOpenChange: onCommentsChange 
@@ -79,7 +79,8 @@ const {
   }, [userHasVoted, userVote, groundTruth]);
 
   const posterName = image?.user_name || "Unknown";
-const timeText = useMemo(() => {
+  
+  const timeText = useMemo(() => {
     const rawDate = image?.created_at || image?.uploaded_at;
     return timeAgo(rawDate);
   }, [image?.created_at, image?.uploaded_at]);
@@ -103,11 +104,11 @@ const timeText = useMemo(() => {
     setRevealPhase((prev) => (prev === "idle" && image?.user_vote ? "pre-existing" : prev));
   }, [image?.user_vote, isOfficial]);
 
- useEffect(() => {
+  useEffect(() => {
     if (postId && isCommentsOpen && comments.length === 0) {
       loadComments();
     }
-  }, [postId, isCommentsOpen]);
+  }, [postId, isCommentsOpen, comments.length]);
 
   // --- HANDLERS ---
   function startRevealAnimation() {
