@@ -101,6 +101,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   let lastPreviewUrl = null;
   let doNotShowDisclaimerAgain = false;
+  let disclaimerAcceptedThisSession = false;
   let resumeTutorialAfterPicker = null;
 
   function suspendTutorialForFilePicker() {
@@ -273,7 +274,7 @@ window.addEventListener("DOMContentLoaded", () => {
         window.AIclipseTutorial.emit("upload-choose-image-clicked");
       }
 
-      if (doNotShowDisclaimerAgain) {
+      if (doNotShowDisclaimerAgain || disclaimerAcceptedThisSession) {
         if (window.AIclipseTutorial && typeof window.AIclipseTutorial.emit === "function") {
           window.AIclipseTutorial.emit("upload-disclaimer-agreed");
         }
@@ -314,6 +315,7 @@ window.addEventListener("DOMContentLoaded", () => {
         }
       }
 
+      disclaimerAcceptedThisSession = true;
       closeDisclaimerModal();
 
       if (window.AIclipseTutorial && typeof window.AIclipseTutorial.emit === "function") {

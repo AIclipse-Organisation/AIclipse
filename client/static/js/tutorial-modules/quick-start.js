@@ -2,92 +2,169 @@
   const registry = window.AIclipseTutorialRegistry;
   if (!registry || typeof registry.registerModule !== "function") return;
 
+  function getCheckStateText() {
+    const el = document.getElementById("check-state");
+    return (el?.textContent || "").trim().toLowerCase();
+  }
+
+  function isTooLargeState() {
+    const text = getCheckStateText();
+    if (!text) return false;
+
+    return (
+      text.includes("too large") ||
+      text.includes("max allowed") ||
+      (text.includes("large") && text.includes("mb"))
+    );
+  }
+
+  function hasSelectedValidImage() {
+    if (isTooLargeState()) return false;
+
+    const fileInput = document.getElementById("file-input");
+    if (fileInput?.files?.length) return true;
+    if (window.lastFile) return true;
+
+    const previewWrap = document.getElementById("upload-preview-wrap");
+    const previewImage = document.getElementById("preview-image");
+
+    return !!previewImage?.getAttribute("src") && previewWrap?.hidden === false;
+  }
+
+  function hasDetectionReady() {
+    if (window.location.pathname === "/results") return true;
+    if (window.lastDetectionToken) return true;
+    if (sessionStorage.getItem("lastDetectionToken")) return true;
+    if (sessionStorage.getItem("lastDetectionResponse")) return true;
+    return false;
+  }
+
+  function isPrivateSelected() {
+    const savePublic = document.getElementById("save-public");
+    if (!savePublic) return true;
+    return !savePublic.checked;
+  }
+
+  function openDrawer() {
+    if (window.AIclipseNavDrawer && typeof window.AIclipseNavDrawer.open === "function") {
+      window.AIclipseNavDrawer.open();
+      return;
+    }
+
+    const drawer = document.getElementById("nav-drawer");
+    const overlay = document.getElementById("menu-overlay");
+
+    if (drawer) drawer.classList.add("active");
+    if (overlay) overlay.style.display = "block";
+  }
+
   registry.registerModule({
     id: "quick_start",
     title: "Quick start",
-    description:
-      "Learn the full private scan flow: choose an image, understand the result, and save it privately.",
+    description: "Learn the private scan flow from upload to saved scans.",
     steps: [
-      {
-        id: "quick-start-upload-intro",
-        pageId: "upload",
-        selector: ".upload-content",
-        title: "This is where every scan starts",
-        body: [
-          "You begin by choosing one image, checking the crop, and then sending that cropped view for analysis.",
-          "Use this first walkthrough to learn the flow, not to prove a final truth. AIclipse gives you a probability signal, so the habit to build is review first, then decide whether to save or share.",
-        ],
-        nextLabel: "Next",
-        allowTargetClick: false,
-      },
       {
         id: "quick-start-choose-image",
         pageId: "upload",
         selector: "label.file-upload",
-        title: "Choose one image to inspect",
+        title: "",
         body: [
-          "Open your file picker and select a clear image. A strong first test is one where the face or edited area is easy to see.",
-          "Why this matters: the detector can only judge what you give it. If the important area is tiny, blurry, or cropped out, the result becomes less useful.",
+          "Choose the image you want to check.",
         ],
         completeEvent: "upload-choose-image-clicked",
         allowTargetClick: true,
+        isSatisfied() {
+          return hasSelectedValidImage();
+        },
+      },
+      {
+        id: "quick-start-disclaimer-read",
+        pageId: "upload",
+        selector: "#disclaimer-modal .modal-text--disclaimer",
+        title: "",
+        body: [
+            "Read this note before scanning. You can open the full terms here if you want more detail, and you can continue only if you agree.",
+        ],
+        nextLabel: "Next",
+        allowTargetClick: false,
+        allowDirectInteraction: true,
       },
       {
         id: "quick-start-disclaimer",
         pageId: "upload",
         selector: "#disclaimer-agree",
-        title: "Read why consent appears before processing",
+        title: "",
         body: [
-          "Before AIclipse processes an image, it explains how the file is handled. This is here so you understand what is analyzed, when data is stored, and what changes if you later choose to post publicly.",
-          "Tap I agree to continue with the tutorial.",
+            "If everything is clear, agree to continue with the scan.",
         ],
         completeEvent: "upload-disclaimer-agreed",
         allowTargetClick: true,
+        isSatisfied() {
+            return hasSelectedValidImage();
+        },
       },
       {
         id: "quick-start-file-picker",
         pageId: "upload",
         selector: null,
-        title: "Pick one file from your device",
+        title: "",
         body: [
-          "Your device file picker is open now. Choose one image to continue.",
-          "For a first test, use a single clear image rather than a collage, screenshot strip, or very compressed file. That makes the result easier to interpret.",
+          "Choose the file you want to scan.",
         ],
         completeEvent: "upload-file-selected",
         allowTargetClick: false,
+        isSatisfied() {
+          return hasSelectedValidImage();
+        },
+        beforeShow() {
+          if (!isTooLargeState()) return null;
+
+          return {
+            id: "quick-start-file-too-large",
+            selector: ".upload-actions",
+            hitTargetSelector: "label.file-upload",
+            title: "",
+            body: [
+              "This image is too large, so choose a smaller one to continue.",
+            ],
+            completeEvent: "upload-file-selected",
+            allowTargetClick: true,
+          };
+        },
       },
       {
         id: "quick-start-crop",
         pageId: "upload",
         selector: "#upload-frame",
-        title: "Adjust what the model will actually inspect",
+        title: "",
         body: [
-          "This square is the exact view that will be analyzed. Drag the image until the most important area sits well inside the frame.",
-          "You are not editing the original file here. You are only deciding which part AIclipse should inspect first. If the framing looks wrong, reset it and try again.",
+          "AIclipse reads the area inside this frame first, so check that the important part is inside it.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
+        note: ["Read-only for this step."],
       },
       {
         id: "quick-start-analyze",
         pageId: "upload",
         selector: "#btn-check",
-        title: "Run the scan",
+        title: "",
         body: [
-          "When the crop looks right, start the scan.",
-          "From here, AIclipse analyzes the cropped image and prepares a result screen where you can review the signal before deciding what to do next.",
+          "Run the scan when the frame looks right, and AIclipse will open the result screen.",
         ],
         completeEvent: "scan-analysis-success",
         allowTargetClick: true,
+        isSatisfied() {
+          return hasDetectionReady();
+        },
       },
       {
         id: "quick-start-results-overview",
         pageId: "results",
         selector: "#detect-card",
-        title: "Treat the result as evidence, not as absolute truth",
+        title: "",
         body: [
-          "This card summarizes the detector's judgment for the scan you just ran.",
-          "A strong result can guide your next step, but good practice is to combine it with context: where the image came from, whether it was re-shared many times, and whether visual artifacts support the score.",
+          "Read this result as a strong signal, not as final proof on its own.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
@@ -96,10 +173,9 @@
         id: "quick-start-confidence-bar",
         pageId: "results",
         selector: ".progress-panel",
-        title: "What the probability bar actually means",
+        title: "",
         body: [
-          "The bar shows how strongly the model leans toward AI-generated content for this scan.",
-          "High confidence does not mean certainty, and lower confidence does not mean the image is safe. It means the signal is weaker, so interpretation should be more careful.",
+          "A higher score means the model sees a stronger AI-like pattern in the image.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
@@ -108,27 +184,25 @@
         id: "quick-start-private-mode",
         pageId: "results",
         selector: ".visibility-selector",
-        title: "Keep your first scan private",
+        title: "",
         body: [
-          "For this walkthrough, stay in Private mode. Private is the safer default when you are still learning how to read the result or when the image may be sensitive.",
-          "You can always publish a later scan, but starting private helps you review before exposing anything to the community.",
+          "Keep this first scan in `Private`, because that is the safer way to learn the flow.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
         beforeShow() {
-          const savePublic = document.getElementById("save-public");
-          if (!savePublic || savePublic.checked !== true) return null;
+          if (isPrivateSelected()) return null;
 
           return {
+            id: "quick-start-private-mode-fix",
             selector: "#mode-private",
-            title: "Switch back to Private before saving",
+            title: "",
             body: [
-              "This tutorial follows the private flow, so change the visibility back to Private now.",
-              "Why: Public is for community posts. Private saves the scan only to your profile, which is the better default for a first run or for sensitive images.",
+              "Switch back to `Private`, because this walkthrough follows the private flow.",
             ],
             completeEvent: "results-private-selected",
-            advanceOnComplete: false,
             allowTargetClick: true,
+            advanceOnComplete: false,
           };
         },
       },
@@ -136,25 +210,42 @@
         id: "quick-start-save",
         pageId: "results",
         selector: "#btn-save",
-        title: "Save the scan to your profile",
+        title: "",
         body: [
-          "Now save the scan. This stores the result in your account so you can return to it later.",
-          "Because this flow stays private, the action saves the scan for you only and does not publish anything to the Community feed.",
+          "Save the scan to your profile so you can come back to it later.",
         ],
         completeEvent: "private-save-success",
         allowTargetClick: true,
+        isSatisfied() {
+          return window.location.pathname === "/profile";
+        },
       },
       {
         id: "quick-start-profile",
         pageId: "profile",
         selector: "#scans-container",
-        title: "This is where you find saved scans later",
+        title: "",
         body: [
-          "Your saved scans live here. Use this area to review past results, compare images, or come back later before deciding whether anything should be shared more widely.",
-          "You have finished the quick start.",
+          "This is your private review area, where saved scans stay easy to find.",
+        ],
+        nextLabel: "Next",
+        allowTargetClick: false,
+      },
+      {
+        id: "quick-start-tutorials-shortcut",
+        pageId: "profile",
+        selector: '#nav-drawer a[href="/tutorials"]',
+        title: "",
+        body: [
+          "If you want guided help later, open `Tutorials` from here and the app will walk you through the flow again.",
         ],
         nextLabel: "Finish",
         allowTargetClick: false,
+        elevateSelectors: ["#nav-drawer", "#menu-overlay"],
+        beforeShow() {
+          openDrawer();
+          return null;
+        },
       },
     ],
   });

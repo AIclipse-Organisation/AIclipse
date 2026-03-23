@@ -33,7 +33,7 @@
 .aiclipse-tutorial-card {
   position: fixed;
   width: min(92vw, 430px);
-  max-height: min(72vh, 560px);
+  max-height: min(68vh, 520px);
   overflow: auto;
   background: #222222;
   border: 1px solid #343434;
@@ -49,11 +49,18 @@
 }
 
 .aiclipse-tutorial-head {
-  padding: 16px 18px 8px;
+  padding: 14px 16px 6px;
+}
+
+.aiclipse-tutorial-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
 }
 
 .aiclipse-tutorial-kicker {
-  margin-bottom: 8px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -61,18 +68,25 @@
   color: #CFB87C;
 }
 
+.aiclipse-tutorial-tracker {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(207, 184, 124, 0.85);
+}
+
 .aiclipse-tutorial-title {
   margin: 0;
-  font-size: 18px;
-  line-height: 1.25;
+  font-size: 14px;
+  font-weight: 800;
   color: #ffffff;
 }
 
 .aiclipse-tutorial-body {
-  padding: 0 18px 16px;
+  padding: 0 16px 12px;
   font-size: 14px;
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.84);
 }
 
 .aiclipse-tutorial-body p {
@@ -80,14 +94,39 @@
 }
 
 .aiclipse-tutorial-body p + p {
-  margin-top: 10px;
+  margin-top: 8px;
+}
+
+.aiclipse-tutorial-body strong {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.aiclipse-tutorial-inline-ui {
+  color: #CFB87C;
+  font-weight: 800;
+}
+
+.aiclipse-tutorial-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.aiclipse-tutorial-note p {
+  margin: 0;
+}
+
+.aiclipse-tutorial-note p + p {
+  margin-top: 4px;
 }
 
 .aiclipse-tutorial-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
-  padding: 0 18px 18px;
+  padding: 0 16px 16px;
 }
 
 .aiclipse-tutorial-btn {
@@ -101,16 +140,7 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-}
-
-.aiclipse-tutorial-btn--primary {
-  border-color: #CFB87C;
-  color: #CFB87C;
-}
-
-.aiclipse-tutorial-btn--primary:hover {
-  background: #CFB87C;
-  color: #111111;
+  min-width: 96px;
 }
 
 .aiclipse-tutorial-btn--neutral {
@@ -123,10 +153,26 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
+.aiclipse-tutorial-btn--primary {
+  margin-left: auto;
+  border-color: #CFB87C;
+  color: #CFB87C;
+}
+
+.aiclipse-tutorial-btn--primary:hover {
+  background: #CFB87C;
+  color: #111111;
+}
+
 .aiclipse-tutorial-target {
   position: relative !important;
   z-index: 4201 !important;
-  background-color: rgba(207, 184, 124, 0.1) !important;
+  background-color: rgba(207, 184, 124, 0.08) !important;
   box-shadow: none !important;
   outline: none !important;
+}
+
+.aiclipse-tutorial-elevated {
+  position: relative !important;
+  z-index: 4201 !important;
 }

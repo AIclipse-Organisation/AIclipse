@@ -35,9 +35,11 @@
   let uiSuspended = false;
   let trackingFrame = 0;
   let trackedTarget = null;
+  let trackedClickTarget = null;
   let renderedStepKey = "";
   let autoScrolledStepKey = "";
   let hitboxMode = "hidden";
+  let elevatedElements = [];
 
   function getUserScope() {
     const fromBody = document.body?.dataset?.tutorialUser;
@@ -187,18 +189,35 @@
       .replaceAll("'", "&#39;");
   }
 
-  function normalizeBody(body) {
-    if (Array.isArray(body)) return body.filter(Boolean).map(String);
-    if (body == null || body === "") return [];
-    return [String(body)];
+  function formatInlineText(value) {
+    let safe = escapeHtml(value);
+    safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    safe = safe.replace(/`([^`]+)`/g, '<span class="aiclipse-tutorial-inline-ui">$1</span>');
+    return safe;
   }
 
-  function renderBodyHtml(body) {
-    const paragraphs = normalizeBody(body);
-    if (!paragraphs.length) return "";
-    return paragraphs
-      .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
-      .join("");
+  function normalizeTextBlocks(value) {
+    if (Array.isArray(value)) return value.filter(Boolean).map(String);
+    if (value == null || value === "") return [];
+    return [String(value)];
+  }
+
+  function renderParagraphsHtml(value) {
+    const blocks = normalizeTextBlocks(value);
+    if (!blocks.length) return "";
+
+    return blocks.map((item) => `<p>${formatInlineText(item)}</p>`).join("");
+  }
+
+  function renderNoteHtml(step) {
+    const noteBlocks = normalizeTextBlocks(step?.note);
+    if (!noteBlocks.length) return "";
+
+    return `
+      <div class="aiclipse-tutorial-note">
+        ${noteBlocks.map((item) => `<p>${formatInlineText(item)}</p>`).join("")}
+      </div>
+    `;
   }
 
   function ensureDom() {
@@ -233,11 +252,9 @@
         event.preventDefault();
         event.stopPropagation();
 
-        if (hitboxMode !== "click") {
-          return;
-        }
+        if (hitboxMode !== "click") return;
 
-        const target = trackedTarget;
+        const target = trackedClickTarget || trackedTarget;
         if (!target || !isVisibleElement(target)) return;
 
         if (typeof target.click === "function") {
@@ -272,6 +289,29 @@
       el.classList.remove("aiclipse-tutorial-target");
     });
     trackedTarget = null;
+    trackedClickTarget = null;
+  }
+
+  function clearElevatedElements() {
+    elevatedElements.forEach((el) => {
+      el.classList.remove("aiclipse-tutorial-elevated");
+    });
+    elevatedElements = [];
+  }
+
+  function applyElevatedSelectors(step) {
+    clearElevatedElements();
+
+    const selectors = Array.isArray(step?.elevateSelectors)
+      ? step.elevateSelectors.filter(Boolean)
+      : [];
+
+    selectors.forEach((selector) => {
+      document.querySelectorAll(selector).forEach((el) => {
+        el.classList.add("aiclipse-tutorial-elevated");
+        elevatedElements.push(el);
+      });
+    });
   }
 
   function stopTracking() {
@@ -315,8 +355,11 @@
   function hideUi() {
     stopTracking();
     clearOverlayStyles();
+    clearElevatedElements();
+
     const { card } = ensureDom();
     card.innerHTML = "";
+
     clearTargetHighlight();
     renderedStepKey = "";
   }
@@ -338,9 +381,9 @@
     return rect.width > 0 && rect.height > 0;
   }
 
-  function findTarget(step) {
-    if (!step || !step.selector) return null;
-    const el = document.querySelector(step.selector);
+  function findTarget(selector) {
+    if (!selector) return null;
+    const el = document.querySelector(selector);
     if (!isVisibleElement(el)) return null;
     return el;
   }
@@ -370,14 +413,15 @@
     return style.borderRadius || "0px";
   }
 
-  function applyTargetHighlight(target) {
-    if (trackedTarget === target) return;
+  function applyTargetHighlight(target, clickTarget = null) {
+    if (trackedTarget === target && trackedClickTarget === (clickTarget || target)) return;
 
     clearTargetHighlight();
 
     if (target) {
       target.classList.add("aiclipse-tutorial-target");
       trackedTarget = target;
+      trackedClickTarget = clickTarget || target;
     }
   }
 
@@ -493,7 +537,6 @@
     const canPlaceAbove = rect.top - gap - cardHeight >= margin;
 
     let top;
-    const left = centeredLeft;
 
     if (canPlaceBelow) {
       top = rect.bottom + gap;
@@ -519,7 +562,7 @@
     }
 
     card.style.top = `${Math.round(top)}px`;
-    card.style.left = `${Math.round(left)}px`;
+    card.style.left = `${Math.round(centeredLeft)}px`;
     card.style.transform = "none";
   }
 
@@ -533,54 +576,6 @@
     if (!path) return;
     if (normalizePathname(window.location.pathname) === normalizePathname(path)) return;
     window.location.href = path;
-  }
-
-  function renderCard({ kicker, title, body, actions, target = null, stepKey = "" }) {
-    const { card } = openUi();
-
-    renderedStepKey = stepKey;
-
-    card.innerHTML = `
-      <div class="aiclipse-tutorial-head">
-        ${kicker ? `<div class="aiclipse-tutorial-kicker">${escapeHtml(kicker)}</div>` : ""}
-        <h3 class="aiclipse-tutorial-title">${escapeHtml(title)}</h3>
-      </div>
-      <div class="aiclipse-tutorial-body">${renderBodyHtml(body)}</div>
-      ${
-        actions.length
-          ? `
-        <div class="aiclipse-tutorial-actions">
-          ${actions
-            .map(
-              (action, index) => `
-                <button
-                  type="button"
-                  class="aiclipse-tutorial-btn ${escapeHtml(action.variant)}"
-                  data-action-index="${index}"
-                >
-                  ${escapeHtml(action.label)}
-                </button>
-              `,
-            )
-            .join("")}
-        </div>
-      `
-          : ""
-      }
-    `;
-
-    card.querySelectorAll("[data-action-index]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const index = Number(btn.getAttribute("data-action-index"));
-        const action = actions[index];
-        if (action && typeof action.onClick === "function") {
-          action.onClick();
-        }
-      });
-    });
-
-    applyTargetHighlight(target);
-    startTracking();
   }
 
   function markModuleCompleted(moduleId) {
@@ -599,6 +594,148 @@
     setProgress(progress);
   }
 
+  function isStepSatisfied(runtime, module, step) {
+    if (!step || typeof step.isSatisfied !== "function") return false;
+
+    try {
+      return !!step.isSatisfied({
+        runtime,
+        module,
+        step,
+        api: API,
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  function moveRuntimeForward(detail = {}) {
+    const runtime = getRuntime();
+    const module = getModule(runtime.moduleId);
+
+    if (!module) {
+      clearRuntime();
+      hideUi();
+      return null;
+    }
+
+    runtime.stepIndex = runtime.stepIndex + 1;
+    runtime.paused = false;
+    runtime.context = { ...(runtime.context || {}), ...detail };
+    setRuntime(runtime);
+    autoScrolledStepKey = "";
+
+    const nextStep = module.steps[runtime.stepIndex] || null;
+
+    if (!nextStep) {
+      markModuleCompleted(runtime.moduleId);
+      clearRuntime();
+      hideUi();
+      return null;
+    }
+
+    return { runtime, module, nextStep };
+  }
+
+  function maybeAdvanceSatisfiedSteps() {
+    let advanced = false;
+
+    for (let guard = 0; guard < 20; guard += 1) {
+      const runtime = getRuntime();
+      if (!runtime.moduleId || runtime.paused) return advanced;
+
+      const module = getModule(runtime.moduleId);
+      const step = resolveStep(runtime);
+
+      if (!module || !step) return advanced;
+      if (!isStepSatisfied(runtime, module, step)) return advanced;
+
+      const moved = moveRuntimeForward({
+        autoSatisfiedStepId: step.id || null,
+      });
+
+      advanced = true;
+
+      if (!moved) {
+        return true;
+      }
+    }
+
+    return advanced;
+  }
+
+  function renderCard({
+    kicker,
+    tracker = "",
+    title,
+    step,
+    actions,
+    target = null,
+    clickTarget = null,
+    stepKey = "",
+  }) {
+    const { card } = openUi();
+
+    renderedStepKey = stepKey;
+
+    card.innerHTML = `
+      <div class="aiclipse-tutorial-head">
+        ${
+          kicker || tracker
+            ? `
+              <div class="aiclipse-tutorial-meta">
+                <div class="aiclipse-tutorial-kicker">${escapeHtml(kicker || "")}</div>
+                ${tracker ? `<div class="aiclipse-tutorial-tracker">${escapeHtml(tracker)}</div>` : ""}
+              </div>
+            `
+            : ""
+        }
+        ${title ? `<h3 class="aiclipse-tutorial-title">${formatInlineText(title)}</h3>` : ""}
+      </div>
+
+      <div class="aiclipse-tutorial-body">
+        ${renderParagraphsHtml(step?.body)}
+        ${renderNoteHtml(step)}
+      </div>
+
+      ${
+        actions.length
+          ? `
+            <div class="aiclipse-tutorial-actions">
+              ${actions
+                .map(
+                  (action, index) => `
+                    <button
+                      type="button"
+                      class="aiclipse-tutorial-btn ${escapeHtml(action.variant)}"
+                      data-action-index="${index}"
+                    >
+                      ${formatInlineText(action.label)}
+                    </button>
+                  `,
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+    `;
+
+    card.querySelectorAll("[data-action-index]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const index = Number(btn.getAttribute("data-action-index"));
+        const action = actions[index];
+        if (action && typeof action.onClick === "function") {
+          action.onClick();
+        }
+      });
+    });
+
+    applyElevatedSelectors(step);
+    applyTargetHighlight(target, clickTarget);
+    startTracking();
+  }
+
   function maybeShowWelcome() {
     const progress = getProgress();
     const runtime = getRuntime();
@@ -610,21 +747,11 @@
     renderCard({
       kicker: "Welcome",
       title: "Get started with AIclipse",
-      body: [
-        "Start the quick tour now or open Tutorials from the menu later.",
-      ],
+      step: {
+        body: ["Start the quick tour now or open `Tutorials` from the menu later."],
+      },
       stepKey: "welcome",
       actions: [
-        {
-          label: "Start quick tour",
-          variant: "aiclipse-tutorial-btn--primary",
-          onClick: () => {
-            const next = getProgress();
-            next.welcomeSeenVersion = VERSION;
-            setProgress(next);
-            API.startModule("quick_start");
-          },
-        },
         {
           label: "Not now",
           variant: "aiclipse-tutorial-btn--neutral",
@@ -636,6 +763,16 @@
             hideUi();
           },
         },
+        {
+          label: "Start quick tour",
+          variant: "aiclipse-tutorial-btn--primary",
+          onClick: () => {
+            const next = getProgress();
+            next.welcomeSeenVersion = VERSION;
+            setProgress(next);
+            API.startModule("quick_start");
+          },
+        },
       ],
     });
   }
@@ -643,6 +780,12 @@
   function buildStepActions(module, step, runtime) {
     const actions = [];
     const isFinalStep = runtime.stepIndex >= module.steps.length - 1;
+
+    actions.push({
+      label: "Not now",
+      variant: "aiclipse-tutorial-btn--neutral",
+      onClick: () => API.pause(),
+    });
 
     if (step.nextLabel) {
       actions.push({
@@ -657,12 +800,6 @@
         onClick: () => API.nextStep(),
       });
     }
-
-    actions.push({
-      label: "Not now",
-      variant: "aiclipse-tutorial-btn--neutral",
-      onClick: () => API.pause(),
-    });
 
     return actions;
   }
@@ -693,12 +830,20 @@
       return;
     }
 
-    const module = getModule(runtime.moduleId);
-    const step = resolveStep(runtime);
+    if (maybeAdvanceSatisfiedSteps()) {
+      const updatedRuntime = getRuntime();
+      if (!updatedRuntime.moduleId) return;
+      renderActiveStep();
+      return;
+    }
+
+    const updatedRuntime = getRuntime();
+    const module = getModule(updatedRuntime.moduleId);
+    const step = resolveStep(updatedRuntime);
 
     if (!module || !step) {
-      if (runtime.moduleId) {
-        markModuleCompleted(runtime.moduleId);
+      if (updatedRuntime.moduleId) {
+        markModuleCompleted(updatedRuntime.moduleId);
       }
       clearRuntime();
       hideUi();
@@ -710,7 +855,8 @@
       return;
     }
 
-    const target = step.selector ? findTarget(step) : null;
+    const target = step.selector ? findTarget(step.selector) : null;
+    const clickTarget = step.hitTargetSelector ? findTarget(step.hitTargetSelector) : target;
 
     if (step.selector && !target) {
       hideUi();
@@ -718,16 +864,24 @@
       return;
     }
 
-    const stepNumber = runtime.stepIndex + 1;
+    if (step.hitTargetSelector && !clickTarget) {
+      hideUi();
+      scheduleRefresh();
+      return;
+    }
+
+    const stepNumber = updatedRuntime.stepIndex + 1;
     const totalSteps = module.steps.length;
 
     renderCard({
-      kicker: `${module.title} · Step ${stepNumber} of ${totalSteps}`,
+      kicker: module.title,
+      tracker: `${stepNumber} / ${totalSteps}`,
       title: step.title,
-      body: step.body,
+      step,
       target,
-      actions: buildStepActions(module, step, runtime),
-      stepKey: getStepKey(runtime, step),
+      clickTarget,
+      actions: buildStepActions(module, step, updatedRuntime),
+      stepKey: getStepKey(updatedRuntime, step),
     });
   }
 
@@ -752,24 +906,43 @@
       return;
     }
 
-    const step = resolveStep(runtime);
+    if (maybeAdvanceSatisfiedSteps()) {
+      const updatedRuntime = getRuntime();
+      if (!updatedRuntime.moduleId) return;
+      renderActiveStep();
+      return;
+    }
+
+    const updatedRuntime = getRuntime();
+    const step = resolveStep(updatedRuntime);
+
     if (!step || step.pageId !== pageId) {
       hideUi();
       return;
     }
 
-    const stepKey = getStepKey(runtime, step);
+    const stepKey = getStepKey(updatedRuntime, step);
     if (renderedStepKey !== stepKey) {
       renderActiveStep();
       return;
     }
 
-    const target = step.selector ? findTarget(step) : null;
+    const target = step.selector ? findTarget(step.selector) : null;
+    const clickTarget = step.hitTargetSelector ? findTarget(step.hitTargetSelector) : target;
+
     if (step.selector && !target) {
       hideUi();
       scheduleRefresh();
       return;
     }
+
+    if (step.hitTargetSelector && !clickTarget) {
+      hideUi();
+      scheduleRefresh();
+      return;
+    }
+
+    applyElevatedSelectors(step);
 
     let rect = null;
     if (target) {
@@ -778,9 +951,15 @@
       rect = getClampedRect(target.getBoundingClientRect());
     }
 
-    applyTargetHighlight(target);
+    applyTargetHighlight(target, clickTarget);
     positionShades(rect);
-    positionHitbox(rect, target, target ? (step.allowTargetClick ? "click" : "block") : "hidden");
+    positionHitbox(
+      rect,
+      target,
+      target
+        ? (step.allowDirectInteraction ? "hidden" : step.allowTargetClick ? "click" : "block")
+        : "hidden",
+    );
     positionCard(card, rect);
   }
 
@@ -801,39 +980,17 @@
   }
 
   function advanceRuntime(detail = {}, navigateFromTutorialsPage = false) {
-    const runtime = getRuntime();
-    const module = getModule(runtime.moduleId);
-
-    if (!module) {
-      clearRuntime();
-      hideUi();
-      return;
-    }
-
-    runtime.stepIndex = runtime.stepIndex + 1;
-    runtime.paused = false;
-    runtime.context = { ...(runtime.context || {}), ...detail };
-    setRuntime(runtime);
-
-    const nextStep = module.steps[runtime.stepIndex] || null;
-
-    if (!nextStep) {
-      markModuleCompleted(runtime.moduleId);
-      clearRuntime();
-      hideUi();
-      return;
-    }
-
-    autoScrolledStepKey = "";
+    const moved = moveRuntimeForward(detail);
+    if (!moved) return;
 
     const currentPageId = getCurrentPageId();
 
-    if (navigateFromTutorialsPage && nextStep.pageId !== currentPageId) {
-      navigateToStep(nextStep);
+    if (navigateFromTutorialsPage && moved.nextStep.pageId !== currentPageId) {
+      navigateToStep(moved.nextStep);
       return;
     }
 
-    if (nextStep.pageId !== currentPageId) {
+    if (moved.nextStep.pageId !== currentPageId) {
       hideUi();
       return;
     }
