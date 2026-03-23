@@ -19,53 +19,67 @@ export default function Page() {
 
   const observerTarget = useRef(null); // Sentinel ref for infinite scroll
 
+  const imageMapRef = useRef(new Map());
+  const loadPosts = useCallback(
+    async (pageNum, signal) => {
+      if (loading) return;
+      setLoading(true);
 
- const loadPosts = useCallback(async (pageNum, signal) => {
-    if (loading) return;
-    setLoading(true);
+      try {
+        // 1. Fetch the paginated posts
+        const postsRes = await fetch(
+          `/community/posts?page=${pageNum}&limit=12`,
+          { credentials: "include", signal },
+        );
+        if (!postsRes.ok) throw new Error("Failed to load posts");
 
-    try {
-      // Just fetch the posts! The backend now includes the image data automatically.
-      const postsRes = await fetch(`/community/posts?page=${pageNum}&limit=12`, { 
-        credentials: "include", 
-        signal 
-      });
+        const posts = await postsRes.json().catch(() => ({}));
+        const postItems = posts.items || [];
 
-      if (!postsRes.ok) {
-        throw new Error("Failed to load data");
+        // 2. THE FIX: Fetch the images ONLY on page 1 (or if our cache is empty)
+        if (pageNum === 1 || imageMapRef.current.size === 0) {
+          const imgsRes = await fetch("/community/images", {
+            credentials: "include",
+            signal,
+          });
+          if (imgsRes.ok) {
+            const imgs = await imgsRes.json().catch(() => ({}));
+            const imagesList = imgs.items || [];
+            // Store in a Ref so it persists across infinite scrolls without triggering React re-renders
+            imageMapRef.current = new Map(
+              imagesList.map((img) => [img.image_id, img]),
+            );
+          }
+        }
+
+        // 3. Merge the posts with our cached image URLs
+        const merged = postItems.map((post, index) => {
+          // Grab the image data (with the proper URL) from our cache
+          const img = imageMapRef.current.get(post.image_id) || {};
+
+          // --- MVP TRENDING FIX ---
+          const hasEngagement =
+            Number(post.up_vote_count) > 0 || Number(post.comment_count) > 0;
+          const isTrending = pageNum === 1 && index < 3 && hasEngagement;
+
+          return { ...img, ...post, isTrending };
+        });
+
+        // Append items if page > 1, replace if page 1
+        setItems((prev) => (pageNum === 1 ? merged : [...prev, ...merged]));
+
+        setHasMore(posts.hasMore ?? merged.length >= 12);
+      } catch (e) {
+        if (e.name !== "AbortError") {
+          setError(e?.message || "Failed to load community feed");
+        }
+      } finally {
+        setLoading(false);
+        setInitialLoad(false);
       }
-
-      const posts = await postsRes.json().catch(() => ({}));
-      const postItems = posts.items || [];
-
-      const merged = postItems.map((post, index) => {
-        // --- MVP TRENDING FIX ---
-        // 1. Check if the post has actual engagement
-        const hasEngagement = 
-         (Number(post.up_vote_count) > 0) || 
-         (Number(post.comment_count) > 0);
-
-        // 2. It is trending ONLY IF it's in the top 3 of Page 1 AND has engagement
-        const isTrending = pageNum === 1 && index < 3 && hasEngagement;
-
-        return { ...post, isTrending };
-      });
-
-      // Append items if page > 1, replace if page 1
-      setItems(prev => pageNum === 1 ? merged : [...prev, ...merged]);
-      
-      // Determine if there are more items to load
-      setHasMore(posts.hasMore ?? merged.length >= 12);
-
-    } catch (e) {
-      if (e.name !== "AbortError") {
-        setError(e?.message || "Failed to load community feed");
-      }
-    } finally {
-      setLoading(false);
-      setInitialLoad(false);
-    }
-  }, [loading]);
+    },
+    [loading],
+  );
 
   // Callback to update vote counts when a post is voted on
   const handleVoteUpdate = (postId, upVoteCount, downVoteCount) => {
@@ -97,9 +111,12 @@ export default function Page() {
 
     async function init() {
       try {
-        const meRes = await fetch("/auth/me", { credentials: "include", signal });
+        const meRes = await fetch("/auth/me", {
+          credentials: "include",
+          signal,
+        });
         const contentType = meRes.headers.get("content-type");
-        
+
         if (contentType && contentType.includes("text/html")) {
           window.location.href = "/";
           return;
@@ -112,7 +129,7 @@ export default function Page() {
             setCurrentUserName(me?.user_name || me?.email || null);
           }
         }
-        
+
         // Initial load of first page
         await loadPosts(1, signal);
       } catch (err) {
@@ -126,7 +143,7 @@ export default function Page() {
       abortController.abort();
       alive = false;
     };
-  }, []); 
+  }, []);
 
   // --- INFINITE SCROLL OBSERVER ---
   useEffect(() => {
@@ -134,10 +151,10 @@ export default function Page() {
       (entries) => {
         // If bottom sentinel is visible and we aren't already loading...
         if (entries[0].isIntersecting && hasMore && !loading && !initialLoad) {
-          setPage(prev => prev + 1);
+          setPage((prev) => prev + 1);
         }
       },
-      { threshold: 0.1, rootMargin: "300px" } // Start loading 300px before reaching bottom
+      { threshold: 0.1, rootMargin: "300px" }, // Start loading 300px before reaching bottom
     );
 
     if (observerTarget.current) {
@@ -189,10 +206,16 @@ export default function Page() {
 
         {/* SENTINEL: This invisible div detects the bottom scroll */}
         <div ref={observerTarget} className="flex justify-center py-10 w-full">
-           {loading && <div className="animate-pulse text-gray-400 text-sm">Loading more items...</div>}
-           {!hasMore && items.length > 0 && (
-             <p className="text-gray-400 text-sm italic">You've seen everything!</p>
-           )}
+          {loading && (
+            <div className="animate-pulse text-gray-400 text-sm">
+              Loading more items...
+            </div>
+          )}
+          {!hasMore && items.length > 0 && (
+            <p className="text-gray-400 text-sm italic">
+              You've seen everything!
+            </p>
+          )}
         </div>
       </section>
     </main>

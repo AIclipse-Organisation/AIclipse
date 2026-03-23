@@ -26,7 +26,7 @@ export default function PostControls({
       <div className="comm_actionsRight">
         <button ref={commentBtnRef} type="button" onClick={onToggleComments} className="comm_actionBtn comm_commentBtn">
           <img className="comm_icon" src="/static/images/comment.png" alt="" />
-          <span className="comm_actionText">({commentCount})</span>
+          {/* <span className="comm_actionText">({commentCount})</span> */}
         </button>
       </div>
     </div>

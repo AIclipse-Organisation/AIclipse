@@ -21,7 +21,9 @@ import PostHeader from "./PostHeader";
 import PostMedia from "./PostMedia";
 import PostResults from "./PostResults";
 import PostControls from "./PostControls";
-import PostComments from "./PostComments";
+// import PostComments from "./PostComments";
+import PostCommentsDrawer from "./PostCommentsDrawer";
+import {timeAgo} from "./utils/timeAgo.js"
 
 export default function PostBox({
   image,
@@ -43,7 +45,14 @@ export default function PostBox({
   const [menuOpen, setMenuOpen] = useState(false);
   const [isReported, setIsReported] = useState(Boolean(image?.is_reported));
 
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+const { isOpen, onOpen, onOpenChange } = useDisclosure();
+
+const { 
+    isOpen: isCommentsOpen, 
+    onOpen: onCommentsOpen, 
+    onOpenChange: onCommentsChange 
+  } = useDisclosure();
+
   const xp = useXp();
   const { triggerFloat, floats } = useXpFloat();
   
@@ -70,10 +79,10 @@ export default function PostBox({
   }, [userHasVoted, userVote, groundTruth]);
 
   const posterName = image?.user_name || "Unknown";
-  const timeText = useMemo(() => {
-    const d = image?.uploaded_at ? new Date(image.uploaded_at) : null;
-    return d && !Number.isNaN(d.getTime()) ? d.toLocaleString() : "";
-  }, [image?.uploaded_at]);
+const timeText = useMemo(() => {
+    const rawDate = image?.created_at || image?.uploaded_at;
+    return timeAgo(rawDate);
+  }, [image?.created_at, image?.uploaded_at]);
 
   const initials = useMemo(() => {
     const s = String(posterName || "").trim();
@@ -94,11 +103,11 @@ export default function PostBox({
     setRevealPhase((prev) => (prev === "idle" && image?.user_vote ? "pre-existing" : prev));
   }, [image?.user_vote, isOfficial]);
 
-  useEffect(() => {
-    if (postId && showComments && comments.length === 0) {
+ useEffect(() => {
+    if (postId && isCommentsOpen && comments.length === 0) {
       loadComments();
     }
-  }, [postId, showComments]);
+  }, [postId, isCommentsOpen]);
 
   // --- HANDLERS ---
   function startRevealAnimation() {
@@ -269,7 +278,7 @@ export default function PostBox({
         commentBtnRef={commentBtnRef}
         onVoteUp={() => vote("up")}
         onVoteDown={() => vote("down")}
-        onToggleComments={() => setShowComments((v) => !v)}
+        onToggleComments={onCommentsOpen}
         userHasVoted={userHasVoted}
         busy={busy}
         upCount={up}
@@ -277,17 +286,17 @@ export default function PostBox({
         commentCount={comments.length}
       />
 
-      {showComments && (
-        <PostComments
-          comments={comments}
-          currentUserId={currentUserId}
-          commentsBusy={commentsBusy}
-          commentText={commentText}
-          setCommentText={setCommentText}
-          onSubmit={submitComment}
-          onDelete={deleteComment}
-        />
-      )}
+      <PostCommentsDrawer
+        isOpen={isCommentsOpen}
+        onOpenChange={onCommentsChange}
+        comments={comments}
+        currentUserId={currentUserId}
+        commentsBusy={commentsBusy}
+        commentText={commentText}
+        setCommentText={setCommentText}
+        onSubmit={submitComment}
+        onDelete={deleteComment}
+      />
 
       {error && <div className="muted mt-2">{error}</div>}
 
