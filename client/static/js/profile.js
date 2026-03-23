@@ -4,8 +4,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   const containerEl = document.getElementById("user-details-container");
 
   try {
-    statusEl.textContent = "Loading user details...";
-    statusEl.className = "status-message loading";
+    statusEl.textContent = "";
+    statusEl.className = "status-message";
 
     const response = await fetch("/auth/me", {
       method: "GET",
@@ -75,7 +75,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     // Show container and hide status
     statusEl.textContent = "";
     statusEl.className = "status-message";
-    containerEl.style.display = "block";
+    containerEl.style.visibility = "visible";
 
     // Animate profile XP fill after container is visible (two frames to guarantee transition fires)
     requestAnimationFrame(() => {

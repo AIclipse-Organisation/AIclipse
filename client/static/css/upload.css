@@ -738,15 +738,14 @@ textarea {
 }
 
 .upload-content {
-  flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
 }
 
 .upload-actions {
   position: sticky;
-  bottom: 0;
+  bottom: 68px;
 
   display: flex;
   flex-direction: column;

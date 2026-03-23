@@ -4,6 +4,13 @@ body {
   padding: 0;
   height: 100%;
   background: #222222;
+  scrollbar-gutter: auto;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
 }
 
 .page-header {
@@ -47,15 +54,28 @@ body {
 
 /* Top bar */
 .app .topbar {
-  position: relative;
-  height: 76px;
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  height: 56px;
+  box-sizing: border-box;
   background: #222222;
   border-bottom: 1px solid #2c2c2c;
+  z-index: 100;
+  will-change: transform;
+  transition: transform 0.3s ease;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
+}
+
+.app .topbar.topbar--hidden {
+  transform: translateX(-50%) translateY(-100%);
 }
 
 .app .topbar-center {
@@ -186,12 +206,14 @@ body {
 /* Screen content area (pad bottom so it doesn't hide under navbar) */
 .app .screen {
   padding: 20px;
+  padding-top: 56px; /* topbar height (border-box) */
   padding-bottom: 80px;
   /* space for bottom nav */
 }
 
 .app .screen.screen--profile {
   padding: 0;
+  padding-top: 56px; /* topbar height */
   padding-bottom: 80px;
 }
 
@@ -400,7 +422,7 @@ body {
 /* XP Toast — floating, portal-rendered */
 .xp-toast {
   position: fixed;
-  top: 72px;
+  top: 56px;
   transform: translateX(-50%);
   z-index: 9000;
 

@@ -126,3 +126,24 @@
 </aside>
 
 <script src="/static/js/auth-ui.js" defer></script>
+<script>
+  (function () {
+    var lastScrollTop = 0;
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var topbar = document.querySelector('.topbar');
+      var container = document.querySelector('.app-container');
+      if (!topbar || !container) return;
+
+      container.addEventListener('scroll', function () {
+        var currentTop = container.scrollTop;
+        if (currentTop > lastScrollTop && currentTop > 50) {
+          topbar.classList.add('topbar--hidden');
+        } else {
+          topbar.classList.remove('topbar--hidden');
+        }
+        lastScrollTop = currentTop;
+      }, { passive: true });
+    });
+  })();
+</script>

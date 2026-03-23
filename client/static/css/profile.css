@@ -44,7 +44,6 @@
   align-items: center;
   gap: 16px;
   padding: 8px 0 16px;
-  margin-top: 10px;
   background: transparent;
   border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
@@ -359,6 +358,7 @@
   max-width: none;
   margin: 0;
   padding: 0;
+  padding-top: 64px; /* 56px fixed topbar + 8px spacing */
   padding-left: 2vh;
   padding-right: 2vh;
   padding-bottom: 8px;
