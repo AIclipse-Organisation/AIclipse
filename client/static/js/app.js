@@ -274,8 +274,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const signupPanel = document.querySelector('[data-panel="signup"]');
   const loginPanel = document.querySelector('[data-panel="login"]');
   const accountStatus = document.getElementById("account-status");
-  const tabs = document.querySelectorAll(".auth-tab");
-  const authToggleContainer = document.querySelector(".auth-toggle");
+  const switchLinks = document.querySelectorAll(".auth-link");
 
   const signupPasswordInput = document.getElementById("signup-password");
   const signupPolicyRoot = document.getElementById("signup-password-policy");
@@ -295,6 +294,30 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!btnSignup) return;
     btnSignup.disabled = signupTerms ? !signupTerms.checked : false;
   }
+
+  function switchAuthMode(mode) {
+    if (mode === "signup") {
+      if (signupPanel) signupPanel.style.display = "block";
+      if (loginPanel) loginPanel.style.display = "none";
+    } else {
+      if (signupPanel) signupPanel.style.display = "none";
+      if (loginPanel) loginPanel.style.display = "block";
+    }
+
+    if (accountStatus) accountStatus.innerHTML = "";
+  }
+
+  if (switchLinks.length > 0) {
+    switchLinks.forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        const mode = link.getAttribute("data-mode");
+        switchAuthMode(mode);
+      });
+    });
+  }
+
+  switchAuthMode("login");
 
   if (signupTerms) {
     signupTerms.addEventListener("change", syncSignupButtonState);
@@ -347,23 +370,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
     signupPasswordInput.addEventListener("input", updateSignupPolicyUI);
   }
-
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const mode = tab.getAttribute("data-mode");
-      tabs.forEach((t) => t.classList.remove("is-active"));
-      tab.classList.add("is-active");
-
-      if (mode === "signup") {
-        if (signupPanel) signupPanel.style.display = "block";
-        if (loginPanel) loginPanel.style.display = "none";
-      } else {
-        if (signupPanel) signupPanel.style.display = "none";
-        if (loginPanel) loginPanel.style.display = "block";
-      }
-      if (accountStatus) accountStatus.innerHTML = "";
-    });
-  });
 
   onEl("btn-signup", (btnSignupEl) => {
     btnSignupEl.addEventListener("click", async (event) => {
@@ -426,7 +432,6 @@ window.addEventListener("DOMContentLoaded", () => {
       }
 
       if (signupPanel) signupPanel.style.display = "none";
-      if (authToggleContainer) authToggleContainer.style.display = "none";
       if (loginSpinner) loginSpinner.style.display = "block";
 
       btnSignupEl.disabled = true;
@@ -459,6 +464,8 @@ window.addEventListener("DOMContentLoaded", () => {
             updateSignupPolicyUI();
           }
 
+          switchAuthMode("signup");
+
           setStatus(
             accountStatus,
             "error",
@@ -467,12 +474,11 @@ window.addEventListener("DOMContentLoaded", () => {
         }
       } catch (err) {
         console.error(err);
+        switchAuthMode("signup");
         setStatus(accountStatus, "error", "Network error during signup.");
       } finally {
         if (!requestSubmitted) {
           btnSignupEl.disabled = false;
-          if (signupPanel) signupPanel.style.display = "block";
-          if (authToggleContainer) authToggleContainer.style.display = "";
           if (loginSpinner) loginSpinner.style.display = "none";
         }
       }
@@ -492,7 +498,6 @@ window.addEventListener("DOMContentLoaded", () => {
       }
 
       if (loginContent) loginContent.style.display = "none";
-      if (authToggleContainer) authToggleContainer.style.display = "none";
       if (loginSpinner) loginSpinner.style.display = "block";
       setStatus(accountStatus, "info", "");
 
@@ -518,7 +523,6 @@ window.addEventListener("DOMContentLoaded", () => {
           window.location.href = "/upload";
         } else {
           if (loginContent) loginContent.style.display = "block";
-          if (authToggleContainer) authToggleContainer.style.display = "";
           if (loginSpinner) loginSpinner.style.display = "none";
 
           const normalized = normalizeApiErrorDetail(data);
@@ -532,7 +536,6 @@ window.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error(err);
         if (loginContent) loginContent.style.display = "block";
-        if (authToggleContainer) authToggleContainer.style.display = "";
         if (loginSpinner) loginSpinner.style.display = "none";
         setStatus(accountStatus, "error", "Network error during login.");
         setCurrentUserChip(null);

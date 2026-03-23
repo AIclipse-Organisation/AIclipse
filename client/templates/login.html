@@ -20,23 +20,6 @@
           </div>
 
           <section class="auth-card">
-            <div class="auth-toggle" role="tablist" aria-label="Auth mode">
-              <button
-                type="button"
-                class="auth-tab is-active"
-                data-mode="login"
-                role="tab"
-                aria-selected="true"
-              >
-                Log in
-              </button>
-              {% if show_signup %}
-              <button type="button" class="auth-tab" data-mode="signup">
-                Sign up
-              </button>
-              {% endif %}
-            </div>
-
             <div class="auth-panels" data-mode="login">
               {% if show_signup %}
               <div class="auth-panel" data-panel="signup">
@@ -128,6 +111,11 @@
 
                 <!-- type="button" stops browser auto-submit; JS handles signup click. -->
                 <button id="btn-signup" type="button" disabled>Request Access</button>
+
+                <p class="auth-switch">
+                  Already have an account?
+                  <button type="button" class="auth-link" data-mode="login">Login</button>
+                </p>
               </div>
               {% endif %}
 
@@ -146,6 +134,13 @@
                   />
 
                   <button id="btn-login" type="button">Log in</button>
+
+                  {% if show_signup %}
+                  <p class="auth-switch">
+                    Don't have an account?
+                    <button type="button" class="auth-link" data-mode="signup">Sign Up</button>
+                  </p>
+                  {% endif %}
                 </div>
 
                 <div id="login-spinner-container" style="display: none">
