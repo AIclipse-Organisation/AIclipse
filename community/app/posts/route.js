@@ -235,7 +235,12 @@ export async function POST(req) {
     await col.insertOne(doc);
 
     // Award points for creating a post
-    await recordActivity(db, authenticatedUserId, SCORES.CREATE_POST, "create_post");
+    await recordActivity(
+      db,
+      authenticatedUserId,
+      SCORES.CREATE_POST,
+      "create_post",
+    );
 
     // 8. Mark the image as public via Gateway
     try {
@@ -622,51 +627,52 @@ export async function GET(req) {
 
     // 7) compute score per post
     // 7) compute score per post
-      const ranked = items.map((post) => {
-        const numVotes = safeNumber(post.up_vote_count) + safeNumber(post.down_vote_count);
-        const numClicks = safeNumber(post.clicks_count);
-        const numComments = safeNumber(post.comment_count);
+    const ranked = items.map((post) => {
+      const numVotes =
+        safeNumber(post.up_vote_count) + safeNumber(post.down_vote_count);
+      const numClicks = safeNumber(post.clicks_count);
+      const numComments = safeNumber(post.comment_count);
 
-        const votesNorm = safeDiv(numVotes, avgVotes);
-        const clicksNorm = safeDiv(numClicks, avgClicks);
-        const commentsNorm = safeDiv(numComments, avgComments);
+      const votesNorm = safeDiv(numVotes, avgVotes);
+      const clicksNorm = safeDiv(numClicks, avgClicks);
+      const commentsNorm = safeDiv(numComments, avgComments);
 
-        const engagement =
-          votesNorm * votesWeight +
-          clicksNorm * clicksWeight +
-          commentsNorm * commentsWeight;
+      const engagement =
+        votesNorm * votesWeight +
+        clicksNorm * clicksWeight +
+        commentsNorm * commentsWeight;
 
-        const createdAtSec = createdAtToUnixSeconds(post.created_at);
-        const ageSeconds = Math.max(nowSec - createdAtSec, 0);
-        const ageHours = ageSeconds / 3600;
+      const createdAtSec = createdAtToUnixSeconds(post.created_at);
+      const ageSeconds = Math.max(nowSec - createdAtSec, 0);
+      const ageHours = ageSeconds / 3600;
 
-        const timeFactor = Math.pow(ageHours + constantOffset, gravity);
+      const timeFactor = Math.pow(ageHours + constantOffset, gravity);
 
-        // --- THE FIX IS HERE ---
-        
-        // 1. Give ALL new posts a baseline score so they start on equal footing
-        let baseScore = 0;
-        if (ageHours < 24) {
-          baseScore = 0.5;
-        }
+      // --- THE FIX IS HERE ---
 
-        // 2. Add the organic engagement ON TOP of the base score
-        let score = baseScore + (engagement / timeFactor);
+      // 1. Give ALL new posts a baseline score so they start on equal footing
+      let baseScore = 0;
+      if (ageHours < 24) {
+        baseScore = 0.5;
+      }
 
-        // 3. Apply the newness multiplier
-        if (ageHours < 24) score *= 1.2;
+      // 2. Add the organic engagement ON TOP of the base score
+      let score = baseScore + engagement / timeFactor;
 
-        if (isControversial(post, nowSec)) score *= 2.5;
+      // 3. Apply the newness multiplier
+      if (ageHours < 24) score *= 1.2;
 
-        // Vote penalty last — deprioritize posts the user has already voted on
-        if (post.user_vote) score *= 0.001;
+      if (isControversial(post, nowSec)) score *= 2.5;
 
-        return {
-          ...post,
-          score,
-          debug: { votesNorm, clicksNorm, commentsNorm, engagement, ageHours },
-        };
-      });
+      // Vote penalty last — deprioritize posts the user has already voted on
+      if (post.user_vote) score *= 0.001;
+
+      return {
+        ...post,
+        score,
+        debug: { votesNorm, clicksNorm, commentsNorm, engagement, ageHours },
+      };
+    });
 
     // 8) sort by score desc, use creation time to break ties
     ranked.sort((a, b) => {
@@ -679,9 +685,26 @@ export async function GET(req) {
 
     const paginatedItems = ranked.slice(skip, skip + limit);
 
+    const paginatedImageIds = paginatedItems.map((p) => p.image_id);
+
+    // Fetch the full image documents just for these posts
+    const imagesForPage = await imagesCol
+      .find({ image_id: { $in: paginatedImageIds } })
+      .toArray();
+
+    // Create a quick lookup map
+    const imageMap = new Map(imagesForPage.map((img) => [img.image_id, img]));
+
+    // Merge the image data directly into the post payload
+    const finalItems = paginatedItems.map((post) => {
+      const imgData = imageMap.get(post.image_id) || {};
+      // We spread imgData first so the post data (like created_at) takes precedence
+      return { ...imgData, ...post };
+    });
+
     return NextResponse.json(
       {
-        items: paginatedItems,
+        items: finalItems,
         hasMore: ranked.length > skip + limit,
       },
       { status: 200 },

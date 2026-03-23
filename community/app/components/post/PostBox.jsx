@@ -244,7 +244,22 @@ export default function PostBox({
     }
   }
 
-  useEffect(() => { if (postId) loadComments(); }, [postId]);
+  // useEffect(() => { if (postId) loadComments(); }, [postId]);
+  //FIX:
+
+  useEffect(() => { 
+  // Only fetch if the panel is open and we haven't loaded them yet
+  if (postId && showComments && comments.length === 0) {
+    loadComments(); 
+  }
+}, [postId, showComments]);
+
+
+
+
+
+
+
 
   /* Progress Bar Calculations */
   function clamp01(n) {
