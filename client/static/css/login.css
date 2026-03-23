@@ -33,7 +33,9 @@ body.app .app-container {
   min-height: 100svh;
   overflow-x: hidden;
   overflow-y: auto;
-  background: #222222;
+  background:
+    radial-gradient(circle at top center, rgba(201, 186, 131, 0.08), transparent 34%),
+    linear-gradient(180deg, #242424 0%, #202020 100%);
 }
 
 /* Background layers */
@@ -55,7 +57,7 @@ body.app .app-container::after {
 }
 
 /* =========================
-   SCREEN + CENTERING
+   SCREEN + LAYOUT
 ========================= */
 
 body.app .screen {
@@ -69,11 +71,39 @@ body.app .screen {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: flex-start;
-  gap: 28px;
-  padding: 18px;
-  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  gap: 18px;
+  padding: 20px 20px 32px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+
+.auth-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.auth-back:hover {
+  color: #fff;
+}
+
+.auth-back:focus-visible {
+  outline: 2px solid #C9BA83;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.auth-back-arrow {
+  font-size: 28px;
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
 /* =========================
@@ -83,29 +113,54 @@ body.app .screen {
 .brand-hero {
   display: flex;
   justify-content: center;
+  margin-top: 4px;
+  margin-bottom: 2px;
 }
 
 .brand-image {
-  width: 280px;
-  max-width: 80vw;
+  width: 220px;
+  max-width: 68vw;
 }
 
 /* =========================
-   AUTH CARD (CRITICAL FIX)
+   AUTH WRAPPER
 ========================= */
 
 .auth-card {
   width: 100%;
-  max-width: 420px;
-  padding: 16px;
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.40);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: flex;
   flex-direction: column;
+}
+
+/* =========================
+   HEAD COPY
+========================= */
+
+.auth-copy {
+  margin: 10px 0 28px;
+}
+
+.auth-eyebrow {
+  margin: 0 0 4px;
+  font-size: 20px;
+  line-height: 1.25;
+  color: #a89c6f;
+  font-weight: 600;
+}
+
+.auth-title {
+  margin: 0;
+  font-size: 40px;
+  line-height: 0.98;
+  color: #C9BA83;
+  font-weight: 800;
 }
 
 /* =========================
@@ -113,10 +168,10 @@ body.app .screen {
 ========================= */
 
 .auth-switch {
-  margin: 14px 0 4px;
+  margin: 18px 0 2px;
   text-align: center;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.82);
+  color: rgba(255, 255, 255, 0.74);
 }
 
 .auth-link {
@@ -126,13 +181,13 @@ body.app .screen {
   margin-left: 4px;
   color: #C9BA83;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: underline;
   cursor: pointer;
 }
 
 .auth-link:hover {
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
 .auth-link:focus-visible {
@@ -142,7 +197,7 @@ body.app .screen {
 }
 
 /* =========================
-   PANELS (CONTAINMENT SAFE)
+   PANELS
 ========================= */
 
 .auth-panels {
@@ -156,7 +211,6 @@ body.app .screen {
   position: static !important;
 }
 
-/* Toggle visibility */
 .auth-panel[data-panel="signup"] {
   display: none;
 }
@@ -177,60 +231,107 @@ body.app .screen {
    INPUTS
 ========================= */
 
+/* =========================
+   INPUTS
+========================= */
 
 label {
   display: block;
-  font-size: 13px;
-  margin: 10px 0 6px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 15px;
+  margin: 0 0 6px;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 500;
 }
 
 input,
 select,
 textarea {
   width: 100%;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  font-size: 16px;
-  border-radius: 5px;
-  border: 1px solid rgb(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.45);
-  color: rgba(255, 255, 255, 0.95);
+  min-height: 56px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.96);
   outline: none;
   box-sizing: border-box;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
 }
 
-select {
-  appearance: auto;
-  cursor: pointer;
-}
-
-select option {
-  background: #1a1a1a;
-  color: rgba(255, 255, 255, 0.95);
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.38);
 }
 
 textarea {
   resize: vertical;
+  min-height: 96px;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: rgba(255, 255, 255, 0.55);
+  border-color: rgba(201, 186, 131, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(201, 186, 131, 0.10);
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 48px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.72) 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(50% - 2px),
+    calc(100% - 14px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+select:required:invalid {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+select option {
+  background: #1c1c1c;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: #fff;
+  -webkit-box-shadow: 0 0 0 1000px #2a2a2a inset;
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 /* =========================
-   PASSWORD POLICY (CHECKLIST)
+   PASSWORD POLICY
 ========================= */
 
 .password-policy {
-  margin-top: 2px;
-  margin-bottom: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.25);
+  margin-top: -6px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 [hidden] {
@@ -303,16 +404,42 @@ textarea:focus {
 
 #btn-login,
 #btn-signup {
+  box-sizing: border-box;
   width: 100%;
-  padding: 13px;
-  margin-top: 6px;
-  border-radius: 10px;
-  border: 1px solid #C9BA83;
-  background: #C9BA83;
-  color: #000000;
+  max-width: 100%;
+  padding: 18px;
+  border-radius: 999px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 800;
+  color: #C9BA83;
+  background: transparent;
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+#btn-login,
+#btn-signup {
+  --btn-outline-color: #C9BA83;
+  --btn-hover-color: #C9BA83;
+  border: 1px solid var(--btn-outline-color);
+}
+
+/* hover only when button is enabled */
+#btn-login:hover,
+#btn-signup:hover:not(:disabled) {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* press effect only when enabled */
+#btn-login:active,
+#btn-signup:active:not(:disabled) {
+  transform: translateY(1px);
+  background: var(--btn-hover-color);
+  color: #111;
 }
 
 #btn-signup:disabled {
@@ -321,17 +448,21 @@ textarea:focus {
   filter: grayscale(35%);
 }
 
+/* disabled stays unchanged */
 #btn-signup:disabled:hover,
 #btn-signup:disabled:active {
+  background: transparent;
+  color: #C9BA83;
   transform: none;
 }
 
 /* =========================
    T&C
 ========================= */
+
 .terms-row {
-  margin-top: 6px;
-  margin-bottom: 10px;
+  margin-top: 2px;
+  margin-bottom: 14px;
 }
 
 .terms-label {
@@ -339,22 +470,29 @@ textarea:focus {
   align-items: flex-start;
   gap: 10px;
   font-size: 13px;
-  line-height: 1.25;
-  color: rgba(255, 255, 255, 0.86);
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.82);
   cursor: pointer;
 }
 
 .terms-label input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  margin: 2px 0 0;
+  min-width: 18px;
+  min-height: 18px;
+  margin: 1px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  accent-color: #C9BA83;
 }
 
 .terms-label a {
   color: #C9BA83;
   text-decoration: underline;
 }
-
 
 /* =========================
    ACCESSIBILITY
@@ -373,30 +511,51 @@ textarea:focus {
    STATUS
 ========================= */
 
-#account-status {
+#login-status,
+#signup-status {
   margin-top: 10px;
+  margin-bottom: 10px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+#login-status .status-success {
+  color: #7ee787;
+}
+
+#login-status .status-error {
+  color: #ff8d8d;
+}
+
+#login-status .status-info {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+#signup-status .status-success {
+  color: #7ee787;
+}
+
+#signup-status .status-error {
+  color: #ff8d8d;
+}
+
+#signup-status .status-info {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 
-
 /* =======================
-Spinner 
-==========================*/
+   Spinner
+========================== */
 
-/* Spinner Animation */
 .spinner {
-  border: 4px solid #f3f3f3;
-  /* Light grey */
-  border-top: 4px solid #3498db;
-  /* Blue */
+  border: 4px solid rgba(255, 255, 255, 0.18);
+  border-top: 4px solid #C9BA83;
   border-radius: 50%;
   width: 40px;
   height: 40px;
   animation: spin 1s linear infinite;
   margin: 20px auto;
-  /* Center it */
 }
 
 @keyframes spin {
@@ -411,5 +570,29 @@ Spinner
 
 #login-spinner-container {
   text-align: center;
-  padding: 20px;
+  padding: 28px 0 16px;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 380px) {
+  .auth-shell {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .brand-image {
+    width: 190px;
+  }
+
+  .auth-title {
+    font-size: 40px;
+  }
+
+  #btn-login,
+  #btn-signup {
+    font-size: 18px;
+  }
 }
