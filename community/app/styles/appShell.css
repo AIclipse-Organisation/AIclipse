@@ -151,7 +151,7 @@ body {
 
 /* Screen content area (pad bottom so it doesn't hide under navbar) */
 .app .screen {
-  padding: 20px;
+  /* padding: 20px; */
   padding-bottom: 80px;
   /* space for bottom nav */
 }
