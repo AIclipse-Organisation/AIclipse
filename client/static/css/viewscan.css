@@ -217,7 +217,7 @@ body.app .page-underline {
 }
 
 .verdict-block {
-  margin-top: 12px;
+  margin-top: 3vh;
 }
 
 /* =========================
@@ -225,8 +225,36 @@ body.app .page-underline {
    ========================= */
 
 .comm_barBlock {
+  position: relative;
   display: grid;
+}
+
+.comm_barBlock + .comm_barBlock {
   margin-top: 12px;
+}
+
+.comm_barSourceLabel {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1;
+  background: #222222;
+  padding: 0 4px;
+  pointer-events: none;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_barSourceLabel {
+  color: rgba(207, 184, 124, 0.95);
+}
+
+.comm_barBlock.comm_communityBar .comm_barSourceLabel {
+  color: #af83c9;
 }
 
 .comm_barHead {
