@@ -38,6 +38,7 @@ export default function PostBox({
   const [userVote, setUserVote] = useState(image?.user_vote || null);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
+  const [commentCount, setCommentCount] = useState(Number(image?.comment_count ?? 0));
   const [commentsBusy, setCommentsBusy] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -156,7 +157,9 @@ export default function PostBox({
   async function loadComments() {
     setCommentsBusy(true);
     try {
-      setComments(await fetchComments(postId));
+      const loaded = await fetchComments(postId);
+      setComments(loaded);
+      setCommentCount(loaded.length);
     } catch (err) {
       setError(err.message || "Failed to load comments.");
     } finally {
@@ -254,18 +257,12 @@ export default function PostBox({
     const realProb = isRealLabel(rawLabel) ? conf : 1 - conf;
     return Math.max(0, Math.min(100, realProb * 100));
   }
+
   function bucketFromRealPct(r) {
     r = Math.max(0, Math.min(100, Number(r) || 0));
-    if (r >= 40 && r <= 60) return { text: "Not sure", type: "neutral" };
-    if (r > 60)
-      return {
-        text: r >= 86 ? "Highly Unlikely Fake" : "Unlikely Fake",
-        type: "safe",
-      };
-    return {
-      text: 100 - r >= 86 ? "Highly Likely Fake" : "Likely Fake",
-      type: "risk",
-    };
+    if (r >= 40 && r <= 60) return { text: "SUSPICIOUS", type: "neutral" };
+    if (r > 60) return { text: "REAL", type: "safe" };
+    return { text: "FAKE", type: "risk" };
   }
   function setWidthStyle(pct) {
     const p = Math.max(0, Math.min(100, Number(pct) || 0));
@@ -349,7 +346,7 @@ export default function PostBox({
         busy={busy}
         upCount={up}
         downCount={down}
-        commentCount={comments.length}
+        commentCount={commentCount}
       />
 
       <PostCommentsDrawer
