@@ -5,13 +5,13 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_api_billing_checkout_proxies_body_auth_and_cookie(client, patch_upstreams):
+async def test_api_billing_checkout_proxies_body_and_auth_without_cookie_forwarding(client, patch_upstreams):
     def checkout_handler(req: httpx.Request) -> httpx.Response:
         body = json.loads(req.content.decode("utf-8"))
         assert body["user_id"] == "u_123"
         assert body["plan_id"] == 2
         assert req.headers.get("authorization") == "Bearer token-123"
-        assert "sessionid=abc123" in req.headers.get("cookie", "")
+        assert req.headers.get("cookie") is None
         return httpx.Response(status_code=200, json={"checkout_url": "https://stripe.test/checkout"})
 
     patch_upstreams.add(
@@ -48,12 +48,12 @@ async def test_billing_checkout_alias_route_works(client, patch_upstreams):
 
 
 @pytest.mark.asyncio
-async def test_api_billing_subscription_status_proxies_query_auth_and_cookie(client, patch_upstreams):
+async def test_api_billing_subscription_status_proxies_query_and_auth_without_cookie_forwarding(client, patch_upstreams):
     def status_handler(req: httpx.Request) -> httpx.Response:
         assert req.url.path == "/subscription/status"
         assert req.url.params.get("user_id") == "u_123"
         assert req.headers.get("authorization") == "Bearer token-123"
-        assert "sessionid=abc123" in req.headers.get("cookie", "")
+        assert req.headers.get("cookie") is None
         return httpx.Response(status_code=200, json={"status": "active"})
 
     patch_upstreams.add(

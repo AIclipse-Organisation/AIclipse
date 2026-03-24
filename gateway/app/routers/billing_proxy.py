@@ -15,14 +15,11 @@ def _timeout(request: Request) -> float:
     return float(request.app.state.settings.http_timeout_s)
 
 
-def _forward_auth_headers(request: Request) -> dict:
+def _forward_billing_headers(request: Request) -> dict:
     headers: dict = {}
     auth = request.headers.get("authorization")
     if auth:
         headers["Authorization"] = auth
-    cookie = request.headers.get("cookie")
-    if cookie:
-        headers["Cookie"] = cookie
     return headers
 
 
@@ -35,7 +32,7 @@ async def billing_create_checkout_session(request: Request, payload: dict = Body
         billing_uri,
         "/create-checkout-session",
         json_body=payload,
-        headers=_forward_auth_headers(request),
+        headers=_forward_billing_headers(request),
         timeout_s=_timeout(request),
     )
 
@@ -49,7 +46,7 @@ async def api_billing_create_checkout_session(request: Request, payload: dict = 
         billing_uri,
         "/create-checkout-session",
         json_body=payload,
-        headers=_forward_auth_headers(request),
+        headers=_forward_billing_headers(request),
         timeout_s=_timeout(request),
     )
 
@@ -78,7 +75,7 @@ async def api_billing_subscription_status(
         billing_uri,
         "/subscription/status",
         params={"user_id": user_id},
-        headers=_forward_auth_headers(request),
+        headers=_forward_billing_headers(request),
         timeout_s=_timeout(request),
     )
 
@@ -92,7 +89,7 @@ async def api_billing_cancel_at_period_end(request: Request, payload: dict = Bod
         billing_uri,
         "/subscription/cancel-at-period-end",
         json_body=payload,
-        headers=_forward_auth_headers(request),
+        headers=_forward_billing_headers(request),
         timeout_s=_timeout(request),
     )
 
