@@ -14,8 +14,6 @@
   margin: 0 auto;
   /* padding: 12px 12px 90px; */
 
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 
 /* =========================
@@ -31,7 +29,6 @@
   /* Only divider should be BELOW each post */
   border-bottom: 1px solid rgba(255, 255, 255, 0.10);
   padding-bottom: 12px;
-  overflow-x: hidden;
 }
 
 /* =========================
@@ -208,22 +205,22 @@
    ========================= */
 
 .comm_postImageWrap {
-  /* padding: 0 12px 10px; */
   position: relative;
+  width: min(100vw, 480px);
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .comm_postImage {
-     aspect-ratio: 1;
-    -o-object-fit: cover;
-    object-fit: cover;
-    cursor: pointer;
-    background: rgba(255, 255, 255, .05);
-    /* border: 1px solid rgba(255, 255, 255, .08); */
-    /* border-radius: 14px; */
-    width: -webkit-fill-available;
-    height: auto;
-    display: block;
-    margin-bottom: 1vh;
+  aspect-ratio: 1;
+  -o-object-fit: cover;
+  object-fit: cover;
+  cursor: pointer;
+  background: rgba(255, 255, 255, .05);
+  width: 100%;
+  height: auto;
+  display: block;
+  margin-bottom: 1vh;
 }
 
 /* =========================
@@ -661,13 +658,64 @@
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
+.comm_bars.is-hidden .comm_zoneLabel {
+  font-size: 7px !important;
+  color: rgba(255, 255, 255, 0.35) !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 !important;
+}
+
 .comm_bars.is-revealed {
   filter: blur(0) saturate(1);
   opacity: 1;
   animation: revealBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.comm_bars.is-revealed .comm_progressFill {
+  transform-origin: left center;
+  animation: barFillIn 1.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: 0.25s;
+}
+
+@keyframes barFillIn {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+.comm_bars.is-revealed .comm_zoneLabel--active {
+  animation: labelReveal 0.5s ease forwards;
+  animation-delay: 2.05s;
+  /* hold grey small state until animation runs */
+  font-size: 7px;
+  filter: grayscale(1);
+  opacity: 0.4;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+}
+
+
+
+@keyframes labelBgIn {
+  to { opacity: 1; }
+}
+
+@keyframes labelReveal {
+  from {
+    font-size: 7px;
+    filter: grayscale(1);
+    opacity: 0.4;
+    text-shadow: none;
+    -webkit-text-stroke: 0;
+  }
+  to {
+    font-size: 14px;
+    filter: grayscale(0);
+    opacity: 1;
+  }
+}
+
 .comm_barBlock {
+  position: relative;
   display: grid;
 }
 
@@ -689,9 +737,15 @@
   flex-shrink: 0;
   justify-content: center;
   align-items: center;
-  width: 5vh;
+  width: 2.5vh;
   height: 2vh;
   display: flex;
+}
+
+.comm_resultAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .comm_resultAvatar_icon {
@@ -718,8 +772,25 @@
   text-align: right;
   color: rgba(207, 184, 124, .95);
   white-space: nowrap;
+  transition: color 0.3s ease;
   font-size: 1.7vh;
   font-weight: 700;
+}
+
+.comm_barSourceLabel {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1;
+  background: #222222;
+  padding: 0 4px;
+  pointer-events: none;
 }
 
 .comm_progressPanel {
@@ -760,7 +831,7 @@
   border-radius: 999px;
   transition: width 300ms ease;
   z-index: 1;
-  min-width: 0px;
+  min-width: 18px;
 }
 
 .comm_progressFill[data-p]:not([data-p="0"]) {
@@ -791,21 +862,9 @@
 
 /* ---------- Color themes ---------- */
 
-/* Analysis bar uses green/red based on REAL% bucket */
-.comm_barBlock.is-safe .comm_progressFill {
-  background: #18c46c;
-}
-
-.comm_barBlock.is-risk .comm_progressFill {
-  background: #e04646;
-}
-
-.comm_barBlock.is-neutral .comm_progressFill {
-  background: rgba(255, 255, 255, 0.22);
-}
-
 .comm_barBlock:not(.comm_communityBar) .comm_barTitle,
-.comm_barBlock:not(.comm_communityBar) .comm_barVerdict {
+.comm_barBlock:not(.comm_communityBar) .comm_barVerdict,
+.comm_barBlock:not(.comm_communityBar) .comm_barSourceLabel {
   color: rgba(207, 184, 124, 0.95) !important;
 }
 
@@ -814,22 +873,73 @@
   border-color: rgba(207, 184, 124, 0.55) !important;
 }
 
-.comm_barBlock:not(.comm_communityBar) .comm_progressFill {
-  background: rgba(207, 184, 124, 0.95) !important;
-}
-
 .comm_barBlock.comm_communityBar .comm_barTitle,
-.comm_barBlock.comm_communityBar .comm_barVerdict {
+.comm_barBlock.comm_communityBar .comm_barVerdict,
+.comm_barBlock.comm_communityBar .comm_barSourceLabel {
   color: #af83c9;
-}
-
-.comm_barBlock.comm_communityBar .comm_progressFill {
-  background: rgba(175, 131, 201, 0.95);
 }
 
 .comm_barBlock.comm_communityBar .comm_barHead,
 .comm_barBlock.comm_communityBar .comm_progressPanel {
   border-color: rgba(175, 131, 201, 0.55);
+}
+
+/* Verdict label colors by outcome */
+.comm_barVerdict--risk {
+  color: #f87171 !important;
+}
+.comm_barVerdict--neutral {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+/* --safe inherits brand color: gold for AIclipse, purple for community */
+
+/* Wrapper that holds zone labels + progress panel */
+.comm_barTrackWrap {
+  position: relative;
+}
+
+/* Zone labels — float above the bar without taking space */
+.comm_zoneLabel {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  transform: translateX(-50%);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+/* Inactive labels are grey; active labels get their zone color */
+.comm_zoneLabel--safe,
+.comm_zoneLabel--neutral,
+.comm_zoneLabel--risk { color: rgba(255, 255, 255, 0.25); }
+
+.comm_zoneLabel--safe.comm_zoneLabel--active    { color: #cfb87c; }
+.comm_zoneLabel--neutral.comm_zoneLabel--active { color: #ffffff; }
+.comm_zoneLabel--risk.comm_zoneLabel--active    { color: #f87171; }
+.comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active { color: #af83c9; }
+
+.comm_zoneLabel--active { font-size: 14px; -webkit-text-stroke: 0.3px #000000; isolation: isolate; }
+
+.comm_zoneLabel--safe.comm_zoneLabel--active    { text-shadow: 0 0 2px rgba(207, 184, 124, 0.6); }
+.comm_zoneLabel--neutral.comm_zoneLabel--active { text-shadow: 0 0 2px rgba(255, 255, 255, 0.6); }
+.comm_zoneLabel--risk.comm_zoneLabel--active    { text-shadow: 0 0 2px rgba(204, 34, 34, 0.6); }
+.comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active { text-shadow: 0 0 2px rgba(175, 131, 201, 0.6); }
+
+/* Threshold markers at 40% and 60% */
+.comm_barMarker {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 1px;
+  z-index: 2;
+  pointer-events: none;
 }
 
 /* Reveal Animation Keyframes */
@@ -881,8 +991,7 @@
 /* Static wrapper covers the image area and flex-centres the card */
 .comm_truthOverlayWrap {
   position: absolute;
-  inset: 0 12px 10px 12px;
-  /* matches comm_postImageWrap padding */
+  inset: 0 0 10px 0;
   display: flex;
   align-items: center;
   justify-content: center;
