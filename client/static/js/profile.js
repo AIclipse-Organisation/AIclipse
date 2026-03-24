@@ -4,6 +4,17 @@ window.addEventListener("DOMContentLoaded", async () => {
   const containerEl = document.getElementById("user-details-container");
   let currentUserPlan = 0;
 
+  function formatDateDMY(value) {
+    if (!value) return "-";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  }
+
   try {
     statusEl.textContent = "Loading user details...";
     statusEl.className = "status-message loading";
@@ -47,9 +58,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("detail-plan").textContent =
       currentUserPlan === 0 ? "Free Trial" : `Plan ${currentUserPlan}`;
 
-    document.getElementById("detail-created").textContent = user.created_at
-      ? new Date(user.created_at).toLocaleDateString()
-      : "-";
+    document.getElementById("detail-created").textContent = formatDateDMY(user.created_at);
 
     const currentStreak = user.current_streak || 0;
     const communityScore = user.community_score || 0;
@@ -251,11 +260,11 @@ window.addEventListener("DOMContentLoaded", async () => {
 
       if (subscriptionStatusHint) {
         if (cancellationAlreadyScheduled && data.billing_period_end) {
-          const endDate = periodEndDate.toLocaleDateString();
+          const endDate = formatDateDMY(periodEndDate);
           subscriptionStatusHint.textContent = `Cancellation scheduled. Active until ${endDate}.`;
           subscriptionStatusHint.hidden = false;
         } else if (data.status === "active" && data.billing_period_end) {
-          const nextPaymentDate = periodEndDate.toLocaleDateString();
+          const nextPaymentDate = formatDateDMY(periodEndDate);
           subscriptionStatusHint.textContent = `Next payment on ${nextPaymentDate}.`;
           subscriptionStatusHint.hidden = false;
         } else {
@@ -266,10 +275,10 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (subscriptionStatusBanner) {
         const statusLabel = normalizeStatusLabel(rawStatus);
         if (rawStatus === "active" && periodEndDate) {
-          subscriptionStatusBanner.textContent = `Subscription: ${statusLabel} · Next payment ${periodEndDate.toLocaleDateString()}`;
+          subscriptionStatusBanner.textContent = `Subscription: ${statusLabel} · Next payment ${formatDateDMY(periodEndDate)}`;
           subscriptionStatusBanner.hidden = false;
         } else if ((rawStatus === "cancel_scheduled" || rawStatus === "canceled") && periodEndDate) {
-          subscriptionStatusBanner.textContent = `Subscription: ${statusLabel} · Expires ${periodEndDate.toLocaleDateString()}`;
+          subscriptionStatusBanner.textContent = `Subscription: ${statusLabel} · Expires ${formatDateDMY(periodEndDate)}`;
           subscriptionStatusBanner.hidden = false;
         } else {
           subscriptionStatusBanner.textContent = `Subscription: ${statusLabel}`;
@@ -422,9 +431,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       closeCancelSubModal();
       closeSheet();
 
-      const end = data.plan_active_until
-        ? new Date(data.plan_active_until).toLocaleDateString()
-        : null;
+      const end = data.plan_active_until ? formatDateDMY(data.plan_active_until) : null;
       const successMessage = end
         ? `Your subscription remains active until ${end}.`
         : "Your subscription remains active until the end of your current billing period.";
