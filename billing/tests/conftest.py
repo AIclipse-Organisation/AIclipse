@@ -32,7 +32,6 @@ def state(monkeypatch, billing_module):
     users_coll = Mock(name="users_coll")
     plan_coll = Mock(name="plan_coll")
     billing_coll = Mock(name="billing_coll")
-    usage_coll = Mock(name="usage_coll")
 
     users_coll.find_one.return_value = {"plan": 0}
     users_coll.update_one.return_value = SimpleNamespace(matched_count=1, modified_count=1)
@@ -45,12 +44,11 @@ def state(monkeypatch, billing_module):
     monkeypatch.setattr(billing_module, "users_coll", users_coll, raising=False)
     monkeypatch.setattr(billing_module, "plan_coll", plan_coll, raising=False)
     monkeypatch.setattr(billing_module, "billing_coll", billing_coll, raising=False)
-    monkeypatch.setattr(billing_module, "usage", usage_coll, raising=False)
 
     customer_create = Mock(return_value=SimpleNamespace(id="cus_123"))
     customer_modify = Mock(return_value=None)
+    subscription_modify = Mock(return_value=SimpleNamespace(id="sub_123", current_period_end=1_900_000_000))
     checkout_create = Mock(return_value=SimpleNamespace(id="cs_123", url="https://stripe.test/checkout"))
-    portal_create = Mock(return_value=SimpleNamespace(url="https://stripe.test/portal"))
     webhook_construct = Mock(return_value={"id": "evt_default", "type": "unknown", "data": {"object": {}}})
 
     monkeypatch.setattr(
@@ -61,14 +59,14 @@ def state(monkeypatch, billing_module):
     )
     monkeypatch.setattr(
         billing_module.stripe,
-        "checkout",
-        SimpleNamespace(Session=SimpleNamespace(create=checkout_create)),
+        "Subscription",
+        SimpleNamespace(modify=subscription_modify),
         raising=False,
     )
     monkeypatch.setattr(
         billing_module.stripe,
-        "billing_portal",
-        SimpleNamespace(Session=SimpleNamespace(create=portal_create)),
+        "checkout",
+        SimpleNamespace(Session=SimpleNamespace(create=checkout_create)),
         raising=False,
     )
     monkeypatch.setattr(
@@ -82,10 +80,9 @@ def state(monkeypatch, billing_module):
         "users_coll": users_coll,
         "plan_coll": plan_coll,
         "billing_coll": billing_coll,
-        "usage_coll": usage_coll,
         "customer_create": customer_create,
         "customer_modify": customer_modify,
+        "subscription_modify": subscription_modify,
         "checkout_create": checkout_create,
-        "portal_create": portal_create,
         "webhook_construct": webhook_construct,
     }

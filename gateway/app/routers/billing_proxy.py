@@ -66,18 +66,33 @@ async def api_billing_config(request: Request):
     )
 
 
-@router.post("/api/billing/admin/upgrade-plan")
-async def api_billing_admin_upgrade_plan(
+@router.get("/api/billing/subscription/status")
+async def api_billing_subscription_status(
     request: Request,
     user_id: str = Query(...),
-    plan_id: int = Query(...),
 ):
+    billing_uri = _billing_base_url(request)
+    return await proxy_json(
+        request,
+        "GET",
+        billing_uri,
+        "/subscription/status",
+        params={"user_id": user_id},
+        headers=_forward_auth_headers(request),
+        timeout_s=_timeout(request),
+    )
+
+
+@router.post("/api/billing/subscription/cancel-at-period-end")
+async def api_billing_cancel_at_period_end(request: Request, payload: dict = Body(...)):
     billing_uri = _billing_base_url(request)
     return await proxy_json(
         request,
         "POST",
         billing_uri,
-        "/admin/upgrade-plan",
-        params={"user_id": user_id, "plan_id": int(plan_id)},
+        "/subscription/cancel-at-period-end",
+        json_body=payload,
+        headers=_forward_auth_headers(request),
         timeout_s=_timeout(request),
     )
+

@@ -220,6 +220,102 @@ def billing_create_checkout_session():
     return jsonify(data), status
 
 
+@app.get("/billing/subscription/status")
+def billing_subscription_status():
+    token = get_access_token(request)
+    if not token:
+        return jsonify({"detail": "Not authenticated"}), 401
+
+    user = session.get("current_user")
+    user_id = user.get("user_id") if isinstance(user, dict) else None
+
+    if not user_id:
+        me, me_status = gateway.fetch_me(token)
+        if me_status == 200 and isinstance(me, dict):
+            user = me
+            user_id = me.get("user_id")
+            session["current_user"] = me
+            session["is_admin"] = bool(me.get("is_admin"))
+            session["auth_checked_at"] = int(time.time())
+        elif me_status == 401:
+            session.clear()
+            resp = make_response(jsonify({"detail": "Unauthorized"}), 401)
+            clear_access_cookie(resp, request)
+            return resp
+        else:
+            return jsonify({"detail": "Service Temporarily Unavailable"}), 502
+
+    if not user_id:
+        return jsonify({"detail": "Missing user info for billing"}), 502
+
+    data, status = gateway.call_json(
+        "GET",
+        f"/api/billing/subscription/status?user_id={user_id}",
+        token=token,
+    )
+    if data is None:
+        data = {"detail": "Invalid JSON from gateway"}
+
+    if status == 401:
+        session.clear()
+        resp = make_response(jsonify(data), 401)
+        clear_access_cookie(resp, request)
+        return resp
+
+    return jsonify(data), status
+
+
+@app.post("/billing/subscription/cancel-at-period-end")
+def billing_cancel_subscription_at_period_end():
+    token = get_access_token(request)
+    if not token:
+        return jsonify({"detail": "Not authenticated"}), 401
+
+    payload = request.get_json(force=True, silent=True) or {}
+    reason = payload.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        return jsonify({"detail": "Cancellation reason is required"}), 400
+
+    user = session.get("current_user")
+    user_id = user.get("user_id") if isinstance(user, dict) else None
+
+    if not user_id:
+        me, me_status = gateway.fetch_me(token)
+        if me_status == 200 and isinstance(me, dict):
+            user = me
+            user_id = me.get("user_id")
+            session["current_user"] = me
+            session["is_admin"] = bool(me.get("is_admin"))
+            session["auth_checked_at"] = int(time.time())
+        elif me_status == 401:
+            session.clear()
+            resp = make_response(jsonify({"detail": "Unauthorized"}), 401)
+            clear_access_cookie(resp, request)
+            return resp
+        else:
+            return jsonify({"detail": "Service Temporarily Unavailable"}), 502
+
+    if not user_id:
+        return jsonify({"detail": "Missing user info for billing"}), 502
+
+    data, status = gateway.call_json(
+        "POST",
+        "/api/billing/subscription/cancel-at-period-end",
+        token=token,
+        json_data={"user_id": user_id, "reason": reason.strip()},
+    )
+    if data is None:
+        data = {"detail": "Invalid JSON from gateway"}
+
+    if status == 401:
+        session.clear()
+        resp = make_response(jsonify(data), 401)
+        clear_access_cookie(resp, request)
+        return resp
+
+    return jsonify(data), status
+
+
 @app.post("/checks")
 def checks():
     token = get_access_token(request)

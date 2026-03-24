@@ -1,6 +1,3 @@
-from types import SimpleNamespace
-
-
 def test_healthz_ok(client, state):
     response = client.get("/healthz")
 
@@ -15,19 +12,23 @@ def test_config_returns_publishable_key(client, state):
     assert response.json() == {"publishable_key": "pk_test"}
 
 
-def test_usage_empty_payload_returns_false(client, state):
-    response = client.post("/usage", json={})
+def test_subscription_status_returns_default_when_no_billing_doc(client, state):
+    state["users_coll"].find_one.return_value = {"plan": 1, "stripe_customer_id": "cus_123"}
+    state["billing_coll"].find_one.return_value = None
+
+    response = client.get("/subscription/status", params={"user_id": "user_1"})
 
     assert response.status_code == 200
-    assert response.json() == {"ok": False}
-
-
-def test_usage_insert_success(client, state):
-    response = client.post("/usage", json={"event": "scan"})
-
-    assert response.status_code == 200
-    assert response.json() == {"ok": True}
-    state["usage_coll"].insert_one.assert_called_once()
+    assert response.json() == {
+        "user_id": "user_1",
+        "plan": 1,
+        "status": "none",
+        "cancel_at_period_end": False,
+        "billing_period_end": None,
+        "stripe_subscription_id": None,
+        "stripe_customer_id": "cus_123",
+        "cancellation_reason": None,
+    }
 
 
 def test_create_checkout_session_success(client, state):
@@ -81,6 +82,44 @@ def test_create_checkout_session_db_unavailable(client, state, monkeypatch, bill
 
     assert response.status_code == 503
     assert response.json()["detail"] == "Database not available"
+
+
+def test_cancel_subscription_schedules_period_end_and_records_reason(client, state):
+    state["users_coll"].find_one.return_value = {"plan": 2}
+    state["billing_coll"].find_one.return_value = {
+        "user_id": "user_1",
+        "plan": 2,
+        "status": "active",
+        "stripe_subscription_id": "sub_123",
+        "stripe_customer_id": "cus_123",
+        "billing_period_start": None,
+        "billing_period_end": None,
+        "amount_paid": "19.99",
+    }
+
+    response = client.post(
+        "/subscription/cancel-at-period-end",
+        json={"user_id": "user_1", "reason": "Too expensive"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert response.json()["status"] == "cancel_scheduled"
+    assert response.json()["plan_active_until"] is not None
+    state["subscription_modify"].assert_called_once()
+    state["billing_coll"].update_many.assert_called_once()
+    state["plan_coll"].insert_one.assert_called()
+    state["billing_coll"].insert_one.assert_called()
+
+
+def test_cancel_subscription_requires_reason(client, state):
+    response = client.post(
+        "/subscription/cancel-at-period-end",
+        json={"user_id": "user_1", "reason": "   "},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Cancellation reason is required"
 
 
 def test_webhook_missing_secret_returns_500(client, state, monkeypatch, billing_module):
@@ -154,13 +193,18 @@ def test_webhook_checkout_completed_missing_user_id_ignored(client, state):
 
 
 def test_webhook_subscription_deleted_cancels_plan(client, state):
-    state["plan_coll"].find_one.return_value = {"user_id": "user_1"}
-    state["users_coll"].find_one.return_value = {"plan": 2}
+    state["billing_coll"].find_one.return_value = {
+        "user_id": "user_1",
+        "plan": 2,
+        "status": "cancel_scheduled",
+        "stripe_subscription_id": "sub_123",
+        "stripe_customer_id": "cus_123",
+    }
 
     event = {
         "id": "evt_sub_deleted_1",
         "type": "customer.subscription.deleted",
-        "data": {"object": {"customer": "cus_123"}},
+        "data": {"object": {"id": "sub_123", "customer": "cus_123", "current_period_end": 1_900_000_000}},
     }
     state["webhook_construct"].return_value = event
 
@@ -169,38 +213,29 @@ def test_webhook_subscription_deleted_cancels_plan(client, state):
     assert response.status_code == 200
     assert response.json() == {"status": "success"}
     state["users_coll"].update_one.assert_called()
+    state["billing_coll"].update_many.assert_called()
     state["billing_coll"].insert_one.assert_called()
 
 
-def test_create_portal_session_success(client, state):
-    response = client.post("/create-portal-session", json={"customer_id": "cus_123"})
+def test_webhook_subscription_updated_marks_cancel_scheduled(client, state):
+    event = {
+        "id": "evt_sub_updated_1",
+        "type": "customer.subscription.updated",
+        "data": {
+            "object": {
+                "id": "sub_123",
+                "customer": "cus_123",
+                "cancel_at_period_end": True,
+                "current_period_end": 1_900_000_000,
+            }
+        },
+    }
+    state["webhook_construct"].return_value = event
+
+    response = client.post("/webhook", data="{}", headers={"stripe-signature": "sig"})
 
     assert response.status_code == 200
-    assert response.json() == {"url": "https://stripe.test/portal"}
+    assert response.json() == {"status": "success"}
+    state["billing_coll"].update_many.assert_called_once()
 
 
-def test_admin_upgrade_plan_success(client, state):
-    response = client.post("/admin/upgrade-plan", params={"user_id": "user_1", "plan_id": 2})
-
-    assert response.status_code == 200
-    assert response.json() == {"ok": True, "user_id": "user_1", "plan": 2}
-    state["plan_coll"].insert_one.assert_called_once()
-    state["billing_coll"].insert_one.assert_called_once()
-
-
-def test_admin_upgrade_plan_user_not_found(client, state):
-    state["users_coll"].update_one.return_value = SimpleNamespace(matched_count=0, modified_count=0)
-
-    response = client.post("/admin/upgrade-plan", params={"user_id": "missing", "plan_id": 2})
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
-
-
-def test_admin_upgrade_plan_db_unavailable(client, state, monkeypatch, billing_module):
-    monkeypatch.setattr(billing_module, "billing_coll", None, raising=False)
-
-    response = client.post("/admin/upgrade-plan", params={"user_id": "user_1", "plan_id": 2})
-
-    assert response.status_code == 503
-    assert response.json()["detail"] == "Database not available"
