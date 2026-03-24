@@ -358,6 +358,14 @@
   cursor: not-allowed;
 }
 
+.comm_voteUp:disabled,
+.comm_voteDown:disabled {
+  background: transparent;
+  border-color: transparent;
+  opacity: 1;
+  cursor: default;
+}
+
 .comm_actionText {
   font-size: 12px;
   font-weight: 700;
