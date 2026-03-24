@@ -55,6 +55,21 @@
                 <label for="signup-date-of-birth">Date of Birth</label>
                 <input id="signup-date-of-birth" type="text" inputmode="numeric" pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY" required />
 
+                <label for="signup-how-found">How did you find us?</label>
+                <select id="signup-how-found" required>
+                  <option value="" selected>Select one</option>
+                  <option value="social_media">Social media</option>
+                  <option value="browsing">Browsing</option>
+                  <option value="friend_or_colleague">Friend or colleague</option>
+                  <option value="news_article">News article</option>
+                  <option value="youtube">YouTube</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="other">Other</option>
+                </select>
+
+                <label for="signup-how-found-detail" id="signup-how-found-detail-label" style="display: none">Other (please elaborate)</label>
+                <textarea id="signup-how-found-detail" placeholder="Tell us how you found AIclipse" rows="3" style="display: none"></textarea>
+
                 <label for="signup-password">Password</label>
                 <input
                   id="signup-password"
@@ -112,7 +127,7 @@
                 </div>
 
                 <!-- type="button" stops browser auto-submit; JS handles signup click. -->
-                <button id="btn-signup" type="button" disabled>Sign up</button>
+                <button id="btn-signup" type="button" disabled>Request Access</button>
               </div>
               {% endif %}
 

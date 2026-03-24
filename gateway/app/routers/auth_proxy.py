@@ -119,6 +119,7 @@ async def gateway_admin_list_users(
     search: Optional[str] = Query(None),
     user_name: Optional[str] = Query(None),
     is_admin: Optional[bool] = Query(None),
+    access_status: Optional[str] = Query(None),
     sort: str = Query("created_at"),
     order: str = Query("desc"),
     page: int = Query(1, ge=1),
@@ -140,6 +141,8 @@ async def gateway_admin_list_users(
         params["user_name"] = user_name
     if is_admin is not None:
         params["is_admin"] = is_admin
+    if access_status:
+        params["access_status"] = access_status
 
     return await proxy_json(
         request,
@@ -242,6 +245,64 @@ async def gateway_admin_deletion_logs(
         "/admin/user-deletion-logs",
         headers={"Authorization": f"Bearer {admin.token}"},
         params=params,
+        timeout_s=_timeout(request),
+    )
+
+
+@router.get("/auth/admin/access-requests")
+async def gateway_admin_access_requests(
+    request: Request,
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=200),
+    admin: UserContext = Depends(get_current_admin),
+):
+    auth_uri = _auth_base_url(request)
+    params: dict = {"page": page, "page_size": page_size}
+    if search:
+        params["search"] = search
+
+    return await proxy_json(
+        request,
+        "GET",
+        auth_uri,
+        "/admin/access-requests",
+        headers={"Authorization": f"Bearer {admin.token}"},
+        params=params,
+        timeout_s=_timeout(request),
+    )
+
+
+@router.post("/auth/admin/access-requests/{user_id}/approve")
+async def gateway_admin_approve_access_request(
+    request: Request,
+    user_id: str = Path(...),
+    admin: UserContext = Depends(get_current_admin),
+):
+    auth_uri = _auth_base_url(request)
+    return await proxy_json(
+        request,
+        "POST",
+        auth_uri,
+        f"/admin/access-requests/{user_id}/approve",
+        headers={"Authorization": f"Bearer {admin.token}"},
+        timeout_s=_timeout(request),
+    )
+
+
+@router.delete("/auth/admin/access-requests/{user_id}/reject")
+async def gateway_admin_reject_access_request(
+    request: Request,
+    user_id: str = Path(...),
+    admin: UserContext = Depends(get_current_admin),
+):
+    auth_uri = _auth_base_url(request)
+    return await proxy_json(
+        request,
+        "DELETE",
+        auth_uri,
+        f"/admin/access-requests/{user_id}/reject",
+        headers={"Authorization": f"Bearer {admin.token}"},
         timeout_s=_timeout(request),
     )
 

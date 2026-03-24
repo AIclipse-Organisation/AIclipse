@@ -124,6 +124,7 @@ async def admin_list_users(
     request: Request,
     search: Optional[str] = Query(None, description="Search by name or email"),
     is_admin: Optional[bool] = Query(None),
+    access_status: Optional[str] = Query(None, pattern="^(approved|pending|rejected)$"),
     sort: str = Query("created_at", pattern="^(created_at|user_name|email)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
@@ -132,16 +133,54 @@ async def admin_list_users(
 ):
     users = request.app.state.user_repo.users
 
-    query: dict = {}
+    filters: List[dict] = []
     if search:
         escaped = re.escape(search)
         name_pattern = {"$regex": escaped, "$options": "i"}
         # Email search is restricted to local-part only (before '@') to avoid
         # matching every account by shared domains like gmail.com.
         local_part_pattern = {"$regex": f"^[^@]*{escaped}[^@]*@", "$options": "i"}
-        query["$or"] = [{"user_name": name_pattern}, {"email": local_part_pattern}]
+        filters.append({"$or": [{"user_name": name_pattern}, {"email": local_part_pattern}]})
     if is_admin is not None:
-        query["is_admin"] = is_admin
+        filters.append({"is_admin": is_admin})
+
+    if access_status == "pending":
+        filters.append(
+            {
+                "$or": [
+                    {"access_status": "pending"},
+                    {"$and": [{"access_status": {"$exists": False}}, {"access_granted": False}]},
+                ]
+            }
+        )
+    elif access_status == "approved":
+        filters.append(
+            {
+                "$or": [
+                    {"access_status": "approved"},
+                    {
+                        "$and": [
+                            {"access_status": {"$exists": False}},
+                            {
+                                "$or": [
+                                    {"access_granted": {"$exists": False}},
+                                    {"access_granted": True},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        )
+    elif access_status == "rejected":
+        filters.append({"access_status": "rejected"})
+
+    if not filters:
+        query: dict = {}
+    elif len(filters) == 1:
+        query = filters[0]
+    else:
+        query = {"$and": filters}
 
     sort_dir = -1 if order == "desc" else 1
     skip = (page - 1) * page_size
@@ -193,6 +232,9 @@ async def admin_create_user(
         "email": email_norm,
         "password": hashed,
         "is_admin": bool(body.is_admin),
+        "access_status": "approved",
+        "reviewed_at": _now_utc(),
+        "reviewed_by_user_id": admin.user_id,
         "plan": 0,
         "created_at": _now_utc(),
         "date_of_birth": validate_date_of_birth(body.date_of_birth),
@@ -399,3 +441,125 @@ async def admin_list_user_deletion_logs(
         items.append(UserDeletionLog(**doc))
 
     return items
+
+@router.get("/access-requests", response_model=AdminListResponse)
+async def admin_list_access_requests(
+    request: Request,
+    search: Optional[str] = Query(None, description="Search by name or email"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=200),
+    admin: TokenUser = Depends(get_current_admin),
+):
+    users = request.app.state.user_repo.users
+
+    query: dict = {
+        "$or": [
+            {"access_status": "pending"},
+            {"$and": [{"access_status": {"$exists": False}}, {"access_granted": False}]},
+        ]
+    }
+    if search:
+        escaped = re.escape(search)
+        name_pattern = {"$regex": escaped, "$options": "i"}
+        local_part_pattern = {"$regex": f"^[^@]*{escaped}[^@]*@", "$options": "i"}
+        query["$and"] = [{"$or": [{"user_name": name_pattern}, {"email": local_part_pattern}]}]
+
+    skip = (page - 1) * page_size
+    cursor = users.find(query).sort("created_at", -1).skip(skip).limit(page_size)
+    items: List[UserPublic] = []
+    async for doc in cursor:
+        items.append(build_user_public(doc))
+
+    total = await users.count_documents(query)
+    return AdminListResponse(items=items, page=page, page_size=page_size, total=total)
+
+
+@router.post("/access-requests/{user_id}/approve", response_model=UserPublic)
+async def admin_approve_access_request(
+    request: Request,
+    user_id: str = Path(...),
+    admin: TokenUser = Depends(get_current_admin),
+):
+    users = request.app.state.user_repo.users
+    reviewed_at = _now_utc()
+    result = await users.find_one_and_update(
+        {
+            "user_id": user_id,
+            "$or": [
+                {"access_status": "pending"},
+                {"$and": [{"access_status": {"$exists": False}}, {"access_granted": False}]},
+            ],
+        },
+        {
+            "$set": {
+                "access_status": "approved",
+                "reviewed_at": reviewed_at,
+                "reviewed_by_user_id": admin.user_id,
+            }
+        },
+        return_document=ReturnDocument.AFTER,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Access request not found")
+
+    event_payload = {
+        "event_type": "auth.access_request.approved",
+        "event_id": f"access_approved_{uuid4()}",
+        "approved_user_id": result.get("user_id"),
+        "approved_user_email": result.get("email"),
+        "approved_user_name": result.get("user_name"),
+        "approved_at": reviewed_at.isoformat(),
+        "approved_by_user_id": admin.user_id,
+        "approved_by_email": admin.email,
+    }
+
+    try:
+        await asyncio.wait_for(
+            request.app.state.event_redis.xadd(
+                request.app.state.settings.AUTH_EVENT_STREAM,
+                {
+                    "type": "auth.access_request.approved",
+                    "data": json.dumps(event_payload),
+                },
+            ),
+            timeout=request.app.state.settings.AUTH_EVENT_PUBLISH_TIMEOUT_S,
+        )
+    except Exception:
+        safe_user_id = str(result.get("user_id") or "").replace("\r", "").replace("\n", "")
+        safe_admin_user_id = str(admin.user_id or "").replace("\r", "").replace("\n", "")
+        logger.exception(
+            "failed_to_publish_access_approved_event user_id=%s approved_by=%s",
+            safe_user_id,
+            safe_admin_user_id,
+        )
+
+    return build_user_public(result)
+
+
+@router.delete("/access-requests/{user_id}/reject", status_code=status.HTTP_200_OK)
+async def admin_reject_access_request(
+    request: Request,
+    user_id: str = Path(...),
+    admin: TokenUser = Depends(get_current_admin),
+):
+    users = request.app.state.user_repo.users
+    result = await users.find_one_and_update(
+        {
+            "user_id": user_id,
+            "$or": [
+                {"access_status": "pending"},
+                {"$and": [{"access_status": {"$exists": False}}, {"access_granted": False}]},
+            ],
+        },
+        {
+            "$set": {
+                "access_status": "rejected",
+                "reviewed_at": _now_utc(),
+                "reviewed_by_user_id": admin.user_id,
+            }
+        },
+        return_document=ReturnDocument.AFTER,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Access request not found")
+    return {"rejected": True, "user_id": result.get("user_id"), "email": result.get("email")}

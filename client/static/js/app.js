@@ -280,6 +280,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const signupPasswordInput = document.getElementById("signup-password");
   const signupPolicyRoot = document.getElementById("signup-password-policy");
   const signupDobInput = document.getElementById("signup-date-of-birth");
+  const signupHowFoundSelect = document.getElementById("signup-how-found");
+  const signupHowFoundDetailLabel = document.getElementById("signup-how-found-detail-label");
+  const signupHowFoundDetail = document.getElementById("signup-how-found-detail");
 
   const signupTerms = document.getElementById("signup-terms");
   const btnSignup = document.getElementById("btn-signup");
@@ -307,6 +310,22 @@ window.addEventListener("DOMContentLoaded", () => {
       if (digits.length > 4) parts.push(digits.slice(4, 8));
       signupDobInput.value = parts.join("-");
     });
+  }
+
+  if (signupHowFoundSelect) {
+    const syncHowFoundDetailVisibility = () => {
+      const isOther = signupHowFoundSelect.value === "other";
+      if (signupHowFoundDetailLabel) {
+        signupHowFoundDetailLabel.style.display = isOther ? "block" : "none";
+      }
+      if (signupHowFoundDetail) {
+        signupHowFoundDetail.style.display = isOther ? "block" : "none";
+        if (!isOther) signupHowFoundDetail.value = "";
+      }
+    };
+
+    signupHowFoundSelect.addEventListener("change", syncHowFoundDetailVisibility);
+    syncHowFoundDetailVisibility();
   }
 
   function updateSignupPolicyUI() {
@@ -354,6 +373,8 @@ window.addEventListener("DOMContentLoaded", () => {
       const email = document.getElementById("signup-email")?.value.trim();
       const dateOfBirthRaw = document.getElementById("signup-date-of-birth")?.value;
       const password = document.getElementById("signup-password")?.value;
+      const howDidYouFindUs = document.getElementById("signup-how-found")?.value;
+      const howDidYouFindUsDetail = document.getElementById("signup-how-found-detail")?.value?.trim();
 
       const termsAccepted = document.getElementById("signup-terms")?.checked;
       if (!termsAccepted) {
@@ -361,13 +382,18 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      let loginSuccess = false;
+      let requestSubmitted = false;
 
       activateSignupPolicyIfNeeded();
 
-      if (!user_name || !email || !password || !String(dateOfBirthRaw || "").trim()) {
-        setStatus(accountStatus, "error", "Please fill username, email, date of birth and password.");
+      if (!user_name || !email || !password || !String(dateOfBirthRaw || "").trim() || !howDidYouFindUs) {
+        setStatus(accountStatus, "error", "Please fill username, email, date of birth, password and how you found us.");
         updateSignupPolicyUI();
+        return;
+      }
+
+      if (howDidYouFindUs === "other" && !String(howDidYouFindUsDetail || "").trim()) {
+        setStatus(accountStatus, "error", "Please elaborate on how you found us.");
         return;
       }
 
@@ -404,7 +430,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (loginSpinner) loginSpinner.style.display = "block";
 
       btnSignupEl.disabled = true;
-      setStatus(accountStatus, "info", "Creating account...");
+      setStatus(accountStatus, "info", "Submitting access request...");
 
       try {
         const { res, data } = await jsonFetch("POST", "/auth/signup", {
@@ -412,35 +438,18 @@ window.addEventListener("DOMContentLoaded", () => {
           email,
           date_of_birth: dateOfBirthRaw,
           password,
+          how_did_you_find_us: howDidYouFindUs,
+          how_did_you_find_us_detail: howDidYouFindUsDetail || null,
         });
 
         if (res.ok) {
-          setStatus(accountStatus, "info", "Account created. Logging in...");
-
-          const loginRes = await fetch("/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ email, password }),
-          });
-
-          let loginData = {};
-          try {
-            loginData = await loginRes.json();
-          } catch {}
-
-          if (loginRes.ok && loginData.user) {
-            loginSuccess = true;
-            setStatus(accountStatus, "success", "Logged in. Redirecting...");
-            setCurrentUserChip(loginData.user);
-            window.location.href = "/upload";
-          } else {
-            setStatus(
-              accountStatus,
-              "error",
-              "Account created, but auto-login failed. Please log in manually.",
-            );
-          }
+          requestSubmitted = true;
+          if (loginSpinner) loginSpinner.style.display = "none";
+          setStatus(
+            accountStatus,
+            "success",
+            data?.message || "Thank you. An admin will review your request and contact you soon.",
+          );
         } else {
           const normalized = normalizeApiErrorDetail(data);
 
@@ -460,7 +469,7 @@ window.addEventListener("DOMContentLoaded", () => {
         console.error(err);
         setStatus(accountStatus, "error", "Network error during signup.");
       } finally {
-        if (!loginSuccess) {
+        if (!requestSubmitted) {
           btnSignupEl.disabled = false;
           if (signupPanel) signupPanel.style.display = "block";
           if (authToggleContainer) authToggleContainer.style.display = "";

@@ -52,9 +52,14 @@ def build_auth_blueprint(gateway: GatewayClient, *, is_signup_enabled: Callable[
         email = (payload.get("email") or "").strip()
         date_of_birth_raw = payload.get("date_of_birth")
         password = payload.get("password") or ""
+        how_did_you_find_us = (payload.get("how_did_you_find_us") or "").strip()
+        how_did_you_find_us_detail = (payload.get("how_did_you_find_us_detail") or "").strip()
 
-        if not user_name or not email or not password or date_of_birth_raw is None:
-            return jsonify({"detail": "Please fill username, email, date of birth and password."}), 400
+        if not user_name or not email or not password or date_of_birth_raw is None or not how_did_you_find_us:
+            return jsonify({"detail": "Please fill username, email, date of birth, password and how you found us."}), 400
+
+        if how_did_you_find_us == "other" and not how_did_you_find_us_detail:
+            return jsonify({"detail": "Please elaborate on how you found us."}), 400
 
         try:
             from datetime import datetime
@@ -71,7 +76,14 @@ def build_auth_blueprint(gateway: GatewayClient, *, is_signup_enabled: Callable[
         if not _is_valid_email_address(email):
             return jsonify({"detail": "Please enter a valid email address."}), 400
 
-        data, status = gateway.signup(user_name, email, date_of_birth_raw, password)
+        data, status = gateway.signup(
+            user_name,
+            email,
+            date_of_birth_raw,
+            password,
+            how_did_you_find_us,
+            how_did_you_find_us_detail or None,
+        )
         if data is None:
             data = {"detail": "Signup failed"}
         return jsonify(data), status

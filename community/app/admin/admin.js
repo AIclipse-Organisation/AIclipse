@@ -74,6 +74,25 @@ export const adminService = {
     return fetchLocal(`/user-deletion-logs?${searchParams.toString()}`);
   },
 
+  getAccessRequests: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v === undefined || v === null || v === "") return;
+      searchParams.set(k, v);
+    });
+    return fetchLocal(`/access-requests?${searchParams.toString()}`);
+  },
+
+  approveAccessRequest: async (userId) =>
+    fetchLocal(`/access-requests/${userId}/approve`, {
+      method: "POST",
+    }),
+
+  rejectAccessRequest: async (userId) =>
+    fetchLocal(`/access-requests/${userId}/reject`, {
+      method: "DELETE",
+    }),
+
   scanImage: async (file) => {
     const formData = new FormData();
     formData.append("file", file);
