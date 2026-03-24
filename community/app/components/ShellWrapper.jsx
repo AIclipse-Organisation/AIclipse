@@ -1,6 +1,7 @@
 "use client";
 import { usePathname } from "next/navigation";
 import Topbar from "./Topbar";
+import AdminTopbar from "./AdminTopbar";
 import BottomNav from "./BottomNav";
 import { HeroUIProvider } from "@heroui/react";
 import { useState } from "react";
@@ -19,9 +20,8 @@ export default function ShellWrapper({ children, user }) {
       <HeroUIProvider>
         {/* FIXED: Background set to #222222 and overflow controlled */}
         <div className="fixed inset-0 flex flex-col bg-[#222222] overflow-hidden z-0">
-          <Topbar
+          <AdminTopbar
             isAdmin={user?.is_admin === true}
-            userName={user?.user_name || "Admin"}
           />
           {/* Main content container with proper padding to prevent bottom clipping */}
           <main className="flex-1 min-h-0 p-4 md:p-8 relative z-0">
@@ -36,37 +36,37 @@ export default function ShellWrapper({ children, user }) {
 
   return (
     <XpProvider>
-    <div className="app">
-      <div className="app-container">
-        <Topbar
-          isAdmin={user?.role === "admin" || user?.is_admin === true}
-          userName={user?.user_name || "Guest"}
-          showBack={isProfileRoute}
-        />
-        <main className={`screen${isProfileRoute ? " screen--profile" : ""}`}>
-          {!isProfileRoute && (
-            <section className="page-header" aria-label="Page title">
-              <div className="how_to_spot_container">
-                <button
-                  onClick={() => setShowTutorial(true)}
-                  className="px-3 py-2 rounded-lg border border-[#2c2c2c] text-[#CFB87C] bg-transparent hover:bg-[#2c2c2c] text-sm font-semibold"
-                >
-                  How to spot AI?
-                </button>
-              </div>
-              <div className="page-underline" role="presentation" />
-            </section>
-          )}
-          {children}
-        </main>
-        <BottomNav />
-        <XpBar />
-        <TutorialModal
-          open={showTutorial}
-          onClose={() => setShowTutorial(false)}
-        />
+      <div className="app">
+        <div className="app-container">
+          <Topbar
+            isAdmin={user?.role === "admin" || user?.is_admin === true}
+            userName={user?.user_name || "Guest"}
+            showBack={isProfileRoute}
+          />
+          <main className={`screen${isProfileRoute ? " screen--profile" : ""}`}>
+            {!isProfileRoute && (
+              <section className="page-header" aria-label="Page title">
+                <div className="how_to_spot_container">
+                  <button
+                    onClick={() => setShowTutorial(true)}
+                    className="px-3 py-2 rounded-lg border border-[#2c2c2c] text-[#CFB87C] bg-transparent hover:bg-[#2c2c2c] text-sm font-semibold"
+                  >
+                    How to spot AI?
+                  </button>
+                </div>
+                <div className="page-underline" role="presentation" />
+              </section>
+            )}
+            {children}
+          </main>
+          <BottomNav />
+          <XpBar />
+          <TutorialModal
+            open={showTutorial}
+            onClose={() => setShowTutorial(false)}
+          />
+        </div>
       </div>
-    </div>
     </XpProvider>
   );
 }

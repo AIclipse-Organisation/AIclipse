@@ -285,8 +285,6 @@ export default function PostBox({
     console.error("❌ PostMedia received an empty URL for label:", label);
   }
 
-  console.log("Image: ", image)
-
   return (
     <div
       className={`comm_postBox ${isOfficial && userHasVoted ? "is-revealed-benchmark" : ""}`}

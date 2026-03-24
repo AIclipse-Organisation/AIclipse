@@ -452,3 +452,35 @@ body::-webkit-scrollbar {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* Admin Menu Styles */
+.admin-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2000;
+  display: none;
+}
+
+.admin-nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100dvh;
+  background: #222222;
+  border-right: 1px solid #2c2c2c;
+  transform: translateX(-100%);
+  z-index: 2001;
+  transition: transform 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-nav-drawer.active {
+  transform: translateX(0);
+  display: flex !important;
+}

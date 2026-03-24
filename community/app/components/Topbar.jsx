@@ -195,7 +195,7 @@ export default function Topbar({ isAdmin, showBack }) {
           </a>
 
           <div className="drawer-separator"></div>
-          
+
           <button
             className="logout-button"
             type="button"
