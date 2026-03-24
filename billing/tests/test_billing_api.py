@@ -28,9 +28,6 @@ def test_subscription_status_returns_default_when_no_billing_doc(client, state):
         "status": "none",
         "cancel_at_period_end": False,
         "billing_period_end": None,
-        "stripe_subscription_id": None,
-        "stripe_customer_id": "cus_123",
-        "cancellation_reason": None,
     }
 
 
@@ -55,9 +52,6 @@ def test_subscription_status_returns_active_with_period_end(client, state):
         "status": "active",
         "cancel_at_period_end": False,
         "billing_period_end": period_end.isoformat(),
-        "stripe_subscription_id": "sub_123",
-        "stripe_customer_id": "cus_123",
-        "cancellation_reason": None,
     }
 
 
@@ -218,6 +212,37 @@ def test_cancel_subscription_uses_existing_period_end_when_stripe_period_missing
 
     assert response.status_code == 200
     assert response.json()["plan_active_until"] == existing_period_end.isoformat()
+
+
+def test_cancel_subscription_is_idempotent_when_already_scheduled(client, state):
+    existing_period_end = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
+    state["users_coll"].find_one.return_value = {"plan": 2}
+    state["billing_coll"].find_one.return_value = {
+        "user_id": "user_1",
+        "plan": 2,
+        "status": "cancel_scheduled",
+        "cancel_at_period_end": True,
+        "stripe_subscription_id": "sub_123",
+        "stripe_customer_id": "cus_123",
+        "billing_period_end": existing_period_end,
+    }
+
+    response = client.post(
+        "/subscription/cancel-at-period-end",
+        json={"user_id": "user_1", "reason": "Too expensive"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "status": "cancel_scheduled",
+        "message": "Subscription cancellation already scheduled",
+        "plan_active_until": existing_period_end.isoformat(),
+    }
+    state["subscription_modify"].assert_not_called()
+    state["billing_coll"].update_many.assert_not_called()
+    state["plan_coll"].insert_one.assert_not_called()
+    state["billing_coll"].insert_one.assert_not_called()
 
 
 def test_webhook_missing_secret_returns_500(client, state, monkeypatch, billing_module):

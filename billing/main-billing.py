@@ -227,9 +227,6 @@ def get_subscription_status(user_id: str):
             "status": "none",
             "cancel_at_period_end": False,
             "billing_period_end": None,
-            "stripe_subscription_id": None,
-            "stripe_customer_id": user_doc.get("stripe_customer_id"),
-            "cancellation_reason": None,
         }
 
     return {
@@ -238,9 +235,6 @@ def get_subscription_status(user_id: str):
         "status": latest_bill.get("status", "none"),
         "cancel_at_period_end": bool(latest_bill.get("cancel_at_period_end", False)),
         "billing_period_end": _iso_or_none(latest_bill.get("billing_period_end")),
-        "stripe_subscription_id": latest_bill.get("stripe_subscription_id"),
-        "stripe_customer_id": latest_bill.get("stripe_customer_id") or user_doc.get("stripe_customer_id"),
-        "cancellation_reason": latest_bill.get("cancellation_reason"),
     }
 
 # -------------------------
@@ -372,6 +366,15 @@ async def cancel_subscription_at_period_end(request: CancelSubscriptionRequest):
     stripe_subscription_id = latest_active.get("stripe_subscription_id")
     if not stripe_subscription_id:
         raise HTTPException(status_code=404, detail="No active subscription found")
+
+    existing_period_end = latest_active.get("billing_period_end")
+    if latest_active.get("status") == "cancel_scheduled" or latest_active.get("cancel_at_period_end"):
+        return {
+            "ok": True,
+            "status": "cancel_scheduled",
+            "message": "Subscription cancellation already scheduled",
+            "plan_active_until": _iso_or_none(existing_period_end),
+        }
 
     now = _now_utc()
     try:
@@ -596,7 +599,7 @@ async def stripe_webhook(request: Request):
         cancellation_details = subscription.get("cancellation_details") or {}
         cancellation_reason = cancellation_details.get("comment") or cancellation_details.get("reason")
 
-        logger.info("customer.subscription.deleted customer=%s subscription=%s", customer_id, subscription_id)
+        logger.info("customer.subscription.deleted received")
 
         last_billing = billing_coll.find_one(
             {
@@ -680,9 +683,9 @@ async def stripe_webhook(request: Request):
                 "timestamp": now,
             })
 
-            logger.info("Subscription cancelled: customer=%s user=%s", customer_id, user_id)
+            logger.info("Subscription cancelled after delete webhook")
         else:
-            logger.warning("No plan record found for customer=%s", customer_id)
+            logger.warning("No matching plan record found for deleted subscription webhook")
 
     else:
         logger.info("Unhandled webhook type=%s (ignored)", event_type)

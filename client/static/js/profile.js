@@ -218,7 +218,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const thenMs = dateValue.getTime();
     const msUntil = thenMs - nowMs;
     const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
-    return msUntil <= threeDaysMs;
+    return msUntil >= 0 && msUntil <= threeDaysMs;
   }
 
   function normalizeStatusLabel(rawStatus) {
