@@ -12,6 +12,7 @@ def register_auth_middleware(app: Flask, gateway: GatewayClient, *, cache_ttl_se
     def is_public_path(path: str) -> bool:
         return (
             path == "/"
+            or path == "/login"
             or path == "/healthz"
             or path.startswith("/static/")
             or path.startswith("/static")
@@ -19,7 +20,7 @@ def register_auth_middleware(app: Flask, gateway: GatewayClient, *, cache_ttl_se
         )
 
     def redirect_to_login(*, clear_cookie: bool):
-        resp = make_response(redirect("/"))
+        resp = make_response(redirect("/login"))
         if clear_cookie:
             clear_access_cookie(resp, request)
         resp.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate"
