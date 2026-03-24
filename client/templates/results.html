@@ -21,27 +21,28 @@
           <div id="detect-card" class="detection-card" aria-live="polite">
             <div class="detection-row">
               <div class="detection-main">
-                <div class="bar-head">
-                  <div class="bar-result-avatar">
-                    <img src="/static/images/aiclipse_logo_gold.png" alt="Aiclipse" />
+                <div class="comm_barBlock is-hidden" id="aiclipse-bar-block">
+                  <div class="comm_barHead">
+                    <div class="comm_resultAvatar">
+                      <img src="/static/images/aiclipse_moon.png" alt="" class="comm_resultIcon" />
+                    </div>
                   </div>
-                  <p id="detect-verdict" class="verdict-text label-neutral">
-                    —
-                  </p>
+                  <div class="comm_barTrackWrap">
+                    <span class="comm_zoneLabel comm_zoneLabel--safe" style="left: 20%">REAL</span>
+                    <span class="comm_zoneLabel comm_zoneLabel--neutral" style="left: 50%">SUSPICIOUS</span>
+                    <span class="comm_zoneLabel comm_zoneLabel--risk" style="left: 80%">FAKE</span>
+                    <div class="comm_progressPanel" aria-hidden="true" title="AI probability">
+                      <div class="comm_progressBar">
+                        <div class="comm_progressFill" id="ai-fill" data-p="0" style="width: 0px"></div>
+                        <div class="comm_barMarker" style="left: 40%"></div>
+                        <div class="comm_barMarker" style="left: 60%"></div>
+                        <span class="comm_barPercent" id="ai-percent">0%</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div
-                  class="progress-panel"
-                  aria-hidden="true"
-                  title="AI probability"
-                >
-                  <div class="progress-bar">
-                    <div class="real-fill" style="--p: 0"></div>
-                    <div class="ai-fill" style="--p: 0"></div>
-
-                    <span class="bar-percent" id="ai-percent">0%</span>
-                  </div>
-                </div>
+                <p id="detect-verdict" class="verdict-text label-neutral" hidden>—</p>
 
                 <input id="save-public" type="checkbox" hidden />
 

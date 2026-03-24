@@ -300,6 +300,30 @@ function showPanel(panel) {
 }
 
 // -------------------------
+// Bar fill + zone label helpers (community bar design)
+// -------------------------
+const GRADIENT_AICLIPSE  = "#cfb87c 0%, #cfb87c 40%, #e07043 60%, #cc2222 100%";
+const GRADIENT_COMMUNITY = "#af83c9 0%, #af83c9 40%, #d06bb0 60%, #cc2222 100%";
+
+function setFillWithGradient(fillEl, aiPct, gradient) {
+  if (!fillEl) return;
+  const p = clamp(aiPct, 0, 100);
+  fillEl.style.width = p === 0 ? "0px" : `calc(${p}% - 0px)`;
+  fillEl.dataset.p = String(p);
+  const pctSafe = Math.max(p, 0.1);
+  const zoneSize = `${(10000 / pctSafe).toFixed(2)}%`;
+  fillEl.style.background = `linear-gradient(to right, rgba(0,0,0,0.28), transparent) left / 100% 100% no-repeat, linear-gradient(to right, ${gradient}) left / ${zoneSize} 100% no-repeat`;
+}
+
+function setZoneLabels(container, aiPct) {
+  if (!container) return;
+  const zone = aiPct < 40 ? "safe" : aiPct <= 60 ? "neutral" : "risk";
+  container.querySelectorAll(".comm_zoneLabel").forEach(el => {
+    el.classList.toggle("comm_zoneLabel--active", el.classList.contains(`comm_zoneLabel--${zone}`));
+  });
+}
+
+// -------------------------
 // NEW: Aiclipse card (gold) computations
 // Matches your Results logic:
 // - If AI/fake/deepfake => confidence is AI% => REAL = 1 - confidence
@@ -333,25 +357,22 @@ function getRealLikelihoodPercent(img) {
 function renderAiclipseCard(img) {
   const wrap = document.getElementById("verdict-block");
   const card = document.getElementById("aiclipse-card");
-  const verdictEl = document.getElementById("aiclipse-verdict");
   const fillEl = document.getElementById("aiclipse-fill");
   const pctEl = document.getElementById("aiclipse-percent");
 
-  if (!wrap || !card || !verdictEl || !fillEl || !pctEl) return;
+  if (!wrap || !card || !fillEl || !pctEl) return;
 
   if (!img) {
     card.hidden = true;
     return;
   }
 
-  const rawLabel = normalizeLabelText(img.label || img.result || img.verdict || "Unknown");
   const realPct = getRealLikelihoodPercent(img);
   const aiPct = 100 - realPct;
 
-  verdictEl.textContent = rawLabel || "—";
   pctEl.textContent = `${Math.round(aiPct)}%`;
-
-  setFillPercent(fillEl, aiPct);
+  setFillWithGradient(fillEl, aiPct, GRADIENT_AICLIPSE);
+  setZoneLabels(card, aiPct);
 
   wrap.hidden = false;
   card.hidden = false;
@@ -364,25 +385,17 @@ function renderAiclipseCard(img) {
 // - no votes => "No community votes" and 0.00%
 // -------------------------
 function communityVerdictText(pctReal) {
-  if (pctReal >= 40 && pctReal <= 60) return "Not sure";
-
-  if (pctReal > 60) {
-    if (pctReal >= 86) return "Highly Unlikely Fake";
-    return "Unlikely Fake";
-  }
-
-  const pctAI = 100 - pctReal;
-  if (pctAI >= 86) return "Highly Likely Fake";
-  return "Likely Fake";
+  if (pctReal >= 40 && pctReal <= 60) return "SUSPICIOUS";
+  if (pctReal > 60) return "REAL";
+  return "FAKE";
 }
 
 function renderCommunityCard(img) {
   const card = document.getElementById("community-card");
-  const verdictEl = document.getElementById("community-verdict");
   const fillEl = document.getElementById("community-fill");
   const pctEl = document.getElementById("community-percent");
 
-  if (!card || !verdictEl || !fillEl || !pctEl) return;
+  if (!card || !fillEl || !pctEl) return;
 
   // Only show for public posts
   if (!img || isPrivateScan(img)) {
@@ -396,11 +409,10 @@ function renderCommunityCard(img) {
   const downN = Number.isFinite(down) ? down : 0;
   const total = upN + downN;
 
-  // FIX: When there are no votes, show "—" instead of "0.00%"
   if (total <= 0) {
-    verdictEl.textContent = "No community votes";
-    pctEl.textContent = "—"; 
-    setFillPercent(fillEl, 0);
+    pctEl.textContent = "—";
+    setFillWithGradient(fillEl, 0, GRADIENT_COMMUNITY);
+    setZoneLabels(card, 0);
     card.hidden = false;
     return;
   }
@@ -408,9 +420,9 @@ function renderCommunityCard(img) {
   const pctReal = clamp((upN / total) * 100, 0, 100);
   const pctAi = 100 - pctReal;
 
-  verdictEl.textContent = communityVerdictText(pctReal);
   pctEl.textContent = `${Math.round(pctAi)}%`;
-  setFillPercent(fillEl, pctAi);
+  setFillWithGradient(fillEl, pctAi, GRADIENT_COMMUNITY);
+  setZoneLabels(card, pctAi);
 
   card.hidden = false;
 }

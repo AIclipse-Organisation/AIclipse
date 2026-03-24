@@ -13,11 +13,11 @@ def get_confidence_label(verdict: str, confidence: float) -> str:
     is_fake = verdict.upper() == "FAKE"
 
     if pct < 15 or pct > 85:
-        label = "Highly Likely Fake" if is_fake else "Highly Unlikely Fake"
+        label = "REAL" if is_fake else "FAKE"
     elif 15 <= pct < 40 or 60 < pct <= 85:
-        label = "Likely Fake" if is_fake else "Unlikely Fake"
+        label = "REAL" if is_fake else "FAKE"
     else:  # 40–60 range
-        label = "Not Sure"
+        label = "Suspicious"
 
     return f"{pct:.2f}% {label}"
 

@@ -23,11 +23,9 @@ function renderDetection(resp) {
   const verdictEl = document.getElementById("detect-verdict");
   const confidenceEl = document.getElementById("detect-confidence");
 
-  const panel = document.querySelector(".progress-panel");
-  const realFill = document.querySelector(".progress-panel .real-fill");
-  const aiFill = document.querySelector(".progress-panel .ai-fill");
-
+  const aiFill = document.getElementById("ai-fill");
   const aiPercentEl = document.getElementById("ai-percent");
+  const barBlock = document.getElementById("aiclipse-bar-block");
 
   if (!resp || typeof resp !== "object") {
     if (detectCard) detectCard.hidden = true;
@@ -57,9 +55,10 @@ function renderDetection(resp) {
   window.__lastAiPct = aiPct;
 
   const labelClass = "label-gold";
+  const verdictLabel = aiPct < 40 ? "REAL" : aiPct <= 60 ? "SUSPICIOUS" : "FAKE";
 
   if (verdictEl) {
-    verdictEl.textContent = cleanLabel;
+    verdictEl.textContent = verdictLabel;
     verdictEl.className = `verdict-text ${labelClass}`;
   }
 
@@ -67,15 +66,22 @@ function renderDetection(resp) {
     confidenceEl.textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
   }
 
-  setFillPercent(realFill, 0);
   setFillPercent(aiFill, aiPct);
+  if (aiFill) {
+    const pctSafe = Math.max(aiPct, 0.1);
+    const zoneSize = `${(10000 / pctSafe).toFixed(2)}%`;
+    aiFill.style.background = `linear-gradient(to right, rgba(0,0,0,0.28), transparent) left / 100% 100% no-repeat, linear-gradient(to right, #cfb87c 0%, #cfb87c 40%, #e07043 60%, #cc2222 100%) left / ${zoneSize} 100% no-repeat`;
+  }
 
   if (aiPercentEl) {
     aiPercentEl.textContent = `${Math.round(aiPct)}%`;
   }
 
-  if (panel) {
-    panel.classList.toggle("is-risk", aiPct > 50);
+  if (barBlock) {
+    const zone = aiPct < 40 ? "safe" : aiPct <= 60 ? "neutral" : "risk";
+    barBlock.querySelectorAll(".comm_zoneLabel").forEach(el => {
+      el.classList.toggle("comm_zoneLabel--active", el.classList.contains(`comm_zoneLabel--${zone}`));
+    });
   }
 
   if (detectCard) detectCard.hidden = false;
@@ -141,7 +147,16 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   const img = document.getElementById("preview-image");
-  if (img) img.src = preview;
+  if (img) {
+    img.onload = () => {
+      const barBlock = document.getElementById("aiclipse-bar-block");
+      if (barBlock) {
+        barBlock.classList.remove("is-hidden");
+        barBlock.classList.add("is-revealed");
+      }
+    };
+    img.src = preview;
+  }
 
   const data = JSON.parse(stored);
   renderDetection(data);

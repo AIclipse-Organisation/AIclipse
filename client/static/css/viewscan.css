@@ -220,133 +220,149 @@ body.app .page-underline {
   margin-top: 12px;
 }
 
-/* Card shell — spacing only, no border (borders live on head/panel) */
-.meter-card {
+/* =========================
+   Community bar design (viewscan)
+   ========================= */
+
+.comm_barBlock {
+  display: grid;
   margin-top: 12px;
 }
 
-/* Header row */
-.meter-head {
+.comm_barHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-
   padding: 12px 14px 8px;
-  background: rgba(0, 0, 0, 0.12);
   border-bottom: 0;
   border-radius: 12px 12px 0 0;
+  background: rgba(0, 0, 0, 0.12);
 }
 
-.meter-head--purple {
-  border-color: rgba(175, 131, 201, 0.55);
-}
-
-.meter-result-avatar {
+.comm_resultAvatar {
   flex-shrink: 0;
   display: flex;
+  justify-content: center;
   align-items: center;
+  width: 2.5vh;
+  height: 2vh;
 }
 
-.meter-result-avatar img {
-  height: 20px;
-  width: auto;
-  display: block;
+.comm_resultAvatar img,
+.comm_resultIcon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
-.meter-result-avatar--purple {
+.comm_resultAvatar_icon {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 2.5vh;
+  height: 2vh;
   color: rgba(175, 131, 201, 0.95);
 }
 
-.meter-result-avatar--purple svg {
-  width: 20px;
-  height: 20px;
+.comm_barTrackWrap {
+  position: relative;
 }
 
-.meter-verdict {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  color: rgba(207, 184, 124, 0.95);
-  text-align: right;
-}
-
-.meter-head--purple .meter-verdict,
-.meter-verdict--purple {
-  color: rgba(175, 131, 201, 0.95);
-}
-
-/* Panel */
-.meter-panel {
+.comm_progressPanel {
   width: 100%;
   box-sizing: border-box;
-  padding: 0;
   margin: 0;
-  background: rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-
   border-top: 0;
   border-radius: 0 0 12px 12px;
+  background: rgba(0, 0, 0, 0.12);
+  overflow: hidden;
 }
 
-/* Bar */
-.meter-bar {
+.comm_progressBar {
   position: relative;
   width: 100%;
   box-sizing: border-box;
-
   height: 26px;
   border-radius: 999px;
-
   background: #141414;
   border: 1px solid rgb(63, 63, 63);
-
   padding: 4px;
   overflow: hidden;
 }
 
-/* Fill */
-.meter-fill {
+.comm_progressFill {
   position: absolute;
   top: 4px;
   left: 4px;
   bottom: 4px;
+  width: 0px;
   border-radius: 999px;
-
-  width: 0%;
-  max-width: calc(100% - 8px);
   transition: width 300ms ease;
   z-index: 1;
+  min-width: 18px;
 }
 
-.meter-fill:not([style*="width: 0"]) {
+.comm_progressFill[data-p]:not([data-p="0"]) {
   min-width: 14px;
 }
 
-.meter-fill--gold {
-  background: rgba(207, 184, 124, 0.95);
+.comm_progressFill[data-p="100"] {
+  right: 4px;
+  width: auto !important;
 }
 
-.meter-fill--purple {
-  background: rgba(175, 131, 201, 0.95);
-}
-
-/* Percent text */
-.meter-percent {
+.comm_barPercent {
   position: absolute;
   right: 14px;
   top: 50%;
   transform: translateY(-50%);
-
   font-size: 13px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
-  pointer-events: none;
-  z-index: 3;
-  white-space: nowrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  z-index: 3;
+  pointer-events: none;
+  white-space: nowrap;
 }
+
+.comm_barMarker {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 1px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.comm_zoneLabel {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  transform: translateX(-50%);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.comm_zoneLabel--active {
+  font-size: 14px;
+  -webkit-text-stroke: 0.3px #000000;
+  isolation: isolate;
+}
+
+.comm_zoneLabel--safe.comm_zoneLabel--active    { color: #cfb87c; text-shadow: 0 0 2px rgba(207, 184, 124, 0.6); }
+.comm_zoneLabel--neutral.comm_zoneLabel--active { color: #ffffff; text-shadow: 0 0 2px rgba(255, 255, 255, 0.6); }
+.comm_zoneLabel--risk.comm_zoneLabel--active    { color: #f87171; text-shadow: 0 0 2px rgba(204, 34, 34, 0.6); }
+.comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active { color: #af83c9; text-shadow: 0 0 2px rgba(175, 131, 201, 0.6); }
 
 /* =========================
    Split Cards (Vote)
@@ -1322,20 +1338,18 @@ body.app .page-underline {
   border-color: rgba(255, 255, 255, 0.18);
 }
 
-/* Vote displays — plain stat, no button look */
+/* Vote displays — same size/spacing as comm_actionBtn but no button styling */
 .vs-votes-display {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0;
-  background: none;
-  border: none;
+  padding: 6px 10px;
   color: rgba(255, 255, 255, 0.92);
 }
 
 .comm_icon {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   display: block;
   object-fit: contain;
   flex-shrink: 0;
