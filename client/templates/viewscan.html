@@ -15,8 +15,26 @@
       {% set page_title = 'View Scan' %} {% include 'partials/topbar.html' %}
 
       <main class="screen">
-        <section class="page-header" aria-label="Page title">
-          <h1 id="viewscan-title" class="page-title">View Scan</h1>
+        <section class="page-header page-header--with-description" aria-label="Page title">
+          <div class="page-header-main">
+            <h1 id="viewscan-title" class="page-title">View Scan</h1>
+
+            <div
+              id="description-header-section"
+              class="page-header-description"
+              hidden
+            >
+              <p id="description-text" class="page-header-description-text"></p>
+            </div>
+            <div
+              id="private-description-placeholder"
+              class="private-placeholder private-placeholder--description"
+              hidden
+            >
+              You will need to publish post to add a description.
+            </div>
+          </div>
+
           <div class="page-underline" role="presentation"></div>
         </section>
 
@@ -101,10 +119,66 @@
                 </div>
               </div>
             </section>
-          </div>
+
+            <div class="split-card-row">
+              <div class="scan-info-votes-row">
+                <!-- LEFT: stacked meta -->
+                <div id="scan-quick-meta" class="scan-quick-meta scan-quick-meta--inline" hidden>
+                  <div class="scan-quick-meta-item">
+                    <span class="scan-quick-meta-label">Visibility</span>
+                    <span id="scan-quick-visibility" class="scan-quick-meta-value">—</span>
+                  </div>
+
+                  <div class="scan-quick-meta-item">
+                    <span class="scan-quick-meta-label">Uploaded</span>
+                    <span id="scan-quick-uploaded" class="scan-quick-meta-value">—</span>
+                  </div>
+                </div>
+
+                <!-- RIGHT: votes -->
+                <section
+                  id="votes-card"
+                  class="votes-inline-row"
+                  hidden
+                >
+                  <div class="votes-inline-side">
+                    <p class="votes-inline-label">Real Votes</p>
+                    <div class="votes-inline-value">
+                      <img
+                        class="vote-icon"
+                        src="/static/images/upvote.png"
+                        alt="Up votes"
+                      />
+                      <p id="card-upvotes" class="split-value">0</p>
+                    </div>
+                  </div>
+
+                  <div class="votes-inline-divider"></div>
+
+                  <div class="votes-inline-side">
+                    <p class="votes-inline-label">AI Votes</p>
+                    <div class="votes-inline-value">
+                      <img
+                        class="vote-icon"
+                        src="/static/images/downvote.png"
+                        alt="Down votes"
+                      />
+                      <p id="card-downvotes" class="split-value">0</p>
+                    </div>
+                  </div>
+                </section>
+                <div
+                  id="private-votes-placeholder"
+                  class="private-placeholder private-placeholder--votes"
+                  hidden
+                >
+                  Publish post to view community votes
+                </div>
+              </div>
+            </div>
 
           <div class="viewscan-meta">
-            <h2 class="viewscan-heading">Details</h2>
+            <h2 class="viewscan-heading"></h2>
 
             <!-- Populated from JS -->
             <dl class="meta-list" id="meta-list"></dl>

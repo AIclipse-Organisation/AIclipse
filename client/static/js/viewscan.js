@@ -311,6 +311,25 @@ function normalizeLabelText(raw) {
   return s.replace(/^\s*\d+(\.\d+)?%\s*/i, "").trim();
 }
 
+function getRealLikelihoodPercent(img) {
+  if (!img) return 0;
+
+  const rawLabel = normalizeLabelText(img.label || img.result || img.verdict || "Unknown");
+  const labelLower = rawLabel.toLowerCase();
+  const confidenceRaw = Number.isFinite(img.confidence) ? img.confidence : (img.score ?? 0);
+  const confidence = clamp(confidenceRaw, 0, 1);
+
+  const isAi =
+    labelLower.includes("ai") ||
+    labelLower.includes("fake") ||
+    labelLower.includes("deepfake");
+
+  const isReal = labelLower.includes("real") && !isAi;
+  const realProb = isReal ? confidence : (1 - confidence);
+
+  return clamp(realProb * 100, 0, 100);
+}
+
 function renderAiclipseCard(img) {
   const wrap = document.getElementById("verdict-block");
   const card = document.getElementById("aiclipse-card");
@@ -326,23 +345,8 @@ function renderAiclipseCard(img) {
   }
 
   const rawLabel = normalizeLabelText(img.label || img.result || img.verdict || "Unknown");
-  const labelLower = rawLabel.toLowerCase();
-
-  const confidenceRaw = Number.isFinite(img.confidence) ? img.confidence : (img.score ?? 0);
-  const confidence = clamp(confidenceRaw, 0, 1);
-
-  const isAi =
-    labelLower.includes("ai") ||
-    labelLower.includes("fake") ||
-    labelLower.includes("deepfake");
-
-  const isReal = labelLower.includes("real") && !isAi;
-
-  // INVERTED: Calculate AI (Fake) probability
-  let aiProb = isAi ? confidence : (1 - confidence);
-  aiProb = clamp(aiProb, 0, 1);
-
-  const aiPct = aiProb * 100;
+  const realPct = getRealLikelihoodPercent(img);
+  const aiPct = 100 - realPct;
 
   verdictEl.textContent = rawLabel || "—";
   pctEl.textContent = `${aiPct.toFixed(2)}%`;
@@ -609,36 +613,15 @@ function renderMeta(img) {
     "comment_count",
     "controversial_since",
     "created_at",
+    "updated_at",
     "debug",
     "result",
     "score",
     "user_name",
+    "model_version",
   ]);
 
-  // ---- Show only allowed fields ----
-  addMeta("Visibility", visibilityOf(img));
-  addMeta("Uploaded", formatDate(img.uploaded_at));
-  addMeta("Verdict", img.verdict != null ? String(img.verdict) : "N/A");
-  addMeta("Confidence", toPercent(img.confidence));
-
-  // Always show description field (even if empty/not set yet)
-  const descValue = img.description ? String(img.description) : "(No description yet)";
-  addMeta("Description", descValue);
-
-  // Show vote counts for public posts
-  if (!isPrivateScan(img)) {
-    const upVotes = img.up_vote_count !== undefined ? img.up_vote_count : 0;
-    const downVotes = img.down_vote_count !== undefined ? img.down_vote_count : 0;
-    addMeta("Up Votes", String(upVotes));
-    addMeta("Down Votes", String(downVotes));
-  }
-
-  // Show updated_at if it exists (formatted like uploaded_at)
-  if (img.updated_at) {
-    addMeta("Updated", formatDate(img.updated_at));
-  }
-
-  // Show any other non-hidden fields (but skip description since we showed it above)
+  // Show any other non-hidden fields (but skip those shown in dedicated cards)
   const alreadyShown = new Set([
     "is_public",
     "uploaded_at",
@@ -646,7 +629,6 @@ function renderMeta(img) {
     "verdict",
     "confidence",
     "description",
-    "updated_at",
     "up_vote_count",
     "down_vote_count",
   ]);
@@ -674,6 +656,101 @@ function renderMeta(img) {
     });
 }
 
+function renderQuickMeta(img) {
+  const wrap = document.getElementById("scan-quick-meta");
+  const visibilityEl = document.getElementById("scan-quick-visibility");
+  const uploadedEl = document.getElementById("scan-quick-uploaded");
+
+  if (!wrap || !visibilityEl || !uploadedEl) return;
+
+  if (!img) {
+    wrap.hidden = true;
+    return;
+  }
+
+  visibilityEl.textContent = visibilityOf(img);
+  uploadedEl.textContent = formatDate(img.uploaded_at);
+  wrap.hidden = false;
+}
+
+// Render description header above image
+function renderDescriptionHeader(img) {
+  const section = document.getElementById("description-header-section");
+  const textEl = document.getElementById("description-text");
+  const privatePlaceholder = document.getElementById("private-description-placeholder");
+
+  if (!section || !textEl || !privatePlaceholder) return;
+
+  const isPrivate = isPrivateScan(img);
+  const hasDescription = !!(img && img.description);
+
+  if (hasDescription) {
+    section.hidden = false;
+    textEl.hidden = false;
+    textEl.textContent = String(img.description);
+    privatePlaceholder.hidden = true;
+    return;
+  }
+
+  if (isPrivate) {
+    section.hidden = false;
+    textEl.hidden = true;
+    textEl.textContent = "";
+    privatePlaceholder.hidden = false;
+    return;
+  }
+
+  section.hidden = true;
+  textEl.hidden = false;
+  textEl.textContent = "";
+  privatePlaceholder.hidden = true;
+}
+
+// Render verdict and confidence in split card
+function renderVerdictConfidenceCard(img) {
+  const card = document.getElementById("verdict-confidence-card");
+  const verdictEl = document.getElementById("card-verdict");
+  const confidenceEl = document.getElementById("card-confidence");
+
+  if (!card) return;
+
+  const hasVerdict = img.verdict != null;
+  const hasConfidence = img.confidence !== undefined && img.confidence !== null;
+
+  if (hasVerdict || hasConfidence) {
+    card.hidden = false;
+    verdictEl.textContent = hasVerdict ? String(img.verdict) : "—";
+    confidenceEl.textContent = hasConfidence ? `${getRealLikelihoodPercent(img).toFixed(0)}%` : "N/A";
+  } else {
+    card.hidden = true;
+  }
+}
+
+// Render votes in split card (only for public posts)
+function renderVotesCard(img) {
+  const card = document.getElementById("votes-card");
+  const upvotesEl = document.getElementById("card-upvotes");
+  const downvotesEl = document.getElementById("card-downvotes");
+  const privatePlaceholder = document.getElementById("private-votes-placeholder");
+
+  if (!card || !privatePlaceholder) return;
+
+  if (isPrivateScan(img)) {
+    card.hidden = true;
+    privatePlaceholder.hidden = false;
+    return;
+  }
+
+  const upVotes = img.up_vote_count !== undefined ? img.up_vote_count : 0;
+  const downVotes = img.down_vote_count !== undefined ? img.down_vote_count : 0;
+
+  if (upvotesEl) upvotesEl.textContent = String(upVotes);
+  if (downvotesEl) downvotesEl.textContent = String(downVotes);
+
+  privatePlaceholder.hidden = true;
+  card.hidden = false;
+}
+
 function renderScan(img, title) {
   currentScan = img;
 
@@ -694,6 +771,10 @@ function renderScan(img, title) {
     if (!ok) return;
 
     renderMeta(currentScan);
+    renderQuickMeta(currentScan);
+    renderDescriptionHeader(currentScan);
+    renderVerdictConfidenceCard(currentScan);
+    renderVotesCard(currentScan);
 
     setupEditDescriptionInline(currentScan);
     setupShowComments(currentScan);
@@ -707,6 +788,9 @@ function renderScan(img, title) {
     if (!ok) return;
 
     renderMeta(currentScan);
+    renderDescriptionHeader(currentScan);
+    renderVerdictConfidenceCard(currentScan);
+    renderVotesCard(currentScan);
 
     setupEditDescriptionInline(currentScan);
     setupShowComments(currentScan);
@@ -720,12 +804,12 @@ function renderScan(img, title) {
 
   if (!img) {
     card.hidden = true;
-    titleEl.textContent = "View Scan";
+    titleEl.textContent = "Post Description";
     setStatus("No scan selected. Go back to Scans and click “View more details”.", "error");
     return;
   }
 
-  titleEl.textContent = title || "View Scan";
+  titleEl.textContent = title || "Post Description";
 
   // Image
   if (img.url) {
@@ -741,8 +825,12 @@ function renderScan(img, title) {
   // NEW: community-style cards
   renderAiclipseCard(img);
   renderCommunityCard(img);
+  renderQuickMeta(img);
 
   renderMeta(img);
+  renderDescriptionHeader(img);
+  renderVerdictConfidenceCard(img);
+  renderVotesCard(img);
   card.hidden = false;
   setStatus("", null);
 
@@ -1138,7 +1226,7 @@ function setupDeletePost(img) {
         sessionStorage.removeItem("selectedScanTitle");
 
         setTimeout(() => {
-          window.location.href = "/scans";
+          window.location.href = "/profile";
         }, 800);
       } catch (err) {
         setStatus(err?.message || "Failed to delete post.", "error");
@@ -1239,7 +1327,7 @@ function setupDeleteScan(img) {
         sessionStorage.removeItem("selectedScanTitle");
 
         setTimeout(() => {
-          window.location.href = "/scans";
+          window.location.href = "/profile";
         }, 800);
       } catch (err) {
         setStatus(err?.message || "Failed to delete scan.", "error");
