@@ -657,20 +657,20 @@ function renderMeta(img) {
 }
 
 function renderQuickMeta(img) {
-  const wrap = document.getElementById("scan-quick-meta");
+  // Hidden compat elements
   const visibilityEl = document.getElementById("scan-quick-visibility");
-  const uploadedEl = document.getElementById("scan-quick-uploaded");
+  if (visibilityEl && img) visibilityEl.textContent = visibilityOf(img);
 
-  if (!wrap || !visibilityEl || !uploadedEl) return;
-
-  if (!img) {
-    wrap.hidden = true;
-    return;
+  // Instagram-style upload date in the page header
+  const uploadDateEl = document.getElementById("vs-upload-date");
+  if (uploadDateEl) {
+    if (img && img.uploaded_at) {
+      uploadDateEl.textContent = formatDate(img.uploaded_at);
+      uploadDateEl.hidden = false;
+    } else {
+      uploadDateEl.hidden = true;
+    }
   }
-
-  visibilityEl.textContent = visibilityOf(img);
-  uploadedEl.textContent = formatDate(img.uploaded_at);
-  wrap.hidden = false;
 }
 
 // Render description header above image
@@ -855,33 +855,28 @@ function renderScan(img, title) {
 // (UNCHANGED)
 // -------------------------
 function setupEditDescriptionInline(img) {
-  const section = document.getElementById("edit-description-section");
+  const modal = document.getElementById("edit-desc-modal");
   const openBtn = document.getElementById("btn-edit-description");
-  const form = document.getElementById("edit-description-form");
   const input = document.getElementById("edit-description-input");
   const countEl = document.getElementById("edit-description-count");
   const statusEl = document.getElementById("edit-description-status");
   const saveBtn = document.getElementById("edit-description-save");
   const cancelBtn = document.getElementById("edit-description-cancel");
 
-  if (!section || !openBtn || !form || !input || !statusEl || !saveBtn || !cancelBtn) {
-    if (section) section.style.display = img && getPostId(img) ? "block" : "none";
+  if (!modal || !openBtn || !input || !statusEl || !saveBtn || !cancelBtn) {
+    if (openBtn) openBtn.hidden = !(img && getPostId(img));
     return;
   }
 
   const postId = getPostId(img);
   const shouldShow = !!postId;
-  section.style.display = shouldShow ? "block" : "none";
+  openBtn.hidden = !shouldShow;
 
-  if (!shouldShow) {
-    form.hidden = true;
-    setSelected(openBtn, false);
-    return;
-  }
+  if (!shouldShow) return;
 
   const maxLen = 1000;
   let originalDescription = img.description || "";
-  let formOpen = false;
+  let modalOpen = false;
   let hasUnsavedChanges = false;
 
   const setFormStatus = (text, kind) => {
@@ -896,7 +891,7 @@ function setupEditDescriptionInline(img) {
     countEl.textContent = String(input.value.length);
   };
 
-  const openForm = () => {
+  const openModal = () => {
     originalDescription = currentScan && currentScan.description ? String(currentScan.description) : "";
     input.value = originalDescription;
     syncCount();
@@ -906,15 +901,14 @@ function setupEditDescriptionInline(img) {
     saveBtn.textContent = "Save";
 
     hasUnsavedChanges = false;
-    formOpen = true;
+    modalOpen = true;
 
-    showPanel(form);
-    setSelected(openBtn, true);
+    modal.hidden = false;
     input.focus();
   };
 
-  const closeForm = () => {
-    hidePanel(form);
+  const closeModal = () => {
+    modal.hidden = true;
     input.value = "";
     if (countEl) countEl.textContent = "0";
     setFormStatus("", null);
@@ -923,26 +917,17 @@ function setupEditDescriptionInline(img) {
     saveBtn.textContent = "Save";
 
     hasUnsavedChanges = false;
-    formOpen = false;
-
-    setSelected(openBtn, false);
-  };
-
-  const toggleForm = () => {
-    const makePublicForm = document.getElementById("make-public-form");
-    const makePublicBtn = document.getElementById("btn-make-public");
-    if (makePublicForm && !makePublicForm.hidden) {
-      hidePanel(makePublicForm);
-      setSelected(makePublicBtn, false);
-    }
-
-    if (form.hidden) openForm();
-    else closeForm();
+    modalOpen = false;
   };
 
   if (!openBtn.dataset.bound) {
     openBtn.dataset.bound = "1";
-    openBtn.addEventListener("click", toggleForm);
+    openBtn.addEventListener("click", openModal);
+  }
+
+  if (!modal.dataset.bound) {
+    modal.dataset.bound = "1";
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
   }
 
   if (!input.dataset.bound) {
@@ -956,7 +941,7 @@ function setupEditDescriptionInline(img) {
   if (!window.__editDescBeforeUnloadBound) {
     window.__editDescBeforeUnloadBound = true;
     window.addEventListener("beforeunload", (e) => {
-      if (formOpen && hasUnsavedChanges) {
+      if (modalOpen && hasUnsavedChanges) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -966,7 +951,7 @@ function setupEditDescriptionInline(img) {
   if (!cancelBtn.dataset.bound) {
     cancelBtn.dataset.bound = "1";
     cancelBtn.addEventListener("click", () => {
-      closeForm();
+      closeModal();
     });
   }
 
@@ -998,10 +983,11 @@ function setupEditDescriptionInline(img) {
         currentScan.description = description;
         currentScan.updated_at = new Date().toISOString();
         renderMeta(currentScan);
+        renderDescriptionHeader(currentScan);
 
         setFormStatus("✓ Description updated.", "success");
 
-        setTimeout(() => closeForm(), 600);
+        setTimeout(() => closeModal(), 600);
       } catch (err) {
         setFormStatus(err?.message || "Failed to update description.", "error");
         saveBtn.disabled = false;
@@ -1032,110 +1018,196 @@ async function patchPostDescription(postId, description) {
 }
 
 // -------------------------
-// Show Comments (UNCHANGED)
+// Comments bottom-sheet drawer
 // -------------------------
-function setupShowComments(img) {
-  const section = document.getElementById("show-comments-section");
-  const showBtn = document.getElementById("btn-show-comments");
-  const container = document.getElementById("comments-container");
-  const statusEl = document.getElementById("comments-status");
-  const listEl = document.getElementById("comments-list");
 
-  if (!section || !showBtn || !container || !statusEl || !listEl) {
-    if (section) section.style.display = "none";
-    return;
-  }
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+function getInitials(name) {
+  if (!name) return "?";
+  return name.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
+}
+
+function setupShowComments(img) {
+  const triggerBtn = document.getElementById("btn-comments");
+  const sheet = document.getElementById("comments-sheet");
+  const backdrop = document.getElementById("comments-backdrop");
+  const closeBtn = document.getElementById("comments-close");
+  const handle = document.getElementById("comments-handle");
+  const listEl = document.getElementById("comments-list");
+  const input = document.getElementById("comments-input");
+  const postBtn = document.getElementById("comments-post");
+
+  if (!triggerBtn || !sheet || !backdrop || !listEl) return;
 
   const postId = getPostId(img);
-
   const shouldShow = !!(postId && !isPrivateScan(img));
-  section.style.display = shouldShow ? "block" : "none";
+  triggerBtn.hidden = !shouldShow;
+  if (!shouldShow) return;
 
-  if (!shouldShow) {
-    return;
+  // Eagerly fetch comment count for the grid cell
+  const countEl = document.getElementById("btn-comments-count");
+  if (countEl) {
+    fetch(`/community/posts/comments?post_id=${encodeURIComponent(postId)}`, {
+      headers: { Accept: "application/json" },
+      credentials: "include",
+    })
+      .then((r) => r.json())
+      .then((d) => { if (countEl) countEl.textContent = String((d.items || []).length); })
+      .catch(() => { if (countEl) countEl.textContent = "0"; });
   }
 
-  let commentsVisible = false;
-
-  const setStatus = (text, isError) => {
-    statusEl.textContent = text || "";
+  // Open/close helpers
+  const openDrawer = () => {
+    const pid = getPostId(currentScan);
+    if (!pid) return;
+    backdrop.hidden = false;
+    sheet.classList.add("comm_bottomSheet--open");
+    document.getElementById("app-container")?.style.setProperty("overflow", "hidden");
+    if (!sheet.dataset.loaded) {
+      loadComments(pid);
+      sheet.dataset.loaded = "1";
+    }
   };
 
-  const renderComments = (comments) => {
-    clearEl(listEl);
+  const closeDrawer = () => {
+    backdrop.hidden = true;
+    sheet.classList.remove("comm_bottomSheet--open");
+    document.getElementById("app-container")?.style.removeProperty("overflow");
+  };
 
+  // Render comments list
+  const renderComments = (comments, currentUserId) => {
+    clearEl(listEl);
     if (!comments || comments.length === 0) {
-      listEl.appendChild(makeEl("div", "comment-empty", "No comments yet."));
+      listEl.appendChild(makeEl("div", "comm_emptyComments", "No comments yet. Start the conversation!"));
       return;
     }
+    comments.forEach((c) => {
+      const row = makeEl("div", "comm_commentRow");
 
-    comments.forEach((comment) => {
-      const commentDiv = makeEl("div", "comment-item");
+      const avatar = makeEl("div", "comm_commentAvatar", getInitials(c.user_name));
 
-      const header = makeEl("div", "comment-header");
-      const username = makeEl("span", "comment-username", comment.user_name || "Anonymous");
-      const date = makeEl(
-        "span",
-        "comment-date",
-        comment.created_at ? new Date(comment.created_at).toLocaleString() : ""
-      );
-      header.appendChild(username);
-      header.appendChild(date);
+      const content = makeEl("div", "comm_commentContent");
+      const top = makeEl("div", "comm_commentTop");
+      const author = makeEl("span", "comm_commentAuthor", c.user_name || "Anonymous");
+      const time = makeEl("span", "comm_commentTime", timeAgo(c.created_at));
+      top.appendChild(author);
+      top.appendChild(time);
 
-      const body = makeEl("div", "comment-body", comment.text || "");
+      const text = makeEl("div", "comm_commentText", c.text || "");
+      content.appendChild(top);
+      content.appendChild(text);
 
-      commentDiv.appendChild(header);
-      commentDiv.appendChild(body);
-      listEl.appendChild(commentDiv);
+      if (currentUserId && c.user_id === currentUserId) {
+        const delBtn = makeEl("button", "comm_commentDeleteBtn", "Delete");
+        delBtn.type = "button";
+        delBtn.addEventListener("click", () => deleteComment(c.comment_id, row));
+        content.appendChild(delBtn);
+      }
+
+      row.appendChild(avatar);
+      row.appendChild(content);
+      listEl.appendChild(row);
     });
   };
 
-  const toggleComments = async () => {
-    if (commentsVisible) {
-      container.hidden = true;
-      commentsVisible = false;
-      showBtn.textContent = "Show Comments";
-      setSelected(showBtn, false);
-    } else {
-      container.hidden = false;
-      commentsVisible = true;
-      showBtn.textContent = "Hide Comments";
-      setSelected(showBtn, true);
-
-      setStatus("Loading comments...", false);
+  // Fetch comments
+  const loadComments = async (pid) => {
+    clearEl(listEl);
+    listEl.appendChild(makeEl("div", "comm_loadingComments", "Loading..."));
+    try {
+      const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(pid)}`, {
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      const meRes = await fetch("/auth/me", { credentials: "include" }).catch(() => null);
+      const me = meRes?.ok ? await meRes.json().catch(() => ({})) : {};
+      renderComments(data.items || [], me.user_id || null);
+    } catch {
       clearEl(listEl);
-
-      try {
-        const postIdNow = getPostId(currentScan);
-        if (!postIdNow) {
-          setStatus("Missing post id for this scan.", true);
-          return;
-        }
-
-        const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(postIdNow)}`, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          credentials: "include",
-        });
-
-        const data = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          setStatus(data.error || data.detail || `Failed to load comments (${res.status})`, true);
-          return;
-        }
-
-        setStatus("", false);
-        renderComments(data.items || []);
-      } catch (err) {
-        setStatus("Network error loading comments.", true);
-      }
+      listEl.appendChild(makeEl("div", "comm_emptyComments", "Failed to load comments."));
     }
   };
 
-  if (!showBtn.dataset.bound) {
-    showBtn.dataset.bound = "1";
-    showBtn.addEventListener("click", toggleComments);
+  // Delete a comment
+  const deleteComment = async (commentId, rowEl) => {
+    try {
+      const res = await fetch(`/community/posts/comments?comment_id=${encodeURIComponent(commentId)}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      if (res.ok) {
+        rowEl.remove();
+        const countEl = document.getElementById("btn-comments-count");
+        if (countEl) {
+          const cur = parseInt(countEl.textContent, 10);
+          if (!isNaN(cur)) countEl.textContent = String(Math.max(0, cur - 1));
+        }
+      }
+    } catch { /* silent */ }
+  };
+
+  // Post a comment
+  const submitComment = async () => {
+    const text = input.value.trim();
+    if (!text) return;
+    const pid = getPostId(currentScan);
+    if (!pid) return;
+
+    postBtn.disabled = true;
+    try {
+      const meRes = await fetch("/auth/me", { credentials: "include" });
+      if (!meRes.ok) return;
+      const me = await meRes.json().catch(() => ({}));
+      if (!me.user_id) return;
+
+      const res = await fetch("/community/posts/comments", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ post_id: pid, user_id: me.user_id, user_name: me.user_name || me.user_id, text }),
+      });
+      if (res.ok) {
+        const newComment = await res.json().catch(() => ({}));
+        input.value = "";
+        postBtn.disabled = true;
+        // Reload to pick up new comment with proper ID and refresh count
+        sheet.dataset.loaded = "";
+        loadComments(pid).then(() => {
+          const countEl = document.getElementById("btn-comments-count");
+          if (countEl) countEl.textContent = String(listEl.querySelectorAll(".comm_commentRow").length);
+        });
+      }
+    } catch { /* silent */ } finally {
+      postBtn.disabled = !input.value.trim();
+    }
+  };
+
+  // Bind events once
+  if (!triggerBtn.dataset.bound) {
+    triggerBtn.dataset.bound = "1";
+    triggerBtn.addEventListener("click", openDrawer);
+    backdrop.addEventListener("click", closeDrawer);
+    closeBtn?.addEventListener("click", closeDrawer);
+    handle?.addEventListener("click", closeDrawer);
+    input?.addEventListener("input", () => { postBtn.disabled = !input.value.trim(); });
+    input?.addEventListener("keydown", (e) => { if (e.key === "Enter" && input.value.trim()) submitComment(); });
+    postBtn?.addEventListener("click", submitComment);
   }
 }
 
@@ -1225,7 +1297,7 @@ function setupDeletePost(img) {
         sessionStorage.setItem("selectedScan", JSON.stringify(currentScan));
 
         setTimeout(() => {
-          window.location.href = "/scans";
+          window.location.href = "/profile";
         }, 800);
       } catch (err) {
         setStatus(err?.message || "Failed to make private.", "error");
@@ -1484,7 +1556,7 @@ function setupMakePublicInline(img) {
         sessionStorage.removeItem("selectedScan");
         sessionStorage.removeItem("selectedScanTitle");
 
-        window.location.href = "/scans?tab=public";
+        window.location.href = "/profile";
       } catch (err) {
         setFormStatus(err?.message || "Failed to publish.", "error");
         publishBtn.disabled = false;
@@ -1534,6 +1606,18 @@ async function handleMakePublic(img, description) {
     }
 
     throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
+  }
+
+  const postData = await postRes.json().catch(() => ({}));
+
+  // Persist the post_id and initial vote counts onto the scan so that
+  // when the user returns from the scans page the data is available.
+  if (postData.post_id) {
+    img.post_id = postData.post_id;
+    img.up_vote_count = postData.up_vote_count ?? 0;
+    img.down_vote_count = postData.down_vote_count ?? 0;
+    img.is_public = true;
+    sessionStorage.setItem("selectedScan", JSON.stringify(img));
   }
 
   const updateRes = await fetch(`/image/${img.image_id}`, {

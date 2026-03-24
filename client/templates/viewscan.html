@@ -11,7 +11,7 @@
   </head>
 
   <body class="app">
-    <div class="app-container">
+    <div id="app-container" class="app-container">
       {% set page_title = 'View Scan' %} {% include 'partials/topbar.html' %}
 
       <main class="screen">
@@ -24,7 +24,12 @@
               class="page-header-description"
               hidden
             >
-              <p id="description-text" class="page-header-description-text"></p>
+              <div class="vs-desc-row">
+                <p id="description-text" class="page-header-description-text"></p>
+                <button type="button" id="btn-edit-description" class="vs-edit-desc-btn" hidden aria-label="Edit description">
+                  <img src="/static/images/edit_icon.svg" alt="" />
+                </button>
+              </div>
             </div>
             <div
               id="private-description-placeholder"
@@ -33,6 +38,7 @@
             >
               You will need to publish post to add a description.
             </div>
+            <span id="vs-upload-date" class="vs-upload-date" hidden></span>
           </div>
 
           <div class="page-underline" role="presentation"></div>
@@ -126,61 +132,40 @@
               </div>
             </section>
 
-            <div class="split-card-row">
-              <div class="scan-info-votes-row">
-                <!-- LEFT: stacked meta -->
-                <div id="scan-quick-meta" class="scan-quick-meta scan-quick-meta--inline" hidden>
-                  <div class="scan-quick-meta-item">
-                    <span class="scan-quick-meta-label">Visibility</span>
-                    <span id="scan-quick-visibility" class="scan-quick-meta-value">—</span>
-                  </div>
-
-                  <div class="scan-quick-meta-item">
-                    <span class="scan-quick-meta-label">Uploaded</span>
-                    <span id="scan-quick-uploaded" class="scan-quick-meta-value">—</span>
-                  </div>
+            <!-- Community-style action row (votes + comments) -->
+            <div id="votes-card" class="comm_bottomRow" hidden aria-label="Community stats">
+              <div class="comm_actionsLeft">
+                <div class="vs-votes-display">
+                  <img class="comm_icon" src="/static/images/upvote.png" alt="" />
+                  <span class="comm_actionText">Real</span>
+                  <span class="comm_actionCount" id="card-upvotes">0</span>
                 </div>
-
-                <!-- RIGHT: votes -->
-                <section
-                  id="votes-card"
-                  class="votes-inline-row"
-                  hidden
-                >
-                  <div class="votes-inline-side">
-                    <p class="votes-inline-label">Real Votes</p>
-                    <div class="votes-inline-value">
-                      <img
-                        class="vote-icon"
-                        src="/static/images/upvote.png"
-                        alt="Up votes"
-                      />
-                      <p id="card-upvotes" class="split-value">0</p>
-                    </div>
-                  </div>
-
-                  <div class="votes-inline-divider"></div>
-
-                  <div class="votes-inline-side">
-                    <p class="votes-inline-label">AI Votes</p>
-                    <div class="votes-inline-value">
-                      <img
-                        class="vote-icon"
-                        src="/static/images/downvote.png"
-                        alt="Down votes"
-                      />
-                      <p id="card-downvotes" class="split-value">0</p>
-                    </div>
-                  </div>
-                </section>
-                <div
-                  id="private-votes-placeholder"
-                  class="private-placeholder private-placeholder--votes"
-                  hidden
-                >
-                  Publish post to view community votes
+                <div class="vs-votes-display">
+                  <img class="comm_icon" src="/static/images/downvote.png" alt="" />
+                  <span class="comm_actionText">AI</span>
+                  <span class="comm_actionCount" id="card-downvotes">0</span>
                 </div>
               </div>
+              <div class="comm_actionsRight">
+                <button type="button" id="btn-comments" class="comm_actionBtn" hidden>
+                  <img class="comm_icon" src="/static/images/comment.png" alt="" />
+                  <span id="btn-comments-count" class="comm_actionCount">0</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Hidden meta for JS compat -->
+            <div id="scan-quick-meta" hidden aria-hidden="true">
+              <span id="scan-quick-visibility"></span>
+              <span id="scan-quick-uploaded"></span>
+            </div>
+
+            <div
+              id="private-votes-placeholder"
+              class="private-placeholder private-placeholder--votes"
+              hidden
+            >
+              Publish post to view community stats
             </div>
 
           <div class="viewscan-meta">
@@ -189,80 +174,18 @@
             <!-- Populated from JS -->
             <dl class="meta-list" id="meta-list"></dl>
 
-            <!-- Edit Description (INLINE, only for public posts with post_id) -->
-            <div
-              id="edit-description-section"
-              class="edit-desc-section"
-              style="display: none"
+            <!-- Comments trigger -->
+            <button
+              type="button"
+              id="btn-comments"
+              class="vs-comments-btn"
+              hidden
             >
-              <button
-                type="button"
-                id="btn-edit-description"
-                class="btn-edit-description"
-              >
-                Edit Post Description
-              </button>
-
-              <div id="edit-description-form" class="edit-desc-form" hidden>
-                <p class="edit-desc-text">
-                  Update the description (required, max 1000 characters):
-                </p>
-
-                <textarea
-                  id="edit-description-input"
-                  class="edit-desc-textarea"
-                  maxlength="1000"
-                  rows="4"
-                  placeholder="Update your description..."
-                ></textarea>
-
-                <div class="edit-desc-count">
-                  <span id="edit-description-count">0</span>/1000
-                </div>
-
-                <div
-                  id="edit-description-status"
-                  class="edit-desc-status"
-                ></div>
-
-                <div class="edit-desc-actions">
-                  <button
-                    type="button"
-                    id="edit-description-cancel"
-                    class="edit-desc-btn-cancel edit-desc-btn--secondary"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    id="edit-description-save"
-                    class="edit-desc-btn-save edit-desc-btn--primary"
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Show Comments -->
-            <div
-              id="show-comments-section"
-              class="show-comments-section"
-              style="display: none"
-            >
-              <button
-                type="button"
-                id="btn-show-comments"
-                class="btn-show-comments"
-              >
-                Show Comments
-              </button>
-
-              <div id="comments-container" class="comments-container" hidden>
-                <div id="comments-status" class="comments-status"></div>
-                <div id="comments-list" class="comments-list"></div>
-              </div>
-            </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span id="btn-comments-count" class="vs-comments-count"></span>
+            </button>
 
             <!-- Delete Post -->
             <div
@@ -391,6 +314,74 @@
             <button type="button" id="scan-modal-confirm" class="danger">
               Delete
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comments Bottom Sheet -->
+      <div id="comments-backdrop" class="comm_sheetBackdrop" hidden></div>
+      <div
+        id="comments-sheet"
+        class="comm_bottomSheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Comments"
+      >
+        <div id="comments-handle" class="comm_sheetHandleWrap">
+          <div class="comm_sheetHandle"></div>
+        </div>
+
+        <div class="comm_sheetHeader">
+          <div class="comm_sheetHeaderTitle">Comments</div>
+          <button id="comments-close" class="comm_sheetCloseBtn" aria-label="Close comments">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div id="comments-body" class="comm_sheetBody">
+          <div id="comments-list" class="comm_commentsList"></div>
+        </div>
+
+        <div class="comm_sheetFooter">
+          <div class="comm_sheetInputWrapper">
+            <input
+              id="comments-input"
+              class="comm_sheetInput"
+              type="text"
+              placeholder="Add a comment..."
+              maxlength="500"
+            />
+            <button id="comments-post" class="comm_sheetPostBtn" type="button" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Description Modal -->
+      <div id="edit-desc-modal" class="modal-overlay" hidden>
+        <div class="modal">
+          <h3 class="modal-title">Edit Description</h3>
+          <textarea
+            id="edit-description-input"
+            class="edit-desc-modal-textarea"
+            maxlength="1000"
+            rows="5"
+            placeholder="Update your description..."
+          ></textarea>
+          <div class="edit-desc-modal-count">
+            <span id="edit-description-count">0</span>/1000
+          </div>
+          <div id="edit-description-status" class="edit-desc-status"></div>
+          <div class="modal-actions">
+            <button type="button" id="edit-description-cancel" class="secondary">Cancel</button>
+            <button type="button" id="edit-description-save" class="primary-gold">Save</button>
           </div>
         </div>
       </div>

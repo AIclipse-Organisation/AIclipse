@@ -107,3 +107,58 @@ def test_community_comments_rejects_invalid_post_id_without_calling_backend(main
     assert resp.status_code == 400
     assert resp.get_json() == {"error": "Invalid post_id parameter"}
     backend_get.assert_not_called()
+
+
+def test_community_moderation_status_forwards_request_correctly(main_client_module, monkeypatch):
+    def fake_post(url, json, headers, timeout):
+        assert url == "http://community.test/community/posts/moderation-status"
+        assert json == {"image_ids": ["img_123", "img_456"]}
+        assert headers["Content-Type"] == "application/json"
+        assert headers["Accept"] == "application/json"
+        assert timeout == 10
+        return ResponseStub(200, {"items": [{"image_id": "img_123", "moderation_status": "removed"}]})
+
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
+
+    client = main_client_module.app.test_client()
+    resp = client.post(
+        "/community/posts/moderation-status",
+        json={"image_ids": ["img_123", "img_456"]},
+        headers={"Content-Type": "application/json"}
+    )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "items" in data
+    assert len(data["items"]) == 1
+    assert data["items"][0]["image_id"] == "img_123"
+    assert data["items"][0]["moderation_status"] == "removed"
+
+
+def test_community_moderation_status_handles_invalid_json(main_client_module):
+    client = main_client_module.app.test_client()
+    resp = client.post(
+        "/community/posts/moderation-status",
+        data="invalid-json",
+        headers={"Content-Type": "application/json"}
+    )
+
+    assert resp.status_code == 400
+    assert resp.get_json() == {"error": "Invalid JSON"}
+
+
+def test_community_moderation_status_handles_service_unavailable(main_client_module, monkeypatch):
+    def fake_post(url, json, headers, timeout):
+        raise main_client_module.requests.RequestException("Connection failed")
+
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
+
+    client = main_client_module.app.test_client()
+    resp = client.post(
+        "/community/posts/moderation-status",
+        json={"image_ids": ["img_123"]},
+        headers={"Content-Type": "application/json"}
+    )
+
+    assert resp.status_code == 502
+    assert resp.get_json() == {"detail": "Community service unreachable"}

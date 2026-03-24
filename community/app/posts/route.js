@@ -517,6 +517,8 @@ export async function GET(req) {
     const limit = Math.max(1, parseInt(searchParams.get("limit") || "10"));
     const skip = (page - 1) * limit;
     const filterUserId = searchParams.get("user_id") || null;
+    const filterImageId = searchParams.get("image_id") || null;
+    const filterPostId = searchParams.get("post_id") || null;
 
     let currentUserId = null;
     try {
@@ -540,6 +542,8 @@ export async function GET(req) {
           is_deleted: { $ne: true }, // Filter out tombstoned posts ( posts kept, but user data removed )
           is_removed: { $ne: true }, // Filter out posts hidden by admins due to reports
           ...(filterUserId ? { user_id: filterUserId } : {}),
+          ...(filterImageId ? { image_id: filterImageId } : {}),
+          ...(filterPostId ? { post_id: filterPostId } : {}),
         },
         { projection: { _id: 0 } },
       )

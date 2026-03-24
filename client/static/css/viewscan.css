@@ -95,7 +95,7 @@ body.app .page-underline {
 
 .page-header-description-text {
   margin: 0;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.88);
@@ -612,7 +612,6 @@ body.app .page-underline {
    Sections (single divider before actions)
    ========================= */
 
-.edit-desc-section,
 .make-public-section {
   padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.10);
@@ -649,30 +648,29 @@ body.app .page-underline {
   color: #111;
 }
 
-.btn-edit-description {
-  --btn-outline-color: #CFB87C;
-  --btn-hover-color: #CFB87C;
-
+/* Description row with inline edit icon */
+.vs-desc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  padding: 12px 14px;
-  border-radius: 10px;
+}
+
+.vs-edit-desc-btn {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  padding: 3px 6px;
   cursor: pointer;
-
-  font: inherit;
-  font-weight: 700;
-
-  border: 1px solid var(--btn-outline-color);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.92);
-
-  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+  opacity: 1;
+  transition: border-color 160ms ease, background 160ms ease;
 }
-
-.btn-edit-description:hover,
-.btn-edit-description.is-selected {
-  background: var(--btn-hover-color);
-  color: #111;
+.vs-edit-desc-btn:hover {
+  border-color: rgba(207, 184, 124, 0.65);
+  background: rgba(207, 184, 124, 0.10);
 }
+.vs-edit-desc-btn img { width: 16px; height: 16px; display: block; }
 
 /* Small action buttons */
 .make-public-btn-cancel {
@@ -731,69 +729,8 @@ body.app .page-underline {
   cursor: not-allowed;
 }
 
-.edit-desc-btn-cancel {
-  --btn-outline-color: #e04646;
-  --btn-hover-color: #e04646;
-
-  padding: 10px 14px;
-  border-radius: 10px;
-  cursor: pointer;
-
-  font: inherit;
-  font-weight: 600;
-
-  border: 1px solid var(--btn-outline-color);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.92);
-
-  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
-}
-
-.edit-desc-btn-cancel:hover {
-  background: var(--btn-hover-color);
-  color: #111;
-}
-
-.edit-desc-btn-cancel--primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.edit-desc-btn-save {
-  --btn-outline-color: #18c46c;
-  --btn-hover-color: #18c46c;
-
-  padding: 10px 14px;
-  border-radius: 10px;
-  cursor: pointer;
-
-  font: inherit;
-  font-weight: 600;
-
-  border: 1px solid var(--btn-outline-color);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.92);
-
-  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
-}
-
-.edit-desc-btn-save:hover {
-  background: var(--btn-hover-color);
-  color: #111;
-}
-
-.edit-desc-btn-save--primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 /* Disabled state (still specific, not grouped) */
 .make-public-btn--primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.edit-desc-btn--primary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -802,20 +739,17 @@ body.app .page-underline {
    Inline forms
    ========================= */
 
-.make-public-form,
-.edit-desc-form {
+.make-public-form {
   margin-top: 12px;
 }
 
-.make-public-text,
-.edit-desc-text {
+.make-public-text {
   margin: 0 0 10px;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.70);
 }
 
-.make-public-textarea,
-.edit-desc-textarea {
+.make-public-textarea {
   width: 100%;
   min-height: 90px;
   resize: vertical;
@@ -828,22 +762,19 @@ body.app .page-underline {
   font: inherit;
 }
 
-.make-public-textarea:focus,
-.edit-desc-textarea:focus {
+.make-public-textarea:focus {
   outline: none;
   border-color: rgba(207, 184, 124, 0.95);
 }
 
-.make-public-count,
-.edit-desc-count {
+.make-public-count {
   margin-top: 6px;
   text-align: right;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.50);
 }
 
-.make-public-status,
-.edit-desc-status {
+.make-public-status {
   margin-top: 10px;
   min-height: 18px;
   font-size: 13px;
@@ -854,24 +785,59 @@ body.app .page-underline {
   color: #e04646;
 }
 
-.edit-desc-status.is-error {
-  color: #e04646;
-}
-
 .make-public-status.is-success {
   color: #18c46c;
 }
 
-.edit-desc-status.is-success {
-  color: #18c46c;
-}
-
-.make-public-actions,
-.edit-desc-actions {
+.make-public-actions {
   margin-top: 12px;
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+/* Edit description modal styles */
+.edit-desc-modal-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 110px;
+  resize: vertical;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  font: inherit;
+  font-size: 14px;
+}
+.edit-desc-modal-textarea:focus { outline: none; border-color: rgba(207, 184, 124, 0.95); }
+
+.edit-desc-modal-count {
+  margin-top: 4px;
+  text-align: right;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.edit-desc-status {
+  margin-top: 10px;
+  min-height: 18px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.edit-desc-status.is-error { color: #e04646; }
+.edit-desc-status.is-success { color: #18c46c; }
+
+/* Gold primary modal button */
+.modal-actions .primary-gold {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+  border-color: var(--btn-outline-color);
+}
+.modal-actions .primary-gold:hover {
+  background: var(--btn-hover-color);
+  color: #111;
 }
 
 /* Delete confirmation modal */
@@ -1299,4 +1265,356 @@ body.app .page-underline {
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================
+   Upload date (Instagram-style timestamp beside description)
+   ========================= */
+
+.vs-upload-date {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 5px;
+  letter-spacing: 0.01em;
+}
+
+/* =========================
+   Community-style action row (mirrors community PostControls)
+   ========================= */
+
+.comm_bottomRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.comm_actionsLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comm_actionsRight {
+  display: flex;
+  align-items: center;
+}
+
+.comm_actionBtn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1;
+  font: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.comm_actionBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Vote displays — plain stat, no button look */
+.vs-votes-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.comm_icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.comm_actionText {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+
+.comm_actionCount {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.55;
+  letter-spacing: 0.02em;
+}
+
+/* =========================
+   Comments bottom-sheet drawer (comm_* classes mirror community)
+   ========================= */
+
+.comm_sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1500;
+}
+
+.comm_sheetBackdrop[hidden] {
+  display: none !important;
+}
+
+.comm_bottomSheet {
+  position: fixed;
+  bottom: 0;
+  left: max(0px, calc(50vw - 240px));
+  right: max(0px, calc(50vw - 240px));
+  width: min(100%, 480px);
+  height: 80dvh;
+  max-height: 80dvh;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 1501;
+  transform: translateY(100%);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.comm_bottomSheet.comm_bottomSheet--open {
+  transform: translateY(0);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.comm_sheetHandleWrap {
+  width: 100%;
+  padding: 12px 0 4px;
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.comm_sheetHandleWrap:hover .comm_sheetHandle {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.comm_sheetHandle {
+  width: 40px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.comm_sheetHeader {
+  padding: 10px 20px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.comm_sheetHeaderTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.comm_sheetCloseBtn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.comm_sheetCloseBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.comm_sheetBody {
+  padding: 0 !important;
+  flex-grow: 1 !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.comm_sheetBody::-webkit-scrollbar {
+  display: none;
+}
+
+.comm_emptyComments {
+  padding: 60px 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.comm_loadingComments {
+  padding: 60px 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+}
+
+.comm_commentsList {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
+
+.comm_commentRow {
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px;
+}
+
+.comm_commentAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #CFB87C;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.comm_commentContent {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-grow: 1;
+}
+
+.comm_commentTop {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.comm_commentAuthor {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  text-decoration: none;
+}
+
+.comm_commentTime {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.comm_commentText {
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comm_commentDeleteBtn {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.comm_commentDeleteBtn:hover {
+  color: rgba(255, 107, 107, 0.95);
+}
+
+.comm_sheetFooter {
+  padding: 12px 20px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #141414;
+  flex-shrink: 0;
+}
+
+.comm_sheetInputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 6px 6px 6px 16px;
+}
+
+.comm_sheetInput {
+  flex-grow: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+  padding: 8px 0;
+}
+
+.comm_sheetInput::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.comm_sheetPostBtn {
+  background: #CFB87C;
+  color: #111;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.comm_sheetPostBtn:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.comm_sheetPostBtn:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
 }
