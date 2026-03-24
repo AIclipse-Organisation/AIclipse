@@ -23,7 +23,7 @@ export default function PostResults({
           <div className="comm_progressPanel">
             <div className="comm_progressBar">
               <div className="comm_progressFill" style={{ width: setWidthStyle(analysisAiPct) }} />
-              <div className="comm_barPercent">{analysisAiPct.toFixed(2)}%</div>
+              <div className="comm_barPercent">{Math.round(analysisAiPct)}%</div>
             </div>
           </div>
         </div>
@@ -43,7 +43,7 @@ export default function PostResults({
             <div className="comm_progressBar">
               <div className="comm_progressFill" style={{ width: setWidthStyle(communityAiPct || 0) }} />
               <div className="comm_barPercent">
-                {communityAiPct !== null ? communityAiPct.toFixed(2) + "%" : "—"}
+                {communityAiPct !== null ? Math.round(communityAiPct) + "%" : "—"}
               </div>
             </div>
           </div>

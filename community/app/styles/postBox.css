@@ -286,12 +286,10 @@
   outline: 2px solid rgba(255, 255, 255, 0.18);
 }
 
-.comm_voteUp.active {
-  background-color: rgba(76, 175, 80, 0.20);
-}
-
+.comm_voteUp.active,
 .comm_voteDown.active {
-  background-color: rgba(244, 67, 54, 0.20);
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .comm_iconBtn {
@@ -317,18 +315,10 @@
 
 /* icon image size */
 .comm_icon {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   display: block;
   object-fit: contain;
-}
-
-/* optional: slightly bigger on touch devices */
-@media (min-width: 420px) {
-  .comm_icon {
-    width: 20px;
-    height: 20px;
-  }
 }
 
 /* =========================
@@ -343,22 +333,24 @@
 }
 
 .comm_actionBtn {
-  background: transparent;
-  border: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   cursor: pointer;
 
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 
   color: rgba(255, 255, 255, 0.92);
   line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .comm_actionBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .comm_actionBtn:disabled {
@@ -371,6 +363,13 @@
   font-weight: 700;
   opacity: 0.92;
   white-space: nowrap;
+}
+
+.comm_actionCount {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.55;
+  letter-spacing: 0.02em;
 }
 
 .comm_actionsLeft {
@@ -1117,15 +1116,15 @@
   overflow: hidden;
 
   z-index: 1501;
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, .5);
 
   /* Hidden by default — slide in when open */
   transform: translateY(100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .comm_bottomSheet.comm_bottomSheet--open {
   transform: translateY(0);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, .5);
 }
 
 /* ── The visual pull-down handle ── */
