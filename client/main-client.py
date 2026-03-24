@@ -232,7 +232,6 @@ def billing_subscription_status():
     if not user_id:
         me, me_status = gateway.fetch_me(token)
         if me_status == 200 and isinstance(me, dict):
-            user = me
             user_id = me.get("user_id")
             session["current_user"] = me
             session["is_admin"] = bool(me.get("is_admin"))
@@ -282,7 +281,6 @@ def billing_cancel_subscription_at_period_end():
     if not user_id:
         me, me_status = gateway.fetch_me(token)
         if me_status == 200 and isinstance(me, dict):
-            user = me
             user_id = me.get("user_id")
             session["current_user"] = me
             session["is_admin"] = bool(me.get("is_admin"))
