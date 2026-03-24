@@ -280,6 +280,22 @@
               <div id="delete-post-status" class="delete-post-status"></div>
             </div>
 
+            <!-- Delete Scan (private scans, or public scans with no community post) -->
+            <div
+              id="delete-scan-section"
+              class="delete-scan-section"
+              style="display: none"
+            >
+              <button
+                type="button"
+                id="btn-delete-scan"
+                class="btn-delete-scan"
+              >
+                Delete Scan
+              </button>
+              <div id="delete-scan-status" class="delete-scan-status"></div>
+            </div>
+
             <!-- Make Public (ONLY for private scans) -->
             <div
               id="make-public-section"
@@ -293,22 +309,6 @@
               >
                 Publish to Community
               </button>
-
-              <!-- Delete Scan (ONLY for private scans) -->
-              <div
-                id="delete-scan-section"
-                class="delete-scan-section"
-                style="display: none"
-              >
-                <button
-                  type="button"
-                  id="btn-delete-scan"
-                  class="btn-delete-scan"
-                >
-                  Delete Scan
-                </button>
-                <div id="delete-scan-status" class="delete-scan-status"></div>
-              </div>
 
               <!-- Inline form: hidden until user clicks Make Public -->
               <div id="make-public-form" class="make-public-form" hidden>

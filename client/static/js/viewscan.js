@@ -1257,7 +1257,8 @@ function setupDeleteScan(img) {
     return;
   }
 
-  const shouldShow = !!(img && img.image_id && isPrivateScan(img));
+  // Show for private scans, OR for public scans where no community post was found
+  const shouldShow = !!(img && img.image_id && (isPrivateScan(img) || !getPostId(img)));
   section.style.display = shouldShow ? "block" : "none";
 
   if (!shouldShow) {
