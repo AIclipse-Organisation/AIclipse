@@ -1140,14 +1140,14 @@ function setupShowComments(img) {
 }
 
 // -------------------------
-// Delete Post (UNCHANGED)
+// Make Private (replaces Delete Post)
 // -------------------------
 function setupDeletePost(img) {
   const section = document.getElementById("delete-post-section");
-  const deleteBtn = document.getElementById("btn-delete-post");
+  const actionBtn = document.getElementById("btn-delete-post");
   const statusEl = document.getElementById("delete-post-status");
 
-  if (!section || !deleteBtn || !statusEl) {
+  if (!section || !actionBtn || !statusEl) {
     if (section) section.style.display = "none";
     return;
   }
@@ -1182,11 +1182,10 @@ function setupDeletePost(img) {
     if (modal) modal.hidden = true;
   };
 
-  if (!deleteBtn.dataset.bound) {
-    deleteBtn.dataset.bound = "1";
-    deleteBtn.addEventListener("click", () => {
-      const postIdNow = getPostId(currentScan);
-      if (!currentScan || !postIdNow) return;
+  if (!actionBtn.dataset.bound) {
+    actionBtn.dataset.bound = "1";
+    actionBtn.addEventListener("click", () => {
+      if (!currentScan || !getPostId(currentScan)) return;
       showModal();
     });
   }
@@ -1199,39 +1198,39 @@ function setupDeletePost(img) {
   if (modalConfirm && !modalConfirm.dataset.bound) {
     modalConfirm.dataset.bound = "1";
     modalConfirm.addEventListener("click", async () => {
-      const postIdNow = getPostId(currentScan);
-      if (!currentScan || !postIdNow) return;
+      if (!currentScan || !currentScan.image_id) return;
 
       hideModal();
-      deleteBtn.disabled = true;
-      deleteBtn.textContent = "Deleting...";
-      setStatus("Deleting post...", null);
+      actionBtn.disabled = true;
+      actionBtn.textContent = "Making private...";
+      setStatus("Making private...", null);
 
       try {
-        const res = await fetch(`/community/posts?post_id=${encodeURIComponent(postIdNow)}`, {
-          method: "DELETE",
+        const res = await fetch(`/image/${encodeURIComponent(currentScan.image_id)}`, {
+          method: "PATCH",
           credentials: "include",
-          headers: { Accept: "application/json" },
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ is_public: false }),
         });
 
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          throw new Error(data.error || data.detail || `Failed to delete post (${res.status})`);
+          throw new Error(data.error || data.detail || `Failed to make private (${res.status})`);
         }
 
-        setStatus("✓ Post deleted. Redirecting...", "success");
+        setStatus("✓ Post made private. Redirecting...", "success");
 
-        sessionStorage.removeItem("selectedScan");
-        sessionStorage.removeItem("selectedScanTitle");
+        currentScan.is_public = false;
+        sessionStorage.setItem("selectedScan", JSON.stringify(currentScan));
 
         setTimeout(() => {
-          window.location.href = "/profile";
+          window.location.href = "/scans";
         }, 800);
       } catch (err) {
-        setStatus(err?.message || "Failed to delete post.", "error");
-        deleteBtn.disabled = false;
-        deleteBtn.textContent = "Delete Post";
+        setStatus(err?.message || "Failed to make private.", "error");
+        actionBtn.disabled = false;
+        actionBtn.textContent = "Make Private";
       }
     });
   }
