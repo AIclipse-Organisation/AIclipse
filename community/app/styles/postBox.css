@@ -859,12 +859,8 @@
 }
 
 .is-revealed-benchmark {
-  border: 2px solid #CFB87C !important;
-  border-radius: 18px;
   margin-top: 4px;
   margin-bottom: 14px;
-  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
-  background: rgba(59, 130, 246, 0.03);
 }
 
 .comm_officialBadge {
