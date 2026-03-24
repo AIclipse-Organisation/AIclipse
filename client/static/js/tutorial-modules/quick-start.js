@@ -31,14 +31,6 @@
     return !!previewImage?.getAttribute("src") && previewWrap?.hidden === false;
   }
 
-  function hasDetectionReady() {
-    if (window.location.pathname === "/results") return true;
-    if (window.lastDetectionToken) return true;
-    if (sessionStorage.getItem("lastDetectionToken")) return true;
-    if (sessionStorage.getItem("lastDetectionResponse")) return true;
-    return false;
-  }
-
   function isPrivateSelected() {
     const savePublic = document.getElementById("save-public");
     if (!savePublic) return true;
@@ -69,7 +61,7 @@
         selector: "label.file-upload",
         title: "",
         body: [
-          "Choose the image you want to check.",
+          "Choose an image you want to scan.",
         ],
         completeEvent: "upload-choose-image-clicked",
         allowTargetClick: true,
@@ -83,7 +75,7 @@
         selector: "#disclaimer-modal .modal-text--disclaimer",
         title: "",
         body: [
-            "Read this note before scanning. You can open the full terms here if you want more detail, and you can continue only if you agree.",
+          "Read this note before scanning. You can open the full terms here if you want more detail, and you can continue only if you agree.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
@@ -95,12 +87,12 @@
         selector: "#disclaimer-agree",
         title: "",
         body: [
-            "If everything is clear, agree to continue with the scan.",
+          "If everything is clear, agree to continue with the scan.",
         ],
         completeEvent: "upload-disclaimer-agreed",
         allowTargetClick: true,
         isSatisfied() {
-            return hasSelectedValidImage();
+          return hasSelectedValidImage();
         },
       },
       {
@@ -109,7 +101,7 @@
         selector: null,
         title: "",
         body: [
-          "Choose the file you want to scan.",
+          "Choose an image you want to scan.",
         ],
         completeEvent: "upload-file-selected",
         allowTargetClick: false,
@@ -138,11 +130,10 @@
         selector: "#upload-frame",
         title: "",
         body: [
-          "AIclipse reads the area inside this frame first, so check that the important part is inside it.",
+          "You can see the image you selected. During normal use, you can adjust the crop and drag the image to set its position before sending it for scanning. During this tutorial, those controls are locked.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
-        note: ["Read-only for this step."],
       },
       {
         id: "quick-start-analyze",
@@ -150,13 +141,10 @@
         selector: "#btn-check",
         title: "",
         body: [
-          "Run the scan when the frame looks right, and AIclipse will open the result screen.",
+          "Click `Analyze Image` to see the result.",
         ],
         completeEvent: "scan-analysis-success",
         allowTargetClick: true,
-        isSatisfied() {
-          return hasDetectionReady();
-        },
       },
       {
         id: "quick-start-results-overview",
@@ -164,7 +152,7 @@
         selector: "#detect-card",
         title: "",
         body: [
-          "Read this result as a strong signal, not as final proof on its own.",
+          "This screen shows the scan result. You can keep it `private`, make it `public` for other AIclipse users, or `delete` it. During this tutorial, those controls are locked.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
@@ -175,7 +163,7 @@
         selector: ".progress-panel",
         title: "",
         body: [
-          "A higher score means the model sees a stronger AI-like pattern in the image.",
+          "The higher the score, the more confident the detector is that the image was AI-generated. The lower the score, the more confident it is that the image is real.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
@@ -186,7 +174,7 @@
         selector: ".visibility-selector",
         title: "",
         body: [
-          "Keep this first scan in `Private`, because that is the safer way to learn the flow.",
+          "Use this switch to choose the image visibility: `Private` or `Public`. It is `Private` by default, and we will keep it private for this walkthrough.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
@@ -226,7 +214,7 @@
         selector: "#scans-container",
         title: "",
         body: [
-          "This is your private review area, where saved scans stay easy to find.",
+          "You are now in the `Profile` section, where you can view your stats and all the images you have saved.",
         ],
         nextLabel: "Next",
         allowTargetClick: false,
@@ -237,7 +225,7 @@
         selector: '#nav-drawer a[href="/tutorials"]',
         title: "",
         body: [
-          "If you want guided help later, open `Tutorials` from here and the app will walk you through the flow again.",
+          "If you need help later, open `Tutorials` and follow another guided walkthrough.",
         ],
         nextLabel: "Finish",
         allowTargetClick: false,
