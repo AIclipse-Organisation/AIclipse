@@ -63,6 +63,10 @@ def inject_common_context():
 def healthz():
     return "OK", 200
 
+@app.get("/landing")
+def landing():
+    return render_template("landing.html")
+
 
 @app.get("/")
 def index():

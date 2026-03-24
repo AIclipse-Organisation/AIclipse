@@ -147,20 +147,12 @@ body.app .screen {
   margin: 10px 0 28px;
 }
 
-.auth-eyebrow {
-  margin: 0 0 4px;
-  font-size: 20px;
-  line-height: 1.25;
-  color: #a89c6f;
-  font-weight: 600;
-}
-
 .auth-title {
   margin: 0;
   font-size: 40px;
   line-height: 0.98;
   color: #C9BA83;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 /* =========================
