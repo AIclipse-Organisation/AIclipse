@@ -72,6 +72,28 @@ async def test_api_billing_subscription_status_proxies_query_auth_and_cookie(cli
 
 
 @pytest.mark.asyncio
+async def test_api_billing_subscription_status_passes_through_cancellation_payload(client, patch_upstreams):
+    patch_upstreams.add(
+        host="billing-srv",
+        method="GET",
+        path="/subscription/status",
+        handler=lambda _req: httpx.Response(
+            status_code=200,
+            json={
+                "status": "cancel_scheduled",
+                "cancel_at_period_end": True,
+                "billing_period_end": "2026-06-01T00:00:00+00:00",
+            },
+        ),
+    )
+
+    r = await client.get("/api/billing/subscription/status?user_id=u_123")
+    assert r.status_code == 200
+    assert r.json()["status"] == "cancel_scheduled"
+    assert r.json()["cancel_at_period_end"] is True
+
+
+@pytest.mark.asyncio
 async def test_api_billing_cancel_at_period_end_proxies_body_and_auth(client, patch_upstreams):
     def cancel_handler(req: httpx.Request) -> httpx.Response:
         assert req.url.path == "/subscription/cancel-at-period-end"

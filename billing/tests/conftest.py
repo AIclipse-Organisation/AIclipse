@@ -39,6 +39,8 @@ def state(monkeypatch, billing_module):
     plan_coll.find_one.return_value = None
     plan_coll.insert_one.return_value = SimpleNamespace(inserted_id="plan_1")
 
+    billing_coll.find_one.return_value = None
+    billing_coll.update_many.return_value = SimpleNamespace(matched_count=1, modified_count=1)
     billing_coll.insert_one.return_value = SimpleNamespace(inserted_id="bill_1")
 
     monkeypatch.setattr(billing_module, "users_coll", users_coll, raising=False)

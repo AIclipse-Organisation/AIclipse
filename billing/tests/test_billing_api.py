@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+
+
 def test_healthz_ok(client, state):
     response = client.get("/healthz")
 
@@ -26,6 +29,33 @@ def test_subscription_status_returns_default_when_no_billing_doc(client, state):
         "cancel_at_period_end": False,
         "billing_period_end": None,
         "stripe_subscription_id": None,
+        "stripe_customer_id": "cus_123",
+        "cancellation_reason": None,
+    }
+
+
+def test_subscription_status_returns_active_with_period_end(client, state):
+    period_end = datetime(2026, 5, 24, 10, 0, tzinfo=timezone.utc)
+    state["users_coll"].find_one.return_value = {"plan": 1, "stripe_customer_id": "cus_123"}
+    state["billing_coll"].find_one.return_value = {
+        "status": "active",
+        "cancel_at_period_end": False,
+        "billing_period_end": period_end,
+        "stripe_subscription_id": "sub_123",
+        "stripe_customer_id": "cus_123",
+        "cancellation_reason": None,
+    }
+
+    response = client.get("/subscription/status", params={"user_id": "user_1"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "user_id": "user_1",
+        "plan": 1,
+        "status": "active",
+        "cancel_at_period_end": False,
+        "billing_period_end": period_end.isoformat(),
+        "stripe_subscription_id": "sub_123",
         "stripe_customer_id": "cus_123",
         "cancellation_reason": None,
     }
@@ -120,6 +150,74 @@ def test_cancel_subscription_requires_reason(client, state):
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Cancellation reason is required"
+
+
+def test_cancel_subscription_requires_paid_plan(client, state):
+    state["users_coll"].find_one.return_value = {"plan": 0}
+
+    response = client.post(
+        "/subscription/cancel-at-period-end",
+        json={"user_id": "user_1", "reason": "Too expensive"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "No active paid subscription"
+
+
+def test_cancel_subscription_returns_404_when_no_active_subscription_record(client, state):
+    state["users_coll"].find_one.return_value = {"plan": 2}
+    state["billing_coll"].find_one.return_value = None
+
+    response = client.post(
+        "/subscription/cancel-at-period-end",
+        json={"user_id": "user_1", "reason": "Too expensive"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No active subscription found"
+
+
+def test_cancel_subscription_returns_404_when_subscription_id_missing(client, state):
+    state["users_coll"].find_one.return_value = {"plan": 2}
+    state["billing_coll"].find_one.return_value = {
+        "user_id": "user_1",
+        "plan": 2,
+        "status": "active",
+        "stripe_customer_id": "cus_123",
+        "stripe_subscription_id": None,
+    }
+
+    response = client.post(
+        "/subscription/cancel-at-period-end",
+        json={"user_id": "user_1", "reason": "Too expensive"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No active subscription found"
+
+
+def test_cancel_subscription_uses_existing_period_end_when_stripe_period_missing(client, state):
+    existing_period_end = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
+    state["users_coll"].find_one.return_value = {"plan": 2}
+    state["billing_coll"].find_one.return_value = {
+        "user_id": "user_1",
+        "plan": 2,
+        "status": "active",
+        "stripe_subscription_id": "sub_123",
+        "stripe_customer_id": "cus_123",
+        "billing_period_start": datetime(2026, 5, 10, 12, 0, tzinfo=timezone.utc),
+        "billing_period_end": existing_period_end,
+        "amount_paid": "19.99",
+    }
+    state["subscription_modify"].return_value = type("Obj", (), {"id": "sub_123", "current_period_end": None})()
+
+    response = client.post(
+        "/subscription/cancel-at-period-end",
+        json={"user_id": "user_1", "reason": "Other"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["plan_active_until"] == existing_period_end.isoformat()
 
 
 def test_webhook_missing_secret_returns_500(client, state, monkeypatch, billing_module):
@@ -237,5 +335,50 @@ def test_webhook_subscription_updated_marks_cancel_scheduled(client, state):
     assert response.status_code == 200
     assert response.json() == {"status": "success"}
     state["billing_coll"].update_many.assert_called_once()
+
+
+def test_webhook_subscription_updated_reactivates_subscription(client, state):
+    event = {
+        "id": "evt_sub_updated_2",
+        "type": "customer.subscription.updated",
+        "data": {
+            "object": {
+                "id": "sub_123",
+                "customer": "cus_123",
+                "cancel_at_period_end": False,
+                "current_period_end": 1_900_000_000,
+            }
+        },
+    }
+    state["webhook_construct"].return_value = event
+
+    response = client.post("/webhook", data="{}", headers={"stripe-signature": "sig"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "success"}
+    state["billing_coll"].update_many.assert_called_once()
+    update_doc = state["billing_coll"].update_many.call_args[0][1]
+    assert update_doc["$set"]["status"] == "active"
+
+
+def test_webhook_subscription_deleted_falls_back_to_plan_record(client, state):
+    state["billing_coll"].find_one.return_value = None
+    state["plan_coll"].find_one.return_value = {"user_id": "user_2"}
+    state["users_coll"].find_one.return_value = {"plan": 1}
+
+    event = {
+        "id": "evt_sub_deleted_2",
+        "type": "customer.subscription.deleted",
+        "data": {"object": {"id": "sub_abc", "customer": "cus_abc", "current_period_end": 1_900_000_000}},
+    }
+    state["webhook_construct"].return_value = event
+
+    response = client.post("/webhook", data="{}", headers={"stripe-signature": "sig"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "success"}
+    state["users_coll"].update_one.assert_called()
+    state["plan_coll"].insert_one.assert_called()
+    state["billing_coll"].insert_one.assert_called()
 
 

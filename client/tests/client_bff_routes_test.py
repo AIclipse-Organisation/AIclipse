@@ -118,6 +118,52 @@ def test_billing_subscription_status_uses_session_user_and_proxies(main_client_m
     )
 
 
+def test_billing_subscription_status_fetches_user_when_missing(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_99", "email": "u99@example.com", "is_admin": False}, 200)
+    )
+    main_client_module.gateway.call_json = Mock(
+        return_value=({"status": "active", "billing_period_end": "2026-06-01T00:00:00+00:00"}, 200)
+    )
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "billing-token")
+
+    resp = client.get("/billing/subscription/status")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "active"
+    main_client_module.gateway.fetch_me.assert_called_once_with("billing-token")
+    main_client_module.gateway.call_json.assert_called_once_with(
+        "GET",
+        "/api/billing/subscription/status?user_id=u_99",
+        token="billing-token",
+    )
+
+
+def test_billing_subscription_status_clears_session_on_revalidation_401(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(return_value=(None, 401))
+    main_client_module.gateway.call_json = Mock(side_effect=AssertionError("call_json must not be called"))
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "expired-token")
+    with client.session_transaction() as sess:
+        sess["current_user"] = {"name": "incomplete-user"}
+        sess["extra"] = "remove-me"
+
+    resp = client.get("/billing/subscription/status", headers={"X-Forwarded-Proto": "https"})
+    clear_cookie_header = "\n".join(resp.headers.getlist("Set-Cookie"))
+
+    assert resp.status_code == 401
+    assert resp.get_json() == {"detail": "Unauthorized"}
+    assert "access_token=" in clear_cookie_header
+    assert "Expires=Thu, 01 Jan 1970" in clear_cookie_header
+    assert "Secure" in clear_cookie_header
+
+    with client.session_transaction() as sess:
+        assert dict(sess) == {}
+
+
 def test_billing_cancel_subscription_requires_reason(main_client_module):
     main_client_module.gateway.call_json = Mock(side_effect=AssertionError("call_json must not be called"))
 
@@ -156,6 +202,33 @@ def test_billing_cancel_subscription_fetches_user_and_proxies_reason(main_client
         token="billing-token",
         json_data={"user_id": "u_42", "reason": "Too expensive"},
     )
+
+
+def test_billing_cancel_subscription_clears_session_on_revalidation_401(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(return_value=(None, 401))
+    main_client_module.gateway.call_json = Mock(side_effect=AssertionError("call_json must not be called"))
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "expired-token")
+    with client.session_transaction() as sess:
+        sess["current_user"] = {"name": "incomplete-user"}
+        sess["extra"] = "remove-me"
+
+    resp = client.post(
+        "/billing/subscription/cancel-at-period-end",
+        json={"reason": "Too expensive"},
+        headers={"X-Forwarded-Proto": "https"},
+    )
+    clear_cookie_header = "\n".join(resp.headers.getlist("Set-Cookie"))
+
+    assert resp.status_code == 401
+    assert resp.get_json() == {"detail": "Unauthorized"}
+    assert "access_token=" in clear_cookie_header
+    assert "Expires=Thu, 01 Jan 1970" in clear_cookie_header
+    assert "Secure" in clear_cookie_header
+
+    with client.session_transaction() as sess:
+        assert dict(sess) == {}
 
 
 def test_community_comments_rejects_invalid_post_id_without_calling_backend(main_client_module, monkeypatch):
