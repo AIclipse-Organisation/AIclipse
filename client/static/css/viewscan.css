@@ -220,20 +220,9 @@ body.app .page-underline {
   margin-top: 12px;
 }
 
-/* Card shell */
+/* Card shell — spacing only, no border (borders live on head/panel) */
 .meter-card {
   margin-top: 12px;
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.10);
-}
-
-.meter-card--gold {
-  border: 1px solid rgba(207, 184, 124, 0.55);
-}
-
-.meter-card--purple {
-  border: 1px solid rgba(170, 120, 255, 0.55);
 }
 
 /* Header row */
@@ -245,13 +234,33 @@ body.app .page-underline {
 
   padding: 12px 14px 8px;
   background: rgba(0, 0, 0, 0.12);
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
 }
 
-.meter-title {
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  color: rgba(207, 184, 124, 0.95);
+.meter-head--purple {
+  border-color: rgba(175, 131, 201, 0.55);
+}
+
+.meter-result-avatar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.meter-result-avatar img {
+  height: 20px;
+  width: auto;
+  display: block;
+}
+
+.meter-result-avatar--purple {
+  color: rgba(175, 131, 201, 0.95);
+}
+
+.meter-result-avatar--purple svg {
+  width: 20px;
+  height: 20px;
 }
 
 .meter-verdict {
@@ -263,23 +272,22 @@ body.app .page-underline {
   text-align: right;
 }
 
-.meter-head--purple .meter-title,
+.meter-head--purple .meter-verdict,
 .meter-verdict--purple {
-  color: rgba(190, 150, 255, 0.95);
-}
-
-.meter-title--purple {
-  color: rgba(190, 150, 255, 0.95);
+  color: rgba(175, 131, 201, 0.95);
 }
 
 /* Panel */
 .meter-panel {
-  padding: 10px 12px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
   background: rgba(0, 0, 0, 0.12);
-}
+  overflow: hidden;
 
-.meter-panel--purple {
-  background: rgba(0, 0, 0, 0.12);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
 }
 
 /* Bar */
@@ -321,7 +329,7 @@ body.app .page-underline {
 }
 
 .meter-fill--purple {
-  background: rgba(190, 150, 255, 0.85);
+  background: rgba(175, 131, 201, 0.95);
 }
 
 /* Percent text */

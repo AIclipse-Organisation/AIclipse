@@ -349,7 +349,7 @@ function renderAiclipseCard(img) {
   const aiPct = 100 - realPct;
 
   verdictEl.textContent = rawLabel || "—";
-  pctEl.textContent = `${aiPct.toFixed(2)}%`;
+  pctEl.textContent = `${Math.round(aiPct)}%`;
 
   setFillPercent(fillEl, aiPct);
 
@@ -409,7 +409,7 @@ function renderCommunityCard(img) {
   const pctAi = 100 - pctReal;
 
   verdictEl.textContent = communityVerdictText(pctReal);
-  pctEl.textContent = `${pctAi.toFixed(2)}%`;
+  pctEl.textContent = `${Math.round(pctAi)}%`;
   setFillPercent(fillEl, pctAi);
 
   card.hidden = false;

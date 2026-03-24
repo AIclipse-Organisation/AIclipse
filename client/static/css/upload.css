@@ -179,6 +179,7 @@ textarea {
   background: transparent;
   box-shadow: none;
   padding: 0;
+  margin-top: 12px;
 }
 
 .results-imageFrame {
@@ -306,24 +307,27 @@ textarea {
   justify-content: space-between;
   gap: 12px;
 
-  margin: 14px 0 0;
   padding: 12px 14px 8px;
-
-  border: 1px solid rgba(207, 184, 124, 0.55);
   border-bottom: 0;
   border-radius: 12px 12px 0 0;
   background: rgba(0, 0, 0, 0.12);
 }
 
-.bar-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: rgba(207, 184, 124, 0.95);
+.bar-result-avatar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.bar-result-avatar img {
+  height: 20px;
+  width: auto;
+  display: block;
 }
 
 .bar-head .verdict-text {
   margin: 0;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   text-align: right;
   color: rgba(207, 184, 124, 0.95) !important;
@@ -335,18 +339,15 @@ textarea {
 
 .progress-panel {
   width: 100%;
-  max-width: 100%;
   box-sizing: border-box;
 
-  padding: 10px 12px 12px;
-  margin: 0 0 12px;
-
-  border: 1px solid rgba(207, 184, 124, 0.55);
+  padding: 0;
+  margin: 0;
   border-top: 0;
   border-radius: 0 0 12px 12px;
   background: rgba(0, 0, 0, 0.12);
 
-  overflow: hidden; 
+  overflow: hidden;
 }
 
 .progress-panel .progress-bar {
@@ -354,15 +355,14 @@ textarea {
   width: 100%;
   box-sizing: border-box;
 
-  height: 26px;                 
+  height: 26px;
   border-radius: 999px;
 
   background: #141414;
   border: 1px solid rgb(63, 63, 63);
 
-  padding: 4px;                 
+  padding: 4px;
   overflow: hidden;
-  margin-bottom: 5px;
 }
 
 .progress-panel .real-fill {
@@ -384,17 +384,14 @@ textarea {
 
 .progress-panel .ai-fill {
   position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  
-  /* Choose your color: */
-  background-color: rgba(207, 184, 124, 0.95); /* Red/Coral for "Fake" warning */
-  /* background-color: #e5c07b; */ /* Uncomment this line instead if you want the original Gold */
-  
-  border-radius: inherit; /* Keeps the rounded corners matching the container */
+  top: 4px;
+  left: 4px;
+  bottom: 4px;
+  border-radius: 999px;
+  background-color: rgba(207, 184, 124, 0.95);
   transition: width 0.4s ease-out;
-  z-index: 1; /* Ensures it sits below the text but above the background */
+  z-index: 1;
+  min-width: 0px;
 }
 
 .progress-panel .bar-percent {

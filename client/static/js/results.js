@@ -71,7 +71,7 @@ function renderDetection(resp) {
   setFillPercent(aiFill, aiPct);
 
   if (aiPercentEl) {
-    aiPercentEl.textContent = `${aiPct.toFixed(2)}%`;
+    aiPercentEl.textContent = `${Math.round(aiPct)}%`;
   }
 
   if (panel) {
