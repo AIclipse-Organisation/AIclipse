@@ -218,7 +218,6 @@
   object-fit: contain;
   opacity: 0.85;
   flex-shrink: 0;
-  filter: sepia(1) saturate(3) brightness(0.95);
 }
 .detail-icon-emoji {
   font-size: 22px; line-height: 1;
