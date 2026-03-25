@@ -11,15 +11,15 @@ def smooth_confidence(confidence: float) -> float:
 def get_confidence_label(verdict: str, confidence: float) -> str:
     pct = confidence * 100
     is_fake = verdict.upper() == "FAKE"
-
+    
     if pct < 15 or pct > 85:
-        label = "REAL" if is_fake else "FAKE"
+        label = "fake" if is_fake else "real"
     elif 15 <= pct < 40 or 60 < pct <= 85:
-        label = "REAL" if is_fake else "FAKE"
+        label = "fake" if is_fake else "real"
     else:  # 40–60 range
-        label = "Suspicious"
-
-    return f"{pct:.2f}% {label}"
+        label = "suspicious"
+    
+    return label
 
 
 def build_prediction(probs: np.ndarray, class_names: tuple):
