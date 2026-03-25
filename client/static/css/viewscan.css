@@ -55,7 +55,7 @@
    ========================= */
 
 body.app .page-header {
-  padding: 6px 0 10px;
+  padding: 0px 0 0px;
 }
 
 body.app .page-title {
@@ -79,8 +79,9 @@ body.app .page-underline {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 4px;
   padding: 0 16px;
+  margin-bottom: 8px;
 }
 
 .page-header--with-description .page-title {
@@ -102,12 +103,16 @@ body.app .page-underline {
   word-break: break-word;
 }
 
+.page-header-description-text.is-moderated-reason {
+  color: #e04646;
+}
+
 /* =========================
    Not-a-card layout (keep same classes/ids)
    ========================= */
 
 .viewscan-card {
-  margin: 12px 16px 24px;
+  margin: 0 16px;
   border: 0;
   border-radius: 0;
   overflow: visible;
@@ -217,7 +222,7 @@ body.app .page-underline {
 }
 
 .verdict-block {
-  margin-top: 3vh;
+  margin-top: 2.5vh;
 }
 
 /* =========================
@@ -321,7 +326,7 @@ body.app .page-underline {
   position: relative;
   width: 100%;
   box-sizing: border-box;
-  height: 26px;
+  height: 18px;
   border-radius: 999px;
   background: #141414;
   border: 1px solid rgb(63, 63, 63);
@@ -425,7 +430,7 @@ body.app .page-underline {
    ========================= */
 
 .verdict-block {
-  margin-top: 3vh;
+  margin-top: 2.5vh;
   display: grid;
   gap: 12px;
   transition:
@@ -602,7 +607,9 @@ body.app .page-underline {
 }
 
 .private-placeholder--description {
-  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.45;
   text-align: left;
 }
 
@@ -707,7 +714,7 @@ body.app .page-underline {
 
 /* Details block */
 .viewscan-meta {
-  padding: 14px 0 0;
+  padding: 6px 0 0;
 }
 
 .viewscan-heading {
@@ -1057,6 +1064,67 @@ body.app .page-underline {
 }
 
 /* =========================
+   Viewscan action button row overrides
+   ========================= */
+
+/* "Publish to Allow Voting" note inside community card for private scans */
+.vs-communityPrivateNote {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
+/* Override community padding so the row aligns to card margins */
+.viewscan-card .comm_voteButtonRow {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Action buttons share remaining space equally */
+.vs-actionBtn {
+  flex: 1;
+}
+
+/* Gold icon filter — normalises source colour first, then tints to #cfb87c */
+.vs-goldIcon {
+  filter: brightness(0) invert(1) sepia(1) saturate(2) hue-rotate(10deg) brightness(0.92);
+}
+
+/* SVG icons in the row (trash etc.) sized to match comm_icon */
+.vs-svgIcon {
+  width: 22px;
+  height: 22px;
+  stroke: #cfb87c;
+  flex-shrink: 0;
+}
+
+/* Delete button: red tint on hover to signal destructive action */
+.vs-deleteBtn:hover {
+  border-color: rgba(224, 70, 70, 0.4) !important;
+  background: rgba(224, 70, 70, 0.08) !important;
+}
+
+.vs-deleteBtn:hover .vs-svgIcon {
+  stroke: #e04646;
+}
+
+.vs-deleteBtn:hover .comm_actionText {
+  color: #e04646;
+}
+
+/* Comments button always pushed to the far right */
+.vs-commentsBtn {
+  margin-left: auto;
+}
+
+/* =========================
    Modal (Results-style)
    ========================= */
 
@@ -1233,136 +1301,112 @@ body.app .page-underline {
   padding: 20px;
 }
 
-.visibility-selector {
-  display: flex;
-  gap: 0; /* No gap makes them look like one unit */
-  margin: 20px 0;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.15); /* Subtle outer border */
-}
-
-.vis-btn {
-  flex: 1;
-  all: unset; /* Reset default button styles */
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.5);
-  padding: 14px;
-  cursor: pointer;
-  transition: all 160ms ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.vis-btn .icon { 
-  font-size: 18px; 
-  opacity: 0.6;
-}
-
-/* Vertical divider between toggle buttons */
-#mode-private {
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Active State: Highlight in Gold */
-.vis-btn.is-selected {
-  background: rgba(207, 184, 124, 0.12);
-  color: #CFB87C;
-}
-
-.vis-btn.is-selected .icon {
-  opacity: 1;
-}
-
 /* =========================
-   Visibility Toggle (Segmented Control)
+   Results page action rows
    ========================= */
-.visibility-selector {
-  display: flex;
-  gap: 0; 
-  margin: 20px 0;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.03);
+
+/* Collapse grid gap — use margin-top on detect-card instead */
+.grid:has(.results-imageFrame) {
+  gap: 0;
 }
 
-.vis-btn {
-  flex: 1;
-  all: unset;
-  padding: 14px;
-  cursor: pointer;
-  transition: all 160ms ease;
+#detect-card {
+  margin-top: 2.5vh;
+}
+
+/* Remove the double margin from barBlock inside results */
+#aiclipse-bar-block {
+  margin-top: 0;
+}
+
+.res-actionRow {
+  padding-left: 0;
+  padding-right: 0;
+  margin-bottom: 8px;
+}
+
+/* Private / Public sliding toggle */
+.res-toggle {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
-  text-align: center;
+  margin: 16px 0 12px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px;
   box-sizing: border-box;
 }
 
-.vis-btn .icon { 
-  font-size: 18px; 
+/* sliding pill */
+.res-toggle::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  bottom: 4px;
+  border-radius: 8px;
+  background: rgba(207, 184, 124, 0.16);
+  border: 1px solid rgba(207, 184, 124, 0.38);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.res-toggle.is-public::before {
+  transform: translateX(100%);
+}
+
+.res-toggle__btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font: 600 13px/1 inherit;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: color 0.22s ease;
+  border-radius: 7px;
+}
+
+.res-toggle__btn img {
+  width: 13px;
+  height: 13px;
   opacity: 0.5;
+  transition: opacity 0.22s ease, filter 0.22s ease;
 }
 
-/* Vertical separator for the segmented control */
-#mode-private {
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Highlighted state for the selected mode */
-.vis-btn.is-selected {
-  background: rgba(207, 184, 124, 0.15);
+.res-toggle__btn.is-selected {
   color: #CFB87C;
 }
 
-.vis-btn.is-selected .icon {
+.res-toggle__btn.is-selected img {
   opacity: 1;
+  filter: brightness(0) invert(1) sepia(1) saturate(2) hue-rotate(10deg) brightness(0.92);
 }
 
-/* =========================
-   Primary Action Button (Confirm & Save)
-   ========================= */
-.btn-save-final {
-  all: unset;
-  box-sizing: border-box;
-  width: 100%;
-  display: block;
-  padding: 18px;
-  background: #CFB87C; /* AIclipse Gold */
-  color: #111;
-  border-radius: 999px;
+/* Save button — gold fill, same shape as siblings */
+.res-saveBtn {
+  background: rgba(207, 184, 124, 0.2);
+  border-color: rgba(207, 184, 124, 0.5);
+  color: #CFB87C;
   font-weight: 800;
-  text-align: center;
-  font-size: 16px;
-  cursor: pointer;
-  margin-top: 12px;
-  transition: transform 100ms ease, opacity 160ms ease;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }
 
-.btn-save-final:hover:not(:disabled) {
-  opacity: 0.95;
+.res-saveBtn:hover:not(:disabled) {
+  background: #CFB87C !important;
+  border-color: #CFB87C !important;
+  color: #111 !important;
 }
 
-.btn-save-final:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.btn-save-final:disabled {
+.res-saveBtn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-  filter: grayscale(1);
 }
 
 /* =========================
@@ -1438,7 +1482,6 @@ body.app .page-underline {
   font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.35);
-  margin-top: 5px;
   letter-spacing: 0.01em;
 }
 
