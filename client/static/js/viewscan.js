@@ -48,6 +48,71 @@ function toPercentNumber(confidence) {
   return Math.round(clamped * 100);
 }
 
+// Scrambling number animation
+function createScrambledNumber(finalValue, element, shouldAnimate, delay = 0) {
+  if (!shouldAnimate) {
+    element.textContent = `${finalValue}%`;
+    return;
+  }
+
+  const startTime = Date.now() + delay;
+  const duration = 1500; // 1.5 seconds of scrambling
+  const scrambleDuration = 1200; // Scramble for first 1.2 seconds
+
+  const animate = () => {
+    const elapsed = Date.now() - startTime;
+
+    if (elapsed < 0) {
+      // Still in delay period
+      element.textContent = "0%";
+      requestAnimationFrame(animate);
+      return;
+    }
+
+    if (elapsed < scrambleDuration) {
+      // Scrambling phase - show random numbers
+      const randomValue = Math.floor(Math.random() * 100);
+      element.textContent = `${randomValue}%`;
+      requestAnimationFrame(animate);
+    } else if (elapsed < duration) {
+      // Settling phase - ease towards final value
+      const settleProgress = (elapsed - scrambleDuration) / (duration - scrambleDuration);
+      const eased = 1 - Math.pow(1 - settleProgress, 3); // Ease out cubic
+      const currentValue = Math.round(eased * finalValue);
+      element.textContent = `${currentValue}%`;
+      requestAnimationFrame(animate);
+    } else {
+      // Animation complete
+      element.textContent = `${finalValue}%`;
+    }
+  };
+
+  requestAnimationFrame(animate);
+}
+
+// Zone gradient anchored to bar width + a sheen overlay
+function fillStyle(aiPct, gradient) {
+  const pct = Math.max(aiPct, 0.1);
+  const zoneSize = `${(10000 / pct).toFixed(2)}%`;
+  return `
+    linear-gradient(to right, rgba(0,0,0,0.28), transparent) left / 100% 100% no-repeat,
+    linear-gradient(to right, ${gradient}) left / ${zoneSize} 100% no-repeat
+  `;
+}
+
+function setFillPercent(fillEl, percent) {
+  if (!fillEl) return;
+  const p = clamp(percent, 0, 100);
+  fillEl.style.width = p === 0 ? "0px" : `calc(${p}% - 8px)`;
+  fillEl.dataset.p = String(p);
+}
+
+function clamp(n, min, max) {
+  n = Number(n);
+  if (!Number.isFinite(n)) n = 0;
+  return Math.max(min, Math.min(max, n));
+}
+
 function clamp(n, min, max) {
   n = Number(n);
   if (!Number.isFinite(n)) n = 0;
@@ -302,13 +367,13 @@ function showPanel(panel) {
 // -------------------------
 // Bar fill + zone label helpers (community bar design)
 // -------------------------
-const GRADIENT_AICLIPSE  = "#cfb87c 0%, #cfb87c 40%, #e07043 60%, #cc2222 100%";
+const GRADIENT_AICLIPSE = "#cfb87c 0%, #cfb87c 40%, #e07043 60%, #cc2222 100%";
 const GRADIENT_COMMUNITY = "#af83c9 0%, #af83c9 40%, #d06bb0 60%, #cc2222 100%";
 
 function setFillWithGradient(fillEl, aiPct, gradient) {
   if (!fillEl) return;
   const p = clamp(aiPct, 0, 100);
-  fillEl.style.width = p === 0 ? "0px" : `calc(${p}% - 0px)`;
+  fillEl.style.width = p === 0 ? "0px" : `calc(${p}% - 8px)`;
   fillEl.dataset.p = String(p);
   const pctSafe = Math.max(p, 0.1);
   const zoneSize = `${(10000 / pctSafe).toFixed(2)}%`;
@@ -329,7 +394,9 @@ function animateVerdictBars() {
   if (!block || block.hidden) return;
 
   block.classList.remove("is-revealed");
-  void block.offsetWidth;
+  block.classList.add("is-hidden");
+  void block.offsetWidth; // Force reflow
+  block.classList.remove("is-hidden");
   block.classList.add("is-revealed");
 }
 
@@ -348,19 +415,16 @@ function normalizeLabelText(raw) {
 function getRealLikelihoodPercent(img) {
   if (!img) return 0;
 
-  const rawLabel = normalizeLabelText(img.label || img.result || img.verdict || "Unknown");
-  const labelLower = rawLabel.toLowerCase();
+  const verdict = String(img.verdict || "unknown").toLowerCase();
+  const label = String(img.label || img.result || verdict).toLowerCase();
   const confidenceRaw = Number.isFinite(img.confidence) ? img.confidence : (img.score ?? 0);
   const confidence = clamp(confidenceRaw, 0, 1);
 
-  const isAi =
-    labelLower.includes("ai") ||
-    labelLower.includes("fake") ||
-    labelLower.includes("deepfake");
+  // Use verdict for logic, label is just lowercase version of verdict
+  const prediction = verdict !== "unknown" ? verdict : label;
 
-  const isReal = labelLower.includes("real") && !isAi;
-  const realProb = isReal ? confidence : (1 - confidence);
-
+  // Calculate real probability based on prediction
+  const realProb = prediction === "real" ? confidence : (1 - confidence);
   return clamp(realProb * 100, 0, 100);
 }
 
@@ -402,16 +466,25 @@ function communityVerdictText(pctReal) {
 
 function renderCommunityCard(img) {
   const card = document.getElementById("community-card");
-  const fillEl = document.getElementById("community-fill");
-  const pctEl = document.getElementById("community-percent");
+  const privateNote = document.getElementById("community-private-note");
+  const realFillEl = document.getElementById("community-real-fill");
+  const fakeFillEl = document.getElementById("community-fake-fill");
+  const realPctEl = document.getElementById("community-real-pct");
+  const fakePctEl = document.getElementById("community-fake-pct");
+  const realCountEl = document.getElementById("community-real-count");
+  const fakeCountEl = document.getElementById("community-fake-count");
+  const summaryEl = document.getElementById("community-summary");
+  const totalEl = document.getElementById("community-total");
+  const verdictEl = document.getElementById("community-verdict");
 
-  if (!card || !fillEl || !pctEl) return;
+  if (!card) return;
 
-  // Only show for public posts
-  if (!img || isPrivateScan(img)) {
+  if (!img) {
     card.hidden = true;
     return;
   }
+
+  if (privateNote) privateNote.hidden = !isPrivateScan(img);
 
   const up = Number(img.up_vote_count);
   const down = Number(img.down_vote_count);
@@ -419,20 +492,72 @@ function renderCommunityCard(img) {
   const downN = Number.isFinite(down) ? down : 0;
   const total = upN + downN;
 
+  // Update vote counts
+  if (realCountEl) realCountEl.textContent = `${upN} ${upN === 1 ? "vote" : "votes"}`;
+  if (fakeCountEl) fakeCountEl.textContent = `${downN} ${downN === 1 ? "vote" : "votes"}`;
+
   if (total <= 0) {
-    pctEl.textContent = "—";
-    setFillWithGradient(fillEl, 0, GRADIENT_COMMUNITY);
-    setZoneLabels(card, 0);
+    // No votes - show empty bars
+    if (realFillEl) {
+      realFillEl.style.width = "0px";
+      realFillEl.style.background = "linear-gradient(to right, rgba(0,0,0,0.28), transparent), #cfb87c";
+    }
+    if (fakeFillEl) {
+      fakeFillEl.style.width = "0px";
+      fakeFillEl.style.background = "linear-gradient(to right, rgba(0,0,0,0.28), transparent), linear-gradient(to right, #cfb87c, #e07043, #cc2222)";
+    }
+    if (realPctEl) realPctEl.textContent = "0%";
+    if (fakePctEl) fakePctEl.textContent = "0%";
+    if (summaryEl) summaryEl.hidden = true;
+
     card.hidden = false;
     return;
   }
 
   const pctReal = clamp((upN / total) * 100, 0, 100);
-  const pctAi = 100 - pctReal;
+  const pctFake = 100 - pctReal;
 
-  pctEl.textContent = `${Math.round(pctAi)}%`;
-  setFillWithGradient(fillEl, pctAi, GRADIENT_COMMUNITY);
-  setZoneLabels(card, pctAi);
+  // Set fill widths and gradients
+  if (realFillEl) {
+    realFillEl.style.width = pctReal === 0 ? "0px" : `calc(${pctReal}% - 8px)`;
+    const realGradient = "#cfb87c";
+    const pctSafe = Math.max(pctReal, 0.1);
+    const zoneSize = `${(10000 / pctSafe).toFixed(2)}%`;
+    realFillEl.style.background = `linear-gradient(to right, rgba(0,0,0,0.28), transparent) left / 100% 100% no-repeat, linear-gradient(to right, ${realGradient}) left / ${zoneSize} 100% no-repeat`;
+  }
+
+  if (fakeFillEl) {
+    fakeFillEl.style.width = pctFake === 0 ? "0px" : `calc(${pctFake}% - 8px)`;
+    const fakeGradient = "#cfb87c, #e07043, #cc2222";
+    const pctSafe = Math.max(pctFake, 0.1);
+    const zoneSize = `${(10000 / pctSafe).toFixed(2)}%`;
+    fakeFillEl.style.background = `linear-gradient(to right, rgba(0,0,0,0.28), transparent) left / 100% 100% no-repeat, linear-gradient(to right, ${fakeGradient}) left / ${zoneSize} 100% no-repeat`;
+  }
+
+  // Add scrambling animations with delay
+  if (realPctEl) createScrambledNumber(Math.round(pctReal), realPctEl, true, 250);
+  if (fakePctEl) createScrambledNumber(Math.round(pctFake), fakePctEl, true, 250);
+
+  // Update summary
+  if (summaryEl && totalEl && verdictEl) {
+    totalEl.textContent = total;
+
+    let verdict, verdictClass;
+    if (pctReal > pctFake) {
+      verdict = "Real";
+      verdictClass = "comm_voteSummary--real";
+    } else if (pctFake > pctReal) {
+      verdict = "Fake";
+      verdictClass = "comm_voteSummary--fake";
+    } else {
+      verdict = "Split";
+      verdictClass = "comm_voteSummary--split";
+    }
+
+    verdictEl.textContent = verdict;
+    verdictEl.className = verdictClass;
+    summaryEl.hidden = false;
+  }
 
   card.hidden = false;
 }
@@ -641,6 +766,8 @@ function renderMeta(img) {
     "score",
     "user_name",
     "model_version",
+    "moderation_status",
+    "moderation_reason",
   ]);
 
   // Show any other non-hidden fields (but skip those shown in dedicated cards)
@@ -704,7 +831,20 @@ function renderDescriptionHeader(img) {
   if (!section || !textEl || !privatePlaceholder) return;
 
   const isPrivate = isPrivateScan(img);
+  const isModerated = !!(img && img.moderation_status === "removed");
   const hasDescription = !!(img && img.description);
+
+  // Reset moderation styling
+  textEl.classList.remove("is-moderated-reason");
+
+  if (isModerated) {
+    section.hidden = false;
+    textEl.hidden = false;
+    textEl.textContent = img.moderation_reason || "This image has been removed by moderation.";
+    textEl.classList.add("is-moderated-reason");
+    privatePlaceholder.hidden = true;
+    return;
+  }
 
   if (hasDescription) {
     section.hidden = false;
@@ -715,7 +855,7 @@ function renderDescriptionHeader(img) {
   }
 
   if (isPrivate) {
-    section.hidden = false;
+    section.hidden = true;
     textEl.hidden = true;
     textEl.textContent = "";
     privatePlaceholder.hidden = false;
@@ -759,7 +899,7 @@ function renderVotesCard(img) {
 
   if (isPrivateScan(img)) {
     card.hidden = true;
-    privatePlaceholder.hidden = false;
+    privatePlaceholder.hidden = true;
     return;
   }
 
@@ -826,7 +966,6 @@ async function renderScan(img, title) {
   renderMeta(currentScan);
   renderDescriptionHeader(currentScan);
   renderVerdictConfidenceCard(currentScan);
-  renderVotesCard(currentScan);
 
   card.hidden = false;
   setStatus("", null);
@@ -1045,8 +1184,8 @@ function setupShowComments(img) {
   if (!triggerBtn || !sheet || !backdrop || !listEl) return;
 
   const postId = getPostId(img);
-  const shouldShow = !!(postId && !isPrivateScan(img));
-  triggerBtn.hidden = !shouldShow;
+  const shouldShow = !!(postId && !isPrivateScan(img) && img?.is_public === true);
+  triggerBtn.style.display = shouldShow ? "flex" : "none";
   if (!shouldShow) return;
 
   // Eagerly fetch comment count for the grid cell
@@ -1207,19 +1346,18 @@ function setupShowComments(img) {
 // Make Private (replaces Delete Post)
 // -------------------------
 function setupDeletePost(img) {
-  const section = document.getElementById("delete-post-section");
   const actionBtn = document.getElementById("btn-delete-post");
   const statusEl = document.getElementById("delete-post-status");
 
-  if (!section || !actionBtn || !statusEl) {
-    if (section) section.style.display = "none";
+  if (!actionBtn || !statusEl) {
+    if (actionBtn) actionBtn.style.display = "none";
     return;
   }
 
   const postId = getPostId(img);
 
   const shouldShow = !!(postId && !isPrivateScan(img));
-  section.style.display = shouldShow ? "block" : "none";
+  actionBtn.style.display = shouldShow ? "flex" : "none";
 
   if (!shouldShow) {
     return;
@@ -1311,18 +1449,17 @@ function setupDeletePost(img) {
 // Delete Scan (UNCHANGED)
 // -------------------------
 function setupDeleteScan(img) {
-  const section = document.getElementById("delete-scan-section");
   const deleteBtn = document.getElementById("btn-delete-scan");
   const statusEl = document.getElementById("delete-scan-status");
 
-  if (!section || !deleteBtn || !statusEl) {
-    if (section) section.style.display = "none";
+  if (!deleteBtn || !statusEl) {
+    if (deleteBtn) deleteBtn.style.display = "none";
     return;
   }
 
   // Show for private scans, OR for public scans where no community post was found
   const shouldShow = !!(img && img.image_id && (isPrivateScan(img) || !getPostId(img)));
-  section.style.display = shouldShow ? "block" : "none";
+  deleteBtn.style.display = shouldShow ? "flex" : "none";
 
   if (!shouldShow) {
     return;
@@ -1415,15 +1552,15 @@ function setupDeleteScan(img) {
 function setupMakePublicInline(img) {
   const makePublicBtn = document.getElementById("btn-make-public");
   const makePublicSection = document.getElementById("make-public-section");
-  const form = document.getElementById("make-public-form");
+  const modal = document.getElementById("make-public-modal");
   const formInput = document.getElementById("make-public-description");
   const formCount = document.getElementById("make-public-count");
   const publishBtn = document.getElementById("make-public-publish");
   const cancelBtn = document.getElementById("make-public-cancel");
   const formStatus = document.getElementById("make-public-status");
 
-  if (!makePublicSection || !makePublicBtn || !form || !formInput || !publishBtn || !cancelBtn || !formStatus) {
-    if (makePublicSection) makePublicSection.style.display = isPrivateScan(img) ? "block" : "none";
+  if (!makePublicBtn || !modal || !formInput || !publishBtn || !cancelBtn || !formStatus) {
+    if (makePublicBtn) makePublicBtn.style.display = isPrivateScan(img) ? "flex" : "none";
     return;
   }
 
@@ -1431,36 +1568,9 @@ function setupMakePublicInline(img) {
   const isModerated = img && img.moderation_status === "removed";
   const shouldShow = isPrivateScan(img) && !isModerated;
 
-  makePublicSection.style.display = shouldShow ? "block" : "none";
+  makePublicBtn.style.display = shouldShow ? "flex" : "none";
 
-  // If moderated, show a warning message instead
-  if (isModerated && isPrivateScan(img)) {
-    makePublicSection.style.display = "block";
-    form.hidden = true;
-    setSelected(makePublicBtn, false);
-
-    // Show moderation warning
-    const warningDiv = document.createElement("div");
-    warningDiv.id = "moderation-warning";
-    warningDiv.style.cssText = "padding: 16px; background: rgba(220, 53, 69, 0.1); border: 1px solid rgba(220, 53, 69, 0.3); border-radius: 12px; color: rgba(220, 53, 69, 0.9); font-size: 14px; margin-top: 12px;";
-    warningDiv.innerHTML = `
-      <strong>⚠️ Content Removed</strong><br>
-      <span style="font-size: 13px; opacity: 0.8;">${img.moderation_reason || "This image has been removed by moderation and cannot be posted to the community."}</span>
-    `;
-
-    // Remove existing warning if any
-    const existingWarning = document.getElementById("moderation-warning");
-    if (existingWarning) existingWarning.remove();
-
-    makePublicSection.appendChild(warningDiv);
-    return;
-  }
-
-  if (!shouldShow) {
-    form.hidden = true;
-    setSelected(makePublicBtn, false);
-    return;
-  }
+  if (!shouldShow) return;
 
   const setFormStatus = (text, kind) => {
     formStatus.classList.remove("is-error", "is-success");
@@ -1469,43 +1579,28 @@ function setupMakePublicInline(img) {
     formStatus.textContent = text || "";
   };
 
-  const openForm = () => {
-    showPanel(form);
+  const openModal = () => {
     formInput.value = "";
     if (formCount) formCount.textContent = "0";
     setFormStatus("", null);
-
-    setSelected(makePublicBtn, true);
+    publishBtn.disabled = false;
+    publishBtn.textContent = "Publish";
+    modal.hidden = false;
     formInput.focus();
   };
 
-  const closeForm = () => {
-    hidePanel(form);
+  const closeModal = () => {
+    modal.hidden = true;
     formInput.value = "";
     if (formCount) formCount.textContent = "0";
     setFormStatus("", null);
-
     publishBtn.disabled = false;
     publishBtn.textContent = "Publish";
-
-    setSelected(makePublicBtn, false);
-  };
-
-  const toggleForm = () => {
-    const editForm = document.getElementById("edit-description-form");
-    const editBtn = document.getElementById("btn-edit-description");
-    if (editForm && !editForm.hidden) {
-      hidePanel(editForm);
-      setSelected(editBtn, false);
-    }
-
-    if (form.hidden) openForm();
-    else closeForm();
   };
 
   if (!makePublicBtn.dataset.bound) {
     makePublicBtn.dataset.bound = "1";
-    makePublicBtn.addEventListener("click", toggleForm);
+    makePublicBtn.addEventListener("click", openModal);
   }
 
   if (!formInput.dataset.bound) {
@@ -1517,16 +1612,18 @@ function setupMakePublicInline(img) {
 
   if (!cancelBtn.dataset.bound) {
     cancelBtn.dataset.bound = "1";
-    cancelBtn.addEventListener("click", () => {
-      closeForm();
-    });
+    cancelBtn.addEventListener("click", closeModal);
+  }
+
+  if (!modal.dataset.bound) {
+    modal.dataset.bound = "1";
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
   }
 
   if (!publishBtn.dataset.bound) {
     publishBtn.dataset.bound = "1";
     publishBtn.addEventListener("click", async () => {
-      if (!currentScan) return;
-      if (publishBtn.disabled) return;
+      if (!currentScan || publishBtn.disabled) return;
 
       const description = formInput.value.trim();
       if (!description) {
@@ -1544,10 +1641,8 @@ function setupMakePublicInline(img) {
 
       try {
         await handleMakePublic(currentScan, description);
-
         sessionStorage.removeItem("selectedScan");
         sessionStorage.removeItem("selectedScanTitle");
-
         window.location.href = "/profile";
       } catch (err) {
         setFormStatus(err?.message || "Failed to publish.", "error");
@@ -1571,47 +1666,58 @@ async function handleMakePublic(img, description) {
   const userId = userData.user_id;
   if (!userId) throw new Error("Could not read current user.");
 
-  const postBody = {
-    user_id: userId,
-    image_id: img.image_id,
-    description,
-    result: {
-      verdict: img.verdict || null,
-      label: img.label || null,
-      confidence: img.confidence || null,
-    },
-  };
+  // Check if a community post already exists for this image to avoid duplicates
+  const existingPost = await fetchPostByImageId(img.image_id);
+  const existingPostId = existingPost
+    ? (existingPost.post_id || existingPost.postId || existingPost.id || null)
+    : (getPostId(img) || null);
 
-  const postRes = await fetch("/community/posts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    credentials: "include",
-    body: JSON.stringify(postBody),
-  });
+  if (existingPostId) {
+    // Post already exists — just update the description and re-show via image PATCH
+    const patchRes = await fetch(`/community/posts?post_id=${encodeURIComponent(existingPostId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ description }),
+    });
+    if (!patchRes.ok) {
+      const errorData = await patchRes.json().catch(() => ({}));
+      throw new Error(errorData.detail || errorData.error || `Failed to update post (${patchRes.status})`);
+    }
+    img.post_id = existingPostId;
+  } else {
+    // No existing post — create a new one
+    const postBody = {
+      user_id: userId,
+      image_id: img.image_id,
+      description,
+      result: {
+        verdict: img.verdict || null,
+        label: img.label || null,
+        confidence: img.confidence || null,
+      },
+    };
 
-  if (!postRes.ok) {
-    const errorData = await postRes.json().catch(() => ({}));
+    const postRes = await fetch("/community/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "include",
+      body: JSON.stringify(postBody),
+    });
 
-    // Check if it's a moderation block (403)
-    if (postRes.status === 403) {
-      throw new Error(errorData.error || "This image cannot be posted to the community.");
+    if (!postRes.ok) {
+      const errorData = await postRes.json().catch(() => ({}));
+      if (postRes.status === 403) {
+        throw new Error(errorData.error || "This image cannot be posted to the community.");
+      }
+      throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
     }
 
-    throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
+    const postData = await postRes.json().catch(() => ({}));
+    if (postData.post_id) img.post_id = postData.post_id;
   }
 
-  const postData = await postRes.json().catch(() => ({}));
-
-  // Persist the post_id and initial vote counts onto the scan so that
-  // when the user returns from the scans page the data is available.
-  if (postData.post_id) {
-    img.post_id = postData.post_id;
-    img.up_vote_count = postData.up_vote_count ?? 0;
-    img.down_vote_count = postData.down_vote_count ?? 0;
-    img.is_public = true;
-    sessionStorage.setItem("selectedScan", JSON.stringify(img));
-  }
-
+  // Mark image as public
   const updateRes = await fetch(`/image/${img.image_id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -1621,10 +1727,13 @@ async function handleMakePublic(img, description) {
 
   if (!updateRes.ok) {
     const errorData = await updateRes.json().catch(() => ({}));
-    throw new Error(
-      errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`
-    );
+    throw new Error(errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`);
   }
+
+  img.up_vote_count = img.up_vote_count ?? 0;
+  img.down_vote_count = img.down_vote_count ?? 0;
+  img.is_public = true;
+  sessionStorage.setItem("selectedScan", JSON.stringify(img));
 }
 
 // -------------------------
