@@ -323,6 +323,16 @@ function setZoneLabels(container, aiPct) {
   });
 }
 
+// NEW: replay the reveal animation for the View Scan bars
+function animateVerdictBars() {
+  const block = document.getElementById("verdict-block");
+  if (!block || block.hidden) return;
+
+  block.classList.remove("is-revealed");
+  void block.offsetWidth;
+  block.classList.add("is-revealed");
+}
+
 // -------------------------
 // NEW: Aiclipse card (gold) computations
 // Matches your Results logic:
@@ -763,8 +773,14 @@ function renderVotesCard(img) {
   card.hidden = false;
 }
 
-function renderScan(img, title) {
+async function renderScan(img, title) {
   currentScan = img;
+
+  const card = document.getElementById("viewscan-card");
+  const imageEl = document.getElementById("viewscan-image");
+  const titleEl = document.getElementById("viewscan-title");
+
+  if (!card || !imageEl || !titleEl) return;
 
   // Mark by post only for explicit scans-origin navigation.
   const scansOriginPostId = consumeScansMarkPostId();
@@ -772,47 +788,6 @@ function renderScan(img, title) {
   if (scansOriginPostId && currentPostId && scansOriginPostId === currentPostId) {
     markNotificationsReadForPost(currentPostId);
   }
-
-  const card = document.getElementById("viewscan-card");
-  const imageEl = document.getElementById("viewscan-image");
-  const titleEl = document.getElementById("viewscan-title");
-
-  // ✅ NEW (necessary): refresh live votes from backend, then re-render community card/meta.
-  // This keeps the first render fast (cached), and then syncs with Community page.
-  refreshCommunityData(img).then((ok) => {
-    if (!ok) return;
-
-    renderMeta(currentScan);
-    renderQuickMeta(currentScan);
-    renderDescriptionHeader(currentScan);
-    renderVerdictConfidenceCard(currentScan);
-    renderVotesCard(currentScan);
-
-    setupEditDescriptionInline(currentScan);
-    setupShowComments(currentScan);
-    setupDeletePost(currentScan);
-
-    renderCommunityCard(currentScan);
-  });
-
-  // Keep your existing enrichment (post_id/description) as-is
-  ensurePostIdForPublicScan(img).then((ok) => {
-    if (!ok) return;
-
-    renderMeta(currentScan);
-    renderDescriptionHeader(currentScan);
-    renderVerdictConfidenceCard(currentScan);
-    renderVotesCard(currentScan);
-
-    setupEditDescriptionInline(currentScan);
-    setupShowComments(currentScan);
-    setupDeletePost(currentScan);
-
-    // re-render community card after enrichment (votes/post id)
-    renderCommunityCard(currentScan);
-  });
-
-  if (!card || !imageEl || !titleEl) return;
 
   if (!img) {
     card.hidden = true;
@@ -834,32 +809,37 @@ function renderScan(img, title) {
     imageEl.style.display = "none";
   }
 
-  // NEW: community-style cards
-  renderAiclipseCard(img);
-  renderCommunityCard(img);
-  renderQuickMeta(img);
+  // Wait for async enrichments first so we only render once
+  try {
+    await Promise.all([
+      refreshCommunityData(img),
+      ensurePostIdForPublicScan(img),
+    ]);
+  } catch (_) {
+    // silent fail — page will still render with whatever data is available
+  }
 
-  renderMeta(img);
-  renderDescriptionHeader(img);
-  renderVerdictConfidenceCard(img);
-  renderVotesCard(img);
+  // Single render pass
+  renderAiclipseCard(currentScan);
+  renderCommunityCard(currentScan);
+  renderQuickMeta(currentScan);
+  renderMeta(currentScan);
+  renderDescriptionHeader(currentScan);
+  renderVerdictConfidenceCard(currentScan);
+  renderVotesCard(currentScan);
+
   card.hidden = false;
   setStatus("", null);
 
-  // Edit Description (INLINE, only when post_id exists)
-  setupEditDescriptionInline(img);
+  // Setup handlers after final data is ready
+  setupEditDescriptionInline(currentScan);
+  setupShowComments(currentScan);
+  setupDeletePost(currentScan);
+  setupDeleteScan(currentScan);
+  setupMakePublicInline(currentScan);
 
-  // Show Comments (only for public posts with post_id)
-  setupShowComments(img);
-
-  // Delete Post (only for public posts with post_id)
-  setupDeletePost(img);
-
-  // Delete Scan (only for private scans)
-  setupDeleteScan(img);
-
-  // Inline Make Public UI (ONLY when private)
-  setupMakePublicInline(img);
+  // Animate once only
+  animateVerdictBars();
 }
 
 // -------------------------
@@ -1650,7 +1630,7 @@ async function handleMakePublic(img, description) {
 // -------------------------
 // Init
 // -------------------------
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
   let img = null;
   let title = null;
 
@@ -1662,5 +1642,5 @@ window.addEventListener("DOMContentLoaded", () => {
     img = null;
   }
 
-  renderScan(img, title);
+  await renderScan(img, title);
 });

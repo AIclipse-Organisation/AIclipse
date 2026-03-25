@@ -233,20 +233,35 @@ body.app .page-underline {
   margin-top: 12px;
 }
 
+.comm_barHead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 14px 6px;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: rgba(0, 0, 0, 0.12);
+  min-height: 28px;
+}
+
 .comm_barSourceLabel {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%) translateY(-50%);
-  font-size: 10px;
-  font-weight: 600;
+  position: static;
+  transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
   letter-spacing: 0.9px;
   text-transform: uppercase;
   white-space: nowrap;
   line-height: 1;
-  background: #222222;
-  padding: 0 4px;
+  background: transparent;
+  padding: 0;
   pointer-events: none;
+  z-index: 5;
 }
 
 .comm_barBlock:not(.comm_communityBar) .comm_barSourceLabel {
@@ -257,24 +272,13 @@ body.app .page-underline {
   color: #af83c9;
 }
 
-.comm_barHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px 8px;
-  border-bottom: 0;
-  border-radius: 12px 12px 0 0;
-  background: rgba(0, 0, 0, 0.12);
-}
-
 .comm_resultAvatar {
   flex-shrink: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 2.5vh;
-  height: 2vh;
+  width: 16px;
+  height: 16px;
 }
 
 .comm_resultAvatar img,
@@ -282,6 +286,7 @@ body.app .page-underline {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  display: block;
 }
 
 .comm_resultAvatar_icon {
@@ -289,13 +294,15 @@ body.app .page-underline {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 2.5vh;
-  height: 2vh;
+  width: 16px;
+  height: 16px;
   color: rgba(175, 131, 201, 0.95);
 }
 
 .comm_barTrackWrap {
   position: relative;
+  padding-top: 26px;
+  background: rgba(0, 0, 0, .12);
 }
 
 .comm_progressPanel {
@@ -327,9 +334,10 @@ body.app .page-underline {
   bottom: 4px;
   width: 0px;
   border-radius: 999px;
-  transition: width 300ms ease;
   z-index: 1;
   min-width: 18px;
+  will-change: transform;
+  transform-origin: left center;
 }
 
 .comm_progressFill[data-p]:not([data-p="0"]) {
@@ -369,28 +377,122 @@ body.app .page-underline {
 
 .comm_zoneLabel {
   position: absolute;
-  bottom: calc(100% + 2px);
+  top: 2px;
+  bottom: auto;
   transform: translateX(-50%);
-  font-size: 7px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.8px;
-  text-transform: uppercase;
+  text-transform: none;
   pointer-events: none;
   user-select: none;
   white-space: nowrap;
+  line-height: 1;
   color: rgba(255, 255, 255, 0.25);
 }
 
 .comm_zoneLabel--active {
   font-size: 14px;
-  -webkit-text-stroke: 0.3px #000000;
+  font-weight: 800;
+  -webkit-text-stroke: 0;
   isolation: isolate;
+  text-transform: uppercase;
 }
 
-.comm_zoneLabel--safe.comm_zoneLabel--active    { color: #cfb87c; text-shadow: 0 0 2px rgba(207, 184, 124, 0.6); }
-.comm_zoneLabel--neutral.comm_zoneLabel--active { color: #ffffff; text-shadow: 0 0 2px rgba(255, 255, 255, 0.6); }
-.comm_zoneLabel--risk.comm_zoneLabel--active    { color: #f87171; text-shadow: 0 0 2px rgba(204, 34, 34, 0.6); }
-.comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active { color: #af83c9; text-shadow: 0 0 2px rgba(175, 131, 201, 0.6); }
+.comm_zoneLabel--safe.comm_zoneLabel--active {
+  color: #cfb87c;
+  text-shadow: 0 0 2px rgba(207, 184, 124, 0.6);
+}
+
+.comm_zoneLabel--neutral.comm_zoneLabel--active {
+  color: #ffffff;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+.comm_zoneLabel--risk.comm_zoneLabel--active {
+  color: #f87171;
+  text-shadow: 0 0 2px rgba(204, 34, 34, 0.6);
+}
+
+.comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active {
+  color: #af83c9;
+  text-shadow: 0 0 2px rgba(175, 131, 201, 0.6);
+}
+
+/* =========================
+   View Scan bar reveal animation
+   ========================= */
+
+.verdict-block {
+  margin-top: 3vh;
+  display: grid;
+  gap: 12px;
+  transition:
+    filter 0.6s cubic-bezier(0.23, 1, 0.32, 1),
+    opacity 0.6s cubic-bezier(0.23, 1, 0.32, 1),
+    transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.verdict-block.is-revealed {
+  filter: blur(0) saturate(1);
+  opacity: 1;
+  animation: viewscanRevealBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.verdict-block.is-revealed .comm_progressFill {
+  animation: viewscanBarFillIn 1.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: 0.25s;
+}
+
+.verdict-block.is-revealed .comm_zoneLabel--active {
+  animation: viewscanLabelReveal 0.5s ease forwards;
+  animation-delay: 2.05s;
+
+  font-size: 13px;
+  filter: grayscale(1);
+  opacity: 0.4;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+}
+
+@keyframes viewscanBarFillIn {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes viewscanRevealBounce {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+  60% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes viewscanLabelReveal {
+  from {
+    font-size: 13px;
+    filter: grayscale(1);
+    opacity: 0.4;
+    text-shadow: none;
+    -webkit-text-stroke: 0;
+  }
+  to {
+    font-size: 14px;
+    filter: grayscale(0);
+    opacity: 1;
+    text-transform: uppercase;
+  }
+}
 
 /* =========================
    Split Cards (Vote)
@@ -470,7 +572,6 @@ body.app .page-underline {
   padding: 12px 14px;
   min-width: 0;
 }
-
 
 .votes-inline-label {
   margin: 0;
@@ -710,11 +811,17 @@ body.app .page-underline {
   opacity: 1;
   transition: border-color 160ms ease, background 160ms ease;
 }
+
 .vs-edit-desc-btn:hover {
   border-color: rgba(207, 184, 124, 0.65);
   background: rgba(207, 184, 124, 0.10);
 }
-.vs-edit-desc-btn img { width: 16px; height: 16px; display: block; }
+
+.vs-edit-desc-btn img {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
 
 /* Small action buttons */
 .make-public-btn-cancel {
@@ -854,7 +961,11 @@ body.app .page-underline {
   font: inherit;
   font-size: 14px;
 }
-.edit-desc-modal-textarea:focus { outline: none; border-color: rgba(207, 184, 124, 0.95); }
+
+.edit-desc-modal-textarea:focus {
+  outline: none;
+  border-color: rgba(207, 184, 124, 0.95);
+}
 
 .edit-desc-modal-count {
   margin-top: 4px;
@@ -870,8 +981,13 @@ body.app .page-underline {
   color: rgba(255, 255, 255, 0.75);
 }
 
-.edit-desc-status.is-error { color: #e04646; }
-.edit-desc-status.is-success { color: #18c46c; }
+.edit-desc-status.is-error {
+  color: #e04646;
+}
+
+.edit-desc-status.is-success {
+  color: #18c46c;
+}
 
 /* Gold primary modal button */
 .modal-actions .primary-gold {
@@ -879,6 +995,7 @@ body.app .page-underline {
   --btn-hover-color: #CFB87C;
   border-color: var(--btn-outline-color);
 }
+
 .modal-actions .primary-gold:hover {
   background: var(--btn-hover-color);
   color: #111;
