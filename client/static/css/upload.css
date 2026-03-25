@@ -309,12 +309,29 @@ textarea {
 .comm_barHead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
-  padding: 12px 14px 8px;
+  padding: 8px 14px 6px;
   border-bottom: 0;
   border-radius: 12px 12px 0 0;
   background: rgba(0, 0, 0, 0.12);
+}
+
+.comm_barHeadBrand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 18px;
+}
+
+.comm_barBrandText {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  line-height: 1;
+  color: #CFB87C;
 }
 
 .comm_resultAvatar {
@@ -322,8 +339,8 @@ textarea {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 2.5vh;
-  height: 2vh;
+  width: 14px;
+  height: 14px;
 }
 
 .comm_resultAvatar img,
@@ -334,7 +351,11 @@ textarea {
 }
 
 .comm_barTrackWrap {
-  position: relative;
+    position: relative;
+    padding-top: 26px;
+    border-bottom-right-radius: 10px;
+    border-bottom-left-radius: 10px;
+    background: rgba(0, 0, 0, 0.12);
 }
 
 .comm_progressPanel {
@@ -343,7 +364,7 @@ textarea {
   margin: 0;
   border-top: 0;
   border-radius: 0 0 12px 12px;
-  background: rgba(0, 0, 0, 0.12);
+  background: transparent;
   overflow: hidden;
 }
 
@@ -351,19 +372,19 @@ textarea {
   position: relative;
   width: 100%;
   box-sizing: border-box;
-  height: 26px;
+  height: 24px;
   border-radius: 999px;
   background: #141414;
-  border: 1px solid rgb(63, 63, 63);
-  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 3px;
   overflow: hidden;
 }
 
 .comm_progressFill {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  bottom: 4px;
+  top: 3px;
+  left: 3px;
+  bottom: 3px;
   width: 0px;
   border-radius: 999px;
   transition: width 300ms ease;
@@ -376,18 +397,29 @@ textarea {
 }
 
 .comm_progressFill[data-p="100"] {
-  right: 4px;
+  right: 3px;
   width: auto !important;
+}
+
+.aiclipse-bar-card .comm_progressFill {
+  background: linear-gradient(
+    90deg,
+    #b7aa7b 0%,
+    #b7aa7b 38%,
+    #c28b63 60%,
+    #d96242 82%,
+    #e14a39 100%
+  );
 }
 
 .comm_barPercent {
   position: absolute;
-  right: 14px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.96);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
   z-index: 3;
   pointer-events: none;
@@ -396,11 +428,11 @@ textarea {
 
 .comm_barMarker {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
+  top: 3px;
+  bottom: 3px;
   width: 2px;
   transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.28);
   border-radius: 1px;
   z-index: 2;
   pointer-events: none;
@@ -408,27 +440,29 @@ textarea {
 
 .comm_zoneLabel {
   position: absolute;
-  bottom: calc(100% + 2px);
+  top: 2px;
+  bottom: auto;
   transform: translateX(-50%);
-  font-size: 7px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.8px;
-  text-transform: uppercase;
+  text-transform: none;
   pointer-events: none;
   user-select: none;
   white-space: nowrap;
+  line-height: 1;
   color: rgba(255, 255, 255, 0.25);
 }
 
 .comm_zoneLabel--active {
   font-size: 14px;
-  -webkit-text-stroke: 0.3px #000000;
+  -webkit-text-stroke: 0;
   isolation: isolate;
 }
 
-.comm_zoneLabel--safe.comm_zoneLabel--active    { color: #cfb87c; text-shadow: 0 0 2px rgba(207, 184, 124, 0.6); }
-.comm_zoneLabel--neutral.comm_zoneLabel--active { color: #ffffff; text-shadow: 0 0 2px rgba(255, 255, 255, 0.6); }
-.comm_zoneLabel--risk.comm_zoneLabel--active    { color: #f87171; text-shadow: 0 0 2px rgba(204, 34, 34, 0.6); }
+.comm_zoneLabel--safe.comm_zoneLabel--active    { color: #8f8b7e; text-shadow: none; }
+.comm_zoneLabel--neutral.comm_zoneLabel--active { color: #8f8b7e; text-shadow: none; }
+.comm_zoneLabel--risk.comm_zoneLabel--active    { color: #ff6b6b; text-shadow: 0 0 2px rgba(255, 107, 107, 0.15); }
 
 /* Reveal animation states */
 .comm_barBlock.is-hidden {
@@ -467,19 +501,16 @@ textarea {
 }
 
 .comm_barBlock.is-revealed .comm_zoneLabel--active {
-  animation: labelReveal 0.5s ease forwards;
+  animation: labelReveal 0.35s ease forwards;
   animation-delay: 2.05s;
-  font-size: 7px;
-  filter: grayscale(1);
-  opacity: 0.4;
-  text-shadow: none;
-  -webkit-text-stroke: 0;
+  font-size: 13px;
+  opacity: 0.45;
 }
 
 @keyframes revealBounce {
   0%   { transform: scale(0.95); opacity: 0.5; }
   60%  { transform: scale(1.02); }
-  100% { transform: scale(1);    opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 @keyframes barFillIn {
@@ -489,16 +520,18 @@ textarea {
 
 @keyframes labelReveal {
   from {
-    font-size: 7px;
+    font-size: 13px;
     filter: grayscale(1);
     opacity: 0.4;
     text-shadow: none;
     -webkit-text-stroke: 0;
+    color:rgba(255, 255, 255, 0.25);
   }
   to {
     font-size: 14px;
     filter: grayscale(0);
     opacity: 1;
+    text-transform: uppercase;
   }
 }
 

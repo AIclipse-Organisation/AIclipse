@@ -21,16 +21,21 @@
           <div id="detect-card" class="detection-card" aria-live="polite">
             <div class="detection-row">
               <div class="detection-main">
-                <div class="comm_barBlock is-hidden" id="aiclipse-bar-block">
+                <div class="comm_barBlock is-hidden aiclipse-bar-card" id="aiclipse-bar-block">
                   <div class="comm_barHead">
-                    <div class="comm_resultAvatar">
-                      <img src="/static/images/aiclipse_moon.png" alt="" class="comm_resultIcon" />
+                    <div class="comm_barHeadBrand" aria-hidden="true">
+                      <div class="comm_resultAvatar">
+                        <img src="/static/images/aiclipse_moon.png" alt="" class="comm_resultIcon" />
+                      </div>
+                      <span class="comm_barBrandText">AICLIPSE</span>
                     </div>
                   </div>
+
                   <div class="comm_barTrackWrap">
-                    <span class="comm_zoneLabel comm_zoneLabel--safe" style="left: 20%">REAL</span>
-                    <span class="comm_zoneLabel comm_zoneLabel--neutral" style="left: 50%">SUSPICIOUS</span>
-                    <span class="comm_zoneLabel comm_zoneLabel--risk" style="left: 80%">FAKE</span>
+                    <span class="comm_zoneLabel comm_zoneLabel--safe" style="left: 20%">Real</span>
+                    <span class="comm_zoneLabel comm_zoneLabel--neutral" style="left: 50%">Suspicious</span>
+                    <span class="comm_zoneLabel comm_zoneLabel--risk" style="left: 80%">Fake</span>
+
                     <div class="comm_progressPanel" aria-hidden="true" title="AI probability">
                       <div class="comm_progressBar">
                         <div class="comm_progressFill" id="ai-fill" data-p="0" style="width: 0px"></div>

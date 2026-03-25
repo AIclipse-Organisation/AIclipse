@@ -398,7 +398,6 @@ body.app .page-underline {
   font-weight: 800;
   -webkit-text-stroke: 0;
   isolation: isolate;
-  text-transform: uppercase;
 }
 
 .comm_zoneLabel--safe.comm_zoneLabel--active {
