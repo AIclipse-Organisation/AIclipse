@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "next/link"; // kept for profile links
 
 export default function PostHeader({
   initials,
@@ -14,9 +14,7 @@ export default function PostHeader({
   menuOpen,
   setMenuOpen,
   closeMenu,
-  onEdit,
   onOpenReport,
-  onDelete,
 }) {
   return (
     <div className="comm_topRow">
@@ -57,8 +55,12 @@ export default function PostHeader({
           {menuOpen && (
             <div className="comm_menuPanel" role="menu">
               {isOwner && (
-                <button type="button" className="comm_menuItem" onClick={onEdit}>
-                  ✏️ Edit description
+                <button
+                  type="button"
+                  className="comm_menuItem"
+                  onClick={() => { closeMenu(); window.location.href = "/viewscan"; }}
+                >
+                  View Scan
                 </button>
               )}
               <button
@@ -67,17 +69,8 @@ export default function PostHeader({
                 onClick={onOpenReport}
                 disabled={isReported}
               >
-                🚩 {isReported ? "Reported" : "Report"}
+                {isReported ? "Reported" : "Report"}
               </button>
-              {isOwner && (
-                <button
-                  type="button"
-                  className="comm_menuItem comm_menuItemDanger"
-                  onClick={onDelete}
-                >
-                  🗑️ Delete
-                </button>
-              )}
             </div>
           )}
         </div>

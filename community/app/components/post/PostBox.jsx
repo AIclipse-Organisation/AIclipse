@@ -231,30 +231,13 @@ export default function PostBox({
   function clamp01(n) {
     return Math.max(0, Math.min(1, Number(n) || 0));
   }
-  function isAiLabel(lbl) {
-    return (
-      lbl.includes("ai") || lbl.includes("fake") || lbl.includes("deepfake")
-    );
-  }
-  function isRealLabel(lbl) {
-    return lbl.includes("real") && !isAiLabel(lbl);
-  }
   function computeRealPctFromModel(img) {
-    const rawLabel = String(
-      img?.result?.label ??
-        img?.label ??
-        img?.result?.verdict ??
-        img?.verdict ??
-        "Unknown",
-    ).toLowerCase();
-    const conf = clamp01(
-      img?.result?.confidence ??
-        img?.confidence ??
-        img?.result?.score ??
-        img?.score ??
-        0,
-    );
-    const realProb = isRealLabel(rawLabel) ? conf : 1 - conf;
+    const verdict = String(img?.result?.verdict ?? img?.verdict ?? "fake").toLowerCase();
+    const conf = clamp01(img?.result?.confidence ?? img?.confidence ?? 0);
+
+    // If verdict is "real", confidence represents real probability
+    // If verdict is "fake", confidence represents fake probability, so real = 1 - confidence
+    const realProb = verdict === "real" ? conf : 1 - conf;
     return Math.max(0, Math.min(100, realProb * 100));
   }
 
@@ -278,7 +261,7 @@ export default function PostBox({
 
 
 
-    if (!image) {
+  if (!image) {
     console.error("❌ PostMedia received an empty URL for label:", label);
   }
 
@@ -328,11 +311,12 @@ export default function PostBox({
         userHasVoted={userHasVoted}
         analysisBucket={analysisBucket}
         analysisAiPct={100 - analysisRealPct}
-        communityBucket={communityBucket}
         communityAiPct={
           communityRealPct !== null ? 100 - communityRealPct : null
         }
         setWidthStyle={setWidthStyle}
+        upCount={up}
+        downCount={down}
       />
 
       <PostControls
