@@ -766,8 +766,8 @@ function renderVotesCard(img) {
   const upVotes = img.up_vote_count !== undefined ? img.up_vote_count : 0;
   const downVotes = img.down_vote_count !== undefined ? img.down_vote_count : 0;
 
-  if (upvotesEl) upvotesEl.textContent = String(upVotes);
-  if (downvotesEl) downvotesEl.textContent = String(downVotes);
+  if (upvotesEl) upvotesEl.textContent = String("(" + upVotes + ")");
+  if (downvotesEl) downvotesEl.textContent = String("(" + downVotes + ")");
 
   privatePlaceholder.hidden = true;
   card.hidden = false;
