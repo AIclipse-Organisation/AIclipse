@@ -303,6 +303,8 @@ body.app .page-underline {
   position: relative;
   padding-top: 26px;
   background: rgba(0, 0, 0, .12);
+  border-bottom-right-radius:10px;
+  border-bottom-left-radius:10px;
 }
 
 .comm_progressPanel {
