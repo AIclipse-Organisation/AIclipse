@@ -48,7 +48,7 @@ class Settings:
             detection_token_secret=os.getenv("DETECTION_TOKEN_SECRET"),
             internal_auth_token=os.getenv("INTERNAL_AUTH_TOKEN"),
             model_cycle_uri = os.getenv("MOEDEL_CYCLE_URI"),
-            max_file_size=5 * 1024 * 1024,
+            max_file_size=20 * 1024 * 1024,
             max_width=12000,
             max_height=12000,
             max_pixels=40_000_000,
