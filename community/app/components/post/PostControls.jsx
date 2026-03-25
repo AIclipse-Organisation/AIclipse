@@ -16,13 +16,13 @@ export default function PostControls({
       <div className="comm_actionsLeft">
         <button ref={voteUpRef} type="button" onClick={onVoteUp} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteUp">
           <img className="comm_icon" src="/static/images/upvote.png" alt="" />
-          <span className="comm_actionText">REAL</span>
-          {userHasVoted && <span className="comm_actionCount">{upCount}</span>}
+          <span className="comm_actionText">Real</span>
+          {userHasVoted && <span className="comm_actionCount">({upCount})</span>}
         </button>
         <button ref={voteDownRef} type="button" onClick={onVoteDown} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteDown">
           <img className="comm_icon" src="/static/images/downvote.png" alt="" />
-          <span className="comm_actionText">FAKE</span>
-          {userHasVoted && <span className="comm_actionCount">{downCount}</span>}
+          <span className="comm_actionText">Fake</span>
+          {userHasVoted && <span className="comm_actionCount">({downCount})</span>}
         </button>
       </div>
       <div className="comm_actionsRight">

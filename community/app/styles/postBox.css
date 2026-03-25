@@ -364,16 +364,16 @@
 }
 
 .comm_actionText {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   opacity: 0.92;
   white-space: nowrap;
 }
 
 .comm_actionCount {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
-  opacity: 0.55;
+  opacity: 0.35;
   letter-spacing: 0.02em;
 }
 
