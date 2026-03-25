@@ -51,19 +51,28 @@ export default function PostResults({
 
         {/* AICLIPSE BAR */}
         <div className={`comm_barBlock is-${analysisBucket.type}`}>
-          <span className="comm_barSourceLabel">AIclipse</span>
           <div className="comm_barHead">
-            <div className="comm_resultAvatar">
-              <img src="/static/images/aiclipse_moon.png" alt="" className="comm_resultIcon" />
+            <div className="comm_barSourceLabel">
+              <div className="comm_resultAvatar">
+                <img src="/static/images/aiclipse_moon.png" alt="" className="comm_resultIcon" />
+              </div>
+              <span>AIclipse</span>
             </div>
           </div>
+
           <div className="comm_barTrackWrap">
-            {zoneLabel("safe",    analysisActive, "20%", "REAL")}
-            {zoneLabel("neutral", analysisActive, "50%", "SUSPICIOUS")}
-            {zoneLabel("risk",    analysisActive, "80%", "FAKE")}
+            {zoneLabel("safe", analysisActive, "20%", "Real")}
+            {zoneLabel("neutral", analysisActive, "50%", "Suspicious")}
+            {zoneLabel("risk", analysisActive, "80%", "Fake")}
             <div className="comm_progressPanel">
               <div className="comm_progressBar">
-                <div className="comm_progressFill" style={{ width: setWidthStyle(analysisAiPct), ...fillStyle(analysisAiPct, GRADIENT_AICLIPSE) }} />
+                <div
+                  className="comm_progressFill"
+                  style={{
+                    width: setWidthStyle(analysisAiPct),
+                    ...fillStyle(analysisAiPct, GRADIENT_AICLIPSE),
+                  }}
+                />
                 <div className="comm_barMarker" style={{ left: "40%" }} />
                 <div className="comm_barMarker" style={{ left: "60%" }} />
                 <div className="comm_barPercent">{Math.round(analysisAiPct)}%</div>
@@ -74,21 +83,30 @@ export default function PostResults({
 
         {/* COMMUNITY BAR */}
         <div className="comm_barBlock comm_communityBar">
-          <span className="comm_barSourceLabel">Community</span>
           <div className="comm_barHead">
-            <div className="comm_resultAvatar_icon">
-              <svg className="comm_resultIcon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-              </svg>
+            <div className="comm_barSourceLabel">
+              <div className="comm_resultAvatar_icon">
+                <svg className="comm_resultIcon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+              </div>
+              <span>Community</span>
             </div>
           </div>
+
           <div className="comm_barTrackWrap">
-            {zoneLabel("safe",    communityActive, "20%", "REAL")}
-            {zoneLabel("neutral", communityActive, "50%", "SUSPICIOUS")}
-            {zoneLabel("risk",    communityActive, "80%", "FAKE")}
+            {zoneLabel("safe", communityActive, "20%", "Real")}
+            {zoneLabel("neutral", communityActive, "50%", "Suspicious")}
+            {zoneLabel("risk", communityActive, "80%", "Fake")}
             <div className="comm_progressPanel">
               <div className="comm_progressBar">
-                <div className="comm_progressFill" style={{ width: setWidthStyle(communityAiPct || 0), ...fillStyle(communityAiPct || 0, GRADIENT_COMMUNITY) }} />
+                <div
+                  className="comm_progressFill"
+                  style={{
+                    width: setWidthStyle(communityAiPct || 0),
+                    ...fillStyle(communityAiPct || 0, GRADIENT_COMMUNITY),
+                  }}
+                />
                 <div className="comm_barMarker" style={{ left: "40%" }} />
                 <div className="comm_barMarker" style={{ left: "60%" }} />
                 <div className="comm_barPercent">

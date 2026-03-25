@@ -648,7 +648,7 @@
 }
 
 .comm_bars.is-hidden .comm_progressBar {
-  background: #141414 !important;
+  background: rgba(0, 0, 0, 0.12) !important;
 }
 
 .comm_bars.is-hidden .comm_barVerdict,
@@ -659,7 +659,7 @@
 }
 
 .comm_bars.is-hidden .comm_zoneLabel {
-  font-size: 7px !important;
+  font-size: 10px !important;
   color: rgba(255, 255, 255, 0.35) !important;
   text-shadow: none !important;
   -webkit-text-stroke: 0 !important;
@@ -685,8 +685,7 @@
 .comm_bars.is-revealed .comm_zoneLabel--active {
   animation: labelReveal 0.5s ease forwards;
   animation-delay: 2.05s;
-  /* hold grey small state until animation runs */
-  font-size: 7px;
+  font-size: 12px;
   filter: grayscale(1);
   opacity: 0.4;
   text-shadow: none;
@@ -701,16 +700,17 @@
 
 @keyframes labelReveal {
   from {
-    font-size: 7px;
+    font-size: 12px;
     filter: grayscale(1);
     opacity: 0.4;
     text-shadow: none;
     -webkit-text-stroke: 0;
   }
   to {
-    font-size: 14px;
+    font-size: 12px;
     filter: grayscale(0);
     opacity: 1;
+    text-transform: uppercase;
   }
 }
 
@@ -722,40 +722,35 @@
 .comm_barHead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
 
-  padding: 12px 14px 8px;
+  padding: 8px 14px 6px;
   margin: 0;
 
   border-bottom: 0;
   border-radius: 12px 12px 0 0;
   background: rgba(0, 0, 0, 0.12);
+
+  min-height: 28px;
 }
 
-.comm_resultAvatar {
-  flex-shrink: 0;
-  justify-content: center;
-  align-items: center;
-  width: 2.5vh;
-  height: 2vh;
-  display: flex;
-}
-
-.comm_resultAvatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
+.comm_resultAvatar,
 .comm_resultAvatar_icon {
   flex-shrink: 0;
   justify-content: center;
   align-items: center;
-  width: 2.5vh;
-  height: 2vh;
+  width: 16px;
+  height: 16px;
   display: flex;
-  color: rgba(175, 131, 201, .95);
+}
+
+.comm_resultAvatar img,
+.comm_resultAvatar_icon .comm_resultIcon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .comm_barTitle {
@@ -778,20 +773,29 @@
 }
 
 .comm_barSourceLabel {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%) translateY(-50%);
-  font-size: 10px;
-  font-weight: 600;
+  position: static;
+  transform: none;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  font-size: 15px;
+  font-weight: 700;
   letter-spacing: 0.9px;
   text-transform: uppercase;
   white-space: nowrap;
   line-height: 1;
-  background: #222222;
-  padding: 0 4px;
+
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+
   pointer-events: none;
+  z-index: 5;
 }
+
 
 .comm_progressPanel {
   width: 100%;
@@ -814,7 +818,7 @@
   height: 26px;
   border-radius: 999px;
 
-  background: #141414;
+  background: rgba(0, 0, 0, 0.12);
   border: 1px solid rgb(63, 63, 63);
 
   padding: 4px;
@@ -896,17 +900,23 @@
 /* Wrapper that holds zone labels + progress panel */
 .comm_barTrackWrap {
   position: relative;
+  padding-top: 25px;
+  background: rgba(0, 0, 0, 0.12);
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
 }
 
 /* Zone labels — float above the bar without taking space */
 .comm_zoneLabel {
   position: absolute;
-  bottom: calc(100% + 2px);
+  top: 0;
+  bottom: auto;
   transform: translateX(-50%);
-  font-size: 7px;
-  font-weight: 700;
+
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.8px;
-  text-transform: uppercase;
+  text-transform: none;
   color: rgba(255, 255, 255, 0.35);
   pointer-events: none;
   user-select: none;
@@ -922,8 +932,12 @@
 .comm_zoneLabel--risk.comm_zoneLabel--active    { color: #f87171; }
 .comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active { color: #af83c9; }
 
-.comm_zoneLabel--active { font-size: 14px; -webkit-text-stroke: 0.3px #000000; isolation: isolate; }
-
+.comm_zoneLabel--active {
+  font-size: 12px;
+  font-weight: 800;
+  -webkit-text-stroke: 0;
+  isolation: isolate;
+}
 .comm_zoneLabel--safe.comm_zoneLabel--active    { text-shadow: 0 0 2px rgba(207, 184, 124, 0.6); }
 .comm_zoneLabel--neutral.comm_zoneLabel--active { text-shadow: 0 0 2px rgba(255, 255, 255, 0.6); }
 .comm_zoneLabel--risk.comm_zoneLabel--active    { text-shadow: 0 0 2px rgba(204, 34, 34, 0.6); }
