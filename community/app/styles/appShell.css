@@ -331,7 +331,8 @@ body::-webkit-scrollbar {
 }
 
 .drawer-links a,
-.drawer-links .logout-button {
+.drawer-links .logout-button,
+.drawer-links .tutorial-button {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -348,7 +349,8 @@ body::-webkit-scrollbar {
 }
 
 .drawer-links a:hover,
-.drawer-links .logout-button:hover {
+.drawer-links .logout-button:hover,
+.drawer-links .tutorial-button:hover {
   background: #2c2c2c;
   color: #CFB87C;
 }
@@ -369,8 +371,11 @@ body::-webkit-scrollbar {
   stroke: currentColor;
 }
 
-.admin-link {
+.logout-button {
   color: #ff4444 !important;
+}
+.admin-link {
+  color: #51b344 !important;
 }
 
 .drawer-separator {

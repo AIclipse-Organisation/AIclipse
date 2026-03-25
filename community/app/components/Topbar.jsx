@@ -197,7 +197,7 @@ export default function Topbar({ isAdmin, showBack }) {
           <div className="drawer-separator"></div>
 
           <button
-            className="logout-button"
+            className="tutorial-button"
             type="button"
             onClick={() => {
               closeMenu();

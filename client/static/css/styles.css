@@ -415,6 +415,11 @@ body.app main {
   cursor: pointer;
 }
 
+.logout-button {
+  color: #ff4444 !important;
+  font-weight: bold;
+}
+
 .drawer-links a:hover,
 .drawer-links .logout-button:hover {
   background: #2c2c2c;
@@ -443,12 +448,12 @@ body.app main {
 }
 
 .admin-link {
-  color: #ff4444 !important;
+  color: #51b344 !important;
   font-weight: bold;
 }
 
 .drawer-links .admin-link:hover {
-  color: #ff6b6b !important;
+  color: #51b344 !important;
 }
 
 .drawer-separator {
