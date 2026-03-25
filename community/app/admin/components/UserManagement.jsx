@@ -19,6 +19,16 @@ import {
 } from "@heroui/react";
 import { adminService } from "../admin";
 
+const FOUND_US_LABELS = {
+    social_media: "Social Media",
+    browsing: "Browsing",
+    friend_or_colleague: "Friend / Colleague",
+    news_article: "News Article",
+    youtube: "YouTube",
+    linkedin: "LinkedIn",
+    other: "Other",
+};
+
 const DELETE_REASON_OPTIONS = [
     { key: "test_purpose", label: "Deleting for test purposes" },
     { key: "user_request", label: "User requested deletion" },
@@ -66,6 +76,22 @@ const PASSWORD_CHARS = `${LOWERCASE_CHARS}${UPPERCASE_CHARS}${NUMBER_CHARS}${SYM
 function formatDate(value) {
     if (!value) return "-";
     return new Date(value).toLocaleString();
+}
+
+function getSelectedKey(selection, fallback) {
+    if (selection == null) return fallback;
+    if (typeof selection === "string") return selection;
+
+    if (typeof selection === "object" && "currentKey" in selection && selection.currentKey != null) {
+        return String(selection.currentKey);
+    }
+
+    if (selection[Symbol.iterator]) {
+        const first = Array.from(selection)[0];
+        if (first != null) return String(first);
+    }
+
+    return fallback;
 }
 
 function secureRandomInt(maxExclusive) {
@@ -212,6 +238,7 @@ export default function UserManagement() {
     const [total, setTotal] = useState(0);
     const [search, setSearch] = useState("");
     const [sort, setSort] = useState("created_at_desc");
+    const [accessStatusFilter, setAccessStatusFilter] = useState("all");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [createError, setCreateError] = useState("");
@@ -235,6 +262,12 @@ export default function UserManagement() {
     const [logPage, setLogPage] = useState(1);
     const [logsHasMore, setLogsHasMore] = useState(false);
     const [activeTab, setActiveTab] = useState("users");
+    const [accessRequests, setAccessRequests] = useState([]);
+    const [accessTotal, setAccessTotal] = useState(0);
+    const [accessPage, setAccessPage] = useState(1);
+    const [accessLoading, setAccessLoading] = useState(false);
+    const [accessError, setAccessError] = useState("");
+    const [accessActionBusyUserId, setAccessActionBusyUserId] = useState("");
 
     const sortParams = useMemo(() => {
         const parts = sort.split("_");
@@ -252,16 +285,30 @@ export default function UserManagement() {
     useEffect(() => {
         const timer = setTimeout(() => loadUsers(1), 250);
         return () => clearTimeout(timer);
-    }, [search, sort]);
+    }, [search, sort, accessStatusFilter]);
 
     async function loadUsers(nextPage = 1) {
         setLoading(true);
         setError("");
         try {
+            const isAdminFilter =
+                accessStatusFilter === "admin"
+                    ? true
+                    : accessStatusFilter === "approved"
+                        ? false
+                        : undefined;
+
+            const accessStatusParam =
+                accessStatusFilter === "approved" || accessStatusFilter === "pending" || accessStatusFilter === "rejected"
+                    ? accessStatusFilter
+                    : undefined;
+
             const params = {
                 page: nextPage,
                 page_size: pageSize,
                 search: search || undefined,
+                is_admin: isAdminFilter,
+                access_status: accessStatusParam,
                 sort: sortParams.sort,
                 order: sortParams.order,
             };
@@ -292,7 +339,37 @@ export default function UserManagement() {
         }
     }
 
+    async function loadAccessRequests(nextPage = 1) {
+        setAccessLoading(true);
+        setAccessError("");
+        try {
+            const data = await adminService.getAccessRequests({
+                page: nextPage,
+                page_size: pageSize,
+                search: search || undefined,
+            });
+            setAccessRequests(data?.items || []);
+            setAccessTotal(data?.total || 0);
+            setAccessPage(nextPage);
+        } catch (err) {
+            setAccessError(err?.message || "Failed to load access requests");
+        } finally {
+            setAccessLoading(false);
+        }
+    }
+
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const accessTotalPages = Math.max(1, Math.ceil(accessTotal / pageSize));
+    const userFoundUsCounts = useMemo(
+        () => Object.entries(
+            users.reduce((acc, u) => {
+                const key = u.how_did_you_find_us || "other";
+                acc[key] = (acc[key] || 0) + 1;
+                return acc;
+            }, {})
+        ).sort((a, b) => b[1] - a[1]),
+        [users]
+    );
     const passwordChecks = useMemo(() => checkPasswordStrength(manualForm.password || ""), [manualForm.password]);
     const hasTypedPassword = Boolean((manualForm.password || "").length);
     const isManualPasswordValid = Object.values(passwordChecks).every(Boolean);
@@ -411,9 +488,14 @@ export default function UserManagement() {
                 <Chip
                     size="sm"
                     variant="flat"
-                    className={user.is_admin
-                        ? "bg-[#CFB87C]/20 border border-[#CFB87C]/30 text-[#CFB87C] font-semibold"
-                        : "bg-white/10 border border-white/20 text-white font-semibold"
+                    className={
+                        user.access_status === "rejected"
+                            ? "bg-red-500/20 border border-red-500/40 text-red-400 font-semibold"
+                            : user.access_status === "pending"
+                                ? "bg-blue-500/20 border border-blue-500/40 text-blue-300 font-semibold"
+                            : user.is_admin
+                                ? "bg-[#CFB87C]/20 border border-[#CFB87C]/30 text-[#CFB87C] font-semibold"
+                                : "bg-white/10 border border-white/20 text-white font-semibold"
                     }
                 >
                     {user.is_admin ? "Admin" : "User"}
@@ -438,6 +520,30 @@ export default function UserManagement() {
             </div>
         </div>
     ));
+
+    async function handleApproveAccessRequest(userId) {
+        setAccessActionBusyUserId(userId);
+        try {
+            await adminService.approveAccessRequest(userId);
+            await Promise.all([loadAccessRequests(accessPage), loadUsers(page)]);
+        } catch (err) {
+            setAccessError(err?.message || "Failed to approve access request");
+        } finally {
+            setAccessActionBusyUserId("");
+        }
+    }
+
+    async function handleRejectAccessRequest(userId) {
+        setAccessActionBusyUserId(userId);
+        try {
+            await adminService.rejectAccessRequest(userId);
+            await Promise.all([loadAccessRequests(accessPage), loadUsers(page)]);
+        } catch (err) {
+            setAccessError(err?.message || "Failed to reject access request");
+        } finally {
+            setAccessActionBusyUserId("");
+        }
+    }
 
     return (
         <div className="flex flex-col gap-6 h-full overflow-y-scroll px-4 md:px-8 pb-10 bg-[#0f0f0f] text-white [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -470,6 +576,21 @@ export default function UserManagement() {
                         >
                             Deleted Users
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearch("");
+                                setActiveTab("access-requests");
+                                loadAccessRequests(1);
+                            }}
+                            className={`h-9 px-4 rounded-xl font-black uppercase tracking-wide text-xs transition-all ${
+                                activeTab === "access-requests"
+                                    ? "bg-[#CFB87C] text-[#111]"
+                                    : "text-white/70 hover:text-white"
+                            }`}
+                        >
+                            Access Requests
+                        </button>
                     </div>
                 </div>
 
@@ -485,16 +606,15 @@ export default function UserManagement() {
                             color="default"
                             classNames={{
                                 inputWrapper: "h-9 min-h-9 bg-[#0b0b0b] border border-white/20 shadow-sm data-[hover=true]:border-white/30 group-data-[focus=true]:border-[#CFB87C] group-data-[focus=true]:shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:outline-none group-data-[focus=true]:ring-0 group-data-[focus=true]:outline-none",
-                                input: "text-white placeholder:text-white/45",
+                                input: "text-white placeholder:text-white/45 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0",
                             }}
                         />
                         <Select
                             size="sm"
                             className="w-[180px]"
                             selectedKeys={new Set([sort])}
-                            onSelectionChange={(keys) => {
-                                const val = Array.from(keys)?.[0] || "created_at_desc";
-                                setSort(val);
+                            onSelectionChange={(selection) => {
+                                setSort(getSelectedKey(selection, "created_at_desc"));
                             }}
                             aria-label="Sort users"
                             variant="flat"
@@ -519,6 +639,39 @@ export default function UserManagement() {
                             </SelectItem>
                         </Select>
 
+                        <Select
+                            size="sm"
+                            className="w-[180px]"
+                            selectedKeys={new Set([accessStatusFilter])}
+                            onSelectionChange={(selection) => {
+                                setAccessStatusFilter(getSelectedKey(selection, "all"));
+                            }}
+                            aria-label="Filter by access status"
+                            variant="flat"
+                            classNames={SELECT_DROPDOWN_CLASSES}
+                            listboxProps={{
+                                itemClasses: {
+                                    base: "text-white data-[hover=true]:bg-white/10 data-[selectable=true]:focus:bg-white/10 data-[selected=true]:bg-[#CFB87C]/20",
+                                },
+                            }}
+                        >
+                            <SelectItem key="all">
+                                All statuses
+                            </SelectItem>
+                            <SelectItem key="approved">
+                                Approved
+                            </SelectItem>
+                            <SelectItem key="pending">
+                                Pending
+                            </SelectItem>
+                            <SelectItem key="rejected">
+                                Rejected
+                            </SelectItem>
+                            <SelectItem key="admin">
+                                Admin
+                            </SelectItem>
+                        </Select>
+
                         <Button
                             size="sm"
                             className={GOLD_BUTTON_SM}
@@ -534,9 +687,19 @@ export default function UserManagement() {
             </div>
 
             {error && <div className="text-sm text-red-400">{error}</div>}
+            {accessError && activeTab === "access-requests" && <div className="text-sm text-red-400">{accessError}</div>}
 
             {activeTab === "users" && (
                 <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
+                    {userFoundUsCounts.length > 0 && (
+                        <div className="flex flex-wrap gap-2 px-4 pt-4">
+                            {userFoundUsCounts.map(([key, count]) => (
+                                <span key={key} className="text-xs px-3 py-1 rounded-full bg-white/10 border border-white/15 text-white/70 font-semibold">
+                                    {FOUND_US_LABELS[key] ?? key} · <span className="text-white">{count}</span>
+                                </span>
+                            ))}
+                        </div>
+                    )}
                     <CardBody className="p-0">
                         <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
                             <div className="col-span-5">User</div>
@@ -622,6 +785,73 @@ export default function UserManagement() {
                                 Previous
                             </Button>
                             <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={loadingLogs || !logsHasMore} onPress={() => loadLogs(logPage + 1)}>
+                                Next
+                            </Button>
+                        </div>
+                    </div>
+                </Card>
+            )}
+
+            {activeTab === "access-requests" && (
+                <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
+                    <CardBody className="p-0">
+                        <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
+                            <div className="col-span-4">Applicant</div>
+                            <div className="col-span-3">Found Us Via</div>
+                            <div className="col-span-3">Requested At</div>
+                            <div className="col-span-2 text-right">Actions</div>
+                        </div>
+
+                        {accessLoading ? (
+                            <div className="flex items-center justify-center py-10">
+                                <Spinner size="sm" color="warning" />
+                            </div>
+                        ) : accessRequests.length === 0 ? (
+                            <div className="p-4 text-sm text-white/60">No pending access requests.</div>
+                        ) : (
+                            <div className="divide-y divide-white/5">
+                                {accessRequests.map((user) => {
+                                    const isBusy = accessActionBusyUserId === user.user_id;
+                                    return (
+                                        <div key={user.user_id} className="grid grid-cols-12 gap-4 p-3 items-center hover:bg-white/5 transition-colors">
+                                            <div className="col-span-4">
+                                                <div className="text-sm font-semibold text-white leading-tight">{user.user_name}</div>
+                                                <div className="text-xs text-white/60 leading-tight">{user.email}</div>
+                                            </div>
+                                            <div className="col-span-3 text-sm text-white/70">{FOUND_US_LABELS[user.how_did_you_find_us] ?? user.how_did_you_find_us ?? "-"}</div>
+                                            <div className="col-span-3 text-sm text-white/70">{formatDate(user.created_at)}</div>
+                                            <div className="col-span-2 flex justify-end gap-2">
+                                                <button
+                                                    className={GOLD_BUTTON_SM}
+                                                    disabled={isBusy}
+                                                    onClick={() => handleApproveAccessRequest(user.user_id)}
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    className={GOLD_BUTTON_SM}
+                                                    disabled={isBusy}
+                                                    onClick={() => handleRejectAccessRequest(user.user_id)}
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </CardBody>
+
+                    <div className="p-4 border-t border-white/10 flex items-center justify-between text-sm text-white/70">
+                        <span>
+                            Page {accessPage} of {accessTotalPages} · {accessTotal} requests
+                        </span>
+                        <div className="flex gap-2">
+                            <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={accessPage === 1 || accessLoading} onPress={() => loadAccessRequests(accessPage - 1)}>
+                                Previous
+                            </Button>
+                            <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={accessPage >= accessTotalPages || accessLoading} onPress={() => loadAccessRequests(accessPage + 1)}>
                                 Next
                             </Button>
                         </div>
@@ -851,9 +1081,8 @@ export default function UserManagement() {
                                     <label className="block text-xs font-black uppercase tracking-wide text-white/50 mb-2">Reason</label>
                                     <Select
                                         selectedKeys={new Set([deleteReason])}
-                                        onSelectionChange={(keys) => {
-                                            const val = Array.from(keys)?.[0] || "test_purpose";
-                                            setDeleteReason(val);
+                                        onSelectionChange={(selection) => {
+                                            setDeleteReason(getSelectedKey(selection, "test_purpose"));
                                         }}
                                         variant="bordered"
                                         classNames={SELECT_DROPDOWN_CLASSES}
