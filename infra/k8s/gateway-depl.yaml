@@ -24,8 +24,6 @@ spec:
               value: "http://media-srv:3000"
             - name: JOBS_URI
               value: "http://jobs-srv:3000"
-            - name: PLANS_URI
-              value: "http://plans-srv:3000"
             - name: BILLING_URI
               value: "http://billing-srv:3000"
             - name: DETECTOR_URI

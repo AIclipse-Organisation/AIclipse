@@ -18,7 +18,7 @@ jobs:
     env:
       ORG: ${{ secrets.GHCR_USERNAME }}
       NS: default
-      IMAGES: "auth gateway media detector billing client community model-cycle"
+      IMAGES: "auth email-worker gateway media detector billing client community model-cycle"
       KUBE_DNS_IP: 10.43.0.10
       DOMAINS: "aiclipse.online aiclipse.site"
 
@@ -251,6 +251,10 @@ jobs:
           STRIPE_PUBLISHABLE_KEY:     ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
           STRIPE_WEBHOOK_SECRET:      ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           CLIENT_URL:                 ${{ secrets.CLIENT_URL }}
+          GMAIL_CLIENT_ID:            ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET:        ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN:        ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_SENDER_EMAIL:         ${{ secrets.GMAIL_SENDER_EMAIL }}
 
         run: |
           set -euo pipefail
@@ -292,6 +296,13 @@ jobs:
             --from-literal=FLASK_SECRET_KEY="$FLASK_SECRET_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
 
+          kubectl -n "$NS" create secret generic email-sec \
+            --from-literal=GMAIL_CLIENT_ID="$GMAIL_CLIENT_ID" \
+            --from-literal=GMAIL_CLIENT_SECRET="$GMAIL_CLIENT_SECRET" \
+            --from-literal=GMAIL_REFRESH_TOKEN="$GMAIL_REFRESH_TOKEN" \
+            --from-literal=GMAIL_SENDER_EMAIL="$GMAIL_SENDER_EMAIL" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
           kubectl -n "$NS" create configmap app-configmap \
             --from-literal=CONFIG_URL="$CONFIG_URL" \
             --from-literal=CLIENT_URL="$CLIENT_URL" \
@@ -330,6 +341,7 @@ jobs:
           set -euo pipefail
 
           kubectl -n "$NS" apply -f infra/k8s/auth-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/email-worker-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/gateway-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/media-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/detector-depl.yaml
@@ -339,6 +351,7 @@ jobs:
           kubectl -n "$NS" apply -f infra/k8s/comments-flush-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/click-flush-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/community-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/user-delete-worker-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/model-cycle-pvc.yaml
           kubectl -n "$NS" apply -f infra/k8s/model-cycle-depl.yaml
 
@@ -357,17 +370,19 @@ jobs:
           done < digests.env
 
           community_digest="$(awk -F= '$1=="community"{print $2}' digests.env)"
-          kubectl -n "$NS" set image deploy/vote-flush-depl     worker="ghcr.io/${ORG}/community@${community_digest}"
-          kubectl -n "$NS" set image deploy/comments-flush-depl worker="ghcr.io/${ORG}/community@${community_digest}"
-          kubectl -n "$NS" set image deploy/click-flush-depl    worker="ghcr.io/${ORG}/community@${community_digest}"
+          kubectl -n "$NS" set image deploy/vote-flush-depl              worker="ghcr.io/${ORG}/community@${community_digest}"
+          kubectl -n "$NS" set image deploy/comments-flush-depl        worker="ghcr.io/${ORG}/community@${community_digest}"
+          kubectl -n "$NS" set image deploy/click-flush-depl           worker="ghcr.io/${ORG}/community@${community_digest}"
+          kubectl -n "$NS" set image deploy/user-delete-worker-depl    worker="ghcr.io/${ORG}/community@${community_digest}"
 
       - name: Wait app rollouts
         run: |
           set -euo pipefail
 
-          kubectl -n "$NS" rollout status deploy/vote-flush-depl     --timeout=300s
-          kubectl -n "$NS" rollout status deploy/comments-flush-depl --timeout=300s
-          kubectl -n "$NS" rollout status deploy/click-flush-depl    --timeout=300s
+          kubectl -n "$NS" rollout status deploy/vote-flush-depl           --timeout=300s
+          kubectl -n "$NS" rollout status deploy/comments-flush-depl   --timeout=300s
+          kubectl -n "$NS" rollout status deploy/click-flush-depl      --timeout=300s
+          kubectl -n "$NS" rollout status deploy/user-delete-worker-depl --timeout=300s
 
           for name in $IMAGES; do
             kubectl -n "$NS" rollout status "deploy/${name}-depl" --timeout=300s
@@ -381,7 +396,7 @@ jobs:
           for name in $IMAGES; do
             DEPLOYS+=("${name}-depl")
           done
-          DEPLOYS+=(vote-flush-depl comments-flush-depl click-flush-depl)
+          DEPLOYS+=(vote-flush-depl comments-flush-depl click-flush-depl user-delete-worker-depl)
 
           for d in "${DEPLOYS[@]}"; do
             if ! kubectl -n "$NS" get deploy "$d" >/dev/null 2>&1; then
