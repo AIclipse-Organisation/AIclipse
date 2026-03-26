@@ -130,7 +130,15 @@ function formatDate(dt) {
   if (!dt) return "N/A";
   const d = new Date(dt);
   if (Number.isNaN(d.getTime())) return "N/A";
-  return d.toLocaleString();
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
 
 function visibilityOf(img) {

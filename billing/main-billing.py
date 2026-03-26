@@ -2,6 +2,7 @@ import logging
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import stripe
 from fastapi import FastAPI, HTTPException, Request
@@ -38,7 +39,6 @@ logger.info("MONGO_DB=%s", MONGO_DB)
 
 
 # Collections
-usage = None
 users_coll = None
 plan_coll = None
 billing_coll = None
@@ -71,8 +71,24 @@ def _resolve_users_collection(db):
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
+
+def _to_utc_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc)
+    except Exception:
+        return None
+
+
 def _month_end_from(start: datetime) -> datetime:
     return start + timedelta(days=30)
+
+
+def _iso_or_none(value: datetime | None) -> str | None:
+    return value.isoformat() if isinstance(value, datetime) else None
 
 def _cents_to_eur_str(cents: int) -> str:
     try:
@@ -91,7 +107,6 @@ try:
     client.admin.command("ping")
     db = client[MONGO_DB]
 
-    usage = db.usage
     users_coll = _resolve_users_collection(db)
     plan_coll = db.plan
     billing_coll = db.billing
@@ -100,7 +115,6 @@ try:
 
 except Exception as e:
     logger.exception("Mongo connection failed: %s", e)
-    usage = None
     users_coll = None
     plan_coll = None
     billing_coll = None
@@ -113,8 +127,10 @@ class CheckoutRequest(BaseModel):
     plan_id: int
     email: str
 
-class PortalRequest(BaseModel):
-    customer_id: str
+
+class CancelSubscriptionRequest(BaseModel):
+    user_id: str
+    reason: str
 
 
 class RequestLogSanitizer:
@@ -183,24 +199,43 @@ def healthz():
 def get_config():
     return {"publishable_key": STRIPE_PUBLISHABLE_KEY}
 
-# -------------------------
-# USAGE (optional)
-# -------------------------
-@app.post("/usage")
-def record_usage(payload: dict):
-    if not payload:
-        return {"ok": False}
 
-    data = dict(payload)
-    data["timestamp"] = datetime.utcnow()
+@app.get("/subscription/status")
+def get_subscription_status(user_id: str):
+    if users_coll is None or billing_coll is None:
+        raise HTTPException(status_code=503, detail="Database not available")
 
-    if usage is not None:
-        try:
-            usage.insert_one(data)
-        except Exception as e:
-            logger.warning("usage.insert_one failed: %s", e)
+    safe_user_id = RequestLogSanitizer.user_id(user_id)
+    if not safe_user_id:
+        raise HTTPException(status_code=400, detail="Invalid user_id")
 
-    return {"ok": True}
+    user_doc = users_coll.find_one({"user_id": safe_user_id}) or {}
+    current_plan = int(user_doc.get("plan", 0) or 0)
+
+    latest_bill = billing_coll.find_one(
+        {
+            "user_id": safe_user_id,
+            "status": {"$in": ["active", "cancel_scheduled", "canceled"]},
+        },
+        sort=[("timestamp", -1), ("billing_period_end", -1)],
+    )
+
+    if not latest_bill:
+        return {
+            "user_id": safe_user_id,
+            "plan": current_plan,
+            "status": "none",
+            "cancel_at_period_end": False,
+            "billing_period_end": None,
+        }
+
+    return {
+        "user_id": safe_user_id,
+        "plan": current_plan,
+        "status": latest_bill.get("status", "none"),
+        "cancel_at_period_end": bool(latest_bill.get("cancel_at_period_end", False)),
+        "billing_period_end": _iso_or_none(latest_bill.get("billing_period_end")),
+    }
 
 # -------------------------
 # CHECKOUT
@@ -220,7 +255,7 @@ async def create_checkout_session(request: CheckoutRequest):
         raise HTTPException(status_code=503, detail="Database not available")
 
     plan_prices = {
-        1: {"name": "Plus Plan", "amount": 999},
+        1: {"name": "AIclipse Plus", "amount": 999},
         2: {"name": "Premium Plan", "amount": 1999},
     }
 
@@ -295,6 +330,125 @@ async def create_checkout_session(request: CheckoutRequest):
         logger.exception("Stripe error creating checkout session: %s", e)
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@app.post("/subscription/cancel-at-period-end")
+async def cancel_subscription_at_period_end(request: CancelSubscriptionRequest):
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Stripe not configured")
+
+    if users_coll is None or plan_coll is None or billing_coll is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    safe_user_id = RequestLogSanitizer.user_id(request.user_id)
+    cancellation_reason = RequestLogSanitizer._clean_text(request.reason, max_len=120)
+
+    if not safe_user_id:
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+    if not cancellation_reason:
+        raise HTTPException(status_code=400, detail="Cancellation reason is required")
+
+    current_user = users_coll.find_one({"user_id": safe_user_id}) or {}
+    current_plan = int(current_user.get("plan", 0) or 0)
+    if current_plan <= 0:
+        raise HTTPException(status_code=400, detail="No active paid subscription")
+
+    latest_active = billing_coll.find_one(
+        {
+            "user_id": safe_user_id,
+            "status": {"$in": ["active", "cancel_scheduled"]},
+            "stripe_subscription_id": {"$exists": True, "$ne": None},
+        },
+        sort=[("timestamp", -1), ("billing_period_end", -1)],
+    )
+    if not latest_active:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+
+    stripe_subscription_id = latest_active.get("stripe_subscription_id")
+    if not stripe_subscription_id:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+
+    existing_period_end = latest_active.get("billing_period_end")
+    if latest_active.get("status") == "cancel_scheduled" or latest_active.get("cancel_at_period_end"):
+        return {
+            "ok": True,
+            "status": "cancel_scheduled",
+            "message": "Subscription cancellation already scheduled",
+            "plan_active_until": _iso_or_none(existing_period_end),
+        }
+
+    now = _now_utc()
+    try:
+        stripe_sub = stripe.Subscription.modify(
+            stripe_subscription_id,
+            cancel_at_period_end=True,
+            metadata={
+                "cancel_reason": cancellation_reason,
+                "cancel_requested_at": now.isoformat(),
+            },
+        )
+    except stripe.error.StripeError as e:
+        logger.exception("Stripe error scheduling cancellation: %s", e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+    stripe_period_end = _to_utc_datetime(getattr(stripe_sub, "current_period_end", None))
+    effective_period_end = stripe_period_end or latest_active.get("billing_period_end") or _month_end_from(now)
+
+    billing_coll.update_many(
+        {
+            "user_id": safe_user_id,
+            "stripe_subscription_id": stripe_subscription_id,
+            "status": {"$in": ["active", "cancel_scheduled"]},
+        },
+        {
+            "$set": {
+                "status": "cancel_scheduled",
+                "cancel_at_period_end": True,
+                "cancel_requested_at": now,
+                "billing_period_end": effective_period_end,
+                "cancellation_reason": cancellation_reason,
+                "timestamp": now,
+            }
+        },
+    )
+
+    plan_coll.insert_one(
+        {
+            "user_id": safe_user_id,
+            "timestamp": now,
+            "original_plan": current_plan,
+            "new_plan": current_plan,
+            "success": True,
+            "action": "cancel_requested",
+            "cancellation_reason": cancellation_reason,
+            "stripe_subscription_id": stripe_subscription_id,
+            "stripe_customer_id": latest_active.get("stripe_customer_id"),
+        }
+    )
+
+    billing_coll.insert_one(
+        {
+            "user_id": safe_user_id,
+            "plan": current_plan,
+            "status": "cancel_scheduled",
+            "cancel_at_period_end": True,
+            "cancel_requested_at": now,
+            "billing_period_start": latest_active.get("billing_period_start"),
+            "billing_period_end": effective_period_end,
+            "amount_paid": latest_active.get("amount_paid"),
+            "cancellation_reason": cancellation_reason,
+            "stripe_subscription_id": stripe_subscription_id,
+            "stripe_customer_id": latest_active.get("stripe_customer_id"),
+            "timestamp": now,
+        }
+    )
+
+    return {
+        "ok": True,
+        "status": "cancel_scheduled",
+        "message": "Subscription cancellation scheduled for period end",
+        "plan_active_until": _iso_or_none(effective_period_end),
+    }
+
 # -------------------------
 # WEBHOOK
 # -------------------------
@@ -335,7 +489,7 @@ async def stripe_webhook(request: Request):
         meta = session.get("metadata") or {}
 
         session_id = session.get("id")
-        customer_from_session = session.get("customer")
+        stripe_subscription_id = session.get("subscription")
 
         user_id = meta.get("user_id")
         plan_id_raw = meta.get("plan_id", "0")
@@ -343,17 +497,8 @@ async def stripe_webhook(request: Request):
         stripe_customer_id = meta.get("stripe_customer_id") or session.get("customer")
 
         logger.info(
-            "resolved user_id=%s plan_id=%s amount_paid=%s customer_id=%s",
-            user_id, plan_id_raw, amount_paid, stripe_customer_id
-        )
-
-
-        logger.info(
-            "checkout.session.completed: session=%s customer=%s metadata=%s",
-            session_id, customer_from_session, meta
-        )
-        logger.info(
-            "resolved: user_id=%s plan_id=%s amount_paid=%s customer_id=%s",
+            "checkout.session.completed: session=%s user_id=%s plan_id=%s amount_paid=%s customer_id=%s",
+            session_id,
             user_id, plan_id_raw, amount_paid, stripe_customer_id
         )
 
@@ -391,6 +536,8 @@ async def stripe_webhook(request: Request):
                 "stripe_customer_id": stripe_customer_id,
                 "stripe_session_id": session_id,
                 "stripe_event_id": event_id,
+                "stripe_subscription_id": stripe_subscription_id,
+                "action": "subscribe",
             }
         )
         logger.info("plan.insert_one id=%s", str(plan_ins.inserted_id))
@@ -405,102 +552,143 @@ async def stripe_webhook(request: Request):
                 "amount_paid": amount_paid,
                 "stripe_session_id": session_id,
                 "stripe_event_id": event_id,
+                "stripe_subscription_id": stripe_subscription_id,
+                "stripe_customer_id": stripe_customer_id,
+                "cancel_at_period_end": False,
+                "cancellation_reason": None,
+                "timestamp": now,
             }
         )
         logger.info("billing.insert_one id=%s", str(bill_ins.inserted_id))
 
         logger.info("UPGRADE COMPLETE user=%s %s->%s", user_id, original_plan, new_plan)
 
+    # --- subscription updated ---
+    elif event_type == "customer.subscription.updated":
+        subscription = event["data"]["object"]
+        customer_id = subscription.get("customer")
+        subscription_id = subscription.get("id")
+        cancel_at_period_end = bool(subscription.get("cancel_at_period_end", False))
+        period_end = _to_utc_datetime(subscription.get("current_period_end"))
+
+        billing_coll.update_many(
+            {
+                "$or": [
+                    {"stripe_subscription_id": subscription_id},
+                    {"stripe_customer_id": customer_id},
+                ],
+                "status": {"$in": ["active", "cancel_scheduled"]},
+            },
+            {
+                "$set": {
+                    "status": "cancel_scheduled" if cancel_at_period_end else "active",
+                    "cancel_at_period_end": cancel_at_period_end,
+                    "billing_period_end": period_end,
+                    "timestamp": _now_utc(),
+                }
+            },
+        )
+
 
     # --- subscription deleted ---
     elif event_type == "customer.subscription.deleted":
         subscription = event["data"]["object"]
         customer_id = subscription.get("customer")
+        subscription_id = subscription.get("id")
+        period_end = _to_utc_datetime(subscription.get("current_period_end"))
+        cancellation_details = subscription.get("cancellation_details") or {}
+        cancellation_reason = cancellation_details.get("comment") or cancellation_details.get("reason")
 
-        logger.info("customer.subscription.deleted customer=%s", customer_id)
+        logger.info("customer.subscription.deleted received")
 
-        last_plan = plan_coll.find_one(
-            {"stripe_customer_id": customer_id},
-            sort=[("timestamp", -1)],
+        last_billing = billing_coll.find_one(
+            {
+                "$or": [
+                    {"stripe_subscription_id": subscription_id},
+                    {"stripe_customer_id": customer_id},
+                ],
+            },
+            sort=[("timestamp", -1), ("billing_period_end", -1)],
         )
 
-        if last_plan and last_plan.get("user_id"):
+        last_plan = None
+        if not last_billing:
+            last_plan = plan_coll.find_one(
+                {"stripe_customer_id": customer_id},
+                sort=[("timestamp", -1)],
+            )
+
+        if last_billing and last_billing.get("user_id"):
+            user_id = last_billing["user_id"]
+            current_plan = int(last_billing.get("plan", 0) or 0)
+        elif last_plan and last_plan.get("user_id"):
             user_id = last_plan["user_id"]
             current_user = users_coll.find_one({"user_id": user_id}) or {}
             current_plan = int(current_user.get("plan", 0))
+        else:
+            user_id = None
+            current_plan = 0
+
+        if user_id:
+            now = _now_utc()
 
             users_coll.update_one({"user_id": user_id}, {"$set": {"plan": 0}})
+
+            billing_coll.update_many(
+                {
+                    "user_id": user_id,
+                    "$or": [
+                        {"stripe_subscription_id": subscription_id},
+                        {"stripe_customer_id": customer_id},
+                    ],
+                    "status": {"$in": ["active", "cancel_scheduled"]},
+                },
+                {
+                    "$set": {
+                        "status": "canceled",
+                        "cancel_at_period_end": False,
+                        "canceled_at": now,
+                        "billing_period_end": period_end,
+                        "cancellation_reason": cancellation_reason,
+                        "timestamp": now,
+                    }
+                },
+            )
+
+            plan_coll.insert_one(
+                {
+                    "user_id": user_id,
+                    "timestamp": now,
+                    "original_plan": current_plan,
+                    "new_plan": 0,
+                    "success": True,
+                    "stripe_customer_id": customer_id,
+                    "stripe_subscription_id": subscription_id,
+                    "stripe_event_id": event_id,
+                    "action": "subscription_deleted",
+                    "cancellation_reason": cancellation_reason,
+                }
+            )
 
             billing_coll.insert_one({
                 "user_id": user_id,
                 "plan": current_plan,
                 "status": "canceled",
                 "billing_period_start": None,
-                "billing_period_end": None,
+                "billing_period_end": period_end,
                 "amount_paid": None,
+                "stripe_customer_id": customer_id,
+                "stripe_subscription_id": subscription_id,
+                "cancellation_reason": cancellation_reason,
+                "timestamp": now,
             })
 
-            logger.info("Subscription cancelled: customer=%s user=%s", customer_id, user_id)
+            logger.info("Subscription cancelled after delete webhook")
         else:
-            logger.warning("No plan record found for customer=%s", customer_id)
+            logger.warning("No matching plan record found for deleted subscription webhook")
 
     else:
         logger.info("Unhandled webhook type=%s (ignored)", event_type)
 
     return {"status": "success"}
 
-# -------------------------
-# BILLING PORTAL
-# -------------------------
-@app.post("/create-portal-session")
-async def create_portal_session(request: PortalRequest):
-    if not STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="Stripe not configured")
-
-    try:
-        session = stripe.billing_portal.Session.create(
-            customer=request.customer_id,
-            return_url=f"{CLIENT_URL}/plan",
-        )
-        return {"url": session.url}
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-# -------------------------
-# ADMIN (testing)
-# -------------------------
-@app.post("/admin/upgrade-plan")
-async def admin_upgrade_plan(user_id: str, plan_id: int):
-    if users_coll is None or plan_coll is None or billing_coll is None:
-        raise HTTPException(status_code=503, detail="Database not available")
-
-    user_doc = users_coll.find_one({"user_id": user_id}) or {}
-    original_plan = int(user_doc.get("plan", 0))
-
-    now = _now_utc()
-    period_start = now
-    period_end = _month_end_from(period_start)
-
-    res = users_coll.update_one({"user_id": user_id}, {"$set": {"plan": int(plan_id)}})
-    if res.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    plan_coll.insert_one({
-        "user_id": user_id,
-        "timestamp": now,
-        "original_plan": original_plan,
-        "new_plan": int(plan_id),
-        "success": True,
-        "stripe_customer_id": None,
-    })
-
-    billing_coll.insert_one({
-        "user_id": user_id,
-        "plan": int(plan_id),
-        "status": "active",
-        "billing_period_start": period_start,
-        "billing_period_end": period_end,
-        "amount_paid": None,
-    })
-
-    return {"ok": True, "user_id": user_id, "plan": plan_id}
