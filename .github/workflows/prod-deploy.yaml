@@ -352,7 +352,8 @@ jobs:
           kubectl -n "$NS" apply -f infra/k8s/click-flush-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/community-depl.yaml
           kubectl -n "$NS" apply -f infra/k8s/user-delete-worker-depl.yaml
-          kubectl -n "$NS" apply -f infra/k8s/model-cycle-pvc.yaml
+          kubectl -n "$NS" get pvc model-cycle-pvc >/dev/null 2>&1 || \
+            kubectl -n "$NS" apply -f infra/k8s/model-cycle-pvc.yaml
           kubectl -n "$NS" apply -f infra/k8s/model-cycle-depl.yaml
 
       - name: Apply HPA
