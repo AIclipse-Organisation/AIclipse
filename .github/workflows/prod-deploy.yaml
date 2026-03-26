@@ -120,7 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           kubectl get sc hostpath-retain >/dev/null 2>&1 || \
-            kubectl -n "$NS" apply -f infra/storageclass-hostpath-retain.yaml
+            kubectl -n "$NS" apply -f infra/storageclass-k3s-retain.yaml
           kubectl get sc
 
       - name: Ensure CoreDNS (idempotent)
@@ -336,6 +336,17 @@ jobs:
           kubectl -n "$NS" rollout status statefulset/redis --timeout=300s
           kubectl -n "$NS" rollout status statefulset/s3    --timeout=300s
 
+      - name: Ensure PV Retain policy
+        run: |
+          set -euo pipefail
+          for pv in $(kubectl get pv -o jsonpath='{.items[*].metadata.name}'); do
+            policy=$(kubectl get pv "$pv" -o jsonpath='{.spec.persistentVolumeReclaimPolicy}')
+            if [ "$policy" != "Retain" ]; then
+              echo "Patching $pv: $policy -> Retain"
+              kubectl patch pv "$pv" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+            fi
+          done
+
       - name: Apply app deployments/services
         run: |
           set -euo pipefail
@@ -495,9 +506,18 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
+
+          # Docker build artifacts
           docker buildx prune -af || true
           docker builder prune -af || true
           docker system prune -af --volumes || true
+
+          # containerd images pulled by k3s (docker prune does NOT touch these)
+          sudo k3s crictl rmi --prune 2>/dev/null || crictl rmi --prune 2>/dev/null || true
+
+          # System logs
+          sudo journalctl --vacuum-size=50M 2>/dev/null || true
+
           df -h
           docker system df || true
 

@@ -31,6 +31,9 @@ metadata:
 spec:
   serviceName: redis-headless
   replicas: 1
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
       app: redis

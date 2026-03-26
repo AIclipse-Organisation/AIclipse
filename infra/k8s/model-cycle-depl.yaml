@@ -4,6 +4,8 @@ metadata:
   name: model-cycle-depl
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: model-cycle

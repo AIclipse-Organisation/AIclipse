@@ -121,14 +121,11 @@ jobs:
           kubectl -n kube-system rollout status deploy/local-path-provisioner --timeout=90s
 
       - name: Ensure hostpath-retain StorageClass
-        # Create SC that matches app manifests but uses k3d’s local-path provisioner.
-        # Avoids immutable-field conflicts with any SC embedded in app yamls.
         shell: bash
         run: |
           set -euo pipefail
-          if ! kubectl get sc hostpath-retain >/dev/null 2>&1; then
-            kubectl apply -f infra/storageclass-hostpath-retain.yaml
-          fi
+          kubectl get sc hostpath-retain >/dev/null 2>&1 || \
+            kubectl apply -f infra/storageclass-k3s-retain.yaml
           kubectl get sc
 
       - name: Import image into cluster (direct mode)
