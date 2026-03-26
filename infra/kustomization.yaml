@@ -22,3 +22,4 @@ resources:
   - k8s-dev/ingress-srv-uploads.yaml
   - k8s-dev/ingress-api.yaml
   - k8s/model-cycle-pvc.yaml
+  - storageclass-hostpath-retain.yaml
