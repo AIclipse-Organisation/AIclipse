@@ -71,8 +71,8 @@ async function jsonFetch(method, url, body) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-  const TOO_LARGE_MSG = "Image is too large. Max allowed size is 5 MB.";
+  const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+  const TOO_LARGE_MSG = "Image is too large. Max allowed size is 20 MB.";
 
   const fileInput = document.getElementById("file-input");
   const fileLabel = document.querySelector("label.file-upload");
@@ -490,7 +490,7 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
     } else if (isData) {
-      const dataUrlRegex = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/i;
+      const dataUrlRegex = /^data:image\/(png|jpeg|jpg);base64,[A-Za-z0-9+/=]+$/i;
       if (!dataUrlRegex.test(url)) {
         imgEl.removeAttribute("src");
         return;

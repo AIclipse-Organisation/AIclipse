@@ -17,8 +17,8 @@ public class DatasetService : IDatasetService
     
     public string GetLocalFilePath(string mediaId)
     {
-        var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
-        
+        var supportedExtensions = new[] { ".jpg", ".jpeg", ".png" };
+
         foreach (var ext in supportedExtensions)
         {
             var path = Path.Combine(_storagePath, $"{mediaId}{ext}");
@@ -46,7 +46,7 @@ public class DatasetService : IDatasetService
     
     public Task DeleteImageAsync(string mediaId)
     {
-        var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+        var supportedExtensions = new[] { ".jpg", ".jpeg", ".png" };
         foreach (var ext in supportedExtensions)
         {
             var filePath = Path.Combine(_storagePath, $"{mediaId}{ext}");

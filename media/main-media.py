@@ -50,7 +50,7 @@ S3_BUCKET = "images"
 MODEL_CYCLE_URL = os.getenv("MODEL_CYCLE_URL", "http://model-cycle:3000")
 
 ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png"}
-MAX_FILE_SIZE = 5 * 1024 * 1024
+MAX_FILE_SIZE = 20 * 1024 * 1024
 
 # Presign TTLs (seconds)
 PRESIGN_PRIVATE_EXPIRES_S = 300
