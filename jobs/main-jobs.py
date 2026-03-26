@@ -1,7 +1,6 @@
 import os, logging
 import json
 import datetime
-import requests
 import redis
 from fastapi import FastAPI, HTTPException
 from pymongo import MongoClient
@@ -16,7 +15,6 @@ MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB = os.getenv("MONGO_DB")
 REDIS_URI = os.getenv("REDIS_URI")
 STREAM = os.getenv("STREAM")
-BILLING_URI = os.getenv("BILLING_URI")
 
 # Fallback store when Mongo is unavailable (demo-friendly)
 mem_jobs = {}
@@ -81,7 +79,7 @@ def create_check(payload: dict):
 
 @app.post("/internal/jobs/{job_id}/complete")
 def complete(job_id: str, payload: dict):
-    # Upserts completion fields and records usage to Billing if provided
+    # Upserts completion fields from detector callbacks
     if jobs_col is None:
         job = mem_jobs.get(job_id)
         if not job:
@@ -111,16 +109,6 @@ def complete(job_id: str, payload: dict):
             "updated_at": datetime.datetime.utcnow()
         }
         jobs_col.update_one({"job_id": job_id}, {"$set": update})
-
-    # Optional usage reporting; best-effort
-    metrics = payload.get("metrics")
-    if metrics:
-        data = {"user_id": (job.get("owner_id") if isinstance(job, dict) else job["owner_id"]), "job_id": job_id}
-        data.update(metrics)
-        try:
-            requests.post(f"{BILLING_URI}/usage", json=data, timeout=2)
-        except Exception:
-            pass
 
     return {"status": "ok"}
 

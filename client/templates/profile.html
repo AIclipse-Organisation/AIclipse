@@ -35,6 +35,10 @@
             Member since <span id="detail-created">-</span> &bull; Monthly
             Usage: <span id="detail-monthly-usage">-</span>
           </div>
+
+          <div id="subscription-status-banner" class="subscription-status-banner" hidden>
+            Subscription: None
+          </div>
         </div>
         <button id="btn-settings" class="profile-settings-btn">⚙</button>
       </section>
@@ -141,12 +145,60 @@
   <div id="settings-sheet-overlay" class="delete-modal-overlay" hidden aria-hidden="true">
     <div class="delete-modal" role="dialog" aria-label="Account settings">
       <h2 class="delete-modal-title">Account</h2>
+      <p id="subscription-status-hint" class="delete-modal-text" hidden>
+        Subscription active.
+      </p>
       <div class="delete-modal-actions settings-modal-actions">
+        <button id="btn-cancel-subscription" class="delete-modal-btn delete-modal-btn-secondary" type="button" hidden>
+          Cancel subscription
+        </button>
         <button id="btn-delete-account" class="delete-modal-btn delete-modal-btn-danger" type="button">
           🗑 Delete account
         </button>
         <button id="btn-close-settings" class="delete-modal-btn delete-modal-btn-secondary" type="button">
           Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cancel-subscription-modal" class="delete-modal-overlay" hidden aria-hidden="true">
+    <div class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="cancel-subscription-title">
+      <h2 id="cancel-subscription-title" class="delete-modal-title">Cancel subscription?</h2>
+      <p class="delete-modal-text">
+        Your plan remains active until the end of your current billing period.
+      </p>
+
+      <label for="cancel-reason-select" class="cancel-reason-label">Reason for cancellation</label>
+      <select id="cancel-reason-select" class="cancel-reason-select" required>
+        <option value="">Select a cancellation reason</option>
+        <option value="Too expensive">Too expensive</option>
+        <option value="Not using it enough">Not using it enough</option>
+        <option value="Technical issues">Technical issues</option>
+        <option value="Switching to another service">Switching to another service</option>
+        <option value="Other">Other</option>
+      </select>
+
+      <div class="delete-modal-actions">
+        <button id="cancel-subscription-close" type="button" class="delete-modal-btn delete-modal-btn-secondary">
+          Keep subscription
+        </button>
+        <button id="confirm-cancel-subscription" type="button" class="delete-modal-btn delete-modal-btn-danger">
+          Confirm cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cancel-subscription-success-modal" class="delete-modal-overlay" hidden aria-hidden="true">
+    <div class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="cancel-success-title">
+      <h2 id="cancel-success-title" class="delete-modal-title">Subscription canceled successfully</h2>
+      <p id="cancel-success-text" class="delete-modal-text">
+        Your subscription remains active until your billing period ends.
+      </p>
+      <div class="delete-modal-actions">
+        <button id="cancel-success-close" type="button" class="delete-modal-btn delete-modal-btn-secondary">
+          Close
         </button>
       </div>
     </div>

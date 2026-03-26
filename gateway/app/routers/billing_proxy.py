@@ -15,14 +15,11 @@ def _timeout(request: Request) -> float:
     return float(request.app.state.settings.http_timeout_s)
 
 
-def _forward_auth_headers(request: Request) -> dict:
+def _forward_billing_headers(request: Request) -> dict:
     headers: dict = {}
     auth = request.headers.get("authorization")
     if auth:
         headers["Authorization"] = auth
-    cookie = request.headers.get("cookie")
-    if cookie:
-        headers["Cookie"] = cookie
     return headers
 
 
@@ -35,7 +32,7 @@ async def billing_create_checkout_session(request: Request, payload: dict = Body
         billing_uri,
         "/create-checkout-session",
         json_body=payload,
-        headers=_forward_auth_headers(request),
+        headers=_forward_billing_headers(request),
         timeout_s=_timeout(request),
     )
 
@@ -49,7 +46,7 @@ async def api_billing_create_checkout_session(request: Request, payload: dict = 
         billing_uri,
         "/create-checkout-session",
         json_body=payload,
-        headers=_forward_auth_headers(request),
+        headers=_forward_billing_headers(request),
         timeout_s=_timeout(request),
     )
 
@@ -66,18 +63,33 @@ async def api_billing_config(request: Request):
     )
 
 
-@router.post("/api/billing/admin/upgrade-plan")
-async def api_billing_admin_upgrade_plan(
+@router.get("/api/billing/subscription/status")
+async def api_billing_subscription_status(
     request: Request,
     user_id: str = Query(...),
-    plan_id: int = Query(...),
 ):
+    billing_uri = _billing_base_url(request)
+    return await proxy_json(
+        request,
+        "GET",
+        billing_uri,
+        "/subscription/status",
+        params={"user_id": user_id},
+        headers=_forward_billing_headers(request),
+        timeout_s=_timeout(request),
+    )
+
+
+@router.post("/api/billing/subscription/cancel-at-period-end")
+async def api_billing_cancel_at_period_end(request: Request, payload: dict = Body(...)):
     billing_uri = _billing_base_url(request)
     return await proxy_json(
         request,
         "POST",
         billing_uri,
-        "/admin/upgrade-plan",
-        params={"user_id": user_id, "plan_id": int(plan_id)},
+        "/subscription/cancel-at-period-end",
+        json_body=payload,
+        headers=_forward_billing_headers(request),
         timeout_s=_timeout(request),
     )
+

@@ -65,7 +65,15 @@ function formatDate(dt) {
   if (!dt) return "N/A";
   const d = new Date(dt);
   if (Number.isNaN(d.getTime())) return "N/A";
-  return d.toLocaleString();
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
 
 function visibilityOf(img) {
@@ -1077,7 +1085,7 @@ function setupShowComments(img) {
       const date = makeEl(
         "span",
         "comment-date",
-        comment.created_at ? new Date(comment.created_at).toLocaleString() : ""
+        comment.created_at ? formatDate(comment.created_at) : ""
       );
       header.appendChild(username);
       header.appendChild(date);

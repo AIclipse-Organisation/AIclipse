@@ -7,8 +7,11 @@ function fmtDate(value) {
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return "";
 
-  // Compacts the date format to shorter display e.g "28 Feb".
-  return dt.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+  return dt.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function buildActionLine(item) {

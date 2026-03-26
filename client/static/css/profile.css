@@ -147,6 +147,45 @@
   font-weight: 600;
 }
 
+.subscription-status-banner {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #c8b06f;
+  background: rgba(207, 184, 124, 0.14);
+  border: 1px solid rgba(207, 184, 124, 0.35);
+}
+
+.subscription-status-banner.status-active {
+  color: #5dd39e;
+  background: rgba(93, 211, 158, 0.14);
+  border-color: rgba(93, 211, 158, 0.4);
+}
+
+.subscription-status-banner.status-cancel-scheduled,
+.subscription-status-banner.status-canceled {
+  color: #e9b96e;
+  background: rgba(233, 185, 110, 0.14);
+  border-color: rgba(233, 185, 110, 0.4);
+}
+
+.subscription-status-banner.status-none {
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.subscription-status-banner.status-warning {
+  color: #ff6767;
+  background: rgba(255, 103, 103, 0.15);
+  border-color: rgba(255, 103, 103, 0.45);
+}
+
 
 /* Plan row under username/email */
 .profile-plan {
@@ -757,6 +796,32 @@
 
 body.modal-open {
   overflow: hidden;
+}
+
+.cancel-reason-label {
+  display: block;
+  margin: 2px 0 8px;
+  text-align: left;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.cancel-reason-select {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #1a1a1a;
+  color: rgba(255, 255, 255, 0.92);
+  font: inherit;
+}
+
+.cancel-reason-select:focus {
+  outline: none;
+  border-color: #cfb87c;
+  box-shadow: 0 0 0 2px rgba(207, 184, 124, 0.2);
 }
 
 [hidden] {
