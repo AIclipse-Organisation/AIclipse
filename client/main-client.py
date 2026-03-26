@@ -63,8 +63,12 @@ def inject_common_context():
 def healthz():
     return "OK", 200
 
-
 @app.get("/")
+def landing():
+    return render_template("landing.html")
+
+
+@app.get("/login")
 def index():
     toggles = cfg.get_client_config()
     show_signup = toggles.get("sign-up", True)

@@ -273,9 +273,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const loginSpinner = document.getElementById("login-spinner-container");
   const signupPanel = document.querySelector('[data-panel="signup"]');
   const loginPanel = document.querySelector('[data-panel="login"]');
-  const accountStatus = document.getElementById("account-status");
-  const tabs = document.querySelectorAll(".auth-tab");
-  const authToggleContainer = document.querySelector(".auth-toggle");
+  const signupStatus = document.getElementById("signup-status");
+  const loginStatus = document.getElementById("login-status");
+  const switchLinks = document.querySelectorAll(".auth-link");
 
   const signupPasswordInput = document.getElementById("signup-password");
   const signupPolicyRoot = document.getElementById("signup-password-policy");
@@ -295,6 +295,31 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!btnSignup) return;
     btnSignup.disabled = signupTerms ? !signupTerms.checked : false;
   }
+
+  function switchAuthMode(mode) {
+    if (mode === "signup") {
+      if (signupPanel) signupPanel.style.display = "block";
+      if (loginPanel) loginPanel.style.display = "none";
+    } else {
+      if (signupPanel) signupPanel.style.display = "none";
+      if (loginPanel) loginPanel.style.display = "block";
+    }
+
+    if (signupStatus) signupStatus.innerHTML = "";
+    if (loginStatus) loginStatus.innerHTML = "";
+  }
+
+  if (switchLinks.length > 0) {
+    switchLinks.forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        const mode = link.getAttribute("data-mode");
+        switchAuthMode(mode);
+      });
+    });
+  }
+
+  switchAuthMode("login");
 
   if (signupTerms) {
     signupTerms.addEventListener("change", syncSignupButtonState);
@@ -348,26 +373,8 @@ window.addEventListener("DOMContentLoaded", () => {
     signupPasswordInput.addEventListener("input", updateSignupPolicyUI);
   }
 
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const mode = tab.getAttribute("data-mode");
-      tabs.forEach((t) => t.classList.remove("is-active"));
-      tab.classList.add("is-active");
-
-      if (mode === "signup") {
-        if (signupPanel) signupPanel.style.display = "block";
-        if (loginPanel) loginPanel.style.display = "none";
-      } else {
-        if (signupPanel) signupPanel.style.display = "none";
-        if (loginPanel) loginPanel.style.display = "block";
-      }
-      if (accountStatus) accountStatus.innerHTML = "";
-    });
-  });
-
   onEl("btn-signup", (btnSignupEl) => {
     btnSignupEl.addEventListener("click", async (event) => {
-      // Stop browser form submit.Without it, browser may submit form and refresh page before our async signup flow finishes.
       event.preventDefault();
       const user_name = document.getElementById("signup-username")?.value.trim();
       const email = document.getElementById("signup-email")?.value.trim();
@@ -378,7 +385,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
       const termsAccepted = document.getElementById("signup-terms")?.checked;
       if (!termsAccepted) {
-        setStatus(accountStatus, "error", "You must accept the Terms & Conditions to sign up.");
+        setStatus(signupStatus, "error", "You must accept the Terms & Conditions to sign up.");
         return;
       }
 
@@ -387,32 +394,32 @@ window.addEventListener("DOMContentLoaded", () => {
       activateSignupPolicyIfNeeded();
 
       if (!user_name || !email || !password || !String(dateOfBirthRaw || "").trim() || !howDidYouFindUs) {
-        setStatus(accountStatus, "error", "Please fill username, email, date of birth, password and how you found us.");
+        setStatus(signupStatus, "error", "Please fill username, email, date of birth, password and how you found us.");
         updateSignupPolicyUI();
         return;
       }
 
       if (howDidYouFindUs === "other" && !String(howDidYouFindUsDetail || "").trim()) {
-        setStatus(accountStatus, "error", "Please elaborate on how you found us.");
+        setStatus(signupStatus, "error", "Please elaborate on how you found us.");
         return;
       }
 
       if (!/^\d{2}-\d{2}-\d{4}$/.test(String(dateOfBirthRaw))) {
-        setStatus(accountStatus, "error", "Date of birth must be in DD-MM-YYYY format.");
+        setStatus(signupStatus, "error", "Date of birth must be in DD-MM-YYYY format.");
         return;
       }
 
       const age = ageFromDobString(String(dateOfBirthRaw));
       if (!Number.isInteger(age)) {
-        setStatus(accountStatus, "error", "Please provide a valid date of birth.");
+        setStatus(signupStatus, "error", "Please provide a valid date of birth.");
         return;
       }
       if (age < 18) {
-        setStatus(accountStatus, "error", "Must be 18 or older.");
+        setStatus(signupStatus, "error", "Must be 18 or older.");
         return;
       }
       if (age > 150) {
-        setStatus(accountStatus, "error", "Please provide a valid date of birth.");
+        setStatus(signupStatus, "error", "Please provide a valid date of birth.");
         return;
       }
 
@@ -420,17 +427,16 @@ window.addEventListener("DOMContentLoaded", () => {
         const checks = evaluatePasswordPolicy(password);
         applyPasswordPolicyUI(signupPolicyRoot, password, checks);
         if (!isPasswordPolicyOk(checks)) {
-          setStatus(accountStatus, "error", "Password does not meet requirements.");
+          setStatus(signupStatus, "error", "Password does not meet requirements.");
           return;
         }
       }
 
       if (signupPanel) signupPanel.style.display = "none";
-      if (authToggleContainer) authToggleContainer.style.display = "none";
       if (loginSpinner) loginSpinner.style.display = "block";
 
       btnSignupEl.disabled = true;
-      setStatus(accountStatus, "info", "Submitting access request...");
+      setStatus(signupStatus, "info", "Submitting access request...");
 
       try {
         const { res, data } = await jsonFetch("POST", "/auth/signup", {
@@ -442,15 +448,19 @@ window.addEventListener("DOMContentLoaded", () => {
           how_did_you_find_us_detail: howDidYouFindUsDetail || null,
         });
 
-        if (res.ok) {
-          requestSubmitted = true;
-          if (loginSpinner) loginSpinner.style.display = "none";
-          setStatus(
-            accountStatus,
-            "success",
-            data?.message || "Thank you. An admin will review your request and contact you soon.",
-          );
-        } else {
+          if (res.ok) {
+            requestSubmitted = true;
+
+            if (loginSpinner) loginSpinner.style.display = "none";
+            if (signupPanel) signupPanel.style.display = "block";
+            if (loginPanel) loginPanel.style.display = "none";
+
+            setStatus(
+              signupStatus,
+              "success",
+              data?.message || "Thank you. An admin will review your request and contact you soon.",
+            );
+          } else {
           const normalized = normalizeApiErrorDetail(data);
 
           if (signupPolicyRoot && normalized.checks) {
@@ -459,20 +469,21 @@ window.addEventListener("DOMContentLoaded", () => {
             updateSignupPolicyUI();
           }
 
+          switchAuthMode("signup");
+
           setStatus(
-            accountStatus,
+            signupStatus,
             "error",
             normalized.message || `Signup failed (${res.status})`,
           );
         }
       } catch (err) {
         console.error(err);
-        setStatus(accountStatus, "error", "Network error during signup.");
+        switchAuthMode("signup");
+        setStatus(signupStatus, "error", "Network error during signup.");
       } finally {
         if (!requestSubmitted) {
           btnSignupEl.disabled = false;
-          if (signupPanel) signupPanel.style.display = "block";
-          if (authToggleContainer) authToggleContainer.style.display = "";
           if (loginSpinner) loginSpinner.style.display = "none";
         }
       }
@@ -481,20 +492,18 @@ window.addEventListener("DOMContentLoaded", () => {
 
   onEl("btn-login", (btnLogin) => {
     btnLogin.addEventListener("click", async (event) => {
-      // Same rule for login: click should call fetch, not submit the form.
       event.preventDefault();
       const email = document.getElementById("login-email")?.value.trim();
       const password = document.getElementById("login-password")?.value;
 
       if (!email || !password) {
-        setStatus(accountStatus, "error", "Please fill email and password.");
+        setStatus(loginStatus, "error", "Please fill email and password.");
         return;
       }
 
       if (loginContent) loginContent.style.display = "none";
-      if (authToggleContainer) authToggleContainer.style.display = "none";
       if (loginSpinner) loginSpinner.style.display = "block";
-      setStatus(accountStatus, "info", "");
+      setStatus(loginStatus, "info", "");
 
       try {
         const res = await fetch("/auth/login", {
@@ -513,17 +522,16 @@ window.addEventListener("DOMContentLoaded", () => {
         setDebug({ url: "/auth/login", status: res.status, body: data });
 
         if (res.ok && data.user) {
-          setStatus(accountStatus, "success", "Logged in.");
+          setStatus(loginStatus, "success", "Logged in.");
           setCurrentUserChip(data.user);
           window.location.href = "/upload";
         } else {
           if (loginContent) loginContent.style.display = "block";
-          if (authToggleContainer) authToggleContainer.style.display = "";
           if (loginSpinner) loginSpinner.style.display = "none";
 
           const normalized = normalizeApiErrorDetail(data);
           setStatus(
-            accountStatus,
+            loginStatus,
             "error",
             normalized.message || `Login failed (${res.status})`,
           );
@@ -532,9 +540,8 @@ window.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error(err);
         if (loginContent) loginContent.style.display = "block";
-        if (authToggleContainer) authToggleContainer.style.display = "";
         if (loginSpinner) loginSpinner.style.display = "none";
-        setStatus(accountStatus, "error", "Network error during login.");
+        setStatus(loginStatus, "error", "Network error during login.");
         setCurrentUserChip(null);
       } finally {
         btnLogin.disabled = false;

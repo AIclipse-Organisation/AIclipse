@@ -11,6 +11,11 @@
     <div class="app-container">
       <main class="screen">
         <div class="auth-shell">
+          <a href="/" class="auth-back" aria-label="Go back">
+            <span class="auth-back-arrow" aria-hidden="true">‹</span>
+            <span>Back</span>
+          </a>
+
           <div class="brand-hero" aria-label="AICLIPSE branding">
             <img
               class="brand-image"
@@ -20,40 +25,34 @@
           </div>
 
           <section class="auth-card">
-            <div class="auth-toggle" role="tablist" aria-label="Auth mode">
-              <button
-                type="button"
-                class="auth-tab is-active"
-                data-mode="login"
-                role="tab"
-                aria-selected="true"
-              >
-                Log in
-              </button>
-              {% if show_signup %}
-              <button type="button" class="auth-tab" data-mode="signup">
-                Sign up
-              </button>
-              {% endif %}
-            </div>
-
             <div class="auth-panels" data-mode="login">
               {% if show_signup %}
               <div class="auth-panel" data-panel="signup">
                 <h2 class="legacy-heading">Create an Account</h2>
 
+                <div class="auth-copy">
+                  <h1 class="auth-title">Registration</h1>
+                </div>
+
                 <label for="signup-username">Username</label>
                 <input
                   id="signup-username"
                   type="text"
-                  placeholder="Username"
+                  placeholder="Please enter your username"
                 />
 
                 <label for="signup-email">Email</label>
-                <input id="signup-email" type="email" placeholder="Email" />
+                <input id="signup-email" type="email" placeholder="Please enter your email" />
 
                 <label for="signup-date-of-birth">Date of Birth</label>
-                <input id="signup-date-of-birth" type="text" inputmode="numeric" pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY" required />
+                <input
+                  id="signup-date-of-birth"
+                  type="text"
+                  inputmode="numeric"
+                  pattern="\d{2}-\d{2}-\d{4}"
+                  placeholder="DD-MM-YYYY"
+                  required
+                />
 
                 <label for="signup-how-found">How did you find us?</label>
                 <select id="signup-how-found" required>
@@ -67,18 +66,28 @@
                   <option value="other">Other</option>
                 </select>
 
-                <label for="signup-how-found-detail" id="signup-how-found-detail-label" style="display: none">Other (please elaborate)</label>
-                <textarea id="signup-how-found-detail" placeholder="Tell us how you found AIclipse" rows="3" style="display: none"></textarea>
+                <label
+                  for="signup-how-found-detail"
+                  id="signup-how-found-detail-label"
+                  style="display: none"
+                >
+                  Other (please elaborate)
+                </label>
+                <textarea
+                  id="signup-how-found-detail"
+                  placeholder="Tell us how you found AIclipse"
+                  rows="3"
+                  style="display: none"
+                ></textarea>
 
                 <label for="signup-password">Password</label>
                 <input
                   id="signup-password"
                   type="password"
-                  placeholder="Password"
+                  placeholder="Please enter your password"
                   autocomplete="new-password"
                 />
 
-                <!-- Must appear ONLY after user clicks the Sign up BUTTON -->
                 <div
                   id="signup-password-policy"
                   class="password-policy"
@@ -122,12 +131,26 @@
                 <div class="terms-row">
                   <label class="terms-label">
                     <input id="signup-terms" type="checkbox" />
-                    <span>I have read and agreed to <a href="/static/files/AIclipse_Terms_of_Service.pdf" target="_blank" rel="noopener">AIclipse Terms &amp; Conditions</a>.</span>
+                    <span>
+                      I have read and agreed to
+                      <a
+                        href="/static/files/AIclipse_Terms_of_Service.pdf"
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        AIclipse Terms &amp; Conditions
+                      </a>.
+                    </span>
                   </label>
                 </div>
 
-                <!-- type="button" stops browser auto-submit; JS handles signup click. -->
                 <button id="btn-signup" type="button" disabled>Request Access</button>
+                <div id="signup-status"></div>
+
+                <p class="auth-switch">
+                  Already have an account?
+                  <button type="button" class="auth-link" data-mode="login">Login</button>
+                </p>
               </div>
               {% endif %}
 
@@ -135,17 +158,30 @@
                 <h2 class="legacy-heading">Log in</h2>
 
                 <div id="login-content">
+                  <div class="auth-copy">
+                    <h1 class="auth-title">Details</h1>
+                  </div>
+
                   <label for="login-email">Email</label>
-                  <input id="login-email" type="email" placeholder="Email" />
+                  <input id="login-email" type="email" placeholder="Please enter your email" />
 
                   <label for="login-password">Password</label>
                   <input
                     id="login-password"
                     type="password"
-                    placeholder="Password"
+                    placeholder="Please enter your password"
                   />
 
+
                   <button id="btn-login" type="button">Log in</button>
+                  <div id="login-status"></div>
+
+                  {% if show_signup %}
+                  <p class="auth-switch">
+                    Don't have an account?
+                    <button type="button" class="auth-link" data-mode="signup">Sign Up</button>
+                  </p>
+                  {% endif %}
                 </div>
 
                 <div id="login-spinner-container" style="display: none">
@@ -153,8 +189,6 @@
                   <p>Logging in...</p>
                 </div>
               </div>
-
-              <div id="account-status"></div>
             </div>
           </section>
 
