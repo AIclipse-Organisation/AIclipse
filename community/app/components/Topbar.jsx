@@ -1,10 +1,27 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Topbar({ isAdmin, showBack }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const lastScrollY = useRef(0);
   const router = useRouter();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      if (currentY > lastScrollY.current && currentY > 50) {
+        setHidden(true);
+      } else {
+        setHidden(false);
+      }
+      lastScrollY.current = currentY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const toggleMenu = () => setIsOpen((prev) => !prev);
   const closeMenu = () => setIsOpen(false);
@@ -22,13 +39,19 @@ export default function Topbar({ isAdmin, showBack }) {
 
   return (
     <>
-      <div className="topbar">
+      <div className={`topbar${hidden ? " topbar--hidden" : ""}`}>
         {showBack ? (
           <button
             className="topbar-back-btn"
             type="button"
             aria-label="Go back"
-            onClick={() => router.back()}
+            onClick={() => {
+              if (window.history.length > 1) {
+                router.back();
+              } else {
+                router.push("/community");
+              }
+            }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
@@ -178,9 +201,9 @@ export default function Topbar({ isAdmin, showBack }) {
           </a>
 
           <div className="drawer-separator"></div>
-          
+
           <button
-            className="logout-button"
+            className="tutorial-button"
             type="button"
             onClick={() => {
               closeMenu();

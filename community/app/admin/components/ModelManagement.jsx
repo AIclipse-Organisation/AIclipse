@@ -4,7 +4,7 @@ import {
   Card, CardHeader, CardBody, CardFooter, Chip, Button,
   Spinner, Progress, Input, ScrollShadow, Divider
 } from "@heroui/react";
-import { adminService } from "@/admin/admin.js";
+import { adminService } from "../admin.js";
 import TrainingImagesTable from "./TrainingImagesTable";
 
 export default function ModelManagement() {

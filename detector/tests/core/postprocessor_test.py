@@ -8,41 +8,37 @@ def test_smooth_confidence():
         assert 0 <= smoothed <= 1
 
 def test_get_confidence_label():
-    # Fake verdicts for testing
-    verdict_fake = "FAKE"
-    verdict_real = "REAL"
+    # low confidence (<15%)
+    assert get_confidence_label("FAKE", 0.1) == "fake"
+    assert get_confidence_label("REAL", 0.1) == "real"
 
-    # low confidence
-    label = get_confidence_label(verdict_fake, 0.1)
-    assert "Highly Likely Fake" in label
-    label = get_confidence_label(verdict_real, 0.1)
-    assert "Highly Unlikely Fake" in label
+    # high confidence (>85%)
+    assert get_confidence_label("FAKE", 0.9) == "fake"
+    assert get_confidence_label("REAL", 0.9) == "real"
 
-    # high confidence
-    label = get_confidence_label(verdict_fake, 0.9)
-    assert "Highly Likely Fake" in label
-    label = get_confidence_label(verdict_real, 0.9)
-    assert "Highly Unlikely Fake" in label
+    # middle confidence (40–60%) — suspicious regardless of verdict
+    assert get_confidence_label("FAKE", 0.5) == "suspicious"
+    assert get_confidence_label("REAL", 0.5) == "suspicious"
 
-    # middle confidence
-    label = get_confidence_label(verdict_fake, 0.5)
-    assert "Not Sure" in label
-    label = get_confidence_label(verdict_real, 0.5)
-    assert "Not Sure" in label
+    # boundary: just below 15%
+    assert get_confidence_label("FAKE", 0.14) == "fake"
+    assert get_confidence_label("REAL", 0.14) == "real"
 
-    # boundary conditions
-    label = get_confidence_label(verdict_fake, 0.14)
-    assert "Highly Likely Fake" in label
-    label = get_confidence_label(verdict_real, 0.86)
-    assert "Highly Unlikely Fake" in label
-    label = get_confidence_label(verdict_fake, 0.16)
-    assert "Likely Fake" in label
-    label = get_confidence_label(verdict_real, 0.84)
-    assert "Unlikely Fake" in label
-    label = get_confidence_label(verdict_fake, 0.45)
-    assert "Not Sure" in label
-    label = get_confidence_label(verdict_real, 0.55)
-    assert "Not Sure" in label
+    # boundary: just above 85%
+    assert get_confidence_label("FAKE", 0.86) == "fake"
+    assert get_confidence_label("REAL", 0.86) == "real"
+
+    # mid-low range (15–40%)
+    assert get_confidence_label("FAKE", 0.16) == "fake"
+    assert get_confidence_label("REAL", 0.16) == "real"
+
+    # mid-high range (60–85%)
+    assert get_confidence_label("FAKE", 0.84) == "fake"
+    assert get_confidence_label("REAL", 0.84) == "real"
+
+    # within suspicious range
+    assert get_confidence_label("FAKE", 0.45) == "suspicious"
+    assert get_confidence_label("REAL", 0.55) == "suspicious"
 
 def test_build_prediction():
     # Example probability array

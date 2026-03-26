@@ -1,6 +1,9 @@
+import Link from "next/link"; // kept for profile links
+
 export default function PostHeader({
   initials,
   posterName,
+  userId,
   isOfficial,
   userHasVoted,
   timeText,
@@ -11,9 +14,8 @@ export default function PostHeader({
   menuOpen,
   setMenuOpen,
   closeMenu,
-  onEdit,
   onOpenReport,
-  onDelete,
+  onViewScan,
 }) {
   return (
     <div className="comm_topRow">
@@ -23,7 +25,11 @@ export default function PostHeader({
         </div>
         <div className="comm_headerMeta">
           <div className="comm_headerNameLine">
-            <div className="comm_headerName">{posterName}</div>
+            {userId ? (
+              <Link href={`/profile/${userId}`} className="comm_headerName comm_headerNameLink">{posterName}</Link>
+            ) : (
+              <div className="comm_headerName">{posterName}</div>
+            )}
             {isOfficial && userHasVoted && (
               <span className="comm_officialBadge">Official Post</span>
             )}
@@ -50,8 +56,12 @@ export default function PostHeader({
           {menuOpen && (
             <div className="comm_menuPanel" role="menu">
               {isOwner && (
-                <button type="button" className="comm_menuItem" onClick={onEdit}>
-                  ✏️ Edit description
+                <button
+                  type="button"
+                  className="comm_menuItem"
+                  onClick={() => { closeMenu(); onViewScan?.(); }}
+                >
+                  View Scan
                 </button>
               )}
               <button
@@ -60,17 +70,8 @@ export default function PostHeader({
                 onClick={onOpenReport}
                 disabled={isReported}
               >
-                🚩 {isReported ? "Reported" : "Report"}
+                {isReported ? "Reported" : "Report"}
               </button>
-              {isOwner && (
-                <button
-                  type="button"
-                  className="comm_menuItem comm_menuItemDanger"
-                  onClick={onDelete}
-                >
-                  🗑️ Delete
-                </button>
-              )}
             </div>
           )}
         </div>

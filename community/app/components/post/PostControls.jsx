@@ -7,28 +7,39 @@ export default function PostControls({
   onToggleComments,
   userHasVoted,
   busy,
-  upCount,
-  downCount,
   commentCount,
 }) {
   return (
-    <div className="comm_bottomRow">
-      <div className="comm_actionsLeft">
-        <button ref={voteUpRef} type="button" onClick={onVoteUp} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteUp">
-          <img className="comm_icon" src="/static/images/upvote.png" alt="" />
-          <span className="comm_actionText">Real {userHasVoted ? `(${upCount})` : ""}</span>
-        </button>
-        <button ref={voteDownRef} type="button" onClick={onVoteDown} disabled={busy || userHasVoted} className="comm_actionBtn comm_voteDown">
-          <img className="comm_icon" src="/static/images/downvote.png" alt="" />
-          <span className="comm_actionText">AI {userHasVoted ? `(${downCount})` : ""}</span>
-        </button>
-      </div>
-      <div className="comm_actionsRight">
-        <button ref={commentBtnRef} type="button" onClick={onToggleComments} className="comm_actionBtn comm_commentBtn">
-          <img className="comm_icon" src="/static/images/comment.png" alt="" />
-          {/* <span className="comm_actionText">({commentCount})</span> */}
-        </button>
-      </div>
+    <div className="comm_voteButtonRow">
+      <button
+        ref={voteUpRef}
+        type="button"
+        onClick={onVoteUp}
+        disabled={busy || userHasVoted}
+        className="comm_voteMainBtn comm_voteMainUp"
+      >
+        <img className="comm_icon" src="/static/images/upvote.png" alt="" />
+        <span>Real</span>
+      </button>
+      <button
+        ref={voteDownRef}
+        type="button"
+        onClick={onVoteDown}
+        disabled={busy || userHasVoted}
+        className="comm_voteMainBtn comm_voteMainDown"
+      >
+        <img className="comm_icon" src="/static/images/downvote.png" alt="" />
+        <span>Fake</span>
+      </button>
+      <button
+        ref={commentBtnRef}
+        type="button"
+        onClick={onToggleComments}
+        className="comm_commentIconBtn"
+      >
+        <img className="comm_icon" src="/static/images/comment.png" alt="" />
+        {commentCount > 0 && <span className="comm_actionCount">{commentCount}</span>}
+      </button>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Card, Spinner, Button } from "@heroui/react";
-import { adminService } from "@/admin/admin.js";
+import { adminService } from "../admin.js";
 
 function StatCard({ title, value, titleColor = "text-gray-300", bgStyle = "bg-[#2a2a2a]", borderStyle = "border-white/10" }) {
   return (

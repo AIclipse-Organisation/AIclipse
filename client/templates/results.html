@@ -1,128 +1,128 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>AIclipse</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/css/styles.css" />
-    <link rel="stylesheet" href="/static/css/upload.css" />
-    <link rel="stylesheet" href="/static/css/loader.css" />
-  </head>
 
-  <body class="app">
-    <div class="app-container">
-      {% set page_title = 'Results' %} {% include 'partials/topbar.html' %}
-      <main class="screen">
-        <div class="grid">
-          <div class="results-imageFrame">
-            <img id="preview-image" alt="Selected image preview" />
-          </div>
+<head>
+  <meta charset="utf-8" />
+  <title>AIclipse</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <link rel="stylesheet" href="/static/css/upload.css" />
+  <link rel="stylesheet" href="/static/css/loader.css" />
+  <link rel="stylesheet" href="/static/css/viewscan.css" />
+</head>
 
-          <div id="detect-card" class="detection-card" aria-live="polite">
-            <div class="detection-row">
-              <div class="detection-main">
-                <div class="bar-head">
-                  <span class="bar-title">Aiclipse</span>
-                  <p id="detect-verdict" class="verdict-text label-neutral">
-                    —
-                  </p>
-                </div>
+<body class="app">
+  <div class="app-container">
+    {% set page_title = 'Results' %} {% include 'partials/topbar.html' %}
+    <main class="screen">
+      <div class="grid">
+        <div class="results-imageFrame">
+          <img id="preview-image" alt="Selected image preview" />
+        </div>
 
-                <div
-                  class="progress-panel"
-                  aria-hidden="true"
-                  title="AI probability"
-                >
-                  <div class="progress-bar">
-                    <div class="real-fill" style="--p: 0"></div>
-                    <div class="ai-fill" style="--p: 0"></div>
-
-                    <span class="bar-percent" id="ai-percent">0%</span>
+        <div id="detect-card" class="detection-card" aria-live="polite">
+          <div class="detection-row">
+            <div class="detection-main">
+              <div class="comm_barBlock is-hidden aiclipse-bar-card" id="aiclipse-bar-block">
+                <div class="comm_barTrackWrap">
+                  <div class="comm_barIconCol">
+                    <img src="/static/images/aiclipse_moon.png" alt="" class="comm_resultIcon" />
                   </div>
-                </div>
+                  <span class="comm_zoneLabel comm_zoneLabel--safe" style="left: 20%">Real</span>
+                  <span class="comm_zoneLabel comm_zoneLabel--neutral" style="left: 50%">Suspicious</span>
+                  <span class="comm_zoneLabel comm_zoneLabel--risk" style="left: 80%">Fake</span>
 
-                <input id="save-public" type="checkbox" hidden />
-
-                <div id="public-desc-wrap" class="publish-extra" hidden>
-                  <label for="post-description" class="publish-label">
-                    Community Description
-                  </label>
-                  <textarea
-                    id="post-description"
-                    rows="3"
-                    placeholder="What should the community know about this scan?"
-                    class="publish-textarea"
-                  ></textarea>
-                </div>
-                <div class="action-row">
-                  <div class="visibility-selector">
-                    <button
-                      type="button"
-                      class="vis-btn is-selected"
-                      id="mode-private"
-                    >
-                      <img src="/static/images/lock.png" class="icon" alt="" />
-                      Private
-                    </button>
-
-                    <button type="button" class="vis-btn" id="mode-public">
-                      <img
-                        src="/static/images/icons8-community-100.png"
-                        class="icon"
-                        alt=""
-                      />
-                      Public
-                    </button>
-                  </div>
-
-                  <button
-                    id="btn-save"
-                    disabled
-                    type="button"
-                    class="btn-save-final"
-                  >
-                    Save
-                  </button>
-                </div>
-
-                <div class="danger-zone">
-                  <button id="btn-delete" class="btn-delete-link" type="button">
-                    Delete this scan
-                  </button>
-                </div>
-
-                <div id="delete-modal" class="modal-overlay" hidden>
-                  <div class="modal">
-                    <h3 class="modal-title">Delete scan?</h3>
-                    <p class="modal-text">This action cannot be undone.</p>
-                    <div class="modal-actions">
-                      <button
-                        id="cancel-delete"
-                        class="secondary"
-                        type="button"
-                      >
-                        Cancel
-                      </button>
-                      <button id="confirm-delete" class="danger" type="button">
-                        Delete
-                      </button>
+                  <div class="comm_progressPanel" aria-hidden="true" title="AI probability">
+                    <div class="comm_progressBar">
+                      <div class="comm_progressFill" id="ai-fill" data-p="0" style="width: 0px"></div>
+                      <div class="comm_barMarker" style="left: 38%"></div>
+                      <div class="comm_barMarker" style="left: 62%"></div>
+                      <span class="comm_barPercent" id="ai-percent">0%</span>
                     </div>
+                  </div>
+                  <div class="comm_voteSummary comm_voteSummary--row">
+                    <span>AIclipse's Estimate</span>
+                    <span>Probability of Fakeness</span>
+                  </div>
+                </div>
+              </div>
+
+              <p id="detect-verdict" class="verdict-text label-neutral" hidden>—</p>
+
+              <input id="save-public" type="checkbox" hidden />
+
+              <!-- Toggle row -->
+              <div class="res-toggle">
+                <button type="button" class="res-toggle__btn is-selected" id="mode-private">
+                  <img src="/static/images/lock.png" alt="" />
+                  <span>Private</span>
+                </button>
+                <button type="button" class="res-toggle__btn" id="mode-public">
+                  <img src="/static/images/icons8-community-100.png" alt="" />
+                  <span>Public</span>
+                </button>
+              </div>
+
+              <!-- Save + Delete row -->
+              <div class="comm_voteButtonRow res-actionRow">
+                <button id="btn-save" disabled type="button" class="comm_voteMainBtn vs-actionBtn res-saveBtn">
+                  <span class="comm_actionText">Confirm &amp; Save</span>
+                </button>
+                <button id="btn-delete" type="button" class="comm_voteMainBtn vs-actionBtn vs-deleteBtn">
+                  <svg class="comm_icon vs-svgIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                  </svg>
+                  <span class="comm_actionText">Delete</span>
+                </button>
+              </div>
+
+              <div id="delete-modal" class="modal-overlay" hidden>
+                <div class="modal">
+                  <h3 class="modal-title">Delete scan?</h3>
+                  <p class="modal-text">This action cannot be undone.</p>
+                  <div class="modal-actions">
+                    <button id="cancel-delete" class="secondary" type="button">
+                      Cancel
+                    </button>
+                    <button id="confirm-delete" class="danger" type="button">
+                      Delete
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </main>
+      </div>
+    </main>
 
-      {% include 'partials/navbar.html' %}
+    {% include 'partials/navbar.html' %}
+  </div>
+
+  <!-- Publish to Community Modal -->
+  <div id="publish-modal" class="modal-overlay" hidden>
+    <div class="modal">
+      <h3 class="modal-title">Publish to Community</h3>
+      <p class="modal-text">Add a description for your post (required, max 1000 characters):</p>
+      <textarea id="post-description" class="edit-desc-modal-textarea" maxlength="1000" rows="5"
+        placeholder="Describe your image..."></textarea>
+      <div class="edit-desc-modal-count">
+        <span id="publish-desc-count">0</span>/1000
+      </div>
+      <div id="publish-modal-status" class="make-public-status"></div>
+      <div class="modal-actions">
+        <button type="button" id="publish-modal-cancel" class="secondary">Cancel</button>
+        <button type="button" id="publish-modal-confirm" class="primary-gold">Confirm</button>
+      </div>
     </div>
+  </div>
 
-    <script src="/static/js/include.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/upload.js"></script>
-    <script src="/static/js/results.js"></script>
-    <script src="/static/js/main.js"></script>
-    <script src="/static/js/loader.js"></script>
-  </body>
+  <script src="/static/js/include.js"></script>
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/upload.js"></script>
+  <script src="/static/js/results.js"></script>
+  <script src="/static/js/main.js"></script>
+  <script src="/static/js/loader.js"></script>
+</body>
+
 </html>

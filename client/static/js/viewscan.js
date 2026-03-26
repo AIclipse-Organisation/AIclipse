@@ -48,6 +48,71 @@ function toPercentNumber(confidence) {
   return Math.round(clamped * 100);
 }
 
+// Scrambling number animation
+function createScrambledNumber(finalValue, element, shouldAnimate, delay = 0) {
+  if (!shouldAnimate) {
+    element.textContent = `${finalValue}%`;
+    return;
+  }
+
+  const startTime = Date.now() + delay;
+  const duration = 1500; // 1.5 seconds of scrambling
+  const scrambleDuration = 1200; // Scramble for first 1.2 seconds
+
+  const animate = () => {
+    const elapsed = Date.now() - startTime;
+
+    if (elapsed < 0) {
+      // Still in delay period
+      element.textContent = "0%";
+      requestAnimationFrame(animate);
+      return;
+    }
+
+    if (elapsed < scrambleDuration) {
+      // Scrambling phase - show random numbers
+      const randomValue = Math.floor(Math.random() * 100);
+      element.textContent = `${randomValue}%`;
+      requestAnimationFrame(animate);
+    } else if (elapsed < duration) {
+      // Settling phase - ease towards final value
+      const settleProgress = (elapsed - scrambleDuration) / (duration - scrambleDuration);
+      const eased = 1 - Math.pow(1 - settleProgress, 3); // Ease out cubic
+      const currentValue = Math.round(eased * finalValue);
+      element.textContent = `${currentValue}%`;
+      requestAnimationFrame(animate);
+    } else {
+      // Animation complete
+      element.textContent = `${finalValue}%`;
+    }
+  };
+
+  requestAnimationFrame(animate);
+}
+
+// Zone gradient anchored to bar width + a sheen overlay
+function fillStyle(aiPct, gradient) {
+  const pct = Math.max(aiPct, 0.1);
+  const zoneSize = `${(10000 / pct).toFixed(2)}%`;
+  return `
+    linear-gradient(to right, rgba(0,0,0,0.28), transparent) left / 100% 100% no-repeat,
+    linear-gradient(to right, ${gradient}) left / ${zoneSize} 100% no-repeat
+  `;
+}
+
+function setFillPercent(fillEl, percent) {
+  if (!fillEl) return;
+  const p = clamp(percent, 0, 100);
+  fillEl.style.width = p === 0 ? "0px" : `calc(${p}% - 8px)`;
+  fillEl.dataset.p = String(p);
+}
+
+function clamp(n, min, max) {
+  n = Number(n);
+  if (!Number.isFinite(n)) n = 0;
+  return Math.max(min, Math.min(max, n));
+}
+
 function clamp(n, min, max) {
   n = Number(n);
   if (!Number.isFinite(n)) n = 0;
@@ -308,6 +373,42 @@ function showPanel(panel) {
 }
 
 // -------------------------
+// Bar fill + zone label helpers (community bar design)
+// -------------------------
+const GRADIENT_AICLIPSE = "#cfb87c 0%, #cfb87c 40%, #e07043 60%, #cc2222 100%";
+const GRADIENT_COMMUNITY = "#af83c9 0%, #af83c9 40%, #d06bb0 60%, #cc2222 100%";
+
+function setFillWithGradient(fillEl, aiPct, gradient) {
+  if (!fillEl) return;
+  const p = clamp(aiPct, 0, 100);
+  fillEl.style.width = p === 0 ? "0px" : `calc(${p}% - 8px)`;
+  fillEl.dataset.p = String(p);
+  const pctSafe = Math.max(p, 0.1);
+  const zoneSize = `${(10000 / pctSafe).toFixed(2)}%`;
+  fillEl.style.background = `linear-gradient(to right, rgba(0,0,0,0.28), transparent) left / 100% 100% no-repeat, linear-gradient(to right, ${gradient}) left / ${zoneSize} 100% no-repeat`;
+}
+
+function setZoneLabels(container, aiPct) {
+  if (!container) return;
+  const zone = aiPct < 40 ? "safe" : aiPct <= 60 ? "neutral" : "risk";
+  container.querySelectorAll(".comm_zoneLabel").forEach(el => {
+    el.classList.toggle("comm_zoneLabel--active", el.classList.contains(`comm_zoneLabel--${zone}`));
+  });
+}
+
+// NEW: replay the reveal animation for the View Scan bars
+function animateVerdictBars() {
+  const block = document.getElementById("verdict-block");
+  if (!block || block.hidden) return;
+
+  block.classList.remove("is-revealed");
+  block.classList.add("is-hidden");
+  void block.offsetWidth; // Force reflow
+  block.classList.remove("is-hidden");
+  block.classList.add("is-revealed");
+}
+
+// -------------------------
 // NEW: Aiclipse card (gold) computations
 // Matches your Results logic:
 // - If AI/fake/deepfake => confidence is AI% => REAL = 1 - confidence
@@ -322,44 +423,38 @@ function normalizeLabelText(raw) {
 function getRealLikelihoodPercent(img) {
   if (!img) return 0;
 
-  const rawLabel = normalizeLabelText(img.label || img.result || img.verdict || "Unknown");
-  const labelLower = rawLabel.toLowerCase();
+  const verdict = String(img.verdict || "unknown").toLowerCase();
+  const label = String(img.label || img.result || verdict).toLowerCase();
   const confidenceRaw = Number.isFinite(img.confidence) ? img.confidence : (img.score ?? 0);
   const confidence = clamp(confidenceRaw, 0, 1);
 
-  const isAi =
-    labelLower.includes("ai") ||
-    labelLower.includes("fake") ||
-    labelLower.includes("deepfake");
+  // Use verdict for logic, label is just lowercase version of verdict
+  const prediction = verdict !== "unknown" ? verdict : label;
 
-  const isReal = labelLower.includes("real") && !isAi;
-  const realProb = isReal ? confidence : (1 - confidence);
-
+  // Calculate real probability based on prediction
+  const realProb = prediction === "real" ? confidence : (1 - confidence);
   return clamp(realProb * 100, 0, 100);
 }
 
 function renderAiclipseCard(img) {
   const wrap = document.getElementById("verdict-block");
   const card = document.getElementById("aiclipse-card");
-  const verdictEl = document.getElementById("aiclipse-verdict");
   const fillEl = document.getElementById("aiclipse-fill");
   const pctEl = document.getElementById("aiclipse-percent");
 
-  if (!wrap || !card || !verdictEl || !fillEl || !pctEl) return;
+  if (!wrap || !card || !fillEl || !pctEl) return;
 
   if (!img) {
     card.hidden = true;
     return;
   }
 
-  const rawLabel = normalizeLabelText(img.label || img.result || img.verdict || "Unknown");
   const realPct = getRealLikelihoodPercent(img);
   const aiPct = 100 - realPct;
 
-  verdictEl.textContent = rawLabel || "—";
-  pctEl.textContent = `${aiPct.toFixed(2)}%`;
-
-  setFillPercent(fillEl, aiPct);
+  pctEl.textContent = `${Math.round(aiPct)}%`;
+  setFillWithGradient(fillEl, aiPct, GRADIENT_AICLIPSE);
+  setZoneLabels(card, aiPct);
 
   wrap.hidden = false;
   card.hidden = false;
@@ -372,31 +467,32 @@ function renderAiclipseCard(img) {
 // - no votes => "No community votes" and 0.00%
 // -------------------------
 function communityVerdictText(pctReal) {
-  if (pctReal >= 40 && pctReal <= 60) return "Not sure";
-
-  if (pctReal > 60) {
-    if (pctReal >= 86) return "Highly Unlikely Fake";
-    return "Unlikely Fake";
-  }
-
-  const pctAI = 100 - pctReal;
-  if (pctAI >= 86) return "Highly Likely Fake";
-  return "Likely Fake";
+  if (pctReal >= 40 && pctReal <= 60) return "SUSPICIOUS";
+  if (pctReal > 60) return "REAL";
+  return "FAKE";
 }
 
 function renderCommunityCard(img) {
   const card = document.getElementById("community-card");
+  const privateNote = document.getElementById("community-private-note");
+  const realFillEl = document.getElementById("community-real-fill");
+  const fakeFillEl = document.getElementById("community-fake-fill");
+  const realPctEl = document.getElementById("community-real-pct");
+  const fakePctEl = document.getElementById("community-fake-pct");
+  const realCountEl = document.getElementById("community-real-count");
+  const fakeCountEl = document.getElementById("community-fake-count");
+  const summaryEl = document.getElementById("community-summary");
+  const totalEl = document.getElementById("community-total");
   const verdictEl = document.getElementById("community-verdict");
-  const fillEl = document.getElementById("community-fill");
-  const pctEl = document.getElementById("community-percent");
 
-  if (!card || !verdictEl || !fillEl || !pctEl) return;
+  if (!card) return;
 
-  // Only show for public posts
-  if (!img || isPrivateScan(img)) {
+  if (!img) {
     card.hidden = true;
     return;
   }
+
+  if (privateNote) privateNote.hidden = !isPrivateScan(img);
 
   const up = Number(img.up_vote_count);
   const down = Number(img.down_vote_count);
@@ -404,21 +500,72 @@ function renderCommunityCard(img) {
   const downN = Number.isFinite(down) ? down : 0;
   const total = upN + downN;
 
-  // FIX: When there are no votes, show "—" instead of "0.00%"
+  // Update vote counts
+  if (realCountEl) realCountEl.textContent = `${upN} ${upN === 1 ? "vote" : "votes"}`;
+  if (fakeCountEl) fakeCountEl.textContent = `${downN} ${downN === 1 ? "vote" : "votes"}`;
+
   if (total <= 0) {
-    verdictEl.textContent = "No community votes";
-    pctEl.textContent = "—"; 
-    setFillPercent(fillEl, 0);
+    // No votes - show empty bars
+    if (realFillEl) {
+      realFillEl.style.width = "0px";
+      realFillEl.style.background = "linear-gradient(to right, rgba(0,0,0,0.28), transparent), #cfb87c";
+    }
+    if (fakeFillEl) {
+      fakeFillEl.style.width = "0px";
+      fakeFillEl.style.background = "linear-gradient(to right, rgba(0,0,0,0.28), transparent), linear-gradient(to right, #cfb87c, #e07043, #cc2222)";
+    }
+    if (realPctEl) realPctEl.textContent = "0%";
+    if (fakePctEl) fakePctEl.textContent = "0%";
+    if (summaryEl) summaryEl.hidden = true;
+
     card.hidden = false;
     return;
   }
 
   const pctReal = clamp((upN / total) * 100, 0, 100);
-  const pctAi = 100 - pctReal;
+  const pctFake = 100 - pctReal;
 
-  verdictEl.textContent = communityVerdictText(pctReal);
-  pctEl.textContent = `${pctAi.toFixed(2)}%`;
-  setFillPercent(fillEl, pctAi);
+  // Set fill widths and gradients
+  if (realFillEl) {
+    realFillEl.style.width = pctReal === 0 ? "0px" : `calc(${pctReal}% - 8px)`;
+    const realGradient = "#cfb87c";
+    const pctSafe = Math.max(pctReal, 0.1);
+    const zoneSize = `${(10000 / pctSafe).toFixed(2)}%`;
+    realFillEl.style.background = `linear-gradient(to right, rgba(0,0,0,0.28), transparent) left / 100% 100% no-repeat, linear-gradient(to right, ${realGradient}) left / ${zoneSize} 100% no-repeat`;
+  }
+
+  if (fakeFillEl) {
+    fakeFillEl.style.width = pctFake === 0 ? "0px" : `calc(${pctFake}% - 8px)`;
+    const fakeGradient = "#cfb87c, #e07043, #cc2222";
+    const pctSafe = Math.max(pctFake, 0.1);
+    const zoneSize = `${(10000 / pctSafe).toFixed(2)}%`;
+    fakeFillEl.style.background = `linear-gradient(to right, rgba(0,0,0,0.28), transparent) left / 100% 100% no-repeat, linear-gradient(to right, ${fakeGradient}) left / ${zoneSize} 100% no-repeat`;
+  }
+
+  // Add scrambling animations with delay
+  if (realPctEl) createScrambledNumber(Math.round(pctReal), realPctEl, true, 250);
+  if (fakePctEl) createScrambledNumber(Math.round(pctFake), fakePctEl, true, 250);
+
+  // Update summary
+  if (summaryEl && totalEl && verdictEl) {
+    totalEl.textContent = total;
+
+    let verdict, verdictClass;
+    if (pctReal > pctFake) {
+      verdict = "Real";
+      verdictClass = "comm_voteSummary--real";
+    } else if (pctFake > pctReal) {
+      verdict = "Fake";
+      verdictClass = "comm_voteSummary--fake";
+    } else {
+      verdict = "Split";
+      verdictClass = "comm_voteSummary--split";
+    }
+
+    verdictEl.textContent = verdict;
+    verdictEl.className = verdictClass;
+    summaryEl.hidden = false;
+  }
 
   card.hidden = false;
 }
@@ -594,91 +741,22 @@ function renderVerdictBlock(img) {
   track.hidden = false;
 }
 
-// Renders a definition list from whatever keys exist.
-// Also renders “known” fields in a nicer order first.
-function renderMeta(img) {
-  const metaList = document.getElementById("meta-list");
-  if (!metaList) return;
-
-  clearEl(metaList);
-
-  const addMeta = (label, value) => {
-    metaList.appendChild(makeEl("dt", "meta-key", label));
-    metaList.appendChild(makeEl("dd", "meta-value", value));
-  };
-
-  // Fields to hide
-  const hiddenFields = new Set([
-    "image_id",
-    "url",
-    "is_reported",
-    "s3_key",
-    "user_id",
-    "_id",
-    "post_id",
-    "is_public",
-    "clicks_count",
-    "comment_count",
-    "controversial_since",
-    "created_at",
-    "updated_at",
-    "debug",
-    "result",
-    "score",
-    "user_name",
-    "model_version",
-  ]);
-
-  // Show any other non-hidden fields (but skip those shown in dedicated cards)
-  const alreadyShown = new Set([
-    "is_public",
-    "uploaded_at",
-    "label",
-    "verdict",
-    "confidence",
-    "description",
-    "up_vote_count",
-    "down_vote_count",
-  ]);
-
-  Object.keys(img || {})
-    .sort()
-    .forEach((key) => {
-      if (hiddenFields.has(key) || alreadyShown.has(key)) return;
-
-      const val = img[key];
-      let out;
-
-      if (val === null || val === undefined) out = "N/A";
-      else if (typeof val === "object") {
-        try {
-          out = JSON.stringify(val);
-        } catch (_) {
-          out = "[object]";
-        }
-      } else {
-        out = String(val);
-      }
-
-      addMeta(key, out);
-    });
-}
 
 function renderQuickMeta(img) {
-  const wrap = document.getElementById("scan-quick-meta");
+  // Hidden compat elements
   const visibilityEl = document.getElementById("scan-quick-visibility");
-  const uploadedEl = document.getElementById("scan-quick-uploaded");
+  if (visibilityEl && img) visibilityEl.textContent = visibilityOf(img);
 
-  if (!wrap || !visibilityEl || !uploadedEl) return;
-
-  if (!img) {
-    wrap.hidden = true;
-    return;
+  // Instagram-style upload date in the page header
+  const uploadDateEl = document.getElementById("vs-upload-date");
+  if (uploadDateEl) {
+    if (img && img.uploaded_at) {
+      uploadDateEl.textContent = formatDate(img.uploaded_at);
+      uploadDateEl.hidden = false;
+    } else {
+      uploadDateEl.hidden = true;
+    }
   }
-
-  visibilityEl.textContent = visibilityOf(img);
-  uploadedEl.textContent = formatDate(img.uploaded_at);
-  wrap.hidden = false;
 }
 
 // Render description header above image
@@ -690,7 +768,20 @@ function renderDescriptionHeader(img) {
   if (!section || !textEl || !privatePlaceholder) return;
 
   const isPrivate = isPrivateScan(img);
+  const isModerated = !!(img && img.moderation_status === "removed");
   const hasDescription = !!(img && img.description);
+
+  // Reset moderation styling
+  textEl.classList.remove("is-moderated-reason");
+
+  if (isModerated) {
+    section.hidden = false;
+    textEl.hidden = false;
+    textEl.textContent = img.moderation_reason || "This image has been removed by moderation.";
+    textEl.classList.add("is-moderated-reason");
+    privatePlaceholder.hidden = true;
+    return;
+  }
 
   if (hasDescription) {
     section.hidden = false;
@@ -701,7 +792,7 @@ function renderDescriptionHeader(img) {
   }
 
   if (isPrivate) {
-    section.hidden = false;
+    section.hidden = true;
     textEl.hidden = true;
     textEl.textContent = "";
     privatePlaceholder.hidden = false;
@@ -745,22 +836,28 @@ function renderVotesCard(img) {
 
   if (isPrivateScan(img)) {
     card.hidden = true;
-    privatePlaceholder.hidden = false;
+    privatePlaceholder.hidden = true;
     return;
   }
 
   const upVotes = img.up_vote_count !== undefined ? img.up_vote_count : 0;
   const downVotes = img.down_vote_count !== undefined ? img.down_vote_count : 0;
 
-  if (upvotesEl) upvotesEl.textContent = String(upVotes);
-  if (downvotesEl) downvotesEl.textContent = String(downVotes);
+  if (upvotesEl) upvotesEl.textContent = String("(" + upVotes + ")");
+  if (downvotesEl) downvotesEl.textContent = String("(" + downVotes + ")");
 
   privatePlaceholder.hidden = true;
   card.hidden = false;
 }
 
-function renderScan(img, title) {
+async function renderScan(img, title) {
   currentScan = img;
+
+  const card = document.getElementById("viewscan-card");
+  const imageEl = document.getElementById("viewscan-image");
+  const titleEl = document.getElementById("viewscan-title");
+
+  if (!card || !imageEl || !titleEl) return;
 
   // Mark by post only for explicit scans-origin navigation.
   const scansOriginPostId = consumeScansMarkPostId();
@@ -768,47 +865,6 @@ function renderScan(img, title) {
   if (scansOriginPostId && currentPostId && scansOriginPostId === currentPostId) {
     markNotificationsReadForPost(currentPostId);
   }
-
-  const card = document.getElementById("viewscan-card");
-  const imageEl = document.getElementById("viewscan-image");
-  const titleEl = document.getElementById("viewscan-title");
-
-  // ✅ NEW (necessary): refresh live votes from backend, then re-render community card/meta.
-  // This keeps the first render fast (cached), and then syncs with Community page.
-  refreshCommunityData(img).then((ok) => {
-    if (!ok) return;
-
-    renderMeta(currentScan);
-    renderQuickMeta(currentScan);
-    renderDescriptionHeader(currentScan);
-    renderVerdictConfidenceCard(currentScan);
-    renderVotesCard(currentScan);
-
-    setupEditDescriptionInline(currentScan);
-    setupShowComments(currentScan);
-    setupDeletePost(currentScan);
-
-    renderCommunityCard(currentScan);
-  });
-
-  // Keep your existing enrichment (post_id/description) as-is
-  ensurePostIdForPublicScan(img).then((ok) => {
-    if (!ok) return;
-
-    renderMeta(currentScan);
-    renderDescriptionHeader(currentScan);
-    renderVerdictConfidenceCard(currentScan);
-    renderVotesCard(currentScan);
-
-    setupEditDescriptionInline(currentScan);
-    setupShowComments(currentScan);
-    setupDeletePost(currentScan);
-
-    // re-render community card after enrichment (votes/post id)
-    renderCommunityCard(currentScan);
-  });
-
-  if (!card || !imageEl || !titleEl) return;
 
   if (!img) {
     card.hidden = true;
@@ -830,32 +886,35 @@ function renderScan(img, title) {
     imageEl.style.display = "none";
   }
 
-  // NEW: community-style cards
-  renderAiclipseCard(img);
-  renderCommunityCard(img);
-  renderQuickMeta(img);
+  // Wait for async enrichments first so we only render once
+  try {
+    await Promise.all([
+      refreshCommunityData(img),
+      ensurePostIdForPublicScan(img),
+    ]);
+  } catch (_) {
+    // silent fail — page will still render with whatever data is available
+  }
 
-  renderMeta(img);
-  renderDescriptionHeader(img);
-  renderVerdictConfidenceCard(img);
-  renderVotesCard(img);
+  // Single render pass
+  renderAiclipseCard(currentScan);
+  renderCommunityCard(currentScan);
+  renderQuickMeta(currentScan);
+  renderDescriptionHeader(currentScan);
+  renderVerdictConfidenceCard(currentScan);
+
   card.hidden = false;
   setStatus("", null);
 
-  // Edit Description (INLINE, only when post_id exists)
-  setupEditDescriptionInline(img);
+  // Setup handlers after final data is ready
+  setupEditDescriptionInline(currentScan);
+  setupShowComments(currentScan);
+  setupDeletePost(currentScan);
+  setupDeleteScan(currentScan);
+  setupMakePublicInline(currentScan);
 
-  // Show Comments (only for public posts with post_id)
-  setupShowComments(img);
-
-  // Delete Post (only for public posts with post_id)
-  setupDeletePost(img);
-
-  // Delete Scan (only for private scans)
-  setupDeleteScan(img);
-
-  // Inline Make Public UI (ONLY when private)
-  setupMakePublicInline(img);
+  // Animate once only
+  animateVerdictBars();
 }
 
 // -------------------------
@@ -863,33 +922,28 @@ function renderScan(img, title) {
 // (UNCHANGED)
 // -------------------------
 function setupEditDescriptionInline(img) {
-  const section = document.getElementById("edit-description-section");
+  const modal = document.getElementById("edit-desc-modal");
   const openBtn = document.getElementById("btn-edit-description");
-  const form = document.getElementById("edit-description-form");
   const input = document.getElementById("edit-description-input");
   const countEl = document.getElementById("edit-description-count");
   const statusEl = document.getElementById("edit-description-status");
   const saveBtn = document.getElementById("edit-description-save");
   const cancelBtn = document.getElementById("edit-description-cancel");
 
-  if (!section || !openBtn || !form || !input || !statusEl || !saveBtn || !cancelBtn) {
-    if (section) section.style.display = img && getPostId(img) ? "block" : "none";
+  if (!modal || !openBtn || !input || !statusEl || !saveBtn || !cancelBtn) {
+    if (openBtn) openBtn.hidden = !(img && getPostId(img));
     return;
   }
 
   const postId = getPostId(img);
   const shouldShow = !!postId;
-  section.style.display = shouldShow ? "block" : "none";
+  openBtn.hidden = !shouldShow;
 
-  if (!shouldShow) {
-    form.hidden = true;
-    setSelected(openBtn, false);
-    return;
-  }
+  if (!shouldShow) return;
 
   const maxLen = 1000;
   let originalDescription = img.description || "";
-  let formOpen = false;
+  let modalOpen = false;
   let hasUnsavedChanges = false;
 
   const setFormStatus = (text, kind) => {
@@ -904,7 +958,7 @@ function setupEditDescriptionInline(img) {
     countEl.textContent = String(input.value.length);
   };
 
-  const openForm = () => {
+  const openModal = () => {
     originalDescription = currentScan && currentScan.description ? String(currentScan.description) : "";
     input.value = originalDescription;
     syncCount();
@@ -914,15 +968,14 @@ function setupEditDescriptionInline(img) {
     saveBtn.textContent = "Save";
 
     hasUnsavedChanges = false;
-    formOpen = true;
+    modalOpen = true;
 
-    showPanel(form);
-    setSelected(openBtn, true);
+    modal.hidden = false;
     input.focus();
   };
 
-  const closeForm = () => {
-    hidePanel(form);
+  const closeModal = () => {
+    modal.hidden = true;
     input.value = "";
     if (countEl) countEl.textContent = "0";
     setFormStatus("", null);
@@ -931,26 +984,17 @@ function setupEditDescriptionInline(img) {
     saveBtn.textContent = "Save";
 
     hasUnsavedChanges = false;
-    formOpen = false;
-
-    setSelected(openBtn, false);
-  };
-
-  const toggleForm = () => {
-    const makePublicForm = document.getElementById("make-public-form");
-    const makePublicBtn = document.getElementById("btn-make-public");
-    if (makePublicForm && !makePublicForm.hidden) {
-      hidePanel(makePublicForm);
-      setSelected(makePublicBtn, false);
-    }
-
-    if (form.hidden) openForm();
-    else closeForm();
+    modalOpen = false;
   };
 
   if (!openBtn.dataset.bound) {
     openBtn.dataset.bound = "1";
-    openBtn.addEventListener("click", toggleForm);
+    openBtn.addEventListener("click", openModal);
+  }
+
+  if (!modal.dataset.bound) {
+    modal.dataset.bound = "1";
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
   }
 
   if (!input.dataset.bound) {
@@ -964,7 +1008,7 @@ function setupEditDescriptionInline(img) {
   if (!window.__editDescBeforeUnloadBound) {
     window.__editDescBeforeUnloadBound = true;
     window.addEventListener("beforeunload", (e) => {
-      if (formOpen && hasUnsavedChanges) {
+      if (modalOpen && hasUnsavedChanges) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -974,7 +1018,7 @@ function setupEditDescriptionInline(img) {
   if (!cancelBtn.dataset.bound) {
     cancelBtn.dataset.bound = "1";
     cancelBtn.addEventListener("click", () => {
-      closeForm();
+      closeModal();
     });
   }
 
@@ -1005,11 +1049,11 @@ function setupEditDescriptionInline(img) {
 
         currentScan.description = description;
         currentScan.updated_at = new Date().toISOString();
-        renderMeta(currentScan);
+        renderDescriptionHeader(currentScan);
 
         setFormStatus("✓ Description updated.", "success");
 
-        setTimeout(() => closeForm(), 600);
+        setTimeout(() => closeModal(), 600);
       } catch (err) {
         setFormStatus(err?.message || "Failed to update description.", "error");
         saveBtn.disabled = false;
@@ -1040,130 +1084,215 @@ async function patchPostDescription(postId, description) {
 }
 
 // -------------------------
-// Show Comments (UNCHANGED)
+// Comments bottom-sheet drawer
 // -------------------------
-function setupShowComments(img) {
-  const section = document.getElementById("show-comments-section");
-  const showBtn = document.getElementById("btn-show-comments");
-  const container = document.getElementById("comments-container");
-  const statusEl = document.getElementById("comments-status");
-  const listEl = document.getElementById("comments-list");
 
-  if (!section || !showBtn || !container || !statusEl || !listEl) {
-    if (section) section.style.display = "none";
-    return;
-  }
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+function getInitials(name) {
+  if (!name) return "?";
+  return name.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
+}
+
+function setupShowComments(img) {
+  const triggerBtn = document.getElementById("btn-comments");
+  const sheet = document.getElementById("comments-sheet");
+  const backdrop = document.getElementById("comments-backdrop");
+  const closeBtn = document.getElementById("comments-close");
+  const handle = document.getElementById("comments-handle");
+  const listEl = document.getElementById("comments-list");
+  const input = document.getElementById("comments-input");
+  const postBtn = document.getElementById("comments-post");
+
+  if (!triggerBtn || !sheet || !backdrop || !listEl) return;
 
   const postId = getPostId(img);
+  const shouldShow = !!(postId && !isPrivateScan(img) && img?.is_public === true);
+  triggerBtn.style.display = shouldShow ? "flex" : "none";
+  if (!shouldShow) return;
 
-  const shouldShow = !!(postId && !isPrivateScan(img));
-  section.style.display = shouldShow ? "block" : "none";
-
-  if (!shouldShow) {
-    return;
+  // Eagerly fetch comment count for the grid cell
+  const countEl = document.getElementById("btn-comments-count");
+  if (countEl) {
+    fetch(`/community/posts/comments?post_id=${encodeURIComponent(postId)}`, {
+      headers: { Accept: "application/json" },
+      credentials: "include",
+    })
+      .then((r) => r.json())
+      .then((d) => { if (countEl) countEl.textContent = String((d.items || []).length); })
+      .catch(() => { if (countEl) countEl.textContent = "0"; });
   }
 
-  let commentsVisible = false;
-
-  const setStatus = (text, isError) => {
-    statusEl.textContent = text || "";
+  // Open/close helpers
+  const openDrawer = () => {
+    const pid = getPostId(currentScan);
+    if (!pid) return;
+    backdrop.hidden = false;
+    sheet.classList.add("comm_bottomSheet--open");
+    document.getElementById("app-container")?.style.setProperty("overflow", "hidden");
+    if (!sheet.dataset.loaded) {
+      loadComments(pid);
+      sheet.dataset.loaded = "1";
+    }
   };
 
-  const renderComments = (comments) => {
-    clearEl(listEl);
+  const closeDrawer = () => {
+    backdrop.hidden = true;
+    sheet.classList.remove("comm_bottomSheet--open");
+    document.getElementById("app-container")?.style.removeProperty("overflow");
+  };
 
+  // Render comments list
+  const renderComments = (comments, currentUserId) => {
+    clearEl(listEl);
     if (!comments || comments.length === 0) {
-      listEl.appendChild(makeEl("div", "comment-empty", "No comments yet."));
+      listEl.appendChild(makeEl("div", "comm_emptyComments", "No comments yet. Start the conversation!"));
       return;
     }
+    comments.forEach((c) => {
+      const row = makeEl("div", "comm_commentRow");
 
-    comments.forEach((comment) => {
-      const commentDiv = makeEl("div", "comment-item");
+      const avatar = makeEl("div", "comm_commentAvatar", getInitials(c.user_name));
 
-      const header = makeEl("div", "comment-header");
-      const username = makeEl("span", "comment-username", comment.user_name || "Anonymous");
-      const date = makeEl(
-        "span",
-        "comment-date",
-        comment.created_at ? formatDate(comment.created_at) : ""
-      );
-      header.appendChild(username);
-      header.appendChild(date);
+      const content = makeEl("div", "comm_commentContent");
+      const top = makeEl("div", "comm_commentTop");
+      const author = makeEl("span", "comm_commentAuthor", c.user_name || "Anonymous");
+      const time = makeEl("span", "comm_commentTime", timeAgo(c.created_at));
+      top.appendChild(author);
+      top.appendChild(time);
 
-      const body = makeEl("div", "comment-body", comment.text || "");
+      const text = makeEl("div", "comm_commentText", c.text || "");
+      content.appendChild(top);
+      content.appendChild(text);
 
-      commentDiv.appendChild(header);
-      commentDiv.appendChild(body);
-      listEl.appendChild(commentDiv);
+      if (currentUserId && c.user_id === currentUserId) {
+        const delBtn = makeEl("button", "comm_commentDeleteBtn", "Delete");
+        delBtn.type = "button";
+        delBtn.addEventListener("click", () => deleteComment(c.comment_id, row));
+        content.appendChild(delBtn);
+      }
+
+      row.appendChild(avatar);
+      row.appendChild(content);
+      listEl.appendChild(row);
     });
   };
 
-  const toggleComments = async () => {
-    if (commentsVisible) {
-      container.hidden = true;
-      commentsVisible = false;
-      showBtn.textContent = "Show Comments";
-      setSelected(showBtn, false);
-    } else {
-      container.hidden = false;
-      commentsVisible = true;
-      showBtn.textContent = "Hide Comments";
-      setSelected(showBtn, true);
-
-      setStatus("Loading comments...", false);
+  // Fetch comments
+  const loadComments = async (pid) => {
+    clearEl(listEl);
+    listEl.appendChild(makeEl("div", "comm_loadingComments", "Loading..."));
+    try {
+      const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(pid)}`, {
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      const meRes = await fetch("/auth/me", { credentials: "include" }).catch(() => null);
+      const me = meRes?.ok ? await meRes.json().catch(() => ({})) : {};
+      renderComments(data.items || [], me.user_id || null);
+    } catch {
       clearEl(listEl);
-
-      try {
-        const postIdNow = getPostId(currentScan);
-        if (!postIdNow) {
-          setStatus("Missing post id for this scan.", true);
-          return;
-        }
-
-        const res = await fetch(`/community/posts/comments?post_id=${encodeURIComponent(postIdNow)}`, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          credentials: "include",
-        });
-
-        const data = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          setStatus(data.error || data.detail || `Failed to load comments (${res.status})`, true);
-          return;
-        }
-
-        setStatus("", false);
-        renderComments(data.items || []);
-      } catch (err) {
-        setStatus("Network error loading comments.", true);
-      }
+      listEl.appendChild(makeEl("div", "comm_emptyComments", "Failed to load comments."));
     }
   };
 
-  if (!showBtn.dataset.bound) {
-    showBtn.dataset.bound = "1";
-    showBtn.addEventListener("click", toggleComments);
+  // Delete a comment
+  const deleteComment = async (commentId, rowEl) => {
+    try {
+      const res = await fetch(`/community/posts/comments?comment_id=${encodeURIComponent(commentId)}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      if (res.ok) {
+        rowEl.remove();
+        const countEl = document.getElementById("btn-comments-count");
+        if (countEl) {
+          const cur = parseInt(countEl.textContent, 10);
+          if (!isNaN(cur)) countEl.textContent = String(Math.max(0, cur - 1));
+        }
+      }
+    } catch { /* silent */ }
+  };
+
+  // Post a comment
+  const submitComment = async () => {
+    const text = input.value.trim();
+    if (!text) return;
+    const pid = getPostId(currentScan);
+    if (!pid) return;
+
+    postBtn.disabled = true;
+    try {
+      const meRes = await fetch("/auth/me", { credentials: "include" });
+      if (!meRes.ok) return;
+      const me = await meRes.json().catch(() => ({}));
+      if (!me.user_id) return;
+
+      const res = await fetch("/community/posts/comments", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ post_id: pid, user_id: me.user_id, user_name: me.user_name || me.user_id, text }),
+      });
+      if (res.ok) {
+        const newComment = await res.json().catch(() => ({}));
+        input.value = "";
+        postBtn.disabled = true;
+        // Reload to pick up new comment with proper ID and refresh count
+        sheet.dataset.loaded = "";
+        loadComments(pid).then(() => {
+          const countEl = document.getElementById("btn-comments-count");
+          if (countEl) countEl.textContent = String(listEl.querySelectorAll(".comm_commentRow").length);
+        });
+      }
+    } catch { /* silent */ } finally {
+      postBtn.disabled = !input.value.trim();
+    }
+  };
+
+  // Bind events once
+  if (!triggerBtn.dataset.bound) {
+    triggerBtn.dataset.bound = "1";
+    triggerBtn.addEventListener("click", openDrawer);
+    backdrop.addEventListener("click", closeDrawer);
+    closeBtn?.addEventListener("click", closeDrawer);
+    handle?.addEventListener("click", closeDrawer);
+    input?.addEventListener("input", () => { postBtn.disabled = !input.value.trim(); });
+    input?.addEventListener("keydown", (e) => { if (e.key === "Enter" && input.value.trim()) submitComment(); });
+    postBtn?.addEventListener("click", submitComment);
   }
 }
 
 // -------------------------
-// Delete Post (UNCHANGED)
+// Make Private (replaces Delete Post)
 // -------------------------
 function setupDeletePost(img) {
-  const section = document.getElementById("delete-post-section");
-  const deleteBtn = document.getElementById("btn-delete-post");
+  const actionBtn = document.getElementById("btn-delete-post");
   const statusEl = document.getElementById("delete-post-status");
 
-  if (!section || !deleteBtn || !statusEl) {
-    if (section) section.style.display = "none";
+  if (!actionBtn || !statusEl) {
+    if (actionBtn) actionBtn.style.display = "none";
     return;
   }
 
   const postId = getPostId(img);
 
   const shouldShow = !!(postId && !isPrivateScan(img));
-  section.style.display = shouldShow ? "block" : "none";
+  actionBtn.style.display = shouldShow ? "flex" : "none";
 
   if (!shouldShow) {
     return;
@@ -1190,11 +1319,10 @@ function setupDeletePost(img) {
     if (modal) modal.hidden = true;
   };
 
-  if (!deleteBtn.dataset.bound) {
-    deleteBtn.dataset.bound = "1";
-    deleteBtn.addEventListener("click", () => {
-      const postIdNow = getPostId(currentScan);
-      if (!currentScan || !postIdNow) return;
+  if (!actionBtn.dataset.bound) {
+    actionBtn.dataset.bound = "1";
+    actionBtn.addEventListener("click", () => {
+      if (!currentScan || !getPostId(currentScan)) return;
       showModal();
     });
   }
@@ -1207,39 +1335,39 @@ function setupDeletePost(img) {
   if (modalConfirm && !modalConfirm.dataset.bound) {
     modalConfirm.dataset.bound = "1";
     modalConfirm.addEventListener("click", async () => {
-      const postIdNow = getPostId(currentScan);
-      if (!currentScan || !postIdNow) return;
+      if (!currentScan || !currentScan.image_id) return;
 
       hideModal();
-      deleteBtn.disabled = true;
-      deleteBtn.textContent = "Deleting...";
-      setStatus("Deleting post...", null);
+      actionBtn.disabled = true;
+      actionBtn.textContent = "Making private...";
+      setStatus("Making private...", null);
 
       try {
-        const res = await fetch(`/community/posts?post_id=${encodeURIComponent(postIdNow)}`, {
-          method: "DELETE",
+        const res = await fetch(`/image/${encodeURIComponent(currentScan.image_id)}`, {
+          method: "PATCH",
           credentials: "include",
-          headers: { Accept: "application/json" },
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ is_public: false }),
         });
 
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          throw new Error(data.error || data.detail || `Failed to delete post (${res.status})`);
+          throw new Error(data.error || data.detail || `Failed to make private (${res.status})`);
         }
 
-        setStatus("✓ Post deleted. Redirecting...", "success");
+        setStatus("✓ Post made private. Redirecting...", "success");
 
-        sessionStorage.removeItem("selectedScan");
-        sessionStorage.removeItem("selectedScanTitle");
+        currentScan.is_public = false;
+        sessionStorage.setItem("selectedScan", JSON.stringify(currentScan));
 
         setTimeout(() => {
           window.location.href = "/profile";
         }, 800);
       } catch (err) {
-        setStatus(err?.message || "Failed to delete post.", "error");
-        deleteBtn.disabled = false;
-        deleteBtn.textContent = "Delete Post";
+        setStatus(err?.message || "Failed to make private.", "error");
+        actionBtn.disabled = false;
+        actionBtn.textContent = "Make Private";
       }
     });
   }
@@ -1256,17 +1384,17 @@ function setupDeletePost(img) {
 // Delete Scan (UNCHANGED)
 // -------------------------
 function setupDeleteScan(img) {
-  const section = document.getElementById("delete-scan-section");
   const deleteBtn = document.getElementById("btn-delete-scan");
   const statusEl = document.getElementById("delete-scan-status");
 
-  if (!section || !deleteBtn || !statusEl) {
-    if (section) section.style.display = "none";
+  if (!deleteBtn || !statusEl) {
+    if (deleteBtn) deleteBtn.style.display = "none";
     return;
   }
 
-  const shouldShow = !!(img && img.image_id && isPrivateScan(img));
-  section.style.display = shouldShow ? "block" : "none";
+  // Show for private scans, OR for public scans where no community post was found
+  const shouldShow = !!(img && img.image_id && (isPrivateScan(img) || !getPostId(img)));
+  deleteBtn.style.display = shouldShow ? "flex" : "none";
 
   if (!shouldShow) {
     return;
@@ -1359,15 +1487,15 @@ function setupDeleteScan(img) {
 function setupMakePublicInline(img) {
   const makePublicBtn = document.getElementById("btn-make-public");
   const makePublicSection = document.getElementById("make-public-section");
-  const form = document.getElementById("make-public-form");
+  const modal = document.getElementById("make-public-modal");
   const formInput = document.getElementById("make-public-description");
   const formCount = document.getElementById("make-public-count");
   const publishBtn = document.getElementById("make-public-publish");
   const cancelBtn = document.getElementById("make-public-cancel");
   const formStatus = document.getElementById("make-public-status");
 
-  if (!makePublicSection || !makePublicBtn || !form || !formInput || !publishBtn || !cancelBtn || !formStatus) {
-    if (makePublicSection) makePublicSection.style.display = isPrivateScan(img) ? "block" : "none";
+  if (!makePublicBtn || !modal || !formInput || !publishBtn || !cancelBtn || !formStatus) {
+    if (makePublicBtn) makePublicBtn.style.display = isPrivateScan(img) ? "flex" : "none";
     return;
   }
 
@@ -1375,36 +1503,9 @@ function setupMakePublicInline(img) {
   const isModerated = img && img.moderation_status === "removed";
   const shouldShow = isPrivateScan(img) && !isModerated;
 
-  makePublicSection.style.display = shouldShow ? "block" : "none";
+  makePublicBtn.style.display = shouldShow ? "flex" : "none";
 
-  // If moderated, show a warning message instead
-  if (isModerated && isPrivateScan(img)) {
-    makePublicSection.style.display = "block";
-    form.hidden = true;
-    setSelected(makePublicBtn, false);
-
-    // Show moderation warning
-    const warningDiv = document.createElement("div");
-    warningDiv.id = "moderation-warning";
-    warningDiv.style.cssText = "padding: 16px; background: rgba(220, 53, 69, 0.1); border: 1px solid rgba(220, 53, 69, 0.3); border-radius: 12px; color: rgba(220, 53, 69, 0.9); font-size: 14px; margin-top: 12px;";
-    warningDiv.innerHTML = `
-      <strong>⚠️ Content Removed</strong><br>
-      <span style="font-size: 13px; opacity: 0.8;">${img.moderation_reason || "This image has been removed by moderation and cannot be posted to the community."}</span>
-    `;
-
-    // Remove existing warning if any
-    const existingWarning = document.getElementById("moderation-warning");
-    if (existingWarning) existingWarning.remove();
-
-    makePublicSection.appendChild(warningDiv);
-    return;
-  }
-
-  if (!shouldShow) {
-    form.hidden = true;
-    setSelected(makePublicBtn, false);
-    return;
-  }
+  if (!shouldShow) return;
 
   const setFormStatus = (text, kind) => {
     formStatus.classList.remove("is-error", "is-success");
@@ -1413,43 +1514,28 @@ function setupMakePublicInline(img) {
     formStatus.textContent = text || "";
   };
 
-  const openForm = () => {
-    showPanel(form);
+  const openModal = () => {
     formInput.value = "";
     if (formCount) formCount.textContent = "0";
     setFormStatus("", null);
-
-    setSelected(makePublicBtn, true);
+    publishBtn.disabled = false;
+    publishBtn.textContent = "Publish";
+    modal.hidden = false;
     formInput.focus();
   };
 
-  const closeForm = () => {
-    hidePanel(form);
+  const closeModal = () => {
+    modal.hidden = true;
     formInput.value = "";
     if (formCount) formCount.textContent = "0";
     setFormStatus("", null);
-
     publishBtn.disabled = false;
     publishBtn.textContent = "Publish";
-
-    setSelected(makePublicBtn, false);
-  };
-
-  const toggleForm = () => {
-    const editForm = document.getElementById("edit-description-form");
-    const editBtn = document.getElementById("btn-edit-description");
-    if (editForm && !editForm.hidden) {
-      hidePanel(editForm);
-      setSelected(editBtn, false);
-    }
-
-    if (form.hidden) openForm();
-    else closeForm();
   };
 
   if (!makePublicBtn.dataset.bound) {
     makePublicBtn.dataset.bound = "1";
-    makePublicBtn.addEventListener("click", toggleForm);
+    makePublicBtn.addEventListener("click", openModal);
   }
 
   if (!formInput.dataset.bound) {
@@ -1461,16 +1547,18 @@ function setupMakePublicInline(img) {
 
   if (!cancelBtn.dataset.bound) {
     cancelBtn.dataset.bound = "1";
-    cancelBtn.addEventListener("click", () => {
-      closeForm();
-    });
+    cancelBtn.addEventListener("click", closeModal);
+  }
+
+  if (!modal.dataset.bound) {
+    modal.dataset.bound = "1";
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
   }
 
   if (!publishBtn.dataset.bound) {
     publishBtn.dataset.bound = "1";
     publishBtn.addEventListener("click", async () => {
-      if (!currentScan) return;
-      if (publishBtn.disabled) return;
+      if (!currentScan || publishBtn.disabled) return;
 
       const description = formInput.value.trim();
       if (!description) {
@@ -1488,11 +1576,9 @@ function setupMakePublicInline(img) {
 
       try {
         await handleMakePublic(currentScan, description);
-
         sessionStorage.removeItem("selectedScan");
         sessionStorage.removeItem("selectedScanTitle");
-
-        window.location.href = "/scans?tab=public";
+        window.location.href = "/profile";
       } catch (err) {
         setFormStatus(err?.message || "Failed to publish.", "error");
         publishBtn.disabled = false;
@@ -1515,35 +1601,58 @@ async function handleMakePublic(img, description) {
   const userId = userData.user_id;
   if (!userId) throw new Error("Could not read current user.");
 
-  const postBody = {
-    user_id: userId,
-    image_id: img.image_id,
-    description,
-    result: {
-      verdict: img.verdict || null,
-      label: img.label || null,
-      confidence: img.confidence || null,
-    },
-  };
+  // Check if a community post already exists for this image to avoid duplicates
+  const existingPost = await fetchPostByImageId(img.image_id);
+  const existingPostId = existingPost
+    ? (existingPost.post_id || existingPost.postId || existingPost.id || null)
+    : (getPostId(img) || null);
 
-  const postRes = await fetch("/community/posts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    credentials: "include",
-    body: JSON.stringify(postBody),
-  });
+  if (existingPostId) {
+    // Post already exists — just update the description and re-show via image PATCH
+    const patchRes = await fetch(`/community/posts?post_id=${encodeURIComponent(existingPostId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ description }),
+    });
+    if (!patchRes.ok) {
+      const errorData = await patchRes.json().catch(() => ({}));
+      throw new Error(errorData.detail || errorData.error || `Failed to update post (${patchRes.status})`);
+    }
+    img.post_id = existingPostId;
+  } else {
+    // No existing post — create a new one
+    const postBody = {
+      user_id: userId,
+      image_id: img.image_id,
+      description,
+      result: {
+        verdict: img.verdict || null,
+        label: img.label || null,
+        confidence: img.confidence || null,
+      },
+    };
 
-  if (!postRes.ok) {
-    const errorData = await postRes.json().catch(() => ({}));
+    const postRes = await fetch("/community/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "include",
+      body: JSON.stringify(postBody),
+    });
 
-    // Check if it's a moderation block (403)
-    if (postRes.status === 403) {
-      throw new Error(errorData.error || "This image cannot be posted to the community.");
+    if (!postRes.ok) {
+      const errorData = await postRes.json().catch(() => ({}));
+      if (postRes.status === 403) {
+        throw new Error(errorData.error || "This image cannot be posted to the community.");
+      }
+      throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
     }
 
-    throw new Error(errorData.detail || errorData.error || `Failed to publish (${postRes.status})`);
+    const postData = await postRes.json().catch(() => ({}));
+    if (postData.post_id) img.post_id = postData.post_id;
   }
 
+  // Mark image as public
   const updateRes = await fetch(`/image/${img.image_id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -1553,16 +1662,19 @@ async function handleMakePublic(img, description) {
 
   if (!updateRes.ok) {
     const errorData = await updateRes.json().catch(() => ({}));
-    throw new Error(
-      errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`
-    );
+    throw new Error(errorData.detail || errorData.error || `Failed to update image visibility (${updateRes.status})`);
   }
+
+  img.up_vote_count = img.up_vote_count ?? 0;
+  img.down_vote_count = img.down_vote_count ?? 0;
+  img.is_public = true;
+  sessionStorage.setItem("selectedScan", JSON.stringify(img));
 }
 
 // -------------------------
 // Init
 // -------------------------
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
   let img = null;
   let title = null;
 
@@ -1574,5 +1686,5 @@ window.addEventListener("DOMContentLoaded", () => {
     img = null;
   }
 
-  renderScan(img, title);
+  await renderScan(img, title);
 });

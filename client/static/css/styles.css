@@ -2,6 +2,10 @@ html {
   scrollbar-gutter: stable;
 }
 
+html:has(body.app) {
+  scrollbar-gutter: auto;
+}
+
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -76,27 +80,55 @@ main {
 /* App container wrapper */
 body.app {
   background: #222222;
+  scrollbar-width: none;
+  /* hide scrollbar — mobile app simulator */
   /* overrides default body background */
+}
+
+body.app::-webkit-scrollbar {
+  display: none;
 }
 
 /* Constrain everything to phone width */
 body.app .app-container {
   position: relative;
-  min-height: 100vh;
+  height: 100dvh;
   background: #222222;
   margin: 0 auto;
   max-width: 480px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  clip-path: inset(0);
 }
 
-/* Top bar */
+body.app .app-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Top bar — fixed and centred over the phone shell */
 body.app .topbar {
-  position: relative;
-  /* Essential for absolute centering inside it */
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  z-index: 100;
+  will-change: transform;
+  transition: transform 0.3s ease;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 10px 16px;
+  height: 56px;
+  box-sizing: border-box;
+}
+
+body.app .topbar.topbar--hidden {
+  transform: translateX(-50%) translateY(-100%);
 }
 
 body .topbar {
@@ -206,12 +238,9 @@ body.app .page-underline {
    Use "fixed" so it stays pinned even if content scrolls */
 body.app .navbar {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   bottom: 0;
-
-  width: 100%;
-  max-width: 480px;
 
   background: #222222;
   border-top: 1px solid #2c2c2c;
@@ -226,7 +255,13 @@ body.app .navbar {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   backface-visibility: hidden;
-  will-change: transform;
+}
+
+@media (min-width: 480px) {
+  body.app .navbar {
+    padding-left: calc((100% - 480px) / 2);
+    padding-right: calc((100% - 480px) / 2);
+  }
 }
 
 body.app .navbar a {
@@ -289,7 +324,10 @@ body.app .notif-dot {
 /* Screen content area
    Add bottom padding so content doesn't hide behind navbar */
 body.app .screen {
+  flex: 1 0 auto;
   padding: 20px;
+  padding-top: 76px;
+  /* 56px topbar + 20px spacing */
   padding-bottom: 80px;
   /* space for bottom nav */
 }
@@ -311,12 +349,11 @@ body.app main {
 
 /* Overlay styles */
 .menu-overlay {
-  position: absolute;
-  /* Changed from fixed to absolute */
+  position: fixed;
   top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  bottom: 0;
+  left: max(0px, calc(50vw - 240px));
+  right: max(0px, calc(50vw - 240px));
   background: rgba(0, 0, 0, 0.7);
   z-index: 2000;
   display: none;
@@ -324,16 +361,14 @@ body.app main {
 
 /* Drawer styles */
 .nav-drawer {
-  position: absolute;
-  /* Changed from fixed to absolute */
+  position: fixed;
   top: 0;
-  left: 0;
+  left: max(0px, calc(50vw - 240px));
   width: 280px;
-  height: 100%;
+  height: 100dvh;
   background: #222222;
   border-right: 1px solid #2c2c2c;
 
-  /* Initial state: Hidden to the left of the container */
   transform: translateX(-100%);
 
   z-index: 2001;
@@ -382,6 +417,11 @@ body.app main {
   cursor: pointer;
 }
 
+.logout-button {
+  color: #ff4444 !important;
+  font-weight: bold;
+}
+
 .drawer-links a:hover,
 .drawer-links .logout-button:hover {
   background: #2c2c2c;
@@ -410,12 +450,12 @@ body.app main {
 }
 
 .admin-link {
-  color: #ff4444 !important;
+  color: #51b344 !important;
   font-weight: bold;
 }
 
 .drawer-links .admin-link:hover {
-  color: #ff6b6b !important;
+  color: #51b344 !important;
 }
 
 .drawer-separator {
@@ -430,4 +470,878 @@ body.app main {
   color: #CFB87C;
   font-size: 2rem;
   cursor: pointer;
+}
+
+/* =========================
+   COMMUNITY BAR STYLES (from community/app/styles/postBox.css)
+   ========================= */
+
+.comm_bars_wrapper {
+  position: relative;
+  padding: 4px 12px 8px;
+}
+
+.comm_vote_prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fff;
+
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.comm_bars {
+  display: grid;
+  gap: 8px;
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.comm_bars.is-hidden {
+  filter: grayscale(1) blur(4px);
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: none;
+}
+
+.comm_bars.is-hidden .comm_progressFill {
+  width: 100% !important;
+  background: #666 !important;
+  transition: none !important;
+}
+
+.comm_bars.is-hidden .comm_progressBar {
+  background: rgba(0, 0, 0, 0.12) !important;
+}
+
+.comm_bars.is-revealed {
+  filter: blur(0) saturate(1);
+  opacity: 1;
+  animation: revealBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.comm_bars.is-revealed .comm_progressFill {
+  transform-origin: left center;
+  animation: barFillIn 1.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: 0.25s;
+}
+
+.comm_bars.is-revealed .comm_voteFill {
+  transform-origin: left center;
+  animation: barFillIn 1.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: 0.25s;
+}
+
+@keyframes barFillIn {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes revealBounce {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+
+  60% {
+    transform: scale(1.02);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.comm_barBlock {
+  position: relative;
+  display: grid;
+}
+
+.comm_barHead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 14px 6px;
+  margin: 0;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: rgba(0, 0, 0, 0.12);
+  min-height: 28px;
+}
+
+.comm_resultAvatar,
+.comm_resultAvatar_icon {
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: center;
+  width: 16px;
+  height: 16px;
+  display: flex;
+}
+
+.comm_resultAvatar img,
+.comm_resultAvatar_icon .comm_resultIcon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.comm_barSourceLabel {
+  position: static;
+  transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.comm_barTrackWrap {
+  position: relative;
+  padding-top: 25px;
+  background: rgba(0, 0, 0, 0.12);
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.comm_zoneLabel {
+  position: absolute;
+  top: 0;
+  bottom: auto;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.comm_zoneLabel--safe,
+.comm_zoneLabel--neutral,
+.comm_zoneLabel--risk {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.comm_zoneLabel--safe.comm_zoneLabel--active {
+  color: #cfb87c;
+}
+
+.comm_zoneLabel--neutral.comm_zoneLabel--active {
+  color: #ffffff;
+}
+
+.comm_zoneLabel--risk.comm_zoneLabel--active {
+  color: #ef4444;
+}
+
+.comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active {
+  color: #af83c9;
+}
+
+.comm_zoneLabel--active {
+  font-size: 12px;
+  font-weight: 800;
+  -webkit-text-stroke: 0;
+  isolation: isolate;
+}
+
+.comm_zoneLabel--safe.comm_zoneLabel--active {
+  text-shadow: 0 0 2px rgba(207, 184, 124, 0.6);
+}
+
+.comm_zoneLabel--neutral.comm_zoneLabel--active {
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+.comm_zoneLabel--risk.comm_zoneLabel--active {
+  text-shadow: 0 0 2px rgba(204, 34, 34, 0.6);
+}
+
+.comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active {
+  text-shadow: 0 0 2px rgba(175, 131, 201, 0.6);
+}
+
+.comm_progressPanel {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.comm_progressBar {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgb(63, 63, 63);
+  padding: 3px;
+  overflow: hidden;
+}
+
+.comm_progressFill {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  bottom: 3px;
+  width: 0px;
+  border-radius: 999px;
+  transition: width 300ms ease;
+  z-index: 1;
+  min-width: 14px;
+}
+
+.comm_progressFill[data-p]:not([data-p="0"]) {
+  min-width: 14px;
+}
+
+.comm_progressFill[data-p]:not([data-p="0"]) {
+  min-width: 14px;
+}
+
+.comm_progressFill[data-p="100"] {
+  right: 3px;
+  width: auto !important;
+  border-radius: 999px;
+}
+
+.comm_barPercent {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  z-index: 3;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.comm_barMarker {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 1.5px;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+/* Color themes */
+.comm_barBlock:not(.comm_communityBar) .comm_barSourceLabel {
+  color: rgba(207, 184, 124, 0.95) !important;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_barHead,
+.comm_barBlock:not(.comm_communityBar) .comm_progressPanel {
+  border-color: rgba(207, 184, 124, 0.55) !important;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_barTrackWrap {
+  border-radius: 12px;
+  padding-top: 25px;
+  padding-bottom: 12px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_zoneLabel {
+  top: 10px;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_progressPanel {
+  padding-left: 0;
+  padding-right: 0;
+  background: transparent;
+}
+
+.comm_barBlock.comm_communityBar .comm_barSourceLabel {
+  color: #af83c9;
+}
+
+.comm_barBlock.comm_communityBar .comm_barHead,
+.comm_barBlock.comm_communityBar .comm_progressPanel {
+  border-color: rgba(175, 131, 201, 0.55);
+}
+
+/* Vote summary styles */
+.comm_voteSummary {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 500;
+}
+
+.comm_voteSummary--row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.comm_voteSummary--real {
+  color: #cfb87c;
+  font-weight: 700;
+}
+
+.comm_voteSummary--fake {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.comm_voteSummary--split {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_voteSummary {
+  padding-left: 0;
+  padding-right: 0;
+  margin-top: 6px;
+}
+
+/* =========================
+   COMMUNITY VOTE STRUCTURE (exact copy from community)
+   ========================= */
+
+.comm_communityVote {
+  padding: 18px 14px 12px;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+
+.comm_communityIconCol,
+.comm_barIconCol {
+  position: absolute;
+  top: 0;
+  left: 14px;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 18px;
+  height: 18px;
+}
+
+.comm_resultIcon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+}
+
+.comm_communityIconSvg {
+  width: 18px;
+  height: 18px;
+  color: #af83c9;
+  opacity: 0.8;
+}
+
+.comm_voteBars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comm_voteRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comm_voteRowHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.comm_voteLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.comm_voteLabel--real {
+  color: #af83c9;
+}
+
+.comm_voteLabel--fake {
+  color: #f87171;
+}
+
+.comm_voteCount {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.comm_voteTrack {
+  width: 100%;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgb(63, 63, 63);
+  overflow: hidden;
+  position: relative;
+  padding: 3px;
+  box-sizing: border-box;
+}
+
+.comm_voteFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.comm_voteFill--real {
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0.28), transparent),
+    #cfb87c;
+}
+
+.comm_voteFill--fake {
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0.28), transparent),
+    linear-gradient(to right, #cfb87c, #e07043, #cc2222);
+}
+
+.comm_votePct {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* =========================
+   BOTTOM SHEET STYLES (for comments)
+   ========================= */
+
+.comm_sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1500;
+}
+
+.comm_bottomSheet {
+  position: fixed;
+  bottom: 0;
+  left: max(0px, calc(50vw - 240px));
+  right: max(0px, calc(50vw - 240px));
+  width: min(100%, 480px);
+  height: 80dvh;
+  max-height: 80dvh;
+
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  z-index: 1501;
+
+  transform: translateY(100%);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.comm_bottomSheet.comm_bottomSheet--open {
+  transform: translateY(0);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, .5);
+}
+
+.comm_sheetHandleWrap {
+  width: 100%;
+  padding: 12px 0 4px 0;
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.comm_sheetHandleWrap:hover .comm_sheetHandle {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.comm_sheetHandle {
+  width: 40px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.comm_sheetHeader {
+  padding: 10px 20px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.comm_sheetHeaderTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.comm_sheetCloseBtn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.comm_sheetCloseBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.comm_sheetBody {
+  padding: 0 !important;
+  flex-grow: 1 !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+}
+
+.comm_sheetBody::-webkit-scrollbar {
+  display: none;
+}
+
+.comm_sheetBody {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.comm_commentsList {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
+
+.comm_sheetFooter {
+  padding: 12px 20px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #141414;
+  flex-shrink: 0;
+}
+
+.comm_sheetInputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 6px 6px 6px 16px;
+}
+
+.comm_sheetInput {
+  flex-grow: 1;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 15px;
+  outline: none;
+  padding: 8px 0;
+}
+
+.comm_sheetInput::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.comm_sheetPostBtn {
+  background: #CFB87C;
+  color: #111;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.comm_sheetPostBtn:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.comm_sheetPostBtn:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
+}
+
+/* =========================
+   ACTION BUTTONS (for vote display)
+   ========================= */
+
+.comm_bottomRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: transparent;
+  border-top: 0;
+}
+
+.comm_actionsLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.comm_actionsRight {
+  display: flex;
+  align-items: center;
+}
+
+.vs-votes-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.comm_actionBtn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.comm_actionBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.comm_actionText {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+
+.comm_actionCount {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.35;
+  letter-spacing: 0.02em;
+}
+
+.comm_icon {
+  width: 26px;
+  height: 26px;
+  display: block;
+  object-fit: contain;
+}
+
+/* Additional styles for results page */
+.comm_barBrandText {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: rgba(207, 184, 124, 0.95);
+}
+
+.comm_barHeadBrand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* =========================
+   VOTE BUTTON ROW (from community)
+   ========================= */
+
+.comm_voteButtonRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 0;
+  justify-content: space-between;
+}
+
+.comm_voteMainBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 14px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.comm_voteMainBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.comm_voteMainBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.comm_commentIconBtn .comm_icon {
+  width: 20px;
+  height: 20px;
+}
+
+.comm_commentIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.comm_commentIconBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Make Private Button Styling */
+.btn-make-private {
+  background: rgba(207, 184, 124, 0.1) !important;
+  border-color: rgba(207, 184, 124, 0.3) !important;
+  color: #CFB87C !important;
+}
+
+.btn-make-private:hover {
+  background: rgba(207, 184, 124, 0.2) !important;
+  border-color: rgba(207, 184, 124, 0.5) !important;
+}
+
+.btn-make-private .comm_actionText {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 1;
+}
+
+/* Ensure make private button fills available space when using comm_voteMainBtn */
+.comm_voteMainBtn.btn-make-private {
+  flex: 1;
+  justify-content: center;
+}
+
+/* Gold lock icon filter */
+.gold-lock-icon {
+  filter: sepia(1) saturate(2) hue-rotate(35deg) brightness(1.2);
+}
+
+/* Delete post status styling */
+.delete-post-status {
+  margin-top: 8px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.delete-post-status.is-error {
+  color: #ff6b6b;
+}
+
+.delete-post-status.is-success {
+  color: #51cf66;
 }

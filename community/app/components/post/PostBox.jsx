@@ -38,6 +38,7 @@ export default function PostBox({
   const [userVote, setUserVote] = useState(image?.user_vote || null);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
+  const [commentCount, setCommentCount] = useState(Number(image?.comment_count ?? 0));
   const [commentsBusy, setCommentsBusy] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -156,7 +157,9 @@ export default function PostBox({
   async function loadComments() {
     setCommentsBusy(true);
     try {
-      setComments(await fetchComments(postId));
+      const loaded = await fetchComments(postId);
+      setComments(loaded);
+      setCommentCount(loaded.length);
     } catch (err) {
       setError(err.message || "Failed to load comments.");
     } finally {
@@ -228,44 +231,21 @@ export default function PostBox({
   function clamp01(n) {
     return Math.max(0, Math.min(1, Number(n) || 0));
   }
-  function isAiLabel(lbl) {
-    return (
-      lbl.includes("ai") || lbl.includes("fake") || lbl.includes("deepfake")
-    );
-  }
-  function isRealLabel(lbl) {
-    return lbl.includes("real") && !isAiLabel(lbl);
-  }
   function computeRealPctFromModel(img) {
-    const rawLabel = String(
-      img?.result?.label ??
-        img?.label ??
-        img?.result?.verdict ??
-        img?.verdict ??
-        "Unknown",
-    ).toLowerCase();
-    const conf = clamp01(
-      img?.result?.confidence ??
-        img?.confidence ??
-        img?.result?.score ??
-        img?.score ??
-        0,
-    );
-    const realProb = isRealLabel(rawLabel) ? conf : 1 - conf;
+    const verdict = String(img?.result?.verdict ?? img?.verdict ?? "fake").toLowerCase();
+    const conf = clamp01(img?.result?.confidence ?? img?.confidence ?? 0);
+
+    // If verdict is "real", confidence represents real probability
+    // If verdict is "fake", confidence represents fake probability, so real = 1 - confidence
+    const realProb = verdict === "real" ? conf : 1 - conf;
     return Math.max(0, Math.min(100, realProb * 100));
   }
+
   function bucketFromRealPct(r) {
     r = Math.max(0, Math.min(100, Number(r) || 0));
-    if (r >= 40 && r <= 60) return { text: "Not sure", type: "neutral" };
-    if (r > 60)
-      return {
-        text: r >= 86 ? "Highly Unlikely Fake" : "Unlikely Fake",
-        type: "safe",
-      };
-    return {
-      text: 100 - r >= 86 ? "Highly Likely Fake" : "Likely Fake",
-      type: "risk",
-    };
+    if (r >= 40 && r <= 60) return { text: "SUSPICIOUS", type: "neutral" };
+    if (r > 60) return { text: "REAL", type: "safe" };
+    return { text: "FAKE", type: "risk" };
   }
   function setWidthStyle(pct) {
     const p = Math.max(0, Math.min(100, Number(pct) || 0));
@@ -281,11 +261,9 @@ export default function PostBox({
 
 
 
-    if (!image) {
+  if (!image) {
     console.error("❌ PostMedia received an empty URL for label:", label);
   }
-
-  console.log("Image: ", image)
 
   return (
     <div
@@ -294,6 +272,7 @@ export default function PostBox({
       <PostHeader
         initials={initials}
         posterName={posterName}
+        userId={image?.user_id}
         isOfficial={isOfficial}
         userHasVoted={userHasVoted}
         timeText={timeText}
@@ -304,8 +283,15 @@ export default function PostBox({
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
         closeMenu={() => setMenuOpen(false)}
-        onEdit={() => {
+        onViewScan={() => {
           setMenuOpen(false);
+          const scan = {
+            ...image,
+            url: image?.url || image?.image_url || image?.imageUrl || image?.s3_path,
+            verdict: image?.result?.verdict ?? image?.verdict,
+            confidence: image?.result?.confidence ?? image?.confidence,
+          };
+          sessionStorage.setItem("selectedScan", JSON.stringify(scan));
           window.location.href = "/viewscan";
         }}
         onOpenReport={() => {
@@ -332,11 +318,12 @@ export default function PostBox({
         userHasVoted={userHasVoted}
         analysisBucket={analysisBucket}
         analysisAiPct={100 - analysisRealPct}
-        communityBucket={communityBucket}
         communityAiPct={
           communityRealPct !== null ? 100 - communityRealPct : null
         }
         setWidthStyle={setWidthStyle}
+        upCount={up}
+        downCount={down}
       />
 
       <PostControls
@@ -350,7 +337,7 @@ export default function PostBox({
         busy={busy}
         upCount={up}
         downCount={down}
-        commentCount={comments.length}
+        commentCount={commentCount}
       />
 
       <PostCommentsDrawer

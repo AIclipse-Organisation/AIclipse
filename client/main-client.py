@@ -554,9 +554,10 @@ def get_community_posts():
     url = f"{COMMUNITY_URI}/community/posts"
 
     headers = {"Accept": "application/json"}
+    params = dict(request.args)  # forward all query params (post_id, image_id, etc.)
 
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
     except requests.RequestException:
         logging.exception("Community posts request failed")
         return jsonify({"detail": "Community service unreachable"}), 502
@@ -702,6 +703,32 @@ def community_report():
         resp = requests.post(url, json=report_data, headers=headers, timeout=10)
     except requests.RequestException:
         logging.exception("Community report request failed")
+        return jsonify({"detail": "Community service unreachable"}), 502
+
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"detail": "Non-JSON response from community service"}
+
+    return jsonify(data), resp.status_code
+
+
+@app.post("/community/posts/moderation-status")
+def community_moderation_status():
+    """Get moderation status for a list of image IDs"""
+    try:
+        moderation_data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    url = f"{COMMUNITY_URI}/community/posts/moderation-status"
+
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+
+    try:
+        resp = requests.post(url, json=moderation_data, headers=headers, timeout=10)
+    except requests.RequestException:
+        logging.exception("Community moderation status request failed")
         return jsonify({"detail": "Community service unreachable"}), 502
 
     try:

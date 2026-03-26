@@ -1,146 +1,164 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AIclipse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/profile.css" />
+    <link rel="stylesheet" href="/static/css/scans.css" />
+  </head>
 
-<head>
-  <meta charset="utf-8" />
-  <title>AIclipse</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/static/css/styles.css" />
-  <link rel="stylesheet" href="/static/css/profile.css" />
-  <link rel="stylesheet" href="/static/css/scans.css" />
-</head>
+  <body class="app">
+    <div class="app-container">
+      {% set page_title = 'Profile' %} {% include 'partials/topbar.html' %}
 
-<body class="app">
-  <div class="app-container">
-
-    {% set page_title = 'Profile' %}
-    {% include 'partials/topbar.html' %}
-
-    <div class="profileScreen">
-      <section class="profile-summary" aria-label="Profile summary">
-        <div class="profile-avatar">
-          <img src="/static/images/profile.png" alt="Profile" class="profile-avatar-img" />
-        </div>
-
-        <div class="profile-identity">
-          <div class="profile-name-row">
-            <div id="detail-username" class="profile-username">-</div>
-            <span id="detail-plan" class="profile-badge plan-badge">-</span>
+      <div class="profileScreen">
+        <section class="profile-summary" aria-label="Profile summary">
+          <div class="profile-avatar">
+            <img
+              src="/static/images/profile.png"
+              alt="Profile"
+              class="profile-avatar-img"
+            />
           </div>
 
-
-          <div id="detail-email" class="profile-email">-</div>
-
-          <div class="profile-meta-row">
-            Member since <span id="detail-created">-</span> &bull; Monthly
-            Usage: <span id="detail-monthly-usage">-</span>
-          </div>
-
-          <div id="subscription-status-banner" class="subscription-status-banner" hidden>
-            Subscription: None
-          </div>
-        </div>
-        <button id="btn-settings" class="profile-settings-btn">⚙</button>
-      </section>
-
-      <div id="user-details-status" class="status-message"></div>
-
-      <section class="user-details-section" aria-label="User stats">
-        <div id="user-details-container" style="display: none">
-          <div class="stats-xp-wrapper">
-            <div class="user-details-container">
-              <div class="user-detail-item">
-                <div class="detail-text">
-                  <span id="detail-accuracy-level" class="detail-value">-</span>
-                  <span class="detail-label">Level</span>
-                </div>
-              </div>
-
-              <div class="user-detail-item">
-                <img src="/static/images/flame-black.png" alt="" class="detail-icon" aria-hidden="true">
-                <div class="detail-text">
-                  <span id="detail-streak" class="detail-value">0</span>
-                  <span class="detail-label">Streak</span>
-                </div>
-              </div>
-
-              <div class="user-detail-item">
-                <img src="/static/images/star-black.png" alt="" class="detail-icon" aria-hidden="true">
-                <div class="detail-text">
-                  <span id="detail-score" class="detail-value">0</span>
-                  <span class="detail-label">Score</span>
-                </div>
-              </div>
-
-              <div class="user-detail-item">
-                <img src="/static/images/accuracy-black.png" alt="" class="detail-icon" aria-hidden="true">
-                <div class="detail-text">
-                  <span id="detail-accuracy" class="detail-value">—</span>
-                  <span class="detail-label">Accuracy</span>
-                </div>
-              </div>
+          <div class="profile-identity">
+            <div class="profile-name-row">
+              <div id="detail-username" class="profile-username">-</div>
+              <span id="detail-plan" class="profile-badge plan-badge">-</span>
             </div>
-            <div class="profile-xp-bar">
-              <span id="profile-xp-level-label" class="profile-xp-label">Lv.1</span>
-              <div class="profile-xp-track">
-                <div id="profile-xp-fill" class="profile-xp-fill"></div>
-              </div>
-              <span id="profile-xp-next-label" class="profile-xp-label">Lv.2</span>
+
+            <div id="detail-email" class="profile-email">-</div>
+
+            <div class="profile-meta-row">
+              Member since <span id="detail-created">-</span> &bull; Monthly
+              Usage: <span id="detail-monthly-usage">-</span>
             </div>
           </div>
-        </div>
-      </section>
+          <button id="btn-settings" class="profile-settings-btn">⚙</button>
+        </section>
+
+        <div id="user-details-status" class="status-message"></div>
+
+        <section class="user-details-section" aria-label="User stats">
+          <div id="user-details-container" style="visibility: hidden">
+            <div class="stats-xp-wrapper">
+              <div class="user-details-container">
+                <div class="user-detail-item">
+                  <div class="detail-text">
+                    <span id="detail-accuracy-level" class="detail-value"
+                      >-</span
+                    >
+                    <span class="detail-label">Level</span>
+                  </div>
+                </div>
+
+                <div class="user-detail-item">
+                  <img
+                    src="/static/images/fire.png"
+                    alt=""
+                    class="detail-icon"
+                    aria-hidden="true"
+                  />
+                  <div class="detail-text">
+                    <span id="detail-streak" class="detail-value">0</span>
+                    <span class="detail-label">Streak</span>
+                  </div>
+                </div>
+
+                <div class="user-detail-item">
+                  <img
+                    src="/static/images/Star.png"
+                    alt=""
+                    class="detail-icon"
+                    aria-hidden="true"
+                  />
+                  <div class="detail-text">
+                    <span id="detail-score" class="detail-value">0</span>
+                    <span class="detail-label">Score</span>
+                  </div>
+                </div>
+
+                <div class="user-detail-item">
+                  <img
+                    src="/static/images/target.png"
+                    alt=""
+                    class="detail-icon"
+                    aria-hidden="true"
+                  />
+                  <div class="detail-text">
+                    <span id="detail-accuracy" class="detail-value">—</span>
+                    <span class="detail-label">Accuracy</span>
+                  </div>
+                </div>
+              </div>
+              <div class="profile-xp-bar">
+                <span id="profile-xp-level-label" class="profile-xp-label"
+                  >Lv.1</span
+                >
+                <div class="profile-xp-track">
+                  <div id="profile-xp-fill" class="profile-xp-fill"></div>
+                </div>
+                <span id="profile-xp-next-label" class="profile-xp-label"
+                  >Lv.2</span
+                >
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="scansScreen">
+        <div id="scans-status" class="status-message"></div>
+        <div id="scans-container" class="scans-grid"></div>
+      </div>
+
+      {% include 'partials/navbar.html' %}
     </div>
 
-    <div class="scansScreen">
-      <div id="scans-status" class="status-message"></div>
-      <div id="scans-container" class="scans-grid"></div>
-    </div>
-
-    {% include 'partials/navbar.html' %}
-  </div>
-
-  <!-- Delete Account Modal -->
-  <div
-    id="delete-account-modal"
-    class="delete-modal-overlay"
-    hidden
-    aria-hidden="true"
-  >
+    <!-- Delete Account Modal -->
     <div
-      class="delete-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="delete-account-title"
-      aria-describedby="delete-account-text"
+      id="delete-account-modal"
+      class="delete-modal-overlay"
+      hidden
+      aria-hidden="true"
     >
-      <h2 id="delete-account-title" class="delete-modal-title">
-        Delete account?
-      </h2>
+      <div
+        class="delete-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-account-title"
+        aria-describedby="delete-account-text"
+      >
+        <h2 id="delete-account-title" class="delete-modal-title">
+          Delete account?
+        </h2>
 
-      <p id="delete-account-text" class="delete-modal-text">
-        This action is permanent. Your account and related access will be removed.
-      </p>
+        <p id="delete-account-text" class="delete-modal-text">
+          This action is permanent. Your account and related access will be
+          removed.
+        </p>
 
-      <div class="delete-modal-actions">
-        <button
-          id="cancel-delete-account"
-          type="button"
-          class="delete-modal-btn delete-modal-btn-secondary"
-        >
-          Cancel
-        </button>
+        <div class="delete-modal-actions">
+          <button
+            id="cancel-delete-account"
+            type="button"
+            class="delete-modal-btn delete-modal-btn-secondary"
+          >
+            Cancel
+          </button>
 
-        <button
-          id="confirm-delete-account"
-          type="button"
-          class="delete-modal-btn delete-modal-btn-danger"
-        >
-          Yes, delete permanently
-        </button>
+          <button
+            id="confirm-delete-account"
+            type="button"
+            class="delete-modal-btn delete-modal-btn-danger"
+          >
+            Yes, delete permanently
+          </button>
+        </div>
       </div>
     </div>
-  </div>
 
   <div id="settings-sheet-overlay" class="delete-modal-overlay" hidden aria-hidden="true">
     <div class="delete-modal" role="dialog" aria-label="Account settings">

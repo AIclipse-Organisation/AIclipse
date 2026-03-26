@@ -44,7 +44,6 @@
   align-items: center;
   gap: 16px;
   padding: 8px 0 16px;
-  margin-top: 10px;
   background: transparent;
   border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
@@ -254,11 +253,10 @@
 .profile-settings-btn:hover { color: rgba(255,255,255,0.85); }
 
 .detail-icon {
-  width: 28px; height: 28px;
+  width: 25px; height: 25px;
   object-fit: contain;
   opacity: 0.85;
   flex-shrink: 0;
-  filter: sepia(1) saturate(3) brightness(0.95);
 }
 .detail-icon-emoji {
   font-size: 22px; line-height: 1;
@@ -274,7 +272,7 @@
 
 .profile-xp-track {
   flex: 1;
-  height: 10px;
+  height: 15px;
   background: rgba(255, 255, 255, 0.07);
   border-radius: 999px;
   overflow: hidden;
@@ -290,7 +288,7 @@
 }
 
 .profile-xp-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: rgba(207, 184, 124, 0.8);
   white-space: nowrap;
@@ -351,7 +349,7 @@
 }
 
 .detail-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.55);
   text-align: center;
@@ -398,6 +396,7 @@
   max-width: none;
   margin: 0;
   padding: 0;
+  padding-top: 64px; /* 56px fixed topbar + 8px spacing */
   padding-left: 2vh;
   padding-right: 2vh;
   padding-bottom: 8px;

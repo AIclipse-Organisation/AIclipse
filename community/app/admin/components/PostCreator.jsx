@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { Card, CardBody, Button, Textarea, Spinner } from "@heroui/react";
-import { adminService } from "@/admin/admin.js";
+import { adminService } from "../admin.js";
 
 export default function PostCreator() {
   const [status, setStatus] = useState({ type: "info", text: "Ready to upload." });
