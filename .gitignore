@@ -251,3 +251,10 @@ model-cycle/Folder.DotSettings.user
 
 .mcp.json
 CLAUDE.md
+gemini.md
+.agent/
+.gemini/
+implementation_plan.md
+task.md
+walkthrough.md
+*.log
