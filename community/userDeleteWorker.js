@@ -34,7 +34,13 @@ async function ensureConsumerGroup(redis) {
 }
 
 async function processMessages(redis, posts, messages) {
-  for (const [msgId, fields] of messages) {
+  for (const [msgId, rawFields] of messages) {
+    // ioredis returns fields as a flat array: ['key', 'val', 'key2', 'val2', ...]
+    const fields = {};
+    for (let i = 0; i < rawFields.length; i += 2) {
+      fields[rawFields[i]] = rawFields[i + 1];
+    }
+
     const type = fields.type;
     const dataRaw = fields.data;
 
