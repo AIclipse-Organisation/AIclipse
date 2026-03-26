@@ -116,3 +116,62 @@ async def test_api_billing_cancel_at_period_end_proxies_body_and_auth(client, pa
     )
     assert r.status_code == 200
     assert r.json() == {"ok": True, "status": "cancel_scheduled"}
+
+
+@pytest.mark.asyncio
+async def test_api_billing_webhook_forwards_raw_bytes_and_stripe_signature(client, patch_upstreams):
+    """Stripe webhook events must arrive at the billing service with the original
+    raw bytes and the Stripe-Signature header intact so HMAC verification passes.
+    HMAC (Hash-based Message Authentication Code) is a way to verify both the integrity
+    and authenticity of a message using a shared secret key combined with a hash function"""
+    raw_payload = b'{"type":"checkout.session.completed","data":{"object":{}}}'
+    sig_header = "t=1234,v1=abcdef"
+
+    def webhook_handler(req: httpx.Request) -> httpx.Response:
+        assert req.url.path == "/webhook"
+        assert req.content == raw_payload
+        assert req.headers.get("stripe-signature") == sig_header
+        assert req.headers.get("authorization") is None
+        return httpx.Response(status_code=200, json={"received": True})
+
+    patch_upstreams.add(
+        host="billing-srv",
+        method="POST",
+        path="/webhook",
+        handler=webhook_handler,
+    )
+
+    r = await client.post(
+        "/api/billing/webhook",
+        content=raw_payload,
+        headers={
+            "stripe-signature": sig_header,
+            "content-type": "application/json",
+            "Authorization": "Bearer should-not-be-forwarded",
+        },
+    )
+    assert r.status_code == 200
+    assert r.json() == {"received": True}
+
+
+@pytest.mark.asyncio
+async def test_api_billing_webhook_no_authorization_header_forwarded(client, patch_upstreams):
+    """Auth header must not be sent to the billing webhook — Stripe calls have no Bearer token."""
+
+    def webhook_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        return httpx.Response(status_code=200, json={"received": True})
+
+    patch_upstreams.add(
+        host="billing-srv",
+        method="POST",
+        path="/webhook",
+        handler=webhook_handler,
+    )
+
+    r = await client.post(
+        "/api/billing/webhook",
+        content=b'{"type":"customer.subscription.deleted"}',
+        headers={"stripe-signature": "t=1,v1=xyz", "content-type": "application/json"},
+    )
+    assert r.status_code == 200

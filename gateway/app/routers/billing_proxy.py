@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Body, Query, Request
 
-from app.core.http_proxy import proxy_json
+from app.core.http_proxy import proxy_json, proxy_raw
 from app.core.settings import require_setting
 
 router = APIRouter()
@@ -90,6 +90,25 @@ async def api_billing_cancel_at_period_end(request: Request, payload: dict = Bod
         "/subscription/cancel-at-period-end",
         json_body=payload,
         headers=_forward_billing_headers(request),
+        timeout_s=_timeout(request),
+    )
+
+
+@router.post("/api/billing/webhook")
+async def api_billing_stripe_webhook(request: Request):
+    """Forward Stripe webhook events to the billing service with raw bytes intact.
+
+    The Stripe-Signature header must be preserved so the billing service can
+    verify the payload signature.  Using proxy_raw (not proxy_json) ensures
+    the body is never re-serialised, which would invalidate the HMAC.
+    """
+    billing_uri = _billing_base_url(request)
+    return await proxy_raw(
+        request,
+        "POST",
+        billing_uri,
+        "/webhook",
+        forward_headers=["stripe-signature", "content-type"],
         timeout_s=_timeout(request),
     )
 
