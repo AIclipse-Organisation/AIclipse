@@ -42,6 +42,12 @@ updates:
       interval: "weekly"
     target-branch: "dev"
 
+  - package-ecosystem: "pip"
+    directory: "/email-worker"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
   # Next.js
   - package-ecosystem: "npm"
     directory: "/community"

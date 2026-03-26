@@ -26,6 +26,7 @@ jobs:
           - detector
           - gateway
           - media
+          - email-worker
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
