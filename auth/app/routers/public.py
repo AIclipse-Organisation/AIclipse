@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional, List
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 import jwt
 from email_validator import EmailNotValidError, validate_email
@@ -440,6 +445,26 @@ async def delete_me(request: Request, user: TokenUser = Depends(get_current_user
     result = await users.find_one_and_delete({"user_id": user.user_id})
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        await asyncio.wait_for(
+            request.app.state.event_redis.xadd(
+                request.app.state.settings.AUTH_EVENT_STREAM,
+                {
+                    "type": "auth.user.deleted.self",
+                    "data": json.dumps({
+                        "event_type": "auth.user.deleted.self",
+                        "deleted_user_id": result["user_id"],
+                    }),
+                },
+            ),
+            timeout=request.app.state.settings.AUTH_EVENT_PUBLISH_TIMEOUT_S,
+        )
+    except Exception:
+        logger.exception(
+            "failed_to_publish_self_delete_event user_id=%s", result["user_id"]
+        )
+
     return {
         "deleted": True,
         "user_id": result["user_id"],

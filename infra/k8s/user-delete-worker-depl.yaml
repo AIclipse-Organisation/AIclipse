@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-delete-worker-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: community-user-delete-worker } }
+  template:
+    metadata: { labels: { app: community-user-delete-worker } }
+    spec:
+      containers:
+        - name: worker
+          image: aiclipse/community
+          command: ["node", "userDeleteWorker.js"]
+          env:
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+            - name: MONGO_DB
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+
+            - name: REDIS_HOST
+              value: redis-srv
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-sec
+                  key: REDIS_PASSWORD
+
+          resources:
+            requests: { cpu: "25m",  memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }

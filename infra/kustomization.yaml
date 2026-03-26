@@ -20,6 +20,7 @@ resources:
   - k8s/click-flush-depl.yaml
   - k8s/vote-flush-depl.yaml
   - k8s/comments-flush-depl.yaml
+  - k8s/user-delete-worker-depl.yaml
   - k8s-dev/ingress-srv.yaml
   - k8s-dev/ingress-srv-uploads.yaml
   - k8s-dev/ingress-api.yaml
