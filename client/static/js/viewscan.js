@@ -741,77 +741,6 @@ function renderVerdictBlock(img) {
   track.hidden = false;
 }
 
-// Renders a definition list from whatever keys exist.
-// Also renders “known” fields in a nicer order first.
-function renderMeta(img) {
-  const metaList = document.getElementById("meta-list");
-  if (!metaList) return;
-
-  clearEl(metaList);
-
-  const addMeta = (label, value) => {
-    metaList.appendChild(makeEl("dt", "meta-key", label));
-    metaList.appendChild(makeEl("dd", "meta-value", value));
-  };
-
-  // Fields to hide
-  const hiddenFields = new Set([
-    "image_id",
-    "url",
-    "is_reported",
-    "s3_key",
-    "user_id",
-    "_id",
-    "post_id",
-    "is_public",
-    "clicks_count",
-    "comment_count",
-    "controversial_since",
-    "created_at",
-    "updated_at",
-    "debug",
-    "result",
-    "score",
-    "user_name",
-    "model_version",
-    "moderation_status",
-    "moderation_reason",
-  ]);
-
-  // Show any other non-hidden fields (but skip those shown in dedicated cards)
-  const alreadyShown = new Set([
-    "is_public",
-    "uploaded_at",
-    "label",
-    "verdict",
-    "confidence",
-    "description",
-    "up_vote_count",
-    "down_vote_count",
-  ]);
-
-  Object.keys(img || {})
-    .sort()
-    .forEach((key) => {
-      if (hiddenFields.has(key) || alreadyShown.has(key)) return;
-
-      const val = img[key];
-      let out;
-
-      if (val === null || val === undefined) out = "N/A";
-      else if (typeof val === "object") {
-        try {
-          out = JSON.stringify(val);
-        } catch (_) {
-          out = "[object]";
-        }
-      } else {
-        out = String(val);
-      }
-
-      addMeta(key, out);
-    });
-}
 
 function renderQuickMeta(img) {
   // Hidden compat elements
@@ -971,7 +900,6 @@ async function renderScan(img, title) {
   renderAiclipseCard(currentScan);
   renderCommunityCard(currentScan);
   renderQuickMeta(currentScan);
-  renderMeta(currentScan);
   renderDescriptionHeader(currentScan);
   renderVerdictConfidenceCard(currentScan);
 
@@ -1121,7 +1049,6 @@ function setupEditDescriptionInline(img) {
 
         currentScan.description = description;
         currentScan.updated_at = new Date().toISOString();
-        renderMeta(currentScan);
         renderDescriptionHeader(currentScan);
 
         setFormStatus("✓ Description updated.", "success");
