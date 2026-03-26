@@ -283,8 +283,15 @@ export default function PostBox({
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
         closeMenu={() => setMenuOpen(false)}
-        onEdit={() => {
+        onViewScan={() => {
           setMenuOpen(false);
+          const scan = {
+            ...image,
+            url: image?.url || image?.image_url || image?.imageUrl || image?.s3_path,
+            verdict: image?.result?.verdict ?? image?.verdict,
+            confidence: image?.result?.confidence ?? image?.confidence,
+          };
+          sessionStorage.setItem("selectedScan", JSON.stringify(scan));
           window.location.href = "/viewscan";
         }}
         onOpenReport={() => {

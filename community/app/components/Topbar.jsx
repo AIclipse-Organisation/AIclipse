@@ -45,7 +45,13 @@ export default function Topbar({ isAdmin, showBack }) {
             className="topbar-back-btn"
             type="button"
             aria-label="Go back"
-            onClick={() => router.back()}
+            onClick={() => {
+              if (window.history.length > 1) {
+                router.back();
+              } else {
+                router.push("/community");
+              }
+            }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />

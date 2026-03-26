@@ -15,6 +15,7 @@ export default function PostHeader({
   setMenuOpen,
   closeMenu,
   onOpenReport,
+  onViewScan,
 }) {
   return (
     <div className="comm_topRow">
@@ -58,7 +59,7 @@ export default function PostHeader({
                 <button
                   type="button"
                   className="comm_menuItem"
-                  onClick={() => { closeMenu(); window.location.href = "/viewscan"; }}
+                  onClick={() => { closeMenu(); onViewScan?.(); }}
                 >
                   View Scan
                 </button>
