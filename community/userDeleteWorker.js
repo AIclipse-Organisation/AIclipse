@@ -1,7 +1,6 @@
 import { getDb } from "./lib/mongo/mongo.js";
 import { getRedis } from "./lib/redis/redis.js";
 
-const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
 const STREAM = "auth-events";
