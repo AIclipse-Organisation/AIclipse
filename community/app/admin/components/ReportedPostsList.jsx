@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Card, CardBody, Spinner, Modal, ModalContent, useDisclosure, ScrollShadow, User } from "@heroui/react";
+import { Card, CardBody, Spinner, Modal, ModalContent, useDisclosure, ScrollShadow } from "@heroui/react";
 import { adminService } from "../admin.js";
 
 export default function ReportedPostsList() {
@@ -99,12 +99,12 @@ export default function ReportedPostsList() {
                 <div className="p-8 border-b border-white/5 bg-white/5">
                   <label className="text-sm font-black text-[#CFB87C] uppercase tracking-wide mb-3 block">Poster Context</label>
                   <p className="text-xs font-bold leading-relaxed mb-5 italic text-gray-300">"{selectedPost?.description}"</p>
-                  <User
-                    name={selectedPost?.user_name}
-                    description={`Posted ${new Date(selectedPost?.created_at).toLocaleDateString()}`}
-                    avatarProps={{ className: "bg-[#CFB87C] text-[#222222] font-black" }}
-                    className="font-black uppercase text-xs text-white"
-                  />
+                  <div className="flex flex-col">
+                    <span className="text-white font-black uppercase text-xs">{selectedPost?.user_name}</span>
+                    <span className="text-gray-500 text-[10px] font-bold mt-1">
+                      POSTED {new Date(selectedPost?.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
 
                 <ScrollShadow className="flex-1 p-8 min-h-0 scrollbar-hide">
