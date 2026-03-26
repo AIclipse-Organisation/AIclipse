@@ -37,12 +37,6 @@ spec:
               valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD } }
             - name: MINIO_BUCKET_NAME
               value: "model-cycle-storage"
-            - name: STREAM
-              value: "jobs"
-            - name: GROUP
-              value: "detector"
-            - name: JOBS_URI
-              value: "http://jobs-srv:3000"
           readinessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }
             initialDelaySeconds: 2
