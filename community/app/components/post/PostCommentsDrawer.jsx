@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@heroui/react";
 import { timeAgo } from "./utils/timeAgo.js";
@@ -21,6 +21,8 @@ export default function PostCommentsDrawer({
   onSubmit,
   onDelete,
 }) {
+  const sheetRef = useRef(null);
+  const bodyRef = useRef(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   // Lock body scroll when open
@@ -31,6 +33,44 @@ export default function PostCommentsDrawer({
       document.body.style.overflow = "";
     }
     return () => { document.body.style.overflow = ""; };
+  }, [isOpen]);
+
+  // Shift sheet above mobile keyboard using visualViewport API
+  useEffect(() => {
+    if (!isOpen) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const sheet = sheetRef.current;
+    const body = bodyRef.current;
+    if (!sheet || !body) return;
+
+    const update = () => {
+      // Record current scroll before height change
+      const currentScroll = body.scrollTop;
+      
+      const offset = Math.max(0, window.innerHeight - vv.height);
+      sheet.style.setProperty("--kb-offset", `${offset}px`);
+
+      if (offset > 0) {
+        sheet.classList.add("comm_bottomSheet--keyboard");
+      } else {
+        sheet.classList.remove("comm_bottomSheet--keyboard");
+      }
+
+      // Restore scroll after layout stabilizes
+      requestAnimationFrame(() => {
+        body.scrollTop = currentScroll;
+      });
+    };
+
+    vv.addEventListener("resize", update);
+    update();
+
+    return () => {
+      vv.removeEventListener("resize", update);
+      sheet.style.removeProperty("--kb-offset");
+      sheet.classList.remove("comm_bottomSheet--keyboard");
+    };
   }, [isOpen]);
 
   const handleDeleteClick = (commentId) => {
@@ -65,6 +105,7 @@ export default function PostCommentsDrawer({
 
       {/* Bottom sheet */}
       <div
+        ref={sheetRef}
         className={`comm_bottomSheet${isOpen ? " comm_bottomSheet--open" : ""}`}
         role="dialog"
         aria-modal="true"
@@ -87,7 +128,7 @@ export default function PostCommentsDrawer({
         </div>
 
         {/* Body */}
-        <div className="comm_sheetBody">
+        <div className="comm_sheetBody" ref={bodyRef}>
           {commentsBusy && comments.length === 0 ? (
             <div className="comm_loadingComments">
               <Spinner size="lg" color="warning" />

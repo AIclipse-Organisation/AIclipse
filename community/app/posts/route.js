@@ -14,6 +14,7 @@ import { getRedis } from "@/lib/redis/redis";
 export const runtime = "nodejs"; // required for MongoDB driver
 
 const POSTS_COLLECTION = "community.posts";
+const VOTES_COLLECTION = "community.votes";
 
 // NEW: user collection to lookup poster name
 const USERS_COLLECTION = "auth.users";
@@ -534,22 +535,66 @@ export async function GET(req) {
 
     const publicImageIds = publicImages.map((img) => img.image_id);
 
-    // 2) posts for public images
-    const posts = await col
-      .find(
-        {
-          image_id: { $in: publicImageIds },
-          is_deleted: { $ne: true }, // Filter out tombstoned posts ( posts kept, but user data removed )
-          is_removed: { $ne: true }, // Filter out posts hidden by admins due to reports
-          ...(filterUserId ? { user_id: filterUserId } : {}),
-          ...(filterImageId ? { image_id: filterImageId } : {}),
-          ...(filterPostId ? { post_id: filterPostId } : {}),
-        },
-        { projection: { _id: 0 } },
-      )
-      .sort({ created_at: -1 })
-      .limit(300)
-      .toArray();
+    // 2) posts for public images - prioritizing unvoted posts if user is logged in
+    let posts;
+    const query = {
+      image_id: { $in: publicImageIds },
+      is_deleted: { $ne: true }, // Filter out tombstoned posts
+      is_removed: { $ne: true }, // Filter out posts hidden by admins
+      ...(filterUserId ? { user_id: filterUserId } : {}),
+      ...(filterImageId ? { image_id: filterImageId } : {}),
+      ...(filterPostId ? { post_id: filterPostId } : {}),
+    };
+
+    if (currentUserId && !filterPostId && !filterImageId && !filterUserId) {
+      // Use aggregation to prioritize unvoted posts for the logged in user
+      posts = await col
+        .aggregate([
+          { $match: query },
+          {
+            $lookup: {
+              from: VOTES_COLLECTION,
+              let: { pid: "$post_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ["$post_id", "$$pid"] },
+                        { $eq: ["$user_id", currentUserId] },
+                      ],
+                    },
+                  },
+                },
+                { $project: { _id: 1, vote: 1 } },
+              ],
+              as: "user_vote_data",
+            },
+          },
+          {
+            $addFields: {
+              is_voted: { $gt: [{ $size: "$user_vote_data" }, 0] },
+              user_vote_stored: { $arrayElemAt: ["$user_vote_data.vote", 0] },
+            },
+          },
+          {
+            $sort: {
+              is_voted: 1, // false (0) before true (1) -> unvoted first
+              created_at: -1, // newest first within groups
+            },
+          },
+          { $limit: 600 },
+          { $project: { _id: 0, user_vote_data: 0 } },
+        ])
+        .toArray();
+    } else {
+      // Simple fetch for non-logged in or filtered views
+      posts = await col
+        .find(query, { projection: { _id: 0 } })
+        .sort({ created_at: -1 })
+        .limit(300)
+        .toArray();
+    }
 
     if (!posts.length) {
       return NextResponse.json({ items: [] }, { status: 200 });
@@ -557,18 +602,29 @@ export async function GET(req) {
 
     let userVotesMap = {};
     if (currentUserId && posts.length > 0) {
-      const votesCol = db.collection("community.votes");
-
-      const userVotes = await votesCol
-        .find({
-          user_id: currentUserId,
-          post_id: { $in: posts.map((p) => p.post_id) },
-        })
-        .toArray();
-
-      userVotes.forEach((v) => {
-        userVotesMap[v.post_id] = v.vote;
+      // If we used the aggregation, we already have the vote data in user_vote_stored
+      posts.forEach((p) => {
+        if (p.user_vote_stored) {
+          userVotesMap[p.post_id] = p.user_vote_stored;
+        }
       });
+
+      // If we didn't use aggregation (e.g. filtered view or not logged in initially), 
+      // or if some posts are missing vote data, fetch it
+      const missingVotes = posts.filter(p => p.is_voted === undefined);
+      if (missingVotes.length > 0) {
+        const votesCol = db.collection(VOTES_COLLECTION);
+        const userVotes = await votesCol
+          .find({
+            user_id: currentUserId,
+            post_id: { $in: missingVotes.map((p) => p.post_id) },
+          })
+          .toArray();
+
+        userVotes.forEach((v) => {
+          userVotesMap[v.post_id] = v.vote;
+        });
+      }
     }
 
     // 3) fetch pending deltas from Redis in one roundtrip
@@ -638,7 +694,6 @@ export async function GET(req) {
     const nowSec = Math.floor(Date.now() / 1000);
 
     // 7) compute score per post
-    // 7) compute score per post
     const ranked = items.map((post) => {
       const numVotes =
         safeNumber(post.up_vote_count) + safeNumber(post.down_vote_count);
@@ -677,7 +732,10 @@ export async function GET(req) {
       if (isControversial(post, nowSec)) score *= 2.5;
 
       // Vote penalty last — deprioritize posts the user has already voted on
-      if (post.user_vote) score *= 0.001;
+      // We use a massive additive penalty to ensure unvoted posts always rank higher
+      if (post.user_vote) {
+        score -= 10000; 
+      }
 
       return {
         ...post,
