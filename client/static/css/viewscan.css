@@ -234,7 +234,7 @@ body.app .page-underline {
   display: grid;
 }
 
-.comm_barBlock + .comm_barBlock {
+.comm_barBlock+.comm_barBlock {
   margin-top: 12px;
 }
 
@@ -308,8 +308,8 @@ body.app .page-underline {
   position: relative;
   padding-top: 26px;
   background: rgba(0, 0, 0, .12);
-  border-bottom-right-radius:10px;
-  border-bottom-left-radius:10px;
+  border-bottom-right-radius: 10px;
+  border-bottom-left-radius: 10px;
 }
 
 .comm_progressPanel {
@@ -465,6 +465,7 @@ body.app .page-underline {
   from {
     transform: scaleX(0);
   }
+
   to {
     transform: scaleX(1);
   }
@@ -475,9 +476,11 @@ body.app .page-underline {
     transform: scale(0.95);
     opacity: 0.5;
   }
+
   60% {
     transform: scale(1.02);
   }
+
   100% {
     transform: scale(1);
     opacity: 1;
@@ -492,6 +495,7 @@ body.app .page-underline {
     text-shadow: none;
     -webkit-text-stroke: 0;
   }
+
   to {
     font-size: 14px;
     filter: grayscale(0);
@@ -511,9 +515,13 @@ body.app .page-underline {
 #aiclipse-card[hidden],
 #verdict-block[hidden],
 #description-header-section[hidden],
-#private-description-placeholder[hidden] {
+#private-description-placeholder[hidden],
+#vs-upload-date[hidden],
+#scan-quick-meta[hidden],
+#btn-comments[hidden] {
   display: none !important;
 }
+
 
 .split-card-row {
   display: grid;
@@ -710,11 +718,6 @@ body.app .page-underline {
 /* "Not sure" */
 .votes-line.is-neutral {
   color: rgba(255, 255, 255, 0.70);
-}
-
-/* Details block */
-.viewscan-meta {
-  padding: 6px 0 0;
 }
 
 .viewscan-heading {
@@ -1420,7 +1423,8 @@ body.app .page-underline {
 
 .btn-delete-link {
   all: unset;
-  color: #e04646; /* Red for deletion */
+  color: #e04646;
+  /* Red for deletion */
   font-size: 13px;
   font-weight: 600;
   text-decoration: underline;
@@ -1469,8 +1473,15 @@ body.app .page-underline {
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* =========================
