@@ -1,11 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import ModalBase from "./ModalBase"; // Adjust the import path if needed
-import { RadioGroup, Radio, Textarea } from "@heroui/react";
+import ModalBase from "./ModalBase";
+
+const REPORT_REASONS = [
+  "AI Misinformation",
+  "Harassment",
+  "Spam",
+  "Inappropriate Content",
+];
 
 export default function ReportModal({ isOpen, onClose, onSubmit, isSubmitting }) {
-  const [reportReason, setReportReason] = useState("AI Misinformation");
+  const [reportReason, setReportReason] = useState(REPORT_REASONS[0]);
   const [reportDetails, setReportDetails] = useState("");
 
   const handleSubmit = () => {
@@ -14,9 +20,9 @@ export default function ReportModal({ isOpen, onClose, onSubmit, isSubmitting })
 
   const footer = (
     <>
-      <button 
-        className="modal-secondary" 
-        onClick={onClose} 
+      <button
+        className="modal-secondary"
+        onClick={onClose}
         disabled={isSubmitting}
       >
         Cancel
@@ -40,37 +46,31 @@ export default function ReportModal({ isOpen, onClose, onSubmit, isSubmitting })
     >
       <p className="modal-lead">Why are you reporting this content?</p>
 
-      <RadioGroup
-        value={reportReason}
-        onValueChange={setReportReason}
-        color="warning"
-        classNames={{ wrapper: "gap-3" }}
-      >
-        <Radio value="AI Misinformation" classNames={{ label: "text-sm text-[#f3f3f3]" }}>
-          AI Misinformation
-        </Radio>
-        <Radio value="Harassment" classNames={{ label: "text-sm text-[#f3f3f3]" }}>
-          Harassment
-        </Radio>
-        <Radio value="Spam" classNames={{ label: "text-sm text-[#f3f3f3]" }}>
-          Spam
-        </Radio>
-        <Radio value="Inappropriate Content" classNames={{ label: "text-sm text-[#f3f3f3]" }}>
-          Inappropriate Content
-        </Radio>
-      </RadioGroup>
+      <div className="report-options">
+        {REPORT_REASONS.map((reason) => (
+          <label key={reason} className="report-option">
+            <span className="report-option-label">{reason}</span>
+            <input
+              type="radio"
+              name="reportReason"
+              value={reason}
+              checked={reportReason === reason}
+              onChange={(e) => setReportReason(e.target.value)}
+              className="report-radio"
+            />
+            <span className="report-radio-custom" />
+          </label>
+        ))}
+      </div>
 
       <div className="modal-section">
-        <Textarea
-          label="Extra details (Optional)"
-          labelPlacement="outside"
+        <label className="report-textarea-label">Extra details (Optional)</label>
+        <textarea
+          className="report-textarea"
           placeholder="Provide context for our moderators..."
           value={reportDetails}
-          onValueChange={setReportDetails}
-          classNames={{
-            input: "text-[#f3f3f3] placeholder:text-gray-500",
-            inputWrapper: "bg-[#2c2c2c] border-[#2c2c2c] focus-within:!border-[#CFB87C] transition-colors",
-          }}
+          onChange={(e) => setReportDetails(e.target.value)}
+          rows={3}
         />
       </div>
     </ModalBase>
