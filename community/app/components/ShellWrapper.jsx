@@ -14,6 +14,7 @@ export default function ShellWrapper({ children, user }) {
   const [showTutorial, setShowTutorial] = useState(false);
   const isAdminRoute = pathname?.startsWith("/admin") || pathname?.startsWith("/community/admin");
   const isProfileRoute = pathname?.startsWith("/profile/");
+  const isFeedRoute = pathname === "/" || pathname === "/community" || pathname === "/community/";
 
   if (isAdminRoute) {
     return (
@@ -59,7 +60,7 @@ export default function ShellWrapper({ children, user }) {
             )}
             {children}
           </main>
-          <BottomNav />
+          <BottomNav hideOnScroll={isFeedRoute} />
           <XpBar />
           <TutorialModal
             open={showTutorial}

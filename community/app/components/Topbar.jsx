@@ -2,26 +2,55 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
+const TOPBAR_HEIGHT = 56;
+const SHOW_AT_TOP = 40;
+const SCROLL_UP_THRESHOLD = 80; // User must scroll up this much before it triggers
+const DAMPING_FACTOR = 0.6;
+
 export default function Topbar({ isAdmin, showBack }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hidden, setHidden] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const offsetRef = useRef(0); // Track offset in a ref to avoid stale closures
   const lastScrollY = useRef(0);
+  const scrollUpAccum = useRef(0);
   const router = useRouter();
 
+  // Sync ref with state
   useEffect(() => {
-    const threshold = 10;
+    offsetRef.current = offset;
+  }, [offset]);
+
+  useEffect(() => {
     const handleScroll = () => {
       const currentY = window.scrollY;
-      const diff = currentY - lastScrollY.current;
-
-      if (Math.abs(diff) < threshold) return;
-
-      if (currentY > lastScrollY.current && currentY > 80) {
-        setHidden(true);
-      } else {
-        setHidden(false);
-      }
+      const delta = currentY - lastScrollY.current;
       lastScrollY.current = currentY;
+
+      // Apply damping to make movement feel "heavier"
+      const dampenedDelta = delta * DAMPING_FACTOR;
+
+      if (currentY <= SHOW_AT_TOP) {
+        setOffset(0);
+        scrollUpAccum.current = 0;
+      } else if (delta > 0) {
+        // Scrolling down - hide bar
+        setOffset((prev) => Math.max(-TOPBAR_HEIGHT, prev - dampenedDelta));
+        // Reset scroll up accumulator when moving down
+        scrollUpAccum.current = 0; 
+      } else {
+        // Scrolling up - show bar
+        scrollUpAccum.current -= delta; 
+        
+        // TRIGGER LOGIC:
+        // 1. If fully hidden: wait for threshold to trigger appearance
+        // 2. If already partially visible: move immediately with scroll for smoothness
+        const isFullyHidden = offsetRef.current <= -TOPBAR_HEIGHT;
+        const hasTriggered = scrollUpAccum.current >= SCROLL_UP_THRESHOLD;
+
+        if (!isFullyHidden || hasTriggered) {
+          setOffset((prev) => Math.min(0, prev - dampenedDelta));
+        }
+      }
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -44,7 +73,7 @@ export default function Topbar({ isAdmin, showBack }) {
 
   return (
     <>
-      <div className={`topbar${hidden ? " topbar--hidden" : ""}`}>
+      <div className="topbar" style={{ transform: `translateX(-50%) translateY(${offset}px)` }}>
         {showBack ? (
           <button
             className="topbar-back-btn"
