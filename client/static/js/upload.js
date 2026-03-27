@@ -173,6 +173,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const connectors = document.querySelectorAll(".flow-step-connector");
     const title = document.querySelector(".flow-header .page-title");
     const instruction = document.querySelector(".flow-header .flow-instruction");
+    const topbarBackBtn = document.getElementById("topbar-back-dynamic");
+    const menuToggle = document.getElementById("menu-toggle");
 
     steps.forEach((el, i) => {
       const stepNum = i + 1;
@@ -187,9 +189,13 @@ window.addEventListener("DOMContentLoaded", () => {
     if (step === 1) {
       if (title) title.textContent = "Upload";
       if (instruction) instruction.textContent = "Choose an image to scan for AI manipulation";
+      if (topbarBackBtn) topbarBackBtn.hidden = true;
+      if (menuToggle) menuToggle.hidden = false;
     } else if (step === 2) {
       if (title) title.textContent = "Analyze";
       if (instruction) instruction.textContent = "Our model will scan your image for signs of AI manipulation";
+      if (topbarBackBtn) topbarBackBtn.hidden = false;
+      if (menuToggle) menuToggle.hidden = true;
     }
   }
 
@@ -424,8 +430,7 @@ window.addEventListener("DOMContentLoaded", () => {
       e.stopPropagation();
     });
 
-    const clearImageBtn = document.getElementById("btn-clear-image");
-    clearImageBtn?.addEventListener("click", () => {
+    function clearImage() {
       const uploadPlaceholder = document.getElementById("upload-placeholder");
 
       try {
@@ -447,7 +452,13 @@ window.addEventListener("DOMContentLoaded", () => {
 
       window.lastFile = null;
       window.lastDetectionToken = null;
-    });
+    }
+
+    const clearImageBtn = document.getElementById("btn-clear-image");
+    clearImageBtn?.addEventListener("click", clearImage);
+
+    const topbarBackBtn = document.getElementById("topbar-back-dynamic");
+    topbarBackBtn?.addEventListener("click", clearImage);
   })();
 
   async function makeCroppedFileFromOriginal(originalFile, frameAspect = 1) {
