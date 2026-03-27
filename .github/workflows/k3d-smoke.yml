@@ -103,7 +103,7 @@ jobs:
           k3d version
 
       - name: Setup kubectl (pinned)
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
         with:
           version: ${{ inputs.kubectl_version }}
 
