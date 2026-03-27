@@ -5,15 +5,13 @@
   inset: 0;
   z-index: 5000;
 
-  background: rgba(0, 0, 0, 0.45); /* softer */
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(1px);
 
   display: flex;
-  align-items: flex-start;        /* not centered */
+  align-items: center;
   justify-content: center;
-  padding-top: 80px;              /* drop it under topbar visually */
-  padding-left: 16px;
-  padding-right: 16px;
+  padding: 16px;
 }
 
 .modal-panel {
@@ -154,6 +152,22 @@
 
 .modal-secondary:hover {
   background: #2c2c2c;
+}
+
+.modal-danger {
+  background: transparent;
+  color: #e04646;
+  border: 1px solid #e04646;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.modal-danger:hover {
+  background: #e04646;
+  color: #fff;
 }
 
 /* ---------- Tutorial modal layout ---------- */

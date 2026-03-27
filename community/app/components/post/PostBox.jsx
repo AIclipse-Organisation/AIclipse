@@ -179,6 +179,14 @@ export default function PostBox({
       );
       setComments((arr) => [data, ...arr]);
       setCommentText("");
+      
+      // Update comment count from API response if available, otherwise increment manually
+      if (data && typeof data.comment_count === "number") {
+        setCommentCount(data.comment_count);
+      } else {
+        setCommentCount((prev) => prev + 1);
+      }
+      
       xp?.addXp(1);
       triggerFloat(commentBtnRef, 1);
     } catch (err) {
@@ -189,11 +197,17 @@ export default function PostBox({
   }
 
   async function deleteComment(comment_id) {
-    if (!confirm("Are you sure?")) return;
     setCommentsBusy(true);
     try {
-      await deleteCommentAPI(comment_id);
+      const data = await deleteCommentAPI(comment_id);
       setComments((arr) => arr.filter((c) => c.comment_id !== comment_id));
+      
+      // Update comment count from API response if available, otherwise decrement manually
+      if (data && typeof data.comment_count === "number") {
+        setCommentCount(data.comment_count);
+      } else {
+        setCommentCount((prev) => Math.max(0, prev - 1));
+      }
     } catch (err) {
       setError(err.message || "Error deleting comment.");
     } finally {
