@@ -1218,11 +1218,16 @@ function setupShowComments(img) {
         headers: { Accept: "application/json" },
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         rowEl.remove();
         const countEl = document.getElementById("btn-comments-count");
         if (countEl) {
-          const cur = parseInt(countEl.textContent, 10);
-          if (!isNaN(cur)) countEl.textContent = String(Math.max(0, cur - 1));
+          if (data && typeof data.comment_count === "number") {
+            countEl.textContent = String(data.comment_count);
+          } else {
+            const cur = parseInt(countEl.textContent, 10);
+            if (!isNaN(cur)) countEl.textContent = String(Math.max(0, cur - 1));
+          }
         }
       }
     } catch { /* silent */ }
@@ -1247,21 +1252,26 @@ function setupShowComments(img) {
     pendingDeleteRowEl = null;
   };
 
-  if (commentModalCancel) {
+  if (commentModalCancel && !commentModalCancel.dataset.bound) {
+    commentModalCancel.dataset.bound = "1";
     commentModalCancel.addEventListener("click", hideDeleteCommentModal);
   }
 
-  if (deleteCommentModal) {
+  if (deleteCommentModal && !deleteCommentModal.dataset.bound) {
+    deleteCommentModal.dataset.bound = "1";
     deleteCommentModal.addEventListener("click", (e) => {
       if (e.target === deleteCommentModal) hideDeleteCommentModal();
     });
   }
 
-  if (commentModalConfirm) {
+  if (commentModalConfirm && !commentModalConfirm.dataset.bound) {
+    commentModalConfirm.dataset.bound = "1";
     commentModalConfirm.addEventListener("click", async () => {
       if (!pendingDeleteCommentId || !pendingDeleteRowEl) return;
+      const commentId = pendingDeleteCommentId;
+      const rowEl = pendingDeleteRowEl;
       hideDeleteCommentModal();
-      await deleteComment(pendingDeleteCommentId, pendingDeleteRowEl);
+      await deleteComment(commentId, rowEl);
     });
   }
 
