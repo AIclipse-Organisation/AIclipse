@@ -1135,6 +1135,42 @@ function setupShowComments(img) {
       .catch(() => { if (countEl) countEl.textContent = "0"; });
   }
 
+  // Shift sheet above mobile keyboard using visualViewport API
+  let vvHandler = null;
+  const attachKeyboardListener = () => {
+    const vv = window.visualViewport;
+    const body = document.getElementById("comments-body");
+    if (!vv || !body) return;
+
+    vvHandler = () => {
+      // Record current scroll before height change
+      const currentScroll = body.scrollTop;
+
+      const offset = Math.max(0, window.innerHeight - vv.height);
+      sheet.style.setProperty("--kb-offset", `${offset}px`);
+
+      if (offset > 0) {
+        sheet.classList.add("comm_bottomSheet--keyboard");
+      } else {
+        sheet.classList.remove("comm_bottomSheet--keyboard");
+      }
+
+      // Restore scroll after layout stabilizes
+      requestAnimationFrame(() => {
+        body.scrollTop = currentScroll;
+      });
+    };
+    vv.addEventListener("resize", vvHandler);
+    vvHandler();
+  };
+  const detachKeyboardListener = () => {
+    const vv = window.visualViewport;
+    if (vv && vvHandler) vv.removeEventListener("resize", vvHandler);
+    vvHandler = null;
+    sheet.style.removeProperty("--kb-offset");
+    sheet.classList.remove("comm_bottomSheet--keyboard");
+  };
+
   // Open/close helpers
   const openDrawer = () => {
     const pid = getPostId(currentScan);
@@ -1142,6 +1178,7 @@ function setupShowComments(img) {
     backdrop.hidden = false;
     sheet.classList.add("comm_bottomSheet--open");
     document.getElementById("app-container")?.style.setProperty("overflow", "hidden");
+    attachKeyboardListener();
     if (!sheet.dataset.loaded) {
       loadComments(pid);
       sheet.dataset.loaded = "1";
@@ -1152,6 +1189,7 @@ function setupShowComments(img) {
     backdrop.hidden = true;
     sheet.classList.remove("comm_bottomSheet--open");
     document.getElementById("app-container")?.style.removeProperty("overflow");
+    detachKeyboardListener();
   };
 
   // Render comments list
