@@ -168,10 +168,37 @@ window.addEventListener("DOMContentLoaded", () => {
   let cropX = 50;
   let cropY = 20;
 
+  function updateFlowStep(step) {
+    const steps = document.querySelectorAll(".flow-step");
+    const connectors = document.querySelectorAll(".flow-step-connector");
+    const title = document.querySelector(".flow-header .page-title");
+    const instruction = document.querySelector(".flow-header .flow-instruction");
+
+    steps.forEach((el, i) => {
+      const stepNum = i + 1;
+      el.classList.toggle("is-active", stepNum <= step);
+      el.classList.toggle("is-complete", stepNum < step);
+    });
+
+    connectors.forEach((el, i) => {
+      el.classList.toggle("is-complete", i + 1 < step);
+    });
+
+    if (step === 1) {
+      if (title) title.textContent = "Upload";
+      if (instruction) instruction.textContent = "Choose an image to scan for AI manipulation";
+    } else if (step === 2) {
+      if (title) title.textContent = "Analyze";
+      if (instruction) instruction.textContent = "Our model will scan your image for signs of AI manipulation";
+    }
+  }
+
   function updateFileLabel(hasFile) {
     if (!fileLabel) return;
     fileLabel.classList.toggle("is-selected", !!hasFile);
+    fileLabel.hidden = !!hasFile;
     fileLabel.textContent = hasFile ? "Change Image" : "Choose Image";
+    updateFlowStep(hasFile ? 2 : 1);
   }
 
   function syncPublishUI() {
@@ -395,6 +422,31 @@ window.addEventListener("DOMContentLoaded", () => {
 
     cropResetBtn?.addEventListener("pointerdown", (e) => {
       e.stopPropagation();
+    });
+
+    const clearImageBtn = document.getElementById("btn-clear-image");
+    clearImageBtn?.addEventListener("click", () => {
+      const uploadPlaceholder = document.getElementById("upload-placeholder");
+
+      try {
+        fileInput.value = "";
+      } catch {}
+
+      if (lastPreviewUrl) {
+        URL.revokeObjectURL(lastPreviewUrl);
+        lastPreviewUrl = null;
+      }
+
+      if (previewImg) previewImg.removeAttribute("src");
+      if (uploadPreviewWrap) uploadPreviewWrap.hidden = true;
+      if (uploadPlaceholder) uploadPlaceholder.hidden = false;
+
+      updateFileLabel(false);
+
+      if (btnCheck) btnCheck.hidden = true;
+
+      window.lastFile = null;
+      window.lastDetectionToken = null;
     });
   })();
 

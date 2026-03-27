@@ -1,0 +1,71 @@
+.flow-header {
+  padding: 0 0 14px;
+  text-align: center;
+}
+
+.flow-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 10px 0;
+}
+
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flow-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  transition: all 200ms ease;
+}
+
+.flow-step-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 200ms ease;
+}
+
+.flow-step.is-active .flow-step-dot {
+  border-color: #CFB87C;
+  background: #CFB87C;
+}
+
+.flow-step.is-active .flow-step-label {
+  color: #CFB87C;
+}
+
+.flow-step.is-complete .flow-step-dot {
+  border-color: #CFB87C;
+  background: transparent;
+}
+
+.flow-step.is-complete .flow-step-label {
+  color: rgba(207, 184, 124, 0.6);
+}
+
+.flow-step-connector {
+  width: 20px;
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 10px;
+  transition: background 200ms ease;
+}
+
+.flow-step-connector.is-complete {
+  background: rgba(207, 184, 124, 0.5);
+}
+
+.flow-instruction {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+}
