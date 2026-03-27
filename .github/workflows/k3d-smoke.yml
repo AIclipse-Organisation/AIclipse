@@ -73,7 +73,7 @@ jobs:
           git lfs pull --include="$FILE" --exclude="*"
           git lfs status || true
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build image (load locally, no push)
         # Build once, load into the runner’s Docker; we will import into all k3d nodes.
