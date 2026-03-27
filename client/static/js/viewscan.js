@@ -1180,7 +1180,7 @@ function setupShowComments(img) {
       if (currentUserId && c.user_id === currentUserId) {
         const delBtn = makeEl("button", "comm_commentDeleteBtn", "Delete");
         delBtn.type = "button";
-        delBtn.addEventListener("click", () => deleteComment(c.comment_id, row));
+        delBtn.addEventListener("click", () => showDeleteCommentModal(c.comment_id, row));
         content.appendChild(delBtn);
       }
 
@@ -1227,6 +1227,43 @@ function setupShowComments(img) {
       }
     } catch { /* silent */ }
   };
+
+  // Delete comment modal
+  const deleteCommentModal = document.getElementById("delete-comment-modal");
+  const commentModalCancel = document.getElementById("comment-modal-cancel");
+  const commentModalConfirm = document.getElementById("comment-modal-confirm");
+  let pendingDeleteCommentId = null;
+  let pendingDeleteRowEl = null;
+
+  const showDeleteCommentModal = (commentId, rowEl) => {
+    pendingDeleteCommentId = commentId;
+    pendingDeleteRowEl = rowEl;
+    if (deleteCommentModal) deleteCommentModal.hidden = false;
+  };
+
+  const hideDeleteCommentModal = () => {
+    if (deleteCommentModal) deleteCommentModal.hidden = true;
+    pendingDeleteCommentId = null;
+    pendingDeleteRowEl = null;
+  };
+
+  if (commentModalCancel) {
+    commentModalCancel.addEventListener("click", hideDeleteCommentModal);
+  }
+
+  if (deleteCommentModal) {
+    deleteCommentModal.addEventListener("click", (e) => {
+      if (e.target === deleteCommentModal) hideDeleteCommentModal();
+    });
+  }
+
+  if (commentModalConfirm) {
+    commentModalConfirm.addEventListener("click", async () => {
+      if (!pendingDeleteCommentId || !pendingDeleteRowEl) return;
+      hideDeleteCommentModal();
+      await deleteComment(pendingDeleteCommentId, pendingDeleteRowEl);
+    });
+  }
 
   // Post a comment
   const submitComment = async () => {
