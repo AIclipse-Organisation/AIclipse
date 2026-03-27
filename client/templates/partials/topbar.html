@@ -144,6 +144,8 @@
 <script>
   (function () {
     var lastScrollTop = 0;
+    var threshold = 10;
+    var hideAt = 80;
 
     document.addEventListener('DOMContentLoaded', function () {
       var topbar = document.querySelector('.topbar');
@@ -152,7 +154,11 @@
 
       container.addEventListener('scroll', function () {
         var currentTop = container.scrollTop;
-        if (currentTop > lastScrollTop && currentTop > 50) {
+        var diff = currentTop - lastScrollTop;
+
+        if (Math.abs(diff) < threshold) return;
+
+        if (currentTop > lastScrollTop && currentTop > hideAt) {
           topbar.classList.add('topbar--hidden');
         } else {
           topbar.classList.remove('topbar--hidden');

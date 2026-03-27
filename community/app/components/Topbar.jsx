@@ -9,9 +9,14 @@ export default function Topbar({ isAdmin, showBack }) {
   const router = useRouter();
 
   useEffect(() => {
+    const threshold = 10;
     const handleScroll = () => {
       const currentY = window.scrollY;
-      if (currentY > lastScrollY.current && currentY > 50) {
+      const diff = currentY - lastScrollY.current;
+
+      if (Math.abs(diff) < threshold) return;
+
+      if (currentY > lastScrollY.current && currentY > 80) {
         setHidden(true);
       } else {
         setHidden(false);
