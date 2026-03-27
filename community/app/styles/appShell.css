@@ -67,7 +67,6 @@ body::-webkit-scrollbar {
   border-bottom: 1px solid #2c2c2c;
   z-index: 100;
   will-change: transform;
-  transition: transform 0.3s ease;
 
   display: flex;
   align-items: center;
@@ -205,7 +204,7 @@ body::-webkit-scrollbar {
 
   display: flex;
   justify-content: space-around;
-  padding: 16px 0 12px 0;
+  padding: 10px 0 8px 0;
 
   z-index: 1000;
 

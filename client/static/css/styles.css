@@ -81,8 +81,8 @@ main {
 body.app {
   background: #222222;
   scrollbar-width: none;
-  /* hide scrollbar — mobile app simulator */
-  /* overrides default body background */
+  overflow: hidden;
+  height: 100dvh;
 }
 
 body.app::-webkit-scrollbar {
@@ -96,9 +96,7 @@ body.app .app-container {
   background: #222222;
   margin: 0 auto;
   max-width: 480px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   clip-path: inset(0);
@@ -118,11 +116,10 @@ body.app .topbar {
   max-width: 480px;
   z-index: 100;
   will-change: transform;
-  transition: transform 0.3s ease;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
+  padding: 10px 12px;
   height: 56px;
   box-sizing: border-box;
 }
@@ -163,7 +160,25 @@ body.app .hamburger-line {
   border-radius: 2px;
 }
 
+body.app .topbar-back-btn {
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
 /* Logo */
+body.app .topbar-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+}
+
 body.app .topbar-logo img {
   width: -webkit-fill-available;
   max-height: 2vh;
@@ -238,18 +253,21 @@ body.app .page-underline {
    Use "fixed" so it stays pinned even if content scrolls */
 body.app .navbar {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 0;
+  width: 100%;
+  max-width: 480px;
 
   background: #222222;
   border-top: 1px solid #2c2c2c;
 
   display: flex;
   justify-content: space-around;
-  padding: 16px 0 12px 0;
+  padding: 10px 0 8px 0;
 
   z-index: 1000;
+  will-change: transform;
 
   /* Force consistent rendering */
   -webkit-font-smoothing: antialiased;
@@ -257,12 +275,6 @@ body.app .navbar {
   backface-visibility: hidden;
 }
 
-@media (min-width: 480px) {
-  body.app .navbar {
-    padding-left: calc((100% - 480px) / 2);
-    padding-right: calc((100% - 480px) / 2);
-  }
-}
 
 body.app .navbar a {
   text-decoration: none;
@@ -324,12 +336,20 @@ body.app .notif-dot {
 /* Screen content area
    Add bottom padding so content doesn't hide behind navbar */
 body.app .screen {
-  flex: 1 0 auto;
-  padding: 20px;
-  padding-top: 76px;
-  /* 56px topbar + 20px spacing */
-  padding-bottom: 80px;
-  /* space for bottom nav */
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  padding: 76px 20px 70px;
+}
+
+body.app .screen::-webkit-scrollbar {
+  display: none;
+}
+
+body.app .screen--flush {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 /* IMPORTANT: override your existing main max-width when in app shell */

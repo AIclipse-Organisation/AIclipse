@@ -4,19 +4,16 @@
 
 
 /* =========================
-   Upload button
+   Flow Primary button (Shared between Upload and Results)
    ========================= */
 
-/* Upload button */
-.file-upload {
-  --btn-outline-color: #CFB87C;
-  --btn-hover-color: #CFB87C;
-
+.btn-flow-primary {
   all: unset;
+  box-sizing: border-box;
   width: 100%;
   max-width: 100%;
-  margin: 250px auto 0;
-  padding: 16px 18px;
+  height: 56px;
+  padding: 0 18px;
   border-radius: 999px;
 
   display: flex;
@@ -29,54 +26,122 @@
   font-weight: 700;
   text-align: center;
 
-  border: 1px solid var(--btn-outline-color);
+  /* Outline style to match Choose Image */
+  border: 1px solid #CFB87C !important;
+  background: transparent !important;
+  color: #fff !important;
+
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, transform 100ms ease;
+}
+
+.btn-flow-primary:hover:not(:disabled) {
+  background: #CFB87C !important;
+  color: #111 !important;
+}
+
+.btn-flow-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-flow-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* =========================
+   Upload button
+   ========================= */
+
+/* Upload button */
+.file-upload {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  height: 56px;
+  margin: 250px auto 0;
+  padding: 0 18px;
+  border-radius: 999px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+
+  border: 1px solid #CFB87C;
   background: transparent;
   color: #fff;
 
   cursor: pointer;
-  box-sizing: border-box;
 
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
 
+/* Ensure the Delete button in results flow doesn't turn red on hover and icon size matches text */
+.btn-flow-primary .vs-svgIcon {
+  height: 18px !important;
+  width: 18px !important;
+  flex-shrink: 0;
+  stroke: #cfb87c;
+}
+
+.vs-deleteBtn.btn-flow-primary:hover {
+  border-color: #CFB87C !important;
+  background: #CFB87C !important;
+}
+
+.vs-deleteBtn.btn-flow-primary:hover .vs-svgIcon {
+  stroke: #111 !important;
+}
+
+.vs-deleteBtn.btn-flow-primary:hover .comm_actionText {
+  color: #111 !important;
+}
+
 .file-upload::before {
   content: "+";
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
 
   display: inline-flex;
   align-items: center;
   justify-content: center;
 
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
 
-  line-height: 0;
+  line-height: 1;
   padding-bottom: 1px;
 
-  border: 1px solid var(--btn-outline-color);
+  border: 1px solid #CFB87C;
 }
 
 .file-upload:hover {
-  background: var(--btn-hover-color);
+  background: #CFB87C;
   color: #111;
 }
 
 .file-upload:hover::before {
   background: #111;
-  color: var(--btn-hover-color);
+  color: #CFB87C;
 }
 
 /* Filled state when a file is selected */
 .file-upload.is-selected {
-  background: var(--btn-hover-color);
+  background: #CFB87C;
   color: #111;
 }
 
 .file-upload.is-selected::before {
   background: #111;
-  color: var(--btn-hover-color);
+  color: #CFB87C;
 }
 
 /* =========================
@@ -84,42 +149,7 @@
    ========================= */
 
 #btn-check {
-  --btn-outline-color: #CFB87C;
-  --btn-hover-color: #CFB87C;
-
-  all: unset;
-  width: 100%;
-  max-width: 100%;
   margin: 24px auto 0;
-  padding: 20px 22px;
-  border-radius: 999px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  font: inherit;
-  font-size: 15px;
-  font-weight: 700;
-
-  border: 1px solid var(--btn-outline-color);
-  background: transparent;
-  color: #fff;
-
-  cursor: pointer;
-  box-sizing: border-box;
-
-  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
-}
-
-#btn-check:hover:not(:disabled) {
-  background: var(--btn-hover-color);
-  color: #111;
-}
-
-#btn-check:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .card {
@@ -187,6 +217,7 @@ textarea {
   aspect-ratio: 1 / 1;
   border-radius: 12px;
   overflow: hidden;
+  flex-shrink: 0;
 
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -222,7 +253,7 @@ textarea {
   color: #fff;
 
   background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 6px 10px;
   border-radius: 999px;
   backdrop-filter: blur(2px);
@@ -283,7 +314,55 @@ textarea {
   color: #111;
 }
 
-.crop-hint { bottom: 52px; }
+.btn-clear-image {
+  all: unset;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(2px);
+
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.btn-clear-image:hover {
+  background: #e04646;
+  border-color: #e04646;
+  color: #fff;
+}
+
+.change-image-link {
+  display: block;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.change-image-link:hover {
+  color: #CFB87C;
+  text-decoration: underline;
+}
+
+.crop-hint {
+  bottom: 52px;
+}
 
 /* Your label colors kept exactly */
 .verdict-text {
@@ -351,11 +430,11 @@ textarea {
 }
 
 .comm_barTrackWrap {
-    position: relative;
-    padding-top: 26px;
-    border-bottom-right-radius: 10px;
-    border-bottom-left-radius: 10px;
-    background: rgba(0, 0, 0, 0.12);
+  position: relative;
+  padding-top: 26px;
+  border-bottom-right-radius: 10px;
+  border-bottom-left-radius: 10px;
+  background: rgba(0, 0, 0, 0.12);
 }
 
 .comm_progressPanel {
@@ -402,14 +481,12 @@ textarea {
 }
 
 .aiclipse-bar-card .comm_progressFill {
-  background: linear-gradient(
-    90deg,
-    #b7aa7b 0%,
-    #b7aa7b 38%,
-    #c28b63 60%,
-    #d96242 82%,
-    #e14a39 100%
-  );
+  background: linear-gradient(90deg,
+      #b7aa7b 0%,
+      #b7aa7b 38%,
+      #c28b63 60%,
+      #d96242 82%,
+      #e14a39 100%);
 }
 
 .comm_barPercent {
@@ -460,9 +537,20 @@ textarea {
   isolation: isolate;
 }
 
-.comm_zoneLabel--safe.comm_zoneLabel--active    { color: #8f8b7e; text-shadow: none; }
-.comm_zoneLabel--neutral.comm_zoneLabel--active { color: #8f8b7e; text-shadow: none; }
-.comm_zoneLabel--risk.comm_zoneLabel--active    { color: #ff6b6b; text-shadow: 0 0 2px rgba(255, 107, 107, 0.15); }
+.comm_zoneLabel--safe.comm_zoneLabel--active {
+  color: #8f8b7e;
+  text-shadow: none;
+}
+
+.comm_zoneLabel--neutral.comm_zoneLabel--active {
+  color: #8f8b7e;
+  text-shadow: none;
+}
+
+.comm_zoneLabel--risk.comm_zoneLabel--active {
+  color: #ff6b6b;
+  text-shadow: 0 0 2px rgba(255, 107, 107, 0.15);
+}
 
 /* Reveal animation states */
 .comm_barBlock.is-hidden {
@@ -508,14 +596,29 @@ textarea {
 }
 
 @keyframes revealBounce {
-  0%   { transform: scale(0.95); opacity: 0.5; }
-  60%  { transform: scale(1.02); }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+
+  60% {
+    transform: scale(1.02);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @keyframes barFillIn {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
 }
 
 @keyframes labelReveal {
@@ -525,8 +628,9 @@ textarea {
     opacity: 0.4;
     text-shadow: none;
     -webkit-text-stroke: 0;
-    color:rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.25);
   }
+
   to {
     font-size: 14px;
     filter: grayscale(0);
@@ -845,37 +949,34 @@ textarea {
   color: #111;
 }
 
-/* Upload page layout inside the phone shell */
-.upload-screen {
+/* Upload and Results page layout inside the phone shell */
+.upload-screen,
+.results-screen {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding-bottom: 100px;
 }
 
-.upload-content {
+.upload-content,
+.results-content {
+  flex: 1;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  /* Ensure content doesn't collapse too much */
 }
 
-.upload-actions {
-  position: sticky;
-  bottom: 68px;
-
+.upload-actions,
+.results-actions {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
 
-  padding-top: 14px;
-  padding-bottom: 12px;
-
-  background: linear-gradient(
-    to top,
-    rgba(34, 34, 34, 0.98),
-    rgba(34, 34, 34, 0.75),
-    rgba(34, 34, 34, 0)
-  );
+/* Ensure results action row has no extra bottom space */
+.results-actions .res-actionRow {
+  margin-bottom: 0 !important;
 }
 
 .file-upload {
@@ -900,14 +1001,14 @@ textarea {
 }
 
 .visibility-selector {
-    display: flex;
-    gap: 0;
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.03);
-    justify-content: center;
-    flex-shrink: 0;
+  display: flex;
+  gap: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .visibility-selector .icon {
@@ -932,8 +1033,8 @@ textarea {
   box-sizing: border-box;
 }
 
-.vis-btn .icon { 
-  font-size: 18px; 
+.vis-btn .icon {
+  font-size: 18px;
   opacity: 0.5;
 }
 
@@ -957,14 +1058,14 @@ textarea {
    ========================= */
 .btn-save-final {
   display: block;
-  flex: 1!important; 
+  flex: 1 !important;
   width: 0;
-  min-width: 0; 
+  min-width: 0;
   margin: 0 !important;
   all: unset;
   box-sizing: border-box;
   padding: 18px;
-  background: transparent; 
+  background: transparent;
   color: #CFB87C;
   border-radius: 999px;
   font-weight: 700;
@@ -980,8 +1081,8 @@ textarea {
 
 .btn-save-final:hover:not(:disabled) {
   opacity: 0.95;
-  background: #CFB87C; 
-  color:#0f0f0f;
+  background: #CFB87C;
+  color: #0f0f0f;
 }
 
 .btn-save-final:active:not(:disabled) {
@@ -1009,7 +1110,7 @@ textarea {
   max-width: 100%;
   padding: 18px;
   border-radius: 999px;
-  font-size:15px;
+  font-size: 15px;
 
   font-weight: 700;
   color: #e04646;
@@ -1072,8 +1173,20 @@ textarea {
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.upload-previewWrap {
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .upload-placeholder {
@@ -1082,17 +1195,18 @@ textarea {
   border-radius: 12px;
   overflow: hidden;
   position: relative;
+  flex-shrink: 0;
 
 
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  
 
-  background: rgba(255, 255, 255, 0.04); 
+
+  background: rgba(255, 255, 255, 0.04);
   border: 2px dashed rgba(255, 255, 255, 0.15);
-  
+
   color: rgba(255, 255, 255, 0.4);
   transition: all 0.3s ease;
   box-sizing: border-box;
@@ -1101,7 +1215,7 @@ textarea {
 .placeholder-icon {
   margin-bottom: 8px;
   opacity: 0.6;
-  color: #CFB87C; 
+  color: #CFB87C;
 }
 
 .upload-placeholder p {
