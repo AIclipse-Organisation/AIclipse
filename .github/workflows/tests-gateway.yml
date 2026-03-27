@@ -1,0 +1,65 @@
+name: tests-gateway
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'gateway/**'
+      - 'infra/k8s/gateway-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-gateway-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            gateway/requirements.txt
+            gateway/requirements-dev.txt
+
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: |
+          set -euo pipefail
+          python -m pytest tests -q
+
+  gateway:
+    name: k3d-smoke
+    needs: unit
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: gateway
+      context: ./gateway
+      dockerfile: gateway/Dockerfile
+      image_name: aiclipse/gateway
+      deployment_yaml: infra/k8s/gateway-depl.yaml
+      deployment_name: gateway-depl
+      container_name: gateway
+      service_name: gateway-srv
+      service_port: 8080
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=gateway
+      

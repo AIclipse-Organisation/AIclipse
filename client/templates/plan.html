@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AIclipse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/loader.css" />
+    <link rel="stylesheet" href="/static/css/plan.css" />
+  </head>
+
+  <body class="app">
+    <div class="app-container">
+      {% set page_title = 'Plan' %}
+
+      {% include 'partials/topbar.html' %}
+
+      <main class="screen">
+        <!-- <section class="page-header" aria-label="Page title">
+          <h1 id="page-title" class="page-title">Subscription Plans</h1>
+          <div class="page-underline" role="presentation"></div>
+        </section> -->
+
+        <div id="status-message"></div>
+
+        <div id="usage-info" class="usage-info" style="display: none">
+          <h2>Your Usage</h2>
+          <p id="usage-text"></p>
+          <div class="usage-bar">
+            <div id="usage-fill" class="usage-fill"></div>
+            <div id="usage-label" class="usage-label">0%</div>
+          </div>
+        </div>
+
+        <div class="plans-container">
+          <div class="plan-card" id="plan-0">
+            <div class="plan-name">Free</div>
+            <div class="plan-price">€0<span>/month</span></div>
+            <ul class="plan-features">
+              <li>✓ 10 scans per month</li>
+              <li>✓ AI detection analysis</li>
+              <li>✓ Basic support</li>
+              <li>✓ Community access</li>
+            </ul>
+            <button class="plan-button" id="btn-plan-0" disabled>
+              Current Plan
+            </button>
+          </div>
+
+          <div class="plan-card" id="plan-1">
+            <div class="plan-name">Plus</div>
+            <div class="plan-price">€9.99<span>/month</span></div>
+            <ul class="plan-features">
+              <li>✓ <strong>Unlimited scans</strong></li>
+              <li>✓ AI detection analysis</li>
+              <li>✓ Priority support</li>
+              <li>✓ Premium badge</li>
+              <li>✓ Community access</li>
+              <li>✓ Advanced analytics</li>
+            </ul>
+            <button class="plan-button" id="btn-plan-1">Upgrade Now</button>
+          </div>
+        </div>
+      </main>
+
+    </div>
+    {% include 'partials/navbar.html' %}
+
+    <div id="usage-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div
+        class="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="usage-modal-title"
+      >
+        <h2 id="usage-modal-title">Usage limit reached</h2>
+        <p id="usage-modal-message"></p>
+        <p id="usage-modal-meta" class="muted"></p>
+        <div class="modal-actions">
+          <a class="plan-button" href="/plan">Upgrade</a>
+          <button class="plan-button" id="usage-modal-close" type="button">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="/static/js/include.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/loader.js"></script>
+    <script src="/static/js/plan.js"></script>
+    <script src="/static/js/main.js"></script>
+  </body>
+</html>

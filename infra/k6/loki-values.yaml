@@ -1,0 +1,24 @@
+loki:
+  enabled: true
+  isDefault: false
+
+  persistence:
+    enabled: true
+    storageClassName: "hostpath"
+    accessModes:
+      - ReadWriteOnce
+    size: 10Gi
+
+  config:
+    auth_enabled: false
+
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+
+grafana:
+  enabled: false
+prometheus:
+  enabled: false  

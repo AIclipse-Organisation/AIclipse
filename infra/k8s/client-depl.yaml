@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: client }
+  template:
+    metadata:
+      labels: { app: client }
+    spec:
+      containers:
+        - name: client
+          image: aiclipse/client
+          env:
+            - name: GATEWAY_URI
+              value: "http://gateway-srv:8080"
+            - name: COMMUNITY_URI
+              value: "http://community-srv:3000"
+            - name: CENTRAL_CONFIG_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-configmap
+                  key: CONFIG_URL
+            - name: FLASK_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: flask-secret
+                  key: FLASK_SECRET_KEY
+          ports:
+            - { name: http, containerPort: 3000 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 30
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 60
+            periodSeconds: 60
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 1
+            failureThreshold: 60
+          resources:
+            requests: { cpu: "50m",  memory: "128Mi" }
+            limits:   { cpu: "250m", memory: "256Mi" }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-srv
+spec:
+  type: ClusterIP
+  selector: { app: client }
+  ports:
+    - { name: http, port: 3000, targetPort: 3000 }

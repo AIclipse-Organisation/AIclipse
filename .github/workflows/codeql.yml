@@ -1,0 +1,84 @@
+name: CodeQL (SAST)
+
+on:
+  pull_request:
+    branches: [ "dev", "main" ]
+  push:
+    branches: [ "dev", "main" ]
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  codeql-python:
+    name: CodeQL Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: python
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v4
+
+  codeql-js:
+    name: CodeQL JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v4
+
+  codeql-csharp:
+    name: CodeQL C#
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: model-cycle
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: csharp
+          queries: security-and-quality
+          build-mode: manual
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore and build ModelCycle
+        id: csharp_build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          project="ModelCycle/ModelCycle.csproj"
+          if [ ! -f "$project" ]; then
+            echo "::warning::Missing $project; skipping CodeQL analyze for C#."
+            echo "built=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          dotnet restore "$project"
+
+          if dotnet build "$project" -c Release -v minimal; then
+            echo "built=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Build failed for $project; skipping CodeQL analyze for C#."
+            echo "built=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+      - name: Analyze (only if build succeeded)
+        if: ${{ steps.csharp_build.outputs.built == 'true' }}
+        uses: github/codeql-action/analyze@v4

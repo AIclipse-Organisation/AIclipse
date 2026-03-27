@@ -1,0 +1,63 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
+  - package-ecosystem: "pip"
+    directory: "/auth"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
+  - package-ecosystem: "pip"
+    directory: "/billing"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
+  - package-ecosystem: "pip"
+    directory: "/client"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
+  - package-ecosystem: "pip"
+    directory: "/detector"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
+  - package-ecosystem: "pip"
+    directory: "/gateway"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
+  - package-ecosystem: "pip"
+    directory: "/media"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
+  - package-ecosystem: "pip"
+    directory: "/email-worker"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
+  # Next.js
+  - package-ecosystem: "npm"
+    directory: "/community"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+
+  # C#
+  - package-ecosystem: "nuget"
+    directory: "/model-cycle"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"

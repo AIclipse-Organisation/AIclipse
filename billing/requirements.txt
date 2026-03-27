@@ -1,0 +1,5 @@
+fastapi==0.129.2
+uvicorn[standard]==0.41.0
+pymongo==4.16.0
+stripe==14.3.0
+pydantic==2.12.5

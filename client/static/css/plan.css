@@ -1,0 +1,198 @@
+
+    .plans-container {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 0;
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      align-items: stretch;
+    }
+
+    .plan-card {
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 12px;
+      padding: 14px 12px;
+      text-align: left;
+      transition: transform 0.2s, border-color 0.2s;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .plan-card:hover {
+      transform: translateY(-5px);
+      border-color: #CFB87C;
+    }
+
+    .plan-card.current {
+      border-color: #CFB87C;
+      background: #2f2a1d;
+      box-shadow: 0 0 0 1px rgba(207, 184, 124, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+
+    .plan-name {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #fff;
+      line-height: 1.1;
+    }
+
+    .plan-price {
+      font-size: 2.25rem;
+      font-weight: bold;
+      color: #CFB87C;
+      margin: 2px 0 10px;
+      line-height: 1;
+    }
+
+    .plan-price span {
+      font-size: 0.78rem;
+      color: #aaa;
+      margin-left: 4px;
+    }
+
+    .plan-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 12px;
+      text-align: left;
+      flex: 1;
+    }
+
+    .plan-features li {
+      padding: 6px 0;
+      border-bottom: 1px solid #444;
+      color: #ddd;
+      font-size: 0.95rem;
+      line-height: 1.25;
+    }
+
+    .plan-features li:last-child {
+      border-bottom: none;
+    }
+
+    .plans-container .plan-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 10px 12px;
+      background: transparent;
+      color: #CFB87C;
+      text-decoration: none;
+      border-radius: 999px;
+      font-weight: bold;
+      cursor: pointer;
+      border: 1px solid #CFB87C;
+      font-size: 0.95rem;
+      transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+    }
+
+    .plans-container .plan-button:hover:not(:disabled) {
+      background: #CFB87C;
+      color: #111;
+    }
+
+    .plans-container .plan-button:disabled {
+      background: #2f2a1d;
+      color: #111;
+      border-color: #444;
+      cursor: not-allowed;
+    }
+
+    .plan-card.current .plan-button:disabled {
+      background: #7a6e4c;
+      color: #222222;
+      border-color: #7a6e4c;
+      box-shadow: 0 0 0 1px rgba(207, 184, 124, 0.4);
+      opacity: 1;
+    }
+
+    .usage-info {
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 12px;
+      padding: 1rem;
+      margin: 1rem 0;
+      max-width: none;
+      text-align: center;
+    }
+
+    .usage-info h2 {
+      margin: 0 0 6px;
+      font-size: 20px;
+    }
+
+    .usage-info p {
+      margin: 0;
+    }
+
+    .usage-bar {
+      background: #444;
+      border-radius: 10px;
+      height: 30px;
+      margin: 1rem 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .usage-label {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      pointer-events: none;
+    }
+
+    .usage-fill {
+      background: linear-gradient(90deg, #CFB87C, #bda669);
+      height: 100%;
+      transition: width 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+
+    .status-message {
+      border-radius: 6px;
+      margin: 1rem 0;
+      text-align: center;
+    }
+
+    .status-success {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status-error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    @media (max-width: 460px) {
+      .plan-name {
+        font-size: 20px;
+      }
+
+      .plan-price {
+        font-size: 2rem;
+      }
+
+      .plan-features li {
+        font-size: 0.88rem;
+      }
+
+      .plan-button {
+        font-size: 0.9rem;
+      }
+    }
+    

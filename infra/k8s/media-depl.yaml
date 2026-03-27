@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: media } }
+  template:
+    metadata: { labels: { app: media } }
+    spec:
+      containers:
+        - name: media
+          image: aiclipse/media
+          env:
+          - name: MODEL_CYCLE_URL
+            value: "http://model-cycle-srv:3000"
+          - name: MONGO_URI
+            valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+          - name: MONGO_DB
+            valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+          - name: S3_ENDPOINT 
+            valueFrom: { secretKeyRef: { name: s3-sec, key: S3_ENDPOINT } } 
+          - name: S3_PUBLIC_ENDPOINT
+            valueFrom: { secretKeyRef: { name: s3-sec, key: S3_PUBLIC_ENDPOINT } } 
+          - name: AWS_ACCESS_KEY_ID 
+            valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_USER } } 
+          - name: AWS_SECRET_ACCESS_KEY 
+            valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD } }
+          ports: [{ name: http, containerPort: 3000 }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 5
+          startupProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 2
+            failureThreshold: 90 
+          resources:
+            requests: { cpu: "50m", memory: "256Mi" }
+            limits:   { cpu: "400m", memory: "768Mi" }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: media-srv
+spec:
+  type: ClusterIP
+  selector: { app: media }
+  ports: [{ name: http, port: 3000, targetPort: 3000 }]

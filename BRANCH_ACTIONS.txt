@@ -1,0 +1,58 @@
+BRANCH ACTIONS*******************
+
+COMMIT:
+
+#see (un)tracked files
+git status
+
+#add everything
+git add .
+
+or 
+
+#add some files
+git add index.html DummyData.json
+
+#commit with message
+git commit -m "Add styling and display data a bit better"
+
+#push
+git push origin main
+
+
+
+CLONE EXISTING BRANCH:
+
+# Clone the repository
+git clone https://github.com/AIclipse-Organisation/AIclipse.git
+
+# Change into the repo directory
+cd AIclipse
+
+# Fetch all branches
+git fetch
+
+# Checkout the branch you mentioned
+git checkout demo/CMNTY/61896/CommentAlgorithmDemo
+or
+git checkout -b ftr/infra-setup origin/ftr/infra-setup
+
+
+
+
+CREATE BRANCH:
+
+# Clone the repository
+git clone https://github.com/AIclipse-Organisation/AIclipse.git
+
+# Make sure you are on dev
+git checkout dev
+
+# Pull the latest changes
+git pull origin dev
+
+# Create the new branch from dev
+git checkout -b demo/CMNTY/61145/AlgorithmDemo
+
+# Push the branch to remote (optional, if you want it on GitHub)
+git push -u origin demo/CMNTY/61145/AlgorithmDemo

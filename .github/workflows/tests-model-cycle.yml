@@ -1,0 +1,69 @@
+name: tests-model-cycle
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'model-cycle/**'
+      - 'infra/k8s/model-cycle-depl.yaml'
+      - 'infra/k8s/model-cycle-pvc.yaml'
+      - 'infra/k8s-dev/model-cycle-secrets.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-model-cycle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: model-cycle
+    steps:
+      - uses: actions/checkout@v4
+
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.11"
+  #         cache: "pip"
+  #         cache-dependency-path: |
+  #           model-cycle/requirements.txt
+  #           model-cycle/requirements-dev.txt
+
+  #     - name: Install deps
+  #       run: |
+  #         set -euo pipefail
+  #         python -m pip install -U pip
+  #         pip install -r requirements-dev.txt
+
+  #     - name: Run pytest
+  #       run: |
+  #         set -euo pipefail
+  #         python -m pytest tests -q
+
+  model-cycle:
+    name: k3d-smoke
+    needs: unit
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: model-cycle
+      context: ./model-cycle
+      dockerfile: model-cycle/Dockerfile
+      image_name: aiclipse/model-cycle
+      deployment_yaml: infra/k8s/model-cycle-depl.yaml
+      deployment_name: model-cycle-depl
+      container_name: model-cycle
+      service_name: model-cycle-srv
+      service_port: 3000
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      extra_secrets_yaml: infra/k8s-dev/model-cycle-secrets.yaml
+      extra_pvc_yaml: infra/k8s/model-cycle-pvc.yaml
+      extra_pvc_name: model-cycle-pvc
+      readiness_selector: app=model-cycle

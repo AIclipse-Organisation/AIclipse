@@ -1,0 +1,527 @@
+name: prod-deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, prod, k8s]
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      ORG: ${{ secrets.GHCR_USERNAME }}
+      NS: default
+      IMAGES: "auth email-worker gateway media detector billing client community model-cycle"
+      KUBE_DNS_IP: 10.43.0.10
+      DOMAINS: "aiclipse.online aiclipse.site"
+
+    steps:
+      - name: Verify git-lfs is available on runner
+        run: |
+          set -euo pipefail
+          git lfs version >/dev/null 2>&1 || {
+            echo "git-lfs is not installed on the runner. Install it manually on the runner host."
+            exit 1
+          }
+          git lfs install --local
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Ensure LFS objects present
+        run: |
+          set -euo pipefail
+          git lfs pull
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Pre-build cleanup (free disk)
+        run: |
+          set -euo pipefail
+          docker buildx prune -af || true
+          docker builder prune -af || true
+          docker system prune -af --volumes || true
+          df -h
+          docker system df || true
+
+      - name: Build & push images
+        run: |
+          set -euo pipefail
+
+          # Tag is used only to push to GHCR. Kubernetes will deploy by digest.
+          PUSH_TAG="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          rm -f digests.env
+          touch digests.env
+
+          for name in $IMAGES; do
+            ref="ghcr.io/${ORG}/${name}:${PUSH_TAG}"
+            echo "BUILD ${ref}"
+
+            docker buildx build \
+              --platform linux/amd64 \
+              --pull \
+              --no-cache \
+              --tag "${ref}" \
+              --push \
+              "./${name}"
+
+            # Get pushed manifest digest
+            digest="$(docker buildx imagetools inspect "${ref}" --format '{{.Digest}}' 2>/dev/null || true)"
+            if [[ -z "${digest}" ]]; then
+              digest="$(docker buildx imagetools inspect "${ref}" 2>/dev/null | awk '/^Digest:/ {print $2; exit}')"
+            fi
+            if [[ -z "${digest}" ]]; then
+              echo "Failed to resolve digest for ${ref}"
+              exit 1
+            fi
+
+            echo "${name}=${digest}" | tee -a digests.env
+          done
+
+      - name: Ensure k8s pull secret for GHCR
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" create secret docker-registry ghcr-pull \
+            --docker-server=ghcr.io \
+            --docker-username="${ORG}" \
+            --docker-password="${{ secrets.GHCR_TOKEN }}" \
+            --docker-email="ci@example.local" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n "$NS" patch serviceaccount default \
+            -p '{"imagePullSecrets":[{"name":"ghcr-pull"}]}' || true
+
+      - name: Node preflight (disk-pressure)
+        run: |
+          set -euo pipefail
+          if kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .spec.taints[*]}{.key}{"="}{.effect}{" "}{end}{"\n"}{end}' \
+              | grep -q 'node.kubernetes.io/disk-pressure'; then
+            echo "ERROR: node has disk-pressure taint. Free disk on the node (often /var/lib/docker build cache) and retry."
+            kubectl describe node "$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')" | sed -n '/Taints:/,/Conditions:/p' || true
+            exit 1
+          fi
+
+      - name: Apply StorageClass
+        run: |
+          set -euo pipefail
+          kubectl apply -f infra/storageclass-k3s-retain.yaml
+          kubectl get sc
+
+      - name: Ensure CoreDNS (idempotent)
+        run: |
+          set -euo pipefail
+          kubectl -n kube-system get deploy coredns >/dev/null 2>&1 || \
+            kubectl apply -f infra/coredns.yaml
+
+          if ! kubectl -n kube-system get svc kube-dns >/dev/null 2>&1; then
+            sed "s/CLUSTER_DNS_IP/${KUBE_DNS_IP}/" infra/kube-dns-svc.yaml | kubectl apply -f -
+          else
+            echo "kube-dns Service exists, skipping create"
+          fi
+
+          kubectl -n kube-system rollout status deploy/coredns --timeout=180s
+          kubectl -n kube-system get svc kube-dns
+
+      - name: DNS smoke inside cluster
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" delete job dns-smoke --ignore-not-found=true
+
+          cat <<'YAML' | NS="$NS" envsubst | kubectl apply -f -
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: dns-smoke
+            namespace: ${NS}
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: check
+                    image: busybox:1.36
+                    command: ["sh","-lc"]
+                    args:
+                      - >
+                        set -e;
+                        nslookup kubernetes.default.svc.cluster.local >/dev/null &&
+                        nslookup kube-dns.kube-system.svc.cluster.local >/dev/null
+          YAML
+
+          if ! kubectl -n "$NS" wait --for=condition=complete job/dns-smoke --timeout=180s; then
+            echo "DNS smoke failed"
+            kubectl -n "$NS" get pods -l job-name=dns-smoke -o wide || true
+            P=$(kubectl -n "$NS" get pods -l job-name=dns-smoke -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+            kubectl -n "$NS" logs "$P" --tail=-1 || true
+            kubectl -n "$NS" describe pod "$P" || true
+            exit 1
+          fi
+
+          kubectl -n "$NS" logs job/dns-smoke --tail=-1 || true
+          kubectl -n "$NS" delete job dns-smoke --ignore-not-found=true
+
+      - name: Ensure Ingress-NGINX controller (official)
+        run: |
+          set -euo pipefail
+          # apply upstream manifest
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.3/deploy/static/provider/cloud/deploy.yaml
+
+          kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=300s
+          kubectl -n ingress-nginx get svc ingress-nginx-controller
+
+      - name: Expose ingress on NodePort for cloudflared
+        run: |
+          set -euo pipefail
+          kubectl -n ingress-nginx patch svc ingress-nginx-controller -p '{
+            "spec":{"type":"NodePort",
+              "ports":[
+                {"name":"http","port":80,"targetPort":80,"nodePort":30080},
+                {"name":"https","port":443,"targetPort":443,"nodePort":30443}
+              ]}}' || true
+          kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
+
+      - name: Ingress smoke via cluster DNS (online OR site)
+        run: |
+          set -euo pipefail
+          kubectl run curl --image=alpine:3.20 --restart=Never --command -- \
+            sh -lc '
+              set -e
+              apk add --no-cache curl >/dev/null
+
+              ok_root=0
+              for d in aiclipse.online aiclipse.site; do
+                code=$(curl -sS -o /dev/null -w "%{http_code}" -H "Host: $d" \
+                  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local || echo 000)
+                echo "$d -> $code"
+                echo "$code" | grep -Eq "^(2|3)" && ok_root=1
+              done
+
+              ok_storage=0
+              for d in aiclipse.online aiclipse.site; do
+                h="storage.$d"
+                code=$(curl -sS -o /dev/null -w "%{http_code}" -H "Host: $h" \
+                  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local || echo 000)
+                echo "$h -> $code"
+                echo "$code" | grep -Eq "^(2|3)" && ok_storage=1
+              done
+
+              [ "$ok_root" -eq 1 ] && [ "$ok_storage" -eq 1 ]
+            '
+          kubectl logs curl --tail=-1 || true
+          kubectl delete pod curl --wait=true --ignore-not-found
+
+      - name: Ensure app Secrets
+        env:
+          MONGO_INITDB_ROOT_USERNAME: ${{ secrets.MONGO_INITDB_ROOT_USERNAME }}
+          MONGO_INITDB_ROOT_PASSWORD: ${{ secrets.MONGO_INITDB_ROOT_PASSWORD }}
+          MONGO_DB:                   ${{ secrets.MONGO_DB }}
+          MONGO_URI:                  ${{ secrets.MONGO_URI }}
+          REDIS_PASSWORD:             ${{ secrets.REDIS_PASSWORD }}
+          REDIS_HOST:                 ${{ secrets.REDIS_HOST }}
+          REDIS_PORT:                 ${{ secrets.REDIS_PORT }}
+          REDIS_URI:                  ${{ secrets.REDIS_URI }}
+          MINIO_ROOT_USER:            ${{ secrets.MINIO_ROOT_USER }}
+          MINIO_ROOT_PASSWORD:        ${{ secrets.MINIO_ROOT_PASSWORD }}
+          S3_ENDPOINT:                ${{ secrets.S3_ENDPOINT }}
+          S3_PUBLIC_ENDPOINT:         ${{ secrets.S3_PUBLIC_ENDPOINT }}
+          JWT_KEY:                    ${{ secrets.JWT_KEY }}
+          INTERNAL_AUTH_TOKEN:        ${{ secrets.INTERNAL_AUTH_TOKEN }}
+          DETECTION_TOKEN_SECRET:     ${{ secrets.DETECTION_TOKEN_SECRET }}
+          API_KEY_PEPPER:             ${{ secrets.API_KEY_PEPPER }}
+          CONFIG_URL:                 ${{ secrets.CONFIG_URL }}
+          FLASK_SECRET_KEY:           ${{ secrets.FLASK_SECRET_KEY }}
+          STRIPE_SECRET_KEY:          ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PUBLISHABLE_KEY:     ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET:      ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          CLIENT_URL:                 ${{ secrets.CLIENT_URL }}
+          GMAIL_CLIENT_ID:            ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET:        ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN:        ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_SENDER_EMAIL:         ${{ secrets.GMAIL_SENDER_EMAIL }}
+
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" create secret generic mongo-sec \
+            --from-literal=MONGO_INITDB_ROOT_USERNAME="$MONGO_INITDB_ROOT_USERNAME" \
+            --from-literal=MONGO_INITDB_ROOT_PASSWORD="$MONGO_INITDB_ROOT_PASSWORD" \
+            --from-literal=MONGO_DB="$MONGO_DB" \
+            --from-literal=MONGO_URI="$MONGO_URI" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic redis-sec \
+            --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
+            --from-literal=REDIS_HOST="$REDIS_HOST" \
+            --from-literal=REDIS_PORT="$REDIS_PORT" \
+            --from-literal=REDIS_URI="$REDIS_URI" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic s3-sec \
+            --from-literal=MINIO_ROOT_USER="$MINIO_ROOT_USER" \
+            --from-literal=MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD" \
+            --from-literal=S3_ENDPOINT="$S3_ENDPOINT" \
+            --from-literal=S3_PUBLIC_ENDPOINT="$S3_PUBLIC_ENDPOINT" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic jwt-sec \
+            --from-literal=JWT_KEY="$JWT_KEY" \
+            --from-literal=DETECTION_TOKEN_SECRET="$DETECTION_TOKEN_SECRET" \
+            --from-literal=INTERNAL_AUTH_TOKEN="$INTERNAL_AUTH_TOKEN" \
+            --from-literal=API_KEY_PEPPER="$API_KEY_PEPPER" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic stripe-sec \
+            --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+            --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic flask-secret \
+            --from-literal=FLASK_SECRET_KEY="$FLASK_SECRET_KEY" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create secret generic email-sec \
+            --from-literal=GMAIL_CLIENT_ID="$GMAIL_CLIENT_ID" \
+            --from-literal=GMAIL_CLIENT_SECRET="$GMAIL_CLIENT_SECRET" \
+            --from-literal=GMAIL_REFRESH_TOKEN="$GMAIL_REFRESH_TOKEN" \
+            --from-literal=GMAIL_SENDER_EMAIL="$GMAIL_SENDER_EMAIL" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "$NS" create configmap app-configmap \
+            --from-literal=CONFIG_URL="$CONFIG_URL" \
+            --from-literal=CLIENT_URL="$CLIENT_URL" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply data layer
+        run: |
+          set -euo pipefail
+          filter_sc () {
+            awk '
+              function emit(buf){
+                if(buf=="")return;
+                if(buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return;
+                if(printed) printf("---\n");
+                printf("%s",buf); printed=1
+              }
+              BEGIN{buf=""; printed=0}
+              /^---[[:space:]]*$/ {emit(buf); buf=""; next}
+              {buf=buf $0 ORS}
+              END{emit(buf)}
+            ' "$1" | kubectl -n "$NS" apply -f -
+          }
+          filter_sc infra/k8s/mongo-depl.yaml
+          filter_sc infra/k8s/redis-depl.yaml
+          filter_sc infra/k8s/s3-depl.yaml
+
+      - name: Wait deps ready
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" rollout status statefulset/mongo --timeout=300s
+          kubectl -n "$NS" rollout status statefulset/redis --timeout=300s
+          kubectl -n "$NS" rollout status statefulset/s3    --timeout=300s
+
+      - name: Ensure PV Retain policy
+        run: |
+          set -euo pipefail
+          for pv in $(kubectl get pv -o jsonpath='{.items[*].metadata.name}'); do
+            policy=$(kubectl get pv "$pv" -o jsonpath='{.spec.persistentVolumeReclaimPolicy}')
+            if [ "$policy" != "Retain" ]; then
+              echo "Patching $pv: $policy -> Retain"
+              kubectl patch pv "$pv" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+            fi
+          done
+
+      - name: Apply app deployments/services
+        run: |
+          set -euo pipefail
+
+          kubectl -n "$NS" apply -f infra/k8s/auth-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/email-worker-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/gateway-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/media-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/detector-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/billing-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/client-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/vote-flush-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/comments-flush-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/click-flush-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/community-depl.yaml
+          kubectl -n "$NS" apply -f infra/k8s/user-delete-worker-depl.yaml
+          kubectl -n "$NS" get pvc model-cycle-pvc >/dev/null 2>&1 || \
+            kubectl -n "$NS" apply -f infra/k8s/model-cycle-pvc.yaml
+          kubectl -n "$NS" apply -f infra/k8s/model-cycle-depl.yaml
+
+      - name: Apply HPA
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" apply -f infra/k8s-prod/hpa.yaml
+
+      - name: Deploy images by digest
+        run: |
+          set -euo pipefail
+
+          while IFS='=' read -r name digest; do
+            kubectl -n "$NS" set image "deploy/${name}-depl" \
+              "${name}=ghcr.io/${ORG}/${name}@${digest}"
+          done < digests.env
+
+          community_digest="$(awk -F= '$1=="community"{print $2}' digests.env)"
+          kubectl -n "$NS" set image deploy/vote-flush-depl              worker="ghcr.io/${ORG}/community@${community_digest}"
+          kubectl -n "$NS" set image deploy/comments-flush-depl        worker="ghcr.io/${ORG}/community@${community_digest}"
+          kubectl -n "$NS" set image deploy/click-flush-depl           worker="ghcr.io/${ORG}/community@${community_digest}"
+          kubectl -n "$NS" set image deploy/user-delete-worker-depl    worker="ghcr.io/${ORG}/community@${community_digest}"
+
+      - name: Wait app rollouts
+        run: |
+          set -euo pipefail
+
+          kubectl -n "$NS" rollout status deploy/vote-flush-depl           --timeout=300s
+          kubectl -n "$NS" rollout status deploy/comments-flush-depl   --timeout=300s
+          kubectl -n "$NS" rollout status deploy/click-flush-depl      --timeout=300s
+          kubectl -n "$NS" rollout status deploy/user-delete-worker-depl --timeout=300s
+
+          for name in $IMAGES; do
+            kubectl -n "$NS" rollout status "deploy/${name}-depl" --timeout=300s
+          done
+
+      - name: Cleanup old ReplicaSets
+        run: |
+          set -euo pipefail
+
+          DEPLOYS=()
+          for name in $IMAGES; do
+            DEPLOYS+=("${name}-depl")
+          done
+          DEPLOYS+=(vote-flush-depl comments-flush-depl click-flush-depl user-delete-worker-depl)
+
+          for d in "${DEPLOYS[@]}"; do
+            if ! kubectl -n "$NS" get deploy "$d" >/dev/null 2>&1; then
+              echo "skip $d (deployment not found)"
+              continue
+            fi
+
+            # current deployment revision
+            REV=$(kubectl -n "$NS" get deploy "$d" -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}')
+            echo "== $d (rev=$REV)"
+
+            # list RS owned by this deployment: name, rsRevision, spec.replicas
+            mapfile -t RS_LINES < <(
+              kubectl -n "$NS" get rs -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.ownerReferences[0].kind}{"\t"}{.metadata.ownerReferences[0].name}{"\t"}{.metadata.annotations.deployment\.kubernetes\.io/revision}{"\t"}{.spec.replicas}{"\n"}{end}' \
+              | awk -v d="$d" '$2=="Deployment" && $3==d {print $1 "\t" $4 "\t" $5}'
+            )
+
+            KEEP=()
+            DEL=()
+
+            for line in "${RS_LINES[@]}"; do
+              RS_NAME=$(echo "$line" | cut -f1)
+              RS_REV=$(echo "$line" | cut -f2)
+              RS_REP=$(echo "$line" | cut -f3)
+
+              if [[ "$RS_REV" == "$REV" ]]; then
+                KEEP+=("$RS_NAME")
+              elif [[ "$RS_REP" == "0" ]]; then
+                DEL+=("$RS_NAME")
+              fi
+            done
+
+            echo "keep: ${KEEP[*]:-none}"
+            if ((${#DEL[@]})); then
+              echo "delete: ${DEL[*]}"
+              kubectl -n "$NS" delete rs "${DEL[@]}" --wait=false
+            fi
+          done
+
+      - name: Apply prod ingress
+        run: |
+          set -euo pipefail
+          kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv.yaml
+          kubectl -n "$NS" apply -f infra/k8s-prod/ingress-api.yaml
+          kubectl -n "$NS" apply -f infra/k8s-prod/ingress-srv-uploads.yaml
+
+      - name: Garbage collection
+        run: |
+          set -euo pipefail
+          # failed
+          kubectl get pods -A --field-selector=status.phase=Failed -o name | xargs -r kubectl delete
+          # evicted
+          kubectl get pods -A | awk '$4=="Evicted"{print $1, $2}' | while read ns pod; do
+            kubectl -n "$ns" delete pod "$pod" --ignore-not-found || true
+          done
+          kubectl delete pod dns-smoke --ignore-not-found=true
+
+      - name: Summary
+        run: |
+          kubectl -n "$NS" get pods,svc,deploy,rs,sts,hpa
+
+      - name: Choose public domain for smoke test (online OR site)
+        run: |
+          set -euo pipefail
+          for d in $DOMAINS; do
+            if getent ahosts "$d" >/dev/null 2>&1; then
+              echo "PUBLIC_DOMAIN=$d" >> "$GITHUB_ENV"
+              echo "PUBLIC_STORAGE_DOMAIN=storage.$d" >> "$GITHUB_ENV"
+              echo "Using PUBLIC_DOMAIN=$d"
+              exit 0
+            fi
+          done
+          echo "Neither aiclipse.online nor aiclipse.site resolves from the runner" >&2
+          exit 1
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          OK='^2|^3'
+
+          for i in {1..30}; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "https://${PUBLIC_DOMAIN}" || echo 000)
+            printf '%s  try %02d  -> %s\n' "$(date +%H:%M:%S)" "$i" "$code"
+            if echo "$code" | grep -Eq "$OK"; then
+              echo "ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "not ready after 60s"
+          exit 1
+
+      - name: Final cleanup (always)
+        if: always()
+        run: |
+          set -euo pipefail
+
+          # Docker build artifacts
+          docker buildx prune -af || true
+          docker builder prune -af || true
+          docker system prune -af --volumes || true
+
+          # containerd images pulled by k3s (docker prune does NOT touch these)
+          sudo k3s crictl rmi --prune 2>/dev/null || crictl rmi --prune 2>/dev/null || true
+
+          # System logs
+          sudo journalctl --vacuum-size=50M 2>/dev/null || true
+
+          df -h
+          docker system df || true
+
+      - name: Cleanup workspace (always)
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf "${GITHUB_WORKSPACE:?}"/*

@@ -1,0 +1,153 @@
+.tutorials-screen {
+  padding: 18px 18px 32px;
+}
+
+.tutorials-header {
+  margin-bottom: 18px;
+}
+
+.tutorials-kicker {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #CFB87C;
+}
+
+.tutorials-title {
+  margin: 0 0 8px;
+  font-size: 28px;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.tutorials-subtitle {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.tutorials-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 18px 0 16px;
+}
+
+.tutorials-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  padding: 12px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tutorials-action--primary {
+  border-color: #CFB87C;
+  color: #CFB87C;
+  background: transparent;
+}
+
+.tutorials-action--primary:hover {
+  background: #CFB87C;
+  color: #111111;
+}
+
+.tutorials-action--neutral {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.92);
+  background: transparent;
+}
+
+.tutorials-action--neutral:hover {
+  background: rgba(255, 255, 255, 0.92);
+  color: #111111;
+}
+
+.tutorials-hero-card,
+.tutorials-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.tutorials-hero-card {
+  margin-bottom: 14px;
+}
+
+.tutorials-hero-kicker {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #CFB87C;
+}
+
+.tutorials-hero-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  color: #ffffff;
+}
+
+.tutorials-hero-text {
+  margin: 0 0 14px;
+  color: rgba(255,255,255,0.72);
+  line-height: 1.55;
+}
+
+.tutorials-list {
+  display: grid;
+  gap: 14px;
+}
+
+.tutorials-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tutorials-card-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.tutorials-card-text {
+  margin: 0;
+  color: rgba(255,255,255,0.72);
+  line-height: 1.55;
+  font-size: 14px;
+}
+
+.tutorials-card-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.tutorials-badge {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #CFB87C;
+  color: #111111;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tutorials-badge--muted {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.72);
+}

@@ -1,0 +1,89 @@
+openapi: 3.0.3
+info:
+  title: Aiclipse Detector Service API
+  version: "1.0.0"
+
+servers:
+  - url: http://detector-srv:3000
+
+paths:
+  /v1.0.0/checks:
+    post:
+      summary: Run image detection (v1.0.0)
+      tags: [v1.0.0]
+      description: >
+        Legacy - Accept an image file as multipart/form-data and return AI/Deepfake detection result.
+        Intended to be called by Gateway.
+      parameters:
+        - in: header
+          name: X-Request-Id
+          required: true
+          schema:
+            type: string
+          description: Correlation ID for logs and tracing. Gateway always sends it.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Legacy detection result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [is_ai, score]
+                properties:
+                  is_ai:
+                    type: boolean
+                  score:
+                    type: number
+        "400":
+          description: Invalid request
+        "500":
+          description: Internal Model error
+
+  /v1.0.1/checks:
+    post:
+      summary: Run image detection (v1.0.1)
+      tags: [v1.0.1]
+      description: >
+        Accept raw image bytes as application/octet-stream and return enhanced AI/Deepfake detection output.
+        This version adds classification label and confidence score.
+      parameters:
+        - in: header
+          name: X-Request-Id
+          required: true
+          schema:
+            type: string
+          description: Correlation ID for logs and tracing. Gateway always sends it.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Detection result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [verdict, label, confidence]
+                properties:
+                  verdict:
+                    type: string
+                  label:
+                    type: string
+                  confidence:
+                    type: number
+                    format: float
+        "400":
+          description: Invalid request
+        "500":
+          description: Internal Model error

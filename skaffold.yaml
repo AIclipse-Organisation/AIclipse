@@ -1,0 +1,143 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+
+build:
+  local:
+    push: false
+  artifacts:
+    - image: aiclipse/auth
+      context: auth
+      docker: { dockerfile: Dockerfile.dev }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/email-worker
+      context: email-worker
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/gateway
+      context: gateway
+      docker: { dockerfile: Dockerfile.dev }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/media
+      context: media
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/detector
+      context: detector
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/model-cycle
+      context: model-cycle
+      docker: { dockerfile: Dockerfile.dev }
+    - image: aiclipse/billing
+      context: billing
+      docker: { dockerfile: Dockerfile }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+    - image: aiclipse/client
+      context: client
+      docker: { dockerfile: Dockerfile.dev }
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: .
+          - src: "**/*.html"
+            dest: .
+          - src: "static/**/*.css"
+            dest: .
+          - src: "static/**/*.js"
+            dest: .
+    - image: aiclipse/community
+      context: community
+      docker: { dockerfile: Dockerfile.dev }
+      sync:
+        manual:
+          - src: "**/*.{js,jsx,ts,tsx,json,css,scss,html}"
+            dest: .
+
+manifests:
+  kustomize:
+    paths:
+      - infra
+
+deploy:
+  kubectl: {}
+
+profiles:
+  - name: dev
+    activation:
+      - kubeContext: docker-desktop
+  - name: prod
+    build:
+        artifacts:
+        - image: aiclipse/auth
+          context: auth
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/email-worker
+          context: email-worker
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/gateway
+          context: gateway
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/media
+          context: media
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/detector
+          context: detector
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/model-cycle
+          context: model-cycle
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/billing
+          context: billing
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/client
+          context: client
+          docker: { dockerfile: Dockerfile }
+        - image: aiclipse/community
+          context: community
+          docker: { dockerfile: Dockerfile }
+    
+portForward:
+  - resourceType: service
+    resourceName: gateway-srv   
+    namespace: default
+    port: 8080
+    localPort: 8080
+  - resourceType: service
+    resourceName: mongo-srv
+    namespace: default
+    port: 27017
+    localPort: 27017
+  - resourceType: service
+    resourceName: s3-srv
+    namespace: default
+    port: 9001
+    localPort: 9001
+  - resourceType: service
+    resourceName: s3-srv
+    namespace: default
+    port: 9000
+    localPort: 9000
+  - resourceType: service
+    resourceName: redis-srv   
+    namespace: default
+    port: 6379
+    localPort: 6379
+    

@@ -1,0 +1,112 @@
+.sk {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(207, 184, 124, 0.14),
+    transparent
+  );
+  animation: sk_shimmer 1.15s ease-in-out infinite;
+}
+
+@keyframes sk_shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.comm_gridLoading {
+  padding-top: 12px;
+}
+
+.comm_postBoxSkeleton {
+  opacity: 0.95;
+}
+
+.sk-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(207, 184, 124, 0.18);
+  background: rgba(207, 184, 124, 0.08);
+}
+
+.sk-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+}
+
+.sk-line {
+  height: 12px;
+  border-radius: 999px;
+}
+
+.sk-name {
+  width: 120px;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.sk-time {
+  width: 90px;
+  height: 11px;
+  opacity: 0.7;
+  margin-top: 6px;
+}
+
+.sk-desc-1 {
+  width: 85%;
+  height: 14px;
+  margin-top: 2px;
+}
+
+.sk-desc-2 {
+  width: 55%;
+  height: 14px;
+  margin-top: 8px;
+  opacity: 0.85;
+}
+
+.sk-media {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sk-barLabel {
+  width: 140px;
+  height: 12px;
+  margin: 0 auto;
+  opacity: 0.75;
+}
+
+.sk-bar {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.sk-pill {
+  width: 90px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sk-pill-wide {
+  width: 130px;
+}

@@ -1,0 +1,1802 @@
+/* =========================
+   COMMUNITY FEED LAYOUT
+   (YouTube-like: single column)
+   ========================= */
+
+.comm_grid {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 14px;
+
+  /* centered feed like YouTube */
+  max-width: 560px;
+  margin: 0 auto;
+  /* padding: 12px 12px 90px; */
+
+}
+
+/* =========================
+   POST CARD (YouTube-like)
+   ========================= */
+
+.comm_postBox {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+
+  /* Only divider should be BELOW each post */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  padding-bottom: 12px;
+}
+
+/* =========================
+   HEADER ROW
+   (avatar + name + time) + actions (report/delete)
+   ========================= */
+
+.comm_topRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+
+  padding: 12px 12px 10px;
+  background: transparent;
+}
+
+.comm_headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.comm_avatar {
+  width: 45px;
+  height: 45px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+
+  display: grid;
+  place-items: center;
+}
+
+.comm_avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.comm_avatarInitials {
+  font-weight: 800;
+  font-size: 15px;
+  opacity: 0.9;
+  color: #CFB87C;
+}
+
+/* meta: name on top, date below */
+.comm_headerMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.comm_headerNameLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.comm_headerName {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #CFB87C;
+}
+
+.comm_headerNameLink {
+  text-decoration: none;
+  color: #CFB87C;
+}
+
+.comm_headerNameLink:hover {
+  text-decoration: underline;
+}
+
+/* Badge row - contains all badges on the right side, wraps when space is tight */
+.comm_badgeRow {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* Unified badge base style */
+.comm_badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+/* Official badge - gold theme with animated border */
+.comm_badge--official {
+  color: #CFB87C;
+  border: 1px solid transparent;
+  background: linear-gradient(#1a1a1a, #1a1a1a) padding-box,
+    linear-gradient(90deg, #1a1a1a, #1a1a1a, #CFB87C, #1a1a1a, #1a1a1a) border-box;
+  background-size: 100% 100%, 400% 100%;
+  animation: badge-border-flow 6s linear infinite;
+}
+
+/* Popular badge - purple theme with animated border */
+.comm_badge--popular {
+  color: #af83c9;
+  border: 1px solid transparent;
+  background: linear-gradient(#1a1a1a, #1a1a1a) padding-box,
+    linear-gradient(90deg, #1a1a1a, #1a1a1a, #af83c9, #1a1a1a, #1a1a1a) border-box;
+  background-size: 100% 100%, 400% 100%;
+  animation: badge-border-flow 6s linear infinite;
+}
+
+@keyframes badge-border-flow {
+  0% {
+    background-position: 0% 0%, 0% 0%;
+  }
+  100% {
+    background-position: 0% 0%, 100% 0%;
+  }
+}
+
+.comm_headerTime {
+  font-size: 12px;
+  opacity: 0.55;
+  white-space: nowrap;
+  color: #fff;
+}
+
+/* right side actions */
+.comm_headerActions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.comm_topRow button {
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.85;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.comm_topRow button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 1;
+}
+
+.comm_topRow button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_deleteButton {
+  color: rgba(255, 107, 107, 0.95);
+}
+
+/* =========================
+   BODY / TEXT
+   ========================= */
+
+.comm_body {
+  padding: 0 12px 4px;
+}
+
+.comm_description {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+  font-weight: 600;
+  opacity: 0.92;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #fff;
+}
+
+.comm_editButton {
+  margin-left: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.comm_editButton:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.comm_metaBlock {
+  display: none;
+}
+
+.comm_score,
+.comm_detection div,
+.comm_poster {
+  font-size: 12px;
+  opacity: 0.70;
+}
+
+/* =========================
+   IMAGE (YouTube-like big image)
+   ========================= */
+
+.comm_postImageWrap {
+  position: relative;
+  width: min(100vw, 480px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.comm_postImage {
+  aspect-ratio: 1;
+  -o-object-fit: cover;
+  object-fit: cover;
+  cursor: pointer;
+  background: rgba(255, 255, 255, .05);
+  width: 100%;
+  height: auto;
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* =========================
+   ACTION ROW (like/dislike/comment)
+   ========================= */
+
+.comm_bottomRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 10px 12px;
+  background: transparent;
+
+  border-top: 0;
+  /* was divider; removed */
+}
+
+.comm_votesCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+}
+
+.comm_votesCell button,
+.comm_CommentsCell button {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 16px;
+  cursor: pointer;
+
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+}
+
+.comm_votesCell button:hover,
+.comm_CommentsCell button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.comm_votesCell button:disabled,
+.comm_CommentsCell button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* counts next to icons */
+.comm_votesCell span {
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.9;
+  min-width: 14px;
+  text-align: left;
+}
+
+.voteActive {
+  outline: 2px solid rgba(255, 255, 255, 0.18);
+}
+
+.comm_voteUp.active,
+.comm_voteDown.active {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.comm_iconBtn {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.comm_iconBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.comm_iconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* icon image size */
+.comm_icon {
+  width: 26px;
+  height: 26px;
+  display: block;
+  object-fit: contain;
+}
+
+/* =========================
+   NEW: unified pill actions (icon + text inside same button)
+   ========================= */
+
+.comm_actionsRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.comm_actionBtn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.comm_actionBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.comm_actionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_voteUp:disabled,
+.comm_voteDown:disabled {
+  background: transparent;
+  border-color: transparent;
+  opacity: 1;
+  cursor: default;
+}
+
+.comm_actionText {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+
+.comm_actionCount {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.35;
+  letter-spacing: 0.02em;
+}
+
+.comm_actionsLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.comm_actionsRight {
+  display: flex;
+  align-items: center;
+}
+
+/* =========================
+   COMMENTS SECTION
+   ========================= */
+
+.comm_commentsWrapper {
+  padding: 12px;
+  border-top: 0;
+  /* was divider; removed */
+}
+
+.comm_commentsHeader {
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.85;
+  margin-bottom: 10px;
+  color: #fff;
+}
+
+.comm_commentInputWrapper {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.comm_commentInput {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.comm_commentInput::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.comm_commentButton {
+  --btn-outline-color: #CFB87C;
+  --btn-hover-color: #CFB87C;
+
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
+
+  font: inherit;
+  font-weight: 700;
+
+  border: 1px solid var(--btn-outline-color);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.comm_commentButton:hover {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+.comm_commentsList {
+  display: grid;
+  gap: 10px;
+}
+
+.comm_comment {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.comm_commentMeta {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+}
+
+.comm_commentText {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  opacity: 0.92;
+  color: #fff;
+}
+
+.comm_deleteCommentButton {
+  margin-left: auto;
+  color: rgba(255, 107, 107, 0.95);
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.comm_deleteCommentButton:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.muted {
+  opacity: 0.6;
+  font-size: 12px;
+  padding-top: 8px;
+  color: #fff;
+}
+
+/* =========================
+   3-dot actions menu
+   ========================= */
+
+.comm_menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.comm_menuBtn {
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.comm_menuBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.comm_menuBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_topRow .comm_menuBtn {
+  font-size: 20px;
+  padding: 8px 12px;
+  line-height: 1;
+}
+
+.comm_menuPanel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 50;
+
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 12px;
+
+  background: rgba(20, 20, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.comm_menuItem {
+  width: 100%;
+  text-align: left;
+
+  display: flex;
+  align-items: center;
+
+  padding: 10px;
+  border-radius: 10px;
+
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+
+  color: rgba(255, 255, 255, 0.92);
+  font: 700 15px/1.2 inherit;
+}
+
+.comm_menuItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.comm_menuItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.comm_menuItemDanger {
+  color: rgba(255, 107, 107, 0.95);
+}
+
+.comm_menuItemMuted {
+  color: rgba(255, 255, 255, 0.60);
+  cursor: default;
+}
+
+.comm_menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: transparent;
+}
+
+/* =========================
+   Community: Results-style bars
+   ========================= */
+
+.comm_bars_wrapper {
+  position: relative;
+  padding: 4px 12px 8px;
+}
+
+.comm_vote_prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fff;
+
+  /* background: rgba(0, 0, 0, 0.7); */
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.comm_bars {
+  display: grid;
+  gap: 12px;
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.comm_bars.is-hidden {
+  filter: grayscale(1) blur(4px);
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: none;
+}
+
+.comm_bars.is-hidden .comm_progressFill {
+  width: 100% !important;
+  background: #666 !important;
+  transition: none !important;
+}
+
+.comm_bars.is-hidden .comm_progressBar {
+  background: rgba(0, 0, 0, 0.12) !important;
+}
+
+.comm_bars.is-hidden .comm_barVerdict,
+.comm_bars.is-hidden .comm_barTitle,
+.comm_bars.is-hidden .comm_barPercent {
+  color: transparent !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.comm_bars.is-hidden .comm_zoneLabel {
+  font-size: 10px !important;
+  color: rgba(255, 255, 255, 0.35) !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 !important;
+}
+
+.comm_bars.is-revealed {
+  filter: blur(0) saturate(1);
+  opacity: 1;
+  animation: revealBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.comm_bars.is-revealed .comm_progressFill {
+  transform-origin: left center;
+  animation: barFillIn 1.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: 0.25s;
+}
+
+.comm_bars.is-revealed .comm_voteFill {
+  transform-origin: left center;
+  animation: barFillIn 1.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: 0.25s;
+}
+
+@keyframes barFillIn {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.comm_bars.is-revealed .comm_zoneLabel--active {
+  animation: labelReveal 0.5s ease forwards;
+  animation-delay: 2.05s;
+  font-size: 12px;
+  filter: grayscale(1);
+  opacity: 0.4;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+}
+
+
+
+@keyframes labelBgIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes labelReveal {
+  from {
+    font-size: 12px;
+    filter: grayscale(1);
+    opacity: 0.4;
+    text-shadow: none;
+    -webkit-text-stroke: 0;
+  }
+
+  to {
+    font-size: 12px;
+    filter: grayscale(0);
+    opacity: 1;
+  }
+}
+
+.comm_barBlock {
+  position: relative;
+  display: grid;
+}
+
+.comm_barHead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  padding: 8px 14px 6px;
+  margin: 0;
+
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: rgba(0, 0, 0, 0.12);
+
+  min-height: 28px;
+}
+
+.comm_resultAvatar,
+.comm_resultAvatar_icon {
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: center;
+  width: 16px;
+  height: 16px;
+  display: flex;
+}
+
+.comm_resultAvatar img,
+.comm_resultAvatar_icon .comm_resultIcon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.comm_barTitle {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: rgba(207, 184, 124, 0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comm_barVerdict {
+  text-align: right;
+  color: rgba(207, 184, 124, .95);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+  font-size: 1.7vh;
+  font-weight: 700;
+}
+
+.comm_barSourceLabel {
+  position: static;
+  transform: none;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1;
+
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+
+  pointer-events: none;
+  z-index: 5;
+}
+
+
+.comm_progressPanel {
+  width: 100%;
+  box-sizing: border-box;
+
+  margin: 0;
+
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: rgba(0, 0, 0, 0.12);
+
+  overflow: hidden;
+}
+
+.comm_progressBar {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+
+  height: 18px;
+  border-radius: 999px;
+
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgb(63, 63, 63);
+
+  padding: 4px;
+  overflow: hidden;
+}
+
+.comm_progressFill {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  bottom: 4px;
+
+  width: 0px;
+  border-radius: 999px;
+  transition: width 300ms ease;
+  z-index: 1;
+  min-width: 18px;
+}
+
+.comm_progressFill[data-p]:not([data-p="0"]) {
+  min-width: 14px;
+}
+
+.comm_progressFill[data-p="100"] {
+  right: 4px;
+  width: auto !important;
+  border-radius: 999px;
+}
+
+.comm_barPercent {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+
+  z-index: 3;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ---------- Color themes ---------- */
+
+.comm_barBlock:not(.comm_communityBar) .comm_barTitle,
+.comm_barBlock:not(.comm_communityBar) .comm_barVerdict,
+.comm_barBlock:not(.comm_communityBar) .comm_barSourceLabel {
+  color: rgba(207, 184, 124, 0.95) !important;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_barHead,
+.comm_barBlock:not(.comm_communityBar) .comm_progressPanel {
+  border-color: rgba(207, 184, 124, 0.55) !important;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_barTrackWrap {
+  border-radius: 12px;
+  padding-top: 38px;
+  padding-bottom: 12px;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_zoneLabel {
+  top: 10px;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_progressPanel {
+  padding-left: 14px;
+  padding-right: 14px;
+  background: transparent;
+}
+
+.comm_barBlock:not(.comm_communityBar) .comm_voteSummary {
+  padding-left: 14px;
+  padding-right: 14px;
+  margin-top: 6px;
+}
+
+.comm_barBlock.comm_communityBar .comm_barTitle,
+.comm_barBlock.comm_communityBar .comm_barVerdict,
+.comm_barBlock.comm_communityBar .comm_barSourceLabel {
+  color: #af83c9;
+}
+
+.comm_barBlock.comm_communityBar .comm_barHead,
+.comm_barBlock.comm_communityBar .comm_progressPanel {
+  border-color: rgba(175, 131, 201, 0.55);
+}
+
+/* Verdict label colors by outcome */
+.comm_barVerdict--risk {
+  color: #f87171 !important;
+}
+
+.comm_barVerdict--neutral {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* --safe inherits brand color: gold for AIclipse, purple for community */
+
+/* Wrapper that holds zone labels + progress panel */
+.comm_barTrackWrap {
+  position: relative;
+  padding-top: 25px;
+  background: rgba(0, 0, 0, 0.12);
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+/* Zone labels — float above the bar without taking space */
+.comm_zoneLabel {
+  position: absolute;
+  top: 0;
+  bottom: auto;
+  transform: translateX(-50%);
+
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Inactive labels are grey; active labels get their zone color */
+.comm_zoneLabel--safe,
+.comm_zoneLabel--neutral,
+.comm_zoneLabel--risk {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.comm_zoneLabel--safe.comm_zoneLabel--active {
+  color: #cfb87c;
+}
+
+.comm_zoneLabel--neutral.comm_zoneLabel--active {
+  color: #ffffff;
+}
+
+.comm_zoneLabel--risk.comm_zoneLabel--active {
+  color: #ef4444;
+}
+
+.comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active {
+  color: #af83c9;
+}
+
+.comm_zoneLabel--active {
+  font-size: 12px;
+  font-weight: 800;
+  -webkit-text-stroke: 0;
+  isolation: isolate;
+}
+
+.comm_zoneLabel--safe.comm_zoneLabel--active {
+  text-shadow: 0 0 2px rgba(207, 184, 124, 0.6);
+}
+
+.comm_zoneLabel--neutral.comm_zoneLabel--active {
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+.comm_zoneLabel--risk.comm_zoneLabel--active {
+  text-shadow: 0 0 2px rgba(204, 34, 34, 0.6);
+}
+
+.comm_communityBar .comm_zoneLabel--safe.comm_zoneLabel--active {
+  text-shadow: 0 0 2px rgba(175, 131, 201, 0.6);
+}
+
+/* Threshold markers at 40% and 60% */
+.comm_barMarker {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 1.5px;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+/* Reveal Animation Keyframes */
+@keyframes revealBounce {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+
+  60% {
+    transform: scale(1.02);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Smooth fade for the text in buttons */
+.comm_actionText {
+  transition: opacity 0.3s ease;
+}
+
+.comm_postBox {
+  transition: border 0.4s ease, box-shadow 0.4s ease;
+}
+
+.is-revealed-benchmark {
+  margin-top: 4px;
+  margin-bottom: 14px;
+}
+
+/* ── Truth reveal: full overlay (new vote) ─────────────────────── */
+
+/* Static wrapper covers the image area and flex-centres the card */
+.comm_truthOverlayWrap {
+  position: absolute;
+  inset: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.comm_truthOverlay {
+  background: rgba(18, 15, 10, 0.91);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(207, 184, 124, 0.30);
+  border-radius: 18px;
+
+  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(207, 184, 124, 0.07);
+
+  z-index: 100;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.comm_truthOverlayIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.comm_truthOverlayIcon.is-correct {
+  background: rgba(207, 184, 124, 0.12);
+  border: 1.5px solid rgba(207, 184, 124, 0.55);
+  color: #CFB87C;
+  box-shadow: 0 0 18px rgba(207, 184, 124, 0.18);
+}
+
+.comm_truthOverlayIcon.is-incorrect {
+  background: rgba(210, 60, 60, 0.12);
+  border: 1.5px solid rgba(210, 60, 60, 0.45);
+  color: #d94040;
+}
+
+.comm_truthOverlayText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.comm_truthTitle {
+  font-weight: 900;
+  font-size: 17px;
+  letter-spacing: -0.2px;
+  line-height: 1.1;
+}
+
+.comm_truthTitle.is-correct {
+  color: #CFB87C;
+}
+
+.comm_truthTitle.is-incorrect {
+  color: #CFB87C;
+}
+
+.comm_truthSub {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.50);
+}
+
+/* ── Truth label (REAL / FAKE) — to the left of the corner badge ── */
+.comm_truthLabel {
+  position: absolute;
+  bottom: 18px;
+  right: 62px;
+  /* 20px badge margin + 36px badge + 6px gap */
+
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+
+  background: rgba(18, 15, 10, 0.88);
+
+  font-size: 15px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  line-height: 1;
+
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55);
+}
+
+.comm_truthLabel.is-real {
+  color: #CFB87C;
+  border: 1.5px solid rgba(207, 184, 124, 0.65);
+}
+
+.comm_truthLabel.is-fake {
+  color: #d94040;
+  border: 1.5px solid rgba(210, 60, 60, 0.50);
+}
+
+/* ── Truth corner badge (settled state) ────────────────────────── */
+.comm_truthCornerBadge {
+  position: absolute;
+  bottom: 18px;
+  right: 20px;
+
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+
+  background: rgba(18, 15, 10, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 50;
+  pointer-events: none;
+}
+
+.comm_truthCornerBadge.is-correct {
+  border: 1.5px solid rgba(207, 184, 124, 0.65);
+  color: #CFB87C;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(207, 184, 124, 0.14);
+}
+
+.comm_truthCornerBadge.is-incorrect {
+  border: 1.5px solid rgba(210, 60, 60, 0.50);
+  color: #d94040;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes comm_fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.comm_debugScore {
+  font-size: 11px;
+  opacity: 0.4;
+  padding: 0 12px;
+  margin: 4px 0;
+}
+
+@keyframes shine-sweep {
+  to {
+    background-position: 200% center;
+  }
+}
+
+
+/* =========================
+   FULL SCREEN BOTTOM SHEET (Instagram/TikTok style)
+   ========================= */
+
+/* Backdrop for the comments drawer */
+.comm_sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1500;
+  touch-action: none;
+}
+
+.comm_bottomSheet {
+  position: fixed;
+  bottom: var(--kb-offset, 0px);
+  left: max(0px, calc(50vw - 240px));
+  right: max(0px, calc(50vw - 240px));
+  width: min(100%, 480px);
+  height: calc(80dvh - var(--kb-offset, 0px));
+  max-height: calc(80dvh - var(--kb-offset, 0px));
+
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  z-index: 1501;
+
+  /* Hidden by default — slide in when open */
+  transform: translateY(100%);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  touch-action: none;
+}
+
+.comm_bottomSheet.comm_bottomSheet--open {
+  transform: translateY(0);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, .5);
+}
+
+.comm_bottomSheet.comm_bottomSheet--keyboard {
+  height: calc(100dvh - var(--kb-offset, 0px));
+  max-height: calc(100dvh - var(--kb-offset, 0px));
+  border-radius: 0;
+}
+
+/* ── The visual pull-down handle ── */
+.comm_sheetHandleWrap {
+  width: 100%;
+  padding: 12px 0 4px 0;
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.comm_sheetHandleWrap:hover .comm_sheetHandle {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.comm_sheetHandle {
+  width: 40px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+/* ── Header Area ── */
+.comm_sheetHeader {
+  padding: 10px 20px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.comm_sheetHeaderTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  /* Forces the title to perfectly center like Instagram */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.comm_sheetCount {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* PC Close Button */
+.comm_sheetCloseBtn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  margin-left: auto;
+  /* Pushes button to the far right */
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.comm_sheetCloseBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* ── Scrollable Body ── */
+.comm_sheetBody {
+  padding: 0 !important;
+  flex-grow: 1 !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+}
+
+/* Hide scrollbar for a cleaner mobile look */
+.comm_sheetBody::-webkit-scrollbar {
+  display: none;
+}
+
+.comm_sheetBody {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.comm_emptyComments {
+  padding: 60px 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.comm_commentsList {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
+
+.comm_commentRow {
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px;
+}
+
+.comm_commentAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #CFB87C;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.comm_commentContent {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-grow: 1;
+}
+
+.comm_commentTop {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.comm_commentAuthor {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.comm_commentTime {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.comm_commentText {
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comm_commentDeleteBtn {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.comm_commentDeleteBtn:hover {
+  color: rgba(255, 107, 107, 0.95);
+}
+
+/* ── Input Box locked to bottom ── */
+.comm_sheetFooter {
+  padding: 12px 20px;
+  /* Respects iPhone home bar area */
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #141414;
+  flex-shrink: 0;
+}
+
+.comm_sheetInputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 6px 6px 6px 16px;
+}
+
+.comm_sheetInput {
+  flex-grow: 1;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 15px;
+  outline: none;
+  padding: 8px 0;
+}
+
+.comm_sheetInput::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.comm_sheetPostBtn {
+  background: #CFB87C;
+  color: #111;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.comm_sheetPostBtn:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.comm_sheetPostBtn:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
+}
+
+
+
+.comm_loadingComments {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* =========================
+   COMMUNITY SPLIT BAR
+   ========================= */
+
+/* =========================
+   COMMUNITY STACKED VOTE BARS
+   ========================= */
+
+.comm_communityVote {
+  padding: 18px 14px 12px;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+
+.comm_communityIconCol,
+.comm_barIconCol {
+  position: absolute;
+  top: 0;
+  left: 14px;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 18px;
+  height: 18px;
+}
+
+.comm_communityIconSvg {
+  width: 18px;
+  height: 18px;
+  color: #af83c9;
+  opacity: 0.8;
+}
+
+.comm_voteBars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comm_voteRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comm_voteRowHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.comm_voteLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.comm_voteLabel--real {
+  color: #af83c9;
+}
+
+.comm_voteLabel--fake {
+  color: #f87171;
+}
+
+.comm_voteCount {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.comm_voteTrack {
+  width: 100%;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgb(63, 63, 63);
+  overflow: hidden;
+  position: relative;
+  padding: 3px;
+  box-sizing: border-box;
+}
+
+.comm_voteFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.comm_voteFill--real {
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0.28), transparent),
+    #cfb87c;
+}
+
+.comm_voteFill--fake {
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0.28), transparent),
+    linear-gradient(to right, #cfb87c, #e07043, #cc2222);
+}
+
+.comm_votePct {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.comm_voteSummary {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 500;
+}
+
+.comm_voteSummary--row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.comm_voteSummary--real {
+  color: #cfb87c;
+  font-weight: 700;
+}
+
+.comm_voteSummary--fake {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.comm_voteSummary--split {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* =========================
+   NEW VOTE BUTTON ROW
+   ========================= */
+
+.comm_voteButtonRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 0;
+}
+
+.comm_voteMainBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 14px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.comm_voteMainBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.comm_voteMainBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.comm_commentIconBtn .comm_icon {
+  width: 20px;
+  height: 20px;
+}
+
+.comm_commentIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.comm_commentIconBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}

@@ -1,0 +1,366 @@
+/* =========================
+   Scan list layout (Instagram-style Grid)
+   ========================= */
+
+.scansScreen {
+  padding: 0;
+}
+
+.scans-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  box-sizing: border-box
+}
+
+/* Make the card flush and compact */
+/* Make the card flush and compact */
+.scan-card {
+  background: rgba(255, 255, 255, 0.03);
+  width: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Subtle press effect */
+.scan-card:hover {
+  transform: scale(0.98);
+  filter: brightness(1.1);
+}
+
+.scan-row {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.scan-left {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  /* Important: Relative positioning here anchors the absolute bar inside it */
+  position: relative;
+  border-radius: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* image */
+.scan-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+}
+
+/* =========================
+   The Integrated Bar Overlay
+   ========================= */
+
+.confidence-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  /* Sleek thickness */
+  /* A dark, semi-transparent background helps the colored bar pop against any image background */
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2;
+  /* Ensures it sits on top of the image */
+  border: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.confidence-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0%;
+  background: rgba(207, 184, 124, 0.95);
+  /* The accent color */
+  border-radius: 0;
+  /* Smooth load-in animation */
+  transition: width 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* =========================
+   Skeleton Loading State
+   ========================= */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-card {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 0;
+  /* Matches your current edge-to-edge look */
+  position: relative;
+  overflow: hidden;
+
+  /* The shimmering gradient */
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.02) 25%,
+      rgba(255, 255, 255, 0.06) 50%,
+      rgba(255, 255, 255, 0.02) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2.5s infinite linear;
+}
+
+/* =========================
+   Visibility Badges (Top Right)
+   ========================= */
+
+.scan-visibility-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 10;
+  /* Keeps it above the image and shimmering skeleton */
+
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  /* For iOS support */
+
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+  /* Off-white icon color */
+
+  /* Very subtle border to define the edge against dark images */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scan-visibility-badge svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+/* Moderation Badge (Warning) */
+.scan-moderation-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 10;
+
+  background: rgba(220, 53, 69, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.95);
+
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.scan-moderation-badge svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+
+
+
+/* ... Keep your Status styles, Tabs, and Empty State styles below here ... */
+/* =========================
+   Status styles
+   ========================= */
+
+.status-message {
+  text-align: center;
+}
+
+.loading {
+  padding: 2rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.error {
+  color: var(--error-color, #dc3545);
+}
+
+/* =========================
+   Tabs
+   ========================= */
+
+.scans-tabs {
+  display: flex;
+  gap: 28px;
+  align-items: flex-end;
+  justify-content: center;
+
+  margin: 0px 16px 10px;
+  padding-bottom: 20px;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.scans-tab {
+  background: transparent;
+  border: 0;
+  padding: 10px 0;
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+
+  color: rgba(255, 255, 255, 0.38);
+  font-size: large;
+  position: relative;
+}
+
+.scans-tab:hover {
+  color: rgba(255, 255, 255, 0.60);
+}
+
+.scans-tab.is-active {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.scans-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+
+  bottom: -1.5px;
+
+  width: 34px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent, #c9a64b);
+}
+
+/* =========================
+   Details link
+   ========================= */
+
+.scan-details-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 14px;
+  border-radius: 10px;
+
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+
+  color: var(--accent, #5f8affe0);
+  background: transparent;
+  border: 1px solid rgba(120, 170, 255, 0.55);
+
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.scan-details-link:hover {
+  background: rgba(120, 170, 255, 0.95);
+  color: #111;
+  border-color: rgba(120, 170, 255, 0.95);
+  text-decoration: none;
+}
+
+.scans-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+
+  /* Pushes it toward the middle of the screen */
+  min-height: 40vh;
+
+  /* If #scans-container is a CSS grid, this ensures the empty state spans the full width */
+  grid-column: 1 / -1;
+  width: 100%;
+  gap: 16px;
+}
+
+.scans-empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.scans-empty-icon {
+  width: 48px;
+  /* Adjust based on your preferred icon size */
+  height: auto;
+  opacity: 0.6;
+}
+
+.scans-empty-text {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.scans-empty-btn {
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.scans-empty-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

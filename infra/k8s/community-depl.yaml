@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: community-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: community } }
+  template:
+    metadata: { labels: { app: community } }
+    spec:
+      containers:
+        - name: community
+          image: aiclipse/community
+          env:
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+            - name: MONGO_DB
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+            - name: GATEWAY_URI
+              value: http://gateway-srv:8080
+
+            - name: REDIS_HOST
+              value: redis-srv
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-sec
+                  key: REDIS_PASSWORD
+
+          ports: [{ name: http, containerPort: 3000 }]
+
+          readinessProbe:
+            httpGet: { path: /community/healthz, port: 3000, scheme: HTTP }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10 # Relax the timeout
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet: { path: /community/healthz, port: 3000, scheme: HTTP }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 10 # Relax the timeout
+            failureThreshold: 3
+
+          startupProbe:
+            httpGet: { path: /community/healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 5
+            timeoutSeconds: 20 # Give Next.js 20 seconds to compile this the first time!
+            failureThreshold: 30
+
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1500m", memory: "2Gi" }
+
+            
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: community-srv
+spec:
+  type: ClusterIP
+  selector: { app: community }
+  ports: [{ name: http, port: 3000, targetPort: 3000 }]

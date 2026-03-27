@@ -1,0 +1,22 @@
+<section class="flow-header" aria-label="Upload flow progress">
+  <h1 class="page-title">{{ flow_title }}</h1>
+
+  <div class="flow-steps">
+    <div class="flow-step {% if flow_step >= 1 %}is-active{% endif %} {% if flow_step > 1 %}is-complete{% endif %}">
+      <span class="flow-step-dot"></span>
+      <span class="flow-step-label">Upload</span>
+    </div>
+    <div class="flow-step-connector {% if flow_step > 1 %}is-complete{% endif %}"></div>
+    <div class="flow-step {% if flow_step >= 2 %}is-active{% endif %} {% if flow_step > 2 %}is-complete{% endif %}">
+      <span class="flow-step-dot"></span>
+      <span class="flow-step-label">Analyze</span>
+    </div>
+    <div class="flow-step-connector {% if flow_step > 2 %}is-complete{% endif %}"></div>
+    <div class="flow-step {% if flow_step == 3 %}is-active{% endif %}">
+      <span class="flow-step-dot"></span>
+      <span class="flow-step-label">Results</span>
+    </div>
+  </div>
+
+  {% if flow_instruction %}<p class="flow-instruction">{{ flow_instruction }}</p>{% endif %}
+</section>

@@ -1,0 +1,490 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #222222;
+  scrollbar-gutter: auto;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
+.page-header {
+  padding: 6px 0 18px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #CFB87C;
+}
+
+.page-underline {
+  margin-top: 12px;
+  height: 1px;
+  width: 100%;
+  background: #CFB87C;
+}
+
+
+/* App shell wrapper */
+.app {
+  background: #222222;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Phone-width container */
+.app .app-container {
+  position: relative;
+  min-height: 100vh;
+  background: #222222;
+  overflow: hidden;
+  clip-path: inset(0);
+  margin: 0 auto;
+  max-width: 480px;
+}
+
+/* Top bar */
+.app .topbar {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  height: 56px;
+  box-sizing: border-box;
+  background: #222222;
+  border-bottom: 1px solid #2c2c2c;
+  z-index: 100;
+  will-change: transform;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.app .topbar.topbar--hidden {
+  transform: translateX(-50%) translateY(-100%);
+}
+
+.app .topbar-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.app .topbar-screen-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #CFB87C;
+}
+
+/* Hamburger */
+.app .menu-button {
+  position: relative;
+  z-index: 10;
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app .hamburger-line {
+  width: 22px;
+  height: 2px;
+  background-color: #CFB87C;
+  border-radius: 2px;
+}
+
+/* Logo */
+.app .topbar-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+}
+
+.app .topbar-logo img {
+  width: -webkit-fill-available;
+  max-height: 2vh;
+  display: block;
+}
+
+.how_to_spot_container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+/* Avatar */
+.app .topbar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 35px;
+  width: 35px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.app .topbar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Right-side user container */
+.app .topbar-user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.app #current-user-chip {
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: #CFB87C;
+}
+
+/* Screen content area (pad bottom so it doesn't hide under navbar) */
+.app .screen {
+  padding: 20px;
+  padding-top: 56px;
+  /* topbar height (border-box) */
+  padding-bottom: 80px;
+  /* space for bottom nav */
+}
+
+.app .screen.screen--profile {
+  padding: 0;
+  padding-top: 56px;
+  /* topbar height */
+  padding-bottom: 80px;
+}
+
+.page-header.page-header--compact {
+  padding: 6px 2vh 0;
+}
+
+/* Bottom navbar */
+.app .navbar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+
+  width: 100%;
+  max-width: 480px;
+
+  background: #222222;
+  border-top: 1px solid #2c2c2c;
+
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0 8px 0;
+
+  z-index: 1000;
+
+  /* Force consistent rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.app .navbar a {
+  text-decoration: none;
+  color: #f3f3f3;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 40px;
+
+  /* Force consistent rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.app .navbar a:hover {
+  color: #CFB87C;
+}
+
+/* Works for NavLink (react-router) because it adds .active automatically */
+.app .navbar a.active {
+  color: #CFB87C;
+}
+
+.app .navbar a::after {
+  content: "";
+  display: block;
+  width: 20px;
+  height: 2px;
+  margin: 6px auto 0;
+  background: transparent;
+  border-radius: 999px;
+}
+
+.app .navbar a.active::after {
+  background: currentColor;
+}
+
+.app .nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app .notif-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #CFB87C;
+  border: 1px solid #222222;
+  border: 1px solid #222222;
+}
+
+/* Responsive: subtle contrast outside phone shell */
+@media (min-width: 768px) {
+  .app {
+    background: #000;
+  }
+}
+
+.menu-overlay {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: max(0px, calc(50vw - 240px));
+  right: max(0px, calc(50vw - 240px));
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2000;
+  display: none;
+}
+
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: max(0px, calc(50vw - 240px));
+  width: 280px;
+  height: 100dvh;
+  background: #222222;
+  border-right: 1px solid #2c2c2c;
+  transform: translateX(-100%);
+
+  z-index: 2001;
+  transition: transform 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-drawer.active {
+  transform: translateX(0);
+  display: flex !important;
+}
+
+.drawer-header {
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #2c2c2c;
+  color: #CFB87C;
+  font-weight: bold;
+}
+
+.drawer-links {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+}
+
+.drawer-links a,
+.drawer-links .logout-button,
+.drawer-links .tutorial-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 15px 25px;
+  text-decoration: none;
+  color: #f3f3f3;
+  font-size: 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drawer-links a:hover,
+.drawer-links .logout-button:hover,
+.drawer-links .tutorial-button:hover {
+  background: #2c2c2c;
+  color: #CFB87C;
+}
+
+.drawer-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  color: inherit;
+}
+
+.drawer-link-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+}
+
+.logout-button {
+  color: #ff4444 !important;
+}
+.admin-link {
+  color: #51b344 !important;
+}
+
+.drawer-separator {
+  height: 1px;
+  background: #2c2c2c;
+  margin: 10px 25px;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #CFB87C;
+  font-size: 2rem;
+  cursor: pointer;
+}
+
+/* XP Toast — floating, portal-rendered */
+/* XP Toast — floating, portal-rendered */
+.xp-toast {
+  position: fixed;
+  top: 56px;
+  transform: translateX(-50%);
+  z-index: 9000;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  background: #1a1a1a;
+  border: 1px solid rgba(207, 184, 124, 0.35);
+  border-radius: 999px;
+  padding: 6px 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(207, 184, 124, 0.12);
+
+  width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.xp-toast-gained {
+  font-size: 12px;
+  font-weight: 800;
+  color: #CFB87C;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.xp-toast-mid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.xp-toast-track {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.xp-toast-fill {
+  height: 100%;
+  background: #CFB87C;
+  border-radius: 999px;
+}
+
+.xp-toast-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(207, 184, 124, 0.7);
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
+.home_tab_bottomNav {
+  color: #CFB87C;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Admin Menu Styles */
+.admin-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2000;
+  display: none;
+}
+
+.admin-nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100dvh;
+  background: #222222;
+  border-right: 1px solid #2c2c2c;
+  transform: translateX(-100%);
+  z-index: 2001;
+  transition: transform 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-nav-drawer.active {
+  transform: translateX(0);
+  display: flex !important;
+}

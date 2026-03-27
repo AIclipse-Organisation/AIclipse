@@ -1,0 +1,641 @@
+openapi: 3.0.3
+info:
+  title: Gateway Service
+  version: "0.0.2"
+servers:
+  - url: http://localhost:8080
+    description: Gateway local
+  - url: http://gateway-srv:8080
+    description: Gateway in-cluster
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: >
+        Developer API key. Only accepted on /v1/checks and /checks.
+        Gateway exchanges it internally for a short-lived JWT.
+
+  schemas:
+    SavedImage:
+      type: object
+      description: Saved image in user's history or community.
+      required:
+        - image_id
+        - verdict
+        - label
+        - confidence
+        - is_public
+        - uploaded_at
+        - url
+      properties:
+        image_id:
+          type: string
+        verdict:
+          type: string
+          description: High-level verdict from detector (e.g. "ai", "human").
+        label:
+          type: string
+          description: Human-readable label for the verdict.
+        confidence:
+          type: number
+          format: float
+          description: Confidence in range [0, 1].
+        is_public:
+          type: boolean
+        uploaded_at:
+          type: string
+          format: date-time
+        url:
+          type: string
+          format: uri
+          description: URL to access the image bytes (direct or signed).
+        user_id:
+          type: string
+          description: Owner user ID (not always needed on the client).
+        is_reported:
+          type: boolean
+          description: Whether the image has been reported by users.
+
+    ApiKeyPublic:
+      type: object
+      required: [key_id, created_at, last4]
+      properties:
+        key_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        last4:
+          type: string
+
+    ApiKeyGetResponse:
+      type: object
+      properties:
+        key:
+          allOf:
+            - $ref: "#/components/schemas/ApiKeyPublic"
+          nullable: true
+
+    ApiKeyCreateResponse:
+      type: object
+      required: [api_key, key]
+      properties:
+        api_key:
+          type: string
+          description: Full API key in format "{key_id}.{secret}". Returned only on rotation/creation.
+        key:
+          $ref: "#/components/schemas/ApiKeyPublic"
+
+    ApiKeyRevokeResponse:
+      type: object
+      required: [revoked]
+      properties:
+        revoked:
+          type: boolean
+
+    DetectionResponse:
+      type: object
+      required: [verdict, label, confidence, detection_token]
+      properties:
+        verdict:
+          type: string
+          description: High-level verdict (e.g. "ai", "human").
+        label:
+          type: string
+          description: Human-readable label for the verdict.
+        confidence:
+          type: number
+          format: float
+          description: Confidence in range [0, 1].
+        detection_token:
+          type: string
+          description: >
+            Signed token issued by Gateway that binds the detection result to the exact image bytes and user.
+            It must be passed back to /upload/image and is only validated by Gateway.
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+
+  /auth/signup:
+    post:
+      summary: User signup
+      description: Register a new user account via Gateway (proxy to Auth Service).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_name, email, date_of_birth, password]
+              properties:
+                user_name:
+                  type: string
+                  minLength: 1
+                email:
+                  type: string
+                  format: email
+                date_of_birth:
+                  type: string
+                  pattern: '^\\d{2}-\\d{2}-\\d{4}$'
+                  description: Date of birth in DD-MM-YYYY format.
+                password:
+                  type: string
+                  format: password
+      responses:
+        "201":
+          description: User created
+        "400":
+          description: Invalid payload
+        "409":
+          description: Email already registered
+
+  /auth/login:
+    post:
+      summary: User login
+      description: Authenticate and obtain a JWT access token via Gateway (proxy to Auth Service).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Login successful
+        "401":
+          description: Invalid credentials
+
+  /auth/me:
+    get:
+      summary: Get current user profile
+      description: Proxy to Auth Service /me using the JWT provided to the Gateway.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user profile
+        "401":
+          description: Unauthorized
+    patch:
+      summary: Update current user profile
+      description: Proxy to Auth Service /me (PATCH).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Updated user profile
+        "400":
+          description: Invalid payload
+        "401":
+          description: Unauthorized
+    delete:
+      summary: Delete current user account
+      description: Proxy to Auth Service /me (DELETE).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Account deleted
+        "401":
+          description: Unauthorized
+
+  /auth/admin/users:
+    get:
+      summary: List users (admin)
+      description: Proxy to Auth Service /admin/users. Requires admin user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: user_name
+          schema:
+            type: string
+          required: false
+          description: Optional case-insensitive partial match on user_name.
+      responses:
+        "200":
+          description: List of users
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+
+  /auth/admin/user/{user_id}:
+    get:
+      summary: Get user by ID (admin)
+      description: Proxy to Auth Service /admin/user/{user_id}.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User details
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "404":
+          description: User not found
+    patch:
+      summary: Update user (admin)
+      description: Proxy to Auth Service /admin/user/{user_id} (PATCH).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                date_of_birth:
+                  type: string
+                  pattern: '^\\d{2}-\\d{2}-\\d{4}$'
+                is_admin:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated user
+        "400":
+          description: Invalid payload
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "404":
+          description: User not found
+    delete:
+      summary: Delete user (admin)
+      description: Proxy to Auth Service /admin/user/{user_id} (DELETE).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "404":
+          description: User not found
+
+  /auth/api-key:
+    get:
+      summary: Get API key metadata
+      description: Proxy to Auth Service /me/api-key (metadata only).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: API key metadata (or null if none)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyGetResponse"
+        "401":
+          description: Unauthorized
+
+    post:
+      summary: Rotate API key
+      description: >
+        Proxy to Auth Service /me/api-key (rotate). Returns the full key once.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: API key created/rotated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreateResponse"
+        "401":
+          description: Unauthorized
+        "409":
+          description: Rotation conflict; retry
+
+    delete:
+      summary: Revoke API key
+      description: Proxy to Auth Service /me/api-key (revoke).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Revocation status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyRevokeResponse"
+        "401":
+          description: Unauthorized
+
+  /v1/checks:
+    post:
+      summary: Analyze an image (no saving) - v1
+      description: >
+        Upload an image and get AI/Deepfake detection result.
+        No image or result is persisted at this step.
+        Auth can be provided either via:
+          - Authorization: Bearer <jwt>
+          - X-Api-Key: <api_key> (developer flow; only allowed on /v1/checks and /checks)
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG/PNG) to analyze.
+      responses:
+        "200":
+          description: Detection result (not persisted) and detection_token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResponse"
+        "400":
+          description: Missing or invalid file
+        "401":
+          description: Unauthorized (invalid or missing JWT / API key not allowed on this route)
+        "413":
+          description: Image too large
+        "415":
+          description: Unsupported media type
+        "502":
+          description: Detector service error
+        "504":
+          description: Detector timeout
+
+  /checks:
+    post:
+      summary: Analyze an image (no saving) - legacy
+      deprecated: true
+      description: >
+        Legacy alias for /v1/checks. Same behavior and response shape.
+        Auth can be provided either via:
+          - Authorization: Bearer <jwt>
+          - X-Api-Key: <api_key> (developer flow; only allowed on /v1/checks and /checks)
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG/PNG) to analyze.
+      responses:
+        "200":
+          description: Detection result (not persisted) and detection_token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResponse"
+        "400":
+          description: Missing or invalid file
+        "401":
+          description: Unauthorized (invalid or missing JWT / API key not allowed on this route)
+        "413":
+          description: Image too large
+        "415":
+          description: Unsupported media type
+        "502":
+          description: Detector service error
+        "504":
+          description: Detector timeout
+
+  /upload/image:
+    post:
+      summary: Save image (history / community)
+      description: >
+        Save an image and its detection result to the user's history and optionally community.
+        The detection result is validated using detection_token issued by /v1/checks (or /checks).
+        Gateway verifies detection_token and image bytes and then forwards only trusted fields to Media.
+        detection_token is never forwarded to internal services.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, detection_token]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG/PNG) to save.
+                detection_token:
+                  type: string
+                  description: >
+                    Signed detection token obtained from /v1/checks (or /checks) for this exact image
+                    and current user. Gateway validates the token and binds it to the uploaded bytes
+                    before saving.
+                is_public:
+                  type: boolean
+                  description: >
+                    If true, the image is public (community post).
+                    If false or omitted, the image is private (history only).
+      responses:
+        "201":
+          description: Image saved with detection result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [verdict, label, confidence, image]
+                properties:
+                  verdict:
+                    type: string
+                  label:
+                    type: string
+                  confidence:
+                    type: number
+                    format: float
+                  image:
+                    $ref: "#/components/schemas/SavedImage"
+        "400":
+          description: Missing or invalid file or detection_token
+        "401":
+          description: Unauthorized (invalid or missing JWT)
+        "413":
+          description: Image too large
+        "415":
+          description: Unsupported media type
+        "502":
+          description: Upstream service error (Media)
+        "504":
+          description: Upstream timeout (Media)
+
+  /images:
+    get:
+      summary: Get current user's images (history)
+      description: Return images that belong to the authenticated user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: is_public
+          schema:
+            type: boolean
+          required: false
+          description: >
+            Optional filter. If true, return only public images of the user.
+            If false, return only private images.
+            If omitted, return all images belonging to the user.
+      responses:
+        "200":
+          description: List of user's images
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SavedImage"
+        "401":
+          description: Unauthorized (invalid or missing JWT)
+
+  /image/{image_id}:
+    get:
+      summary: Get single image metadata
+      description: Return metadata for a single saved image (owner-only in practice).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+          description: ID of the saved image.
+      responses:
+        "200":
+          description: Saved image metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedImage"
+        "401":
+          description: Unauthorized (invalid or missing JWT)
+        "404":
+          description: Image not found or not accessible
+
+    delete:
+      summary: Delete image
+      description: Delete a saved image (owner-only).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+          description: ID of the saved image.
+      responses:
+        "200":
+          description: Deleted
+        "401":
+          description: Unauthorized (invalid or missing JWT)
+        "403":
+          description: You can only delete your own images
+        "404":
+          description: Image not found
+
+  /community/images:
+    get:
+      summary: Get public community images
+      description: Return a list of public images visible in the community feed.
+      responses:
+        "200":
+          description: List of public images
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SavedImage"

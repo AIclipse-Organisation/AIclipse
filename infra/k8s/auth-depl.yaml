@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: auth } }
+  template:
+    metadata: { labels: { app: auth } }
+    spec:
+      containers:
+        - name: auth
+          image: aiclipse/auth
+          env:
+            - name: JWT_KEY
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: JWT_KEY } }
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+            - name: MONGO_DB
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+            - name: INTERNAL_AUTH_TOKEN
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
+            - name: API_KEY_PEPPER
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: API_KEY_PEPPER } }
+            - name: REDIS_URI
+              valueFrom: { secretKeyRef: { name: redis-sec, key: REDIS_URI } }
+            - name: AUTH_EVENT_STREAM
+              value: "auth-events"
+          ports: [{ name: http, containerPort: 3000 }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 5
+          startupProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 2
+            failureThreshold: 90 
+          resources:
+            requests: { cpu: "200m",  memory: "256Mi" }
+            limits:   { cpu: "800m", memory: "768Mi" }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-srv
+spec:
+  type: ClusterIP
+  selector: { app: auth }
+  ports: [{ name: http, port: 3000, targetPort: 3000 }]

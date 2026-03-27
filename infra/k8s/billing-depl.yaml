@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-depl
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: billing } }
+  template:
+    metadata: { labels: { app: billing } }
+    spec:
+      containers:
+        - name: billing
+          image: aiclipse/billing
+          env:
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+            - name: MONGO_DB
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+            - name: STRIPE_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: stripe-sec, key: STRIPE_SECRET_KEY } }
+            - name: STRIPE_PUBLISHABLE_KEY
+              valueFrom: { secretKeyRef: { name: stripe-sec, key: STRIPE_PUBLISHABLE_KEY } }
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom: { secretKeyRef: { name: stripe-sec, key: STRIPE_WEBHOOK_SECRET } }
+            - name: CLIENT_URL
+              valueFrom: { configMapKeyRef: { name: app-configmap, key: CLIENT_URL } }
+          ports: [{ name: http, containerPort: 3000 }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 5
+          startupProbe:
+            httpGet: { path: /healthz, port: 3000, scheme: HTTP }
+            periodSeconds: 2
+            failureThreshold: 90 
+          resources:
+            requests: { cpu: "25m",  memory: "128Mi" }
+            limits:   { cpu: "150m", memory: "256Mi" }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-srv
+spec:
+  type: ClusterIP
+  selector: { app: billing }
+  ports: [{ name: http, port: 3000, targetPort: 3000 }]

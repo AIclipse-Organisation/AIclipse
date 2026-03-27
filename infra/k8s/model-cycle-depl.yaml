@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-cycle-depl
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: model-cycle
+  template:
+    metadata:
+      labels:
+        app: model-cycle
+    spec:
+      volumes: 
+        - name: model-data
+          persistentVolumeClaim:
+            claimName: model-cycle-pvc
+
+    #To wait for s3, model cycle will have a dependency and requires minio to be started before we spin it up
+      initContainers:
+          - name: wait-for-minio
+            image: busybox
+            command: ['sh', '-c', 'until nc -z s3-srv 9000; do echo waiting for minio; sleep 2; done;']
+      containers:
+        - name: model-cycle
+          image: aiclipse/model-cycle
+          ports:
+            - name: http
+              containerPort: 3000
+          volumeMounts: 
+            - name: model-data
+              mountPath: /app/data
+          env:
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
+            - name: MONGO_DB
+              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+            - name: REDIS_HOST
+              value: "redis-srv"    
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-sec      
+                  key: REDIS_PASSWORD
+            - name: APP_ENV
+              value: "dev"
+            - name: CENTRAL_CONFIG_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-configmap
+                  key: CONFIG_URL
+            - name: TRAINING_DATA_PATH
+              value: "/app/data"
+            - name: MediaServiceUrl
+              value: "http://media-srv:3000"
+            - name: S3_ENDPOINT 
+              valueFrom: { secretKeyRef: { name: s3-sec, key: S3_ENDPOINT } } 
+            - name: S3_PUBLIC_ENDPOINT
+              valueFrom: { secretKeyRef: { name: s3-sec, key: S3_PUBLIC_ENDPOINT } } 
+            - name: AWS_ACCESS_KEY_ID 
+              valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_USER } } 
+            - name: AWS_SECRET_ACCESS_KEY 
+              valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD } }
+            - name: AUTH_URI
+              value: "http://auth-srv:3000"
+            - name: DETECTOR_URI
+              value: "http://detector-srv:3000"
+            - name: MINIO_BUCKET_NAME
+              value: "model-cycle-storage"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+              scheme: HTTP
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+              scheme: HTTP
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+              scheme: HTTP
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits: { cpu: "2000m", memory: "3Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-cycle-srv
+spec:
+  type: ClusterIP
+  selector:
+    app: model-cycle
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000

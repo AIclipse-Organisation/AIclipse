@@ -1,0 +1,39 @@
+apiVersion: skaffold/v2beta29
+kind: Config
+metadata:
+  name: model-cycle-dev
+
+build:
+  local:
+    push: false
+  artifacts:
+    - image: aiclipse/model-cycle
+      context: model-cycle
+      docker:
+        dockerfile: Dockerfile
+
+deploy:
+  kubectl:
+    manifests:
+      - infra/k8s-dev/model-cycle-secrets.yaml
+      
+      - infra/k8s/s3-depl.yaml
+      
+      - infra/k8s/model-cycle-depl.yaml
+
+portForward:
+  - resourceType: service
+    resourceName: s3-srv
+    namespace: default
+    port: 9001
+    localPort: 9001
+  - resourceType: service
+    resourceName: s3-srv
+    namespace: default
+    port: 9000
+    localPort: 9000
+  - resourceType: service
+    resourceName: model-cycle-srv
+    namespace: default
+    port: 3000
+    localPort: 3000

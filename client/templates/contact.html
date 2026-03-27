@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Contact Us</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/contact.css" />
+  </head>
+
+  <body class="app">
+    <div class="app-container">
+      {% set page_title = 'Contact Us' %}
+      {% include 'partials/topbar.html' %}
+
+      <main class="screen">
+
+        <section class="contact-wrap" aria-label="Contact section">
+          <h2 class="contact-title">Get in Touch</h2>
+          <p class="contact-subtitle">
+            If you have any inquiries, get in touch with us. We’ll be more than happy to help you.
+          </p>
+
+          <div class="contact-pills" role="list">
+            <a class="contact-pill" role="listitem" href="tel:+353000000000" aria-label="Call us">
+              <span class="pill-icon" aria-hidden="true">
+                <img src="/static/images/phone.png" alt="" />
+              </span>
+              <span class="pill-text">+353 01 123 4567</span>
+            </a>
+
+            <a class="contact-pill" role="listitem" href="mailto:companynameinfo@gmail.com" aria-label="Email us">
+              <span class="pill-icon" aria-hidden="true">
+                <img src="/static/images/gmail.png" alt="" />
+              </span>
+              <span class="pill-text">aiclipse.support@gmail.com</span>
+            </a>
+          </div>
+
+          <div class="contact-divider"></div>
+
+
+          <h2 class="social-title">Social Media</h2>
+          <p class="social-description">
+            Follow us to stay updated with the latest features, announcements, and news.
+          </p>
+          <div class="social-list" role="list">
+            <a class="social-item" role="listitem" href="#" target="_blank" rel="noreferrer" aria-label="Facebook">
+              <span class="social-icon" aria-hidden="true">
+                <img src="/static/images/facebook.png" alt="" />
+              </span>
+              <span class="social-name">Facebook</span>
+            </a>
+
+            <a class="social-item" role="listitem" href="#" target="_blank" rel="noreferrer" aria-label="Instagram">
+              <span class="social-icon" aria-hidden="true">
+                <img src="/static/images/insta.png" alt="" />
+              </span>
+              <span class="social-name">Instagram</span>
+            </a>
+
+            <a class="social-item" role="listitem" href="#" target="_blank" rel="noreferrer" aria-label="X / Twitter">
+              <span class="social-icon" aria-hidden="true">
+                <img src="/static/images/twitter.png" alt="" />
+              </span>
+              <span class="social-name">X / Twitter</span>
+            </a>
+          </div>
+        </section>
+      </main>
+
+    </div>
+    {% include 'partials/navbar.html' %}
+
+    <script src="/static/js/include.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/contact.js"></script>
+  </body>
+</html>

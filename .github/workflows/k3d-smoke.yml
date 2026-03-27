@@ -1,0 +1,322 @@
+# Goal: spin up a throwaway k3d cluster, create StorageClass compatible with k3d,
+# deploy Redis/Mongo/S3 as deps, deploy the target service, and probe health.
+# Images are always used locally (no pulls).
+
+name: k3d-smoke-template
+
+on:
+  workflow_call:
+    inputs:
+      svc_name:            { type: string,  required: true }  # used to name the cluster
+      context:             { type: string,  required: true }  # Docker build context
+      dockerfile:          { type: string,  required: true }
+      image_name:          { type: string,  required: true }  # repo without tag
+      deployment_yaml:     { type: string,  required: true }  # service manifest to patch with CI tag
+      deployment_name:     { type: string,  required: true }  # k8s Deployment name
+      container_name:      { type: string,  required: true }
+      service_name:        { type: string,  required: true }  # ClusterIP svc used for curl from a pod
+      service_port:        { type: number,  required: true }
+      health_path:         { type: string,  required: true }  # e.g. /healthz
+      secrets_yaml:        { type: string,  required: true }  # dev secrets for deps + service
+      readiness_selector:  { type: string,  required: true }  # reserved, not used here
+
+      # NEW: optional extra resources (service-specific)
+      extra_secrets_yaml:  { type: string,  required: false, default: "" } # e.g. infra/k8s-dev/model-cycle-secrets.yaml
+      extra_pvc_yaml:      { type: string,  required: false, default: "" } # e.g. infra/k8s/model-cycle-pvc.yaml
+      extra_pvc_name:      { type: string,  required: false, default: "" } # e.g. model-cycle-pvc
+
+      rollout_timeout:     { type: string,  required: false, default: "90s" }
+      namespace:           { type: string,  required: false, default: "default" }
+      k3d_version:         { type: string,  required: false, default: "v5.7.4" }   # pinned for reproducibility
+      k3s_image:           { type: string,  required: false, default: "rancher/k3s:v1.32.2-k3s1" }  # pinned k3s
+      kubectl_version:     { type: string,  required: false, default: "v1.32.2" }  # kubectl matches k8s minor
+      lfs_weights_enabled: { type: boolean, required: false, default: false }
+      lfs_weights_path:    { type: string, required: false, default: "" }
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMAGE_TAG: ci-${{ github.sha }}                       # unique tag per run
+      CLUSTER: ci-${{ inputs.svc_name }}
+      SVC_PORT: ${{ inputs.service_port }}
+      NAMESPACE: ${{ inputs.namespace }}
+      K3D_VERSION: ${{ inputs.k3d_version }}
+      K3S_IMAGE: ${{ inputs.k3s_image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Git LFS objects
+        if: ${{ inputs.lfs_weights_enabled }}
+        uses: actions/cache@v4
+        with:
+          path: .git/lfs/objects
+          key: lfs-${{ runner.os }}-${{ hashFiles(inputs.lfs_weights_path) }}
+          restore-keys: |
+            lfs-${{ runner.os }}-
+
+      - name: Ensure weights (Git LFS)
+        if: ${{ inputs.lfs_weights_enabled }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(git rev-parse --show-toplevel)"
+
+          FILE='${{ inputs.lfs_weights_path }}'
+          if [[ -z "$FILE" ]]; then
+            echo "ERROR: lfs_weights_path is empty while lfs_weights_enabled=true" >&2
+            exit 1
+          fi
+
+          git lfs install --local
+          git lfs pull --include="$FILE" --exclude="*"
+          git lfs status || true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (load locally, no push)
+        # Build once, load into the runner’s Docker; we will import into all k3d nodes.
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          platforms: linux/amd64
+          tags: ${{ inputs.image_name }}:${{ env.IMAGE_TAG }}
+          load: true
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install k3d (pinned + checksum)
+        # Pin and verify SHA256 to avoid supply-chain drift.
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/k3d "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
+          curl -fsSL -o /tmp/checksums.txt "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/checksums.txt" || \
+          curl -fsSL -o /tmp/checksums.txt "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/sha256sum.txt"
+          EXP=$(grep 'k3d-linux-amd64' /tmp/checksums.txt | head -n1 | awk '{print $1}')
+          ACT=$(sha256sum /tmp/k3d | awk '{print $1}')
+          test "$EXP" = "$ACT"
+          install -m 0755 /tmp/k3d /usr/local/bin/k3d
+          k3d version
+
+      - name: Setup kubectl (pinned)
+        uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ inputs.kubectl_version }}
+
+      - name: Create cluster (pinned k3s)
+        # One server + one agent, wait for readiness to reduce race conditions.
+        run: |
+          k3d cluster create "$CLUSTER" --image "$K3S_IMAGE" --agents 1 --wait --timeout 120s
+          kubectl cluster-info
+
+      - name: Wait local-path-provisioner
+        # Ensure the default dynamic provisioner is ready before creating PVCs.
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n kube-system rollout status deploy/local-path-provisioner --timeout=90s
+
+      - name: Ensure hostpath-retain StorageClass
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl get sc hostpath-retain >/dev/null 2>&1 || \
+            kubectl apply -f infra/storageclass-k3s-retain.yaml
+          kubectl get sc
+
+      - name: Import image into cluster (direct mode)
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
+          k3d image import "$IMG" -c "$CLUSTER" --mode=direct
+
+
+      - name: Apply dev secrets
+        # Supplies creds/URIs for deps and the service under test.
+        run: kubectl apply -n "$NAMESPACE" -f "${{ inputs.secrets_yaml }}"
+
+      - name: Apply extra secrets (optional)
+        if: ${{ inputs.extra_secrets_yaml != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_secrets_yaml }}"
+
+      - name: Apply extra PVC (optional)
+        if: ${{ inputs.extra_pvc_yaml != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_pvc_yaml }}"
+
+      - name: Apply Redis, Mongo, S3
+        shell: bash
+        # mongo-depl.yaml contains its own StorageClass named hostpath-retain with a different provisioner.
+        # Filter that document out to avoid immutable-field update errors.
+        run: |
+          set -euo pipefail
+          apply_filtered() {
+            local f="$1"
+            awk '
+            function emit(buf){
+              if (buf == "") return
+              if (buf ~ /kind:[[:space:]]*StorageClass/ && buf ~ /name:[[:space:]]*hostpath-retain/) return
+              if (printed) printf("---\n")
+              printf("%s", buf)
+              printed=1
+            }
+            BEGIN { buf=""; printed=0 }
+            /^---[[:space:]]*$/ { emit(buf); buf=""; next }
+            { buf = buf $0 ORS }
+            END { emit(buf) }
+            ' "$f" | kubectl apply -n "$NAMESPACE" -f -
+          }
+          apply_filtered infra/k8s/mongo-depl.yaml
+          kubectl apply -n "$NAMESPACE" -f infra/k8s/redis-depl.yaml
+          kubectl apply -n "$NAMESPACE" -f infra/k8s/s3-depl.yaml
+
+      - name: Wait storage (PVC Bound)
+        # Do not use `kubectl wait --for=condition=Bound` (flaky for PVCs).
+        # Poll phase until Bound and print strong diagnostics on timeout.
+        shell: bash
+        run: |
+          set -euo pipefail
+          TO_SEC=$(echo '${{ inputs.rollout_timeout }}' | sed 's/s$//')
+          wait_pvc() {
+            local name="$1"
+            local deadline=$(( $(date +%s) + TO_SEC ))
+            echo ">> waiting PVC/$name"
+            while true; do
+              if kubectl -n "$NAMESPACE" get pvc "$name" >/dev/null 2>&1; then
+                phase=$(kubectl -n "$NAMESPACE" get pvc "$name" -o jsonpath='{.status.phase}')
+                if [ "$phase" = "Bound" ]; then
+                  echo "OK PVC/$name Bound"
+                  return 0
+                fi
+              fi
+              if [ $(date +%s) -ge $deadline ]; then
+                echo "timeout PVC/$name"
+                kubectl -n "$NAMESPACE" get sc,pv,pvc || true
+                kubectl -n "$NAMESPACE" describe pvc "$name" || true
+                kubectl -n kube-system get pods | grep local-path || true
+                kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
+                return 1
+              fi
+              sleep 2
+            done
+          }
+          for claim in data-redis-0 data-mongo-0 data-s3-0; do
+            wait_pvc "$claim"
+          done
+
+      - name: Wait deps
+        # Ensure Redis/Mongo statefulsets and S3 deployment are ready before testing the app.
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl rollout status -n "$NAMESPACE" statefulset/redis --timeout=${{ inputs.rollout_timeout }}
+          kubectl rollout status -n "$NAMESPACE" statefulset/mongo --timeout=${{ inputs.rollout_timeout }}
+          kubectl rollout status -n "$NAMESPACE" statefulset/s3 --timeout=${{ inputs.rollout_timeout }}
+
+      - name: Deploy service
+        # Patch image tag in the deployment manifest to the CI-built tag.
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
+          DEP="${{ inputs.deployment_yaml }}"
+          TMP="/tmp/depl.yaml"
+          sed "s|image: ${{ inputs.image_name }}|image: ${IMG}|g" "$DEP" > "$TMP"
+          kubectl apply -n "$NAMESPACE" -f "$TMP"
+
+      - name: Force local image usage
+        # Guarantee kubelet never pulls from a registry. Fail fast if image is missing.
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n "$NAMESPACE" patch deployment/${{ inputs.deployment_name }} \
+            --type=strategic \
+            -p '{"spec":{"template":{"spec":{"containers":[{"name":"'"${{ inputs.container_name }}"'","imagePullPolicy":"Never"}]}}}}'
+
+      - name: Wait extra PVC (post-deploy, optional)
+        if: ${{ inputs.extra_pvc_name != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TO_SEC=$(echo '${{ inputs.rollout_timeout }}' | sed 's/s$//')
+          wait_pvc() {
+            local name="$1"
+            local deadline=$(( $(date +%s) + TO_SEC ))
+            echo ">> waiting PVC/$name"
+            while true; do
+              if kubectl -n "$NAMESPACE" get pvc "$name" >/dev/null 2>&1; then
+                phase=$(kubectl -n "$NAMESPACE" get pvc "$name" -o jsonpath='{.status.phase}')
+                if [ "$phase" = "Bound" ]; then
+                  echo "OK PVC/$name Bound"
+                  return 0
+                fi
+              fi
+              if [ $(date +%s) -ge $deadline ]; then
+                echo "timeout PVC/$name"
+                kubectl -n "$NAMESPACE" get sc,pv,pvc || true
+                kubectl -n "$NAMESPACE" describe pvc "$name" || true
+                kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
+                return 1
+              fi
+              sleep 2
+            done
+          }
+          wait_pvc "${{ inputs.extra_pvc_name }}"
+
+      - name: Wait for rollout
+        # The app must be ready before probing.
+        run: kubectl rollout status -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} --timeout=${{ inputs.rollout_timeout }}
+
+      - name: Start curl pod
+        # Run curl inside the cluster to avoid NodePort/Ingress complexity.
+        run: |
+          kubectl run -n "$NAMESPACE" smoke --image=curlimages/curl:8.7.1 --restart=Never -- sh -c "sleep 300"
+          kubectl wait -n "$NAMESPACE" --for=condition=Ready pod/smoke --timeout=60s
+
+      - name: Health check (with retries)
+        # Simple HTTP probe against the ClusterIP service.
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="http://${{ inputs.service_name }}:${{ inputs.service_port }}${{ inputs.health_path }}"
+          for i in {1..5}; do
+            if kubectl exec -n "$NAMESPACE" smoke -- sh -c "curl -fsS $URL >/dev/null"; then
+              echo "healthz OK"; exit 0
+            fi
+            echo "retry $i"; sleep 3
+          done
+          echo "healthz failed"; exit 1
+
+      - name: Logs on failure
+        # Print cluster state and app logs only if the job failed.
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl -n "$NAMESPACE" get sc,pv,pvc,pods -o wide || true
+          kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 200 || true
+
+          POD=$(kubectl -n "$NAMESPACE" get pod -l app=${{ inputs.svc_name }} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [ -n "$POD" ]; then
+            kubectl -n "$NAMESPACE" describe pod "$POD" || true
+            kubectl -n "$NAMESPACE" logs "$POD" --all-containers=true --tail=-1 || true
+          fi
+
+          if kubectl -n "$NAMESPACE" get deploy/${{ inputs.deployment_name }} >/dev/null 2>&1; then
+            kubectl logs -n "$NAMESPACE" deploy/${{ inputs.deployment_name }} --all-containers=true --tail=-1 || true
+          fi
+
+      - name: Cleanup
+        # Always tear down the k3d cluster to avoid runner leakage.
+        if: always()
+        run: k3d cluster delete "$CLUSTER"

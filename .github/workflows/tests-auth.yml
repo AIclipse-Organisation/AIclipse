@@ -1,0 +1,64 @@
+name: tests-auth
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'auth/**'
+      - 'infra/k8s/auth-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-auth-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: auth
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            auth/requirements.txt
+            auth/requirements-dev.txt
+
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: |
+          set -euo pipefail
+          python -m pytest tests -q
+          
+  auth:
+    name: k3d-smoke
+    needs: unit
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: auth
+      context: ./auth
+      dockerfile: auth/Dockerfile
+      image_name: aiclipse/auth
+      deployment_yaml: infra/k8s/auth-depl.yaml
+      deployment_name: auth-depl
+      container_name: auth
+      service_name: auth-srv
+      service_port: 3000
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=auth

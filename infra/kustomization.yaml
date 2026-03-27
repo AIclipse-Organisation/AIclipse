@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - k8s-dev/dev-secrets.yaml
+  - k8s/mongo-depl.yaml
+  - k8s/redis-depl.yaml
+  - k8s/s3-depl.yaml
+  - k8s/auth-depl.yaml
+  - k8s/email-worker-depl.yaml
+  - k8s/gateway-depl.yaml
+  - k8s/media-depl.yaml
+  - k8s/detector-depl.yaml
+  - k8s/model-cycle-depl.yaml
+  - k8s/billing-depl.yaml
+  - k8s/client-depl.yaml
+  - k8s/community-depl.yaml
+  - k8s/click-flush-depl.yaml
+  - k8s/vote-flush-depl.yaml
+  - k8s/comments-flush-depl.yaml
+  - k8s/user-delete-worker-depl.yaml
+  - k8s-dev/ingress-srv.yaml
+  - k8s-dev/ingress-srv-uploads.yaml
+  - k8s-dev/ingress-api.yaml
+  - k8s/model-cycle-pvc.yaml
+  - storageclass-hostpath-retain.yaml
