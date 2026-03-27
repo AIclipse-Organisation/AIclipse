@@ -17,6 +17,8 @@ export default function PostHeader({
   onOpenReport,
   onViewScan,
 }) {
+  const hasBadges = (isOfficial && userHasVoted) || isTrending;
+
   return (
     <div className="comm_topRow">
       <div className="comm_headerLeft">
@@ -30,17 +32,19 @@ export default function PostHeader({
             ) : (
               <div className="comm_headerName">{posterName}</div>
             )}
-            {isOfficial && userHasVoted && (
-              <span className="comm_officialBadge">Official Post</span>
-            )}
           </div>
           {timeText && <div className="comm_headerTime">{timeText}</div>}
         </div>
       </div>
       <div className="comm_headerActions">
-        {isTrending && (
-          <div className="trend_div_container_body">
-            <span className="comm_trendingBadge">POPULAR</span>
+        {hasBadges && (
+          <div className="comm_badgeRow">
+            {isOfficial && userHasVoted && (
+              <span className="comm_badge comm_badge--official">Official</span>
+            )}
+            {isTrending && (
+              <span className="comm_badge comm_badge--popular">Popular</span>
+            )}
           </div>
         )}
         <div className="comm_menu">
