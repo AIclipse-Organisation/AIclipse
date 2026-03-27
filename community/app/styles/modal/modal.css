@@ -5,15 +5,13 @@
   inset: 0;
   z-index: 5000;
 
-  background: rgba(0, 0, 0, 0.45); /* softer */
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(1px);
 
   display: flex;
-  align-items: flex-start;        /* not centered */
+  align-items: center;
   justify-content: center;
-  padding-top: 80px;              /* drop it under topbar visually */
-  padding-left: 16px;
-  padding-right: 16px;
+  padding: 16px;
 }
 
 .modal-panel {
@@ -156,6 +154,22 @@
   background: #2c2c2c;
 }
 
+.modal-danger {
+  background: transparent;
+  color: #e04646;
+  border: 1px solid #e04646;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.modal-danger:hover {
+  background: #e04646;
+  color: #fff;
+}
+
 /* ---------- Tutorial modal layout ---------- */
 .tut-intro {
   display: flex;
@@ -251,5 +265,98 @@
   margin: 0 0 6px 0;
   font-weight: 800;
   color: #CFB87C;
+}
+
+/* ---------- Report modal ---------- */
+.report-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.report-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.report-option:last-child {
+  border-bottom: none;
+}
+
+.report-option-label {
+  font-size: 14px;
+  color: #f3f3f3;
+}
+
+.report-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.report-radio-custom {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+  transition: border-color 0.15s ease;
+}
+
+.report-option:hover .report-radio-custom {
+  border-color: rgba(207, 184, 124, 0.5);
+}
+
+.report-radio:checked + .report-radio-custom {
+  border-color: #CFB87C;
+}
+
+.report-radio:checked + .report-radio-custom::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #CFB87C;
+}
+
+.report-textarea-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f3f3f3;
+  margin-bottom: 8px;
+}
+
+.report-textarea {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #2c2c2c;
+  background: #1a1a1a;
+  color: #f3f3f3;
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.report-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.report-textarea:focus {
+  outline: none;
+  border-color: #CFB87C;
 }
 

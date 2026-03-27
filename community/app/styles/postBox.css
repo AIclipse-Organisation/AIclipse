@@ -38,7 +38,7 @@
 
 .comm_topRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 
@@ -91,7 +91,7 @@
 
 .comm_headerNameLine {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   min-width: 0;
 }
@@ -115,6 +115,61 @@
   text-decoration: underline;
 }
 
+/* Badge row - contains all badges on the right side, wraps when space is tight */
+.comm_badgeRow {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* Unified badge base style */
+.comm_badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+/* Official badge - gold theme with animated border */
+.comm_badge--official {
+  color: #CFB87C;
+  border: 1px solid transparent;
+  background: linear-gradient(#1a1a1a, #1a1a1a) padding-box,
+    linear-gradient(90deg, #1a1a1a, #1a1a1a, #CFB87C, #1a1a1a, #1a1a1a) border-box;
+  background-size: 100% 100%, 400% 100%;
+  animation: badge-border-flow 6s linear infinite;
+}
+
+/* Popular badge - purple theme with animated border */
+.comm_badge--popular {
+  color: #af83c9;
+  border: 1px solid transparent;
+  background: linear-gradient(#1a1a1a, #1a1a1a) padding-box,
+    linear-gradient(90deg, #1a1a1a, #1a1a1a, #af83c9, #1a1a1a, #1a1a1a) border-box;
+  background-size: 100% 100%, 400% 100%;
+  animation: badge-border-flow 6s linear infinite;
+}
+
+@keyframes badge-border-flow {
+  0% {
+    background-position: 0% 0%, 0% 0%;
+  }
+  100% {
+    background-position: 0% 0%, 100% 0%;
+  }
+}
+
 .comm_headerTime {
   font-size: 12px;
   opacity: 0.55;
@@ -125,9 +180,10 @@
 /* right side actions */
 .comm_headerActions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  flex: 0 0 auto;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .comm_topRow button {
@@ -1050,19 +1106,6 @@
   margin-bottom: 14px;
 }
 
-.comm_officialBadge {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 99px;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  margin-left: 8px;
-  animation: comm_fadeIn 0.5s ease forwards;
-}
-
 /* ── Truth reveal: full overlay (new vote) ─────────────────────── */
 
 /* Static wrapper covers the image area and flex-centres the card */
@@ -1226,46 +1269,11 @@
   }
 }
 
-.comm_trendingBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 1vh;
-  padding: 0.3vh 1.2vh;
-  border-radius: 6px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: #af83c9;
-  border: 2px solid transparent;
-  background: linear-gradient(#222222, #222222) padding-box,
-    linear-gradient(90deg, #222222, #222222, #af83c9, #222222, #222222) border-box;
-  background-size: 100% 100%, 400% 100%;
-  animation: border-flow 6s linear infinite;
-}
-
-@keyframes border-flow {
-  0% {
-    background-position: 0% 0%, 0% 0%;
-  }
-
-  100% {
-    background-position: 0% 0%, 100% 0%;
-  }
-}
-
 .comm_debugScore {
   font-size: 11px;
   opacity: 0.4;
   padding: 0 12px;
   margin: 4px 0;
-}
-
-.comm_trendingBadge .fa-fire {
-  background: linear-gradient(110deg, #c9ba83 40%, #fff7d6 50%, #c9ba83 60%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: shine-sweep 3s linear infinite;
 }
 
 @keyframes shine-sweep {
