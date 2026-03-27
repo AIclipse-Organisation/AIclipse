@@ -13,10 +13,6 @@
     <span class="hamburger-line"></span>
   </button>
 
-  <div class="topbar-center">
-    <span class="topbar-screen-name">{{ page_title }}</span>
-  </div>
-
   <div class="topbar-logo">
     <img src="/static/images/aiclipse_logo_gold.png" alt="Logo">
   </div>
@@ -143,27 +139,38 @@
 <script src="/static/js/auth-ui.js" defer></script>
 <script>
   (function () {
-    var lastScrollTop = 0;
-    var threshold = 10;
-    var hideAt = 80;
+    var TOPBAR_HEIGHT = 56;
+    var SHOW_AT_TOP = 80;
+    var SCROLL_UP_THRESHOLD = 80;
 
     document.addEventListener('DOMContentLoaded', function () {
       var topbar = document.querySelector('.topbar');
       var container = document.querySelector('.app-container');
       if (!topbar || !container) return;
 
+      var lastScrollTop = 0;
+      var offset = 0;
+      var scrollUpAccum = 0;
+
       container.addEventListener('scroll', function () {
         var currentTop = container.scrollTop;
-        var diff = currentTop - lastScrollTop;
-
-        if (Math.abs(diff) < threshold) return;
-
-        if (currentTop > lastScrollTop && currentTop > hideAt) {
-          topbar.classList.add('topbar--hidden');
-        } else {
-          topbar.classList.remove('topbar--hidden');
-        }
+        var delta = currentTop - lastScrollTop;
         lastScrollTop = currentTop;
+
+        if (currentTop <= SHOW_AT_TOP) {
+          offset = 0;
+          scrollUpAccum = 0;
+        } else if (delta > 0) {
+          offset = Math.max(-TOPBAR_HEIGHT, offset - delta);
+          scrollUpAccum = 0;
+        } else {
+          scrollUpAccum -= delta;
+          if (scrollUpAccum >= SCROLL_UP_THRESHOLD) {
+            offset = Math.min(0, offset - delta);
+          }
+        }
+
+        topbar.style.transform = 'translateX(-50%) translateY(' + offset + 'px)';
       }, { passive: true });
     });
   })();

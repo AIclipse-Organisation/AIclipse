@@ -2,28 +2,31 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>AIclipse</title>
+    <title>AIclipse{% block title_suffix %}{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/static/css/styles.css" />
-    <link rel="stylesheet" href="/static/css/notification.css" />
+    {% block styles %}{% endblock %}
   </head>
 
   <body class="app">
     <div class="app-container">
-      {% set page_title = 'Notifications' %}
+      {% set page_title = self.page_title() %}
+      {% block page_title %}{% endblock %}
+
       {% include 'partials/topbar.html' %}
 
-      <main class="screen">
-        <section class="notification-list" id="notification-list" aria-live="polite"></section>
-        <p class="notification-status" id="notification-status"></p>
+      <main class="screen{% block screen_class %}{% endblock %}">
+        {% block content %}{% endblock %}
       </main>
-
     </div>
+
     {% include 'partials/navbar.html' %}
-    <script src="/static/js/loader.js"></script>
+
+    {% block modals %}{% endblock %}
+
     <script src="/static/js/include.js"></script>
     <script src="/static/js/app.js"></script>
-    <script src="/static/js/notification.js"></script>
     <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
   </body>
 </html>

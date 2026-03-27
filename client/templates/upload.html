@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/css/styles.css" />
     <link rel="stylesheet" href="/static/css/upload.css" />
     <link rel="stylesheet" href="/static/css/loader.css" />
+    <link rel="stylesheet" href="/static/css/flow-header.css" />
   </head>
 
   <body class="app">
@@ -16,10 +17,10 @@
       {% include 'partials/topbar.html' %}
 
       <main class="screen upload-screen">
-        <!-- <section class="page-header" aria-label="Page title">
-          <h1 id="page-title" class="page-title">Upload</h1>
-          <div class="page-underline" role="presentation"></div>
-        </section> -->
+        {% set flow_step = 1 %}
+        {% set flow_title = 'Upload' %}
+        {% set flow_instruction = 'Choose an image to scan for AI manipulation' %}
+        {% include 'partials/flow-header.html' %}
 
         <!-- PREVIEW AREA (flex grows) -->
         <div class="upload-content">
@@ -49,6 +50,17 @@
                 alt="Selected image preview"
                 draggable="false"
               />
+              <button
+                type="button"
+                class="btn-clear-image"
+                id="btn-clear-image"
+                aria-label="Remove image"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
               <div class="crop-hint" id="crop-hint">Drag to reposition</div>
 
               <button
@@ -59,6 +71,7 @@
                 Reset Crop
               </button>
             </div>
+            <label for="file-input" class="change-image-link">Change image</label>
           </div>
         </div>
 
@@ -67,11 +80,7 @@
 
           <label for="file-input" class="file-upload"> Choose Image </label>
 
-          <span id="check-state" class="muted">
-            Select an image to analyze.
-          </span>
-
-          <button id="btn-check" disabled hidden>Analyze Image</button>
+          <button id="btn-check" class="btn-flow-primary" disabled hidden>Analyze Image</button>
         </div>
 
         <div id="quota-modal" class="modal-overlay" hidden>
@@ -165,8 +174,8 @@
         </div>
       </main>
 
-      {% include 'partials/navbar.html' %}
     </div>
+    {% include 'partials/navbar.html' %}
     <script src="/static/js/loader.js"></script>
     <script src="/static/js/include.js"></script>
     <script src="/static/js/app.js"></script>
