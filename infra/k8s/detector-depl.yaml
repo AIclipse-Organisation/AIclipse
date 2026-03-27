@@ -37,30 +37,22 @@ spec:
               valueFrom: { secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD } }
             - name: MINIO_BUCKET_NAME
               value: "model-cycle-storage"
-            - name: STREAM
-              value: "jobs"
-            - name: GROUP
-              value: "detector"
-            - name: JOBS_URI
-              value: "http://jobs-srv:3000"
           readinessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }
-            initialDelaySeconds: 2
             periodSeconds: 10
-            timeoutSeconds: 1
+            timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }
-            initialDelaySeconds: 40
             periodSeconds: 20
-            timeoutSeconds: 1
-            failureThreshold: 3
+            timeoutSeconds: 5
+            failureThreshold: 5
           startupProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }
-            periodSeconds: 1
-            failureThreshold: 60 
+            periodSeconds: 5
+            failureThreshold: 60
           resources:
-            requests: { cpu: "250m",  memory: "512Mi" }
+            requests: { cpu: "250m",  memory: "1Gi" }
             limits:   { cpu: "1500m", memory: "2Gi" }
 
 ---
