@@ -629,30 +629,36 @@ export async function GET(req) {
 
     // 3) fetch pending deltas from Redis in one roundtrip
     const redis = getRedis();
-    const deltaKeys = posts.map((p) => `post:${p.post_id}:vote_deltas`);
+    const voteDeltaKeys = posts.map((p) => `post:${p.post_id}:vote_deltas`);
+    const commentDeltaKeys = posts.map((p) => `post:${p.post_id}:comment_deltas`);
 
     const pipe = redis.pipeline();
-    for (const k of deltaKeys) pipe.hgetall(k);
+    for (const k of voteDeltaKeys) pipe.hgetall(k);
+    for (const k of commentDeltaKeys) pipe.hgetall(k);
     const pipeRes = await pipe.exec();
 
-    // Map post_id -> {up, down}
+    // Map post_id -> {up, down, comments}
     const deltasByPostId = {};
     for (let i = 0; i < posts.length; i++) {
       const postId = posts[i].post_id;
-      const data = pipeRes?.[i]?.[1] || {};
+      const voteData = pipeRes?.[i]?.[1] || {};
+      const commentData = pipeRes?.[i + posts.length]?.[1] || {};
+      
       deltasByPostId[postId] = {
-        up: Number(data.up || 0),
-        down: Number(data.down || 0),
+        up: Number(voteData.up || 0),
+        down: Number(voteData.down || 0),
+        comments: Number(commentData.count || 0),
       };
     }
 
     // 4) merge: base counts from posts + pending redis deltas
     const items = posts.map((post) => {
-      const d = deltasByPostId[post.post_id] || { up: 0, down: 0 };
+      const d = deltasByPostId[post.post_id] || { up: 0, down: 0, comments: 0 };
       return {
         ...post,
         up_vote_count: Number(post.up_vote_count || 0) + d.up,
         down_vote_count: Number(post.down_vote_count || 0) + d.down,
+        comment_count: Number(post.comment_count || 0) + d.comments,
         user_vote: userVotesMap[post.post_id] || null,
       };
     });

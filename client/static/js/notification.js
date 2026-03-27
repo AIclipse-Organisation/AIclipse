@@ -1,17 +1,18 @@
 const listEl = document.getElementById("notification-list");
 const statusEl = document.getElementById("notification-status");
 
-function fmtDate(value) {
-  // Return an empty string when date input is missing or invalid.
-  if (!value) return "";
-  const dt = new Date(value);
-  if (Number.isNaN(dt.getTime())) return "";
-
-  return dt.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(dateStr).toLocaleDateString();
 }
 
 function buildActionLine(item) {
@@ -21,7 +22,7 @@ function buildActionLine(item) {
 
   // Build text based on notification type and vote payload.
   if (item?.type === "vote") {
-    const vote = String(item?.vote_value || "").toLowerCase() === "real" ? "real" : "ai";
+    const vote = String(item?.vote_value || "").toLowerCase() === "real" ? "Real" : "Fake";
     return `voted ${vote} on your post${suffix}.`;
   }
 
@@ -81,7 +82,7 @@ function makeNotificationCard(item) {
   actorStrong.textContent = actorName;
   summary.appendChild(actorStrong);
   summary.appendChild(
-    document.createTextNode(`, ${buildActionLine(item)} ${fmtDate(item?.created_at)}.`),
+    document.createTextNode(` ${buildActionLine(item)} ${timeAgo(item?.created_at)}.`),
   );
   content.appendChild(summary);
 

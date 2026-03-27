@@ -1222,7 +1222,7 @@ function setupShowComments(img) {
       if (currentUserId && c.user_id === currentUserId) {
         const delBtn = makeEl("button", "comm_commentDeleteBtn", "Delete");
         delBtn.type = "button";
-        delBtn.addEventListener("click", () => deleteComment(c.comment_id, row));
+        delBtn.addEventListener("click", () => showDeleteCommentModal(c.comment_id, row));
         content.appendChild(delBtn);
       }
 
@@ -1260,15 +1260,62 @@ function setupShowComments(img) {
         headers: { Accept: "application/json" },
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         rowEl.remove();
         const countEl = document.getElementById("btn-comments-count");
         if (countEl) {
-          const cur = parseInt(countEl.textContent, 10);
-          if (!isNaN(cur)) countEl.textContent = String(Math.max(0, cur - 1));
+          if (data && typeof data.comment_count === "number") {
+            countEl.textContent = String(data.comment_count);
+          } else {
+            const cur = parseInt(countEl.textContent, 10);
+            if (!isNaN(cur)) countEl.textContent = String(Math.max(0, cur - 1));
+          }
         }
       }
     } catch { /* silent */ }
   };
+
+  // Delete comment modal
+  const deleteCommentModal = document.getElementById("delete-comment-modal");
+  const commentModalCancel = document.getElementById("comment-modal-cancel");
+  const commentModalConfirm = document.getElementById("comment-modal-confirm");
+  let pendingDeleteCommentId = null;
+  let pendingDeleteRowEl = null;
+
+  const showDeleteCommentModal = (commentId, rowEl) => {
+    pendingDeleteCommentId = commentId;
+    pendingDeleteRowEl = rowEl;
+    if (deleteCommentModal) deleteCommentModal.hidden = false;
+  };
+
+  const hideDeleteCommentModal = () => {
+    if (deleteCommentModal) deleteCommentModal.hidden = true;
+    pendingDeleteCommentId = null;
+    pendingDeleteRowEl = null;
+  };
+
+  if (commentModalCancel && !commentModalCancel.dataset.bound) {
+    commentModalCancel.dataset.bound = "1";
+    commentModalCancel.addEventListener("click", hideDeleteCommentModal);
+  }
+
+  if (deleteCommentModal && !deleteCommentModal.dataset.bound) {
+    deleteCommentModal.dataset.bound = "1";
+    deleteCommentModal.addEventListener("click", (e) => {
+      if (e.target === deleteCommentModal) hideDeleteCommentModal();
+    });
+  }
+
+  if (commentModalConfirm && !commentModalConfirm.dataset.bound) {
+    commentModalConfirm.dataset.bound = "1";
+    commentModalConfirm.addEventListener("click", async () => {
+      if (!pendingDeleteCommentId || !pendingDeleteRowEl) return;
+      const commentId = pendingDeleteCommentId;
+      const rowEl = pendingDeleteRowEl;
+      hideDeleteCommentModal();
+      await deleteComment(commentId, rowEl);
+    });
+  }
 
   // Post a comment
   const submitComment = async () => {

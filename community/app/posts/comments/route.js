@@ -390,8 +390,21 @@ export async function DELETE(req) {
     pipe.expire(firstKey, DELTA_TTL_SECONDS);
     await pipe.exec();
 
+    const pending = await redis.hget(deltaKey, "count");
+    const pendingCount = Number(pending || 0);
+
+    const postsCol = db.collection(POSTS_COLLECTION);
+    const postDoc = await postsCol.findOne(
+      { post_id: comment.post_id },
+      { projection: { _id: 0, comment_count: 1 } },
+    );
+
     return NextResponse.json(
-      { message: "Comment deleted successfully", comment_id: safeCommentId },
+      {
+        message: "Comment deleted successfully",
+        comment_id: safeCommentId,
+        comment_count: Number(postDoc?.comment_count || 0) + pendingCount,
+      },
       { status: 200 },
     );
   } catch (err) {

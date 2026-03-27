@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@heroui/react";
 import { timeAgo } from "./utils/timeAgo.js";
+import ModalBase from "../modals/ModalBase";
 
 // Helper for quick avatar initials
 function getInitials(name) {
@@ -22,6 +23,7 @@ export default function PostCommentsDrawer({
 }) {
   const sheetRef = useRef(null);
   const bodyRef = useRef(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   // Lock body scroll when open
   useEffect(() => {
@@ -41,8 +43,6 @@ export default function PostCommentsDrawer({
     const sheet = sheetRef.current;
     const body = bodyRef.current;
     if (!sheet || !body) return;
-
-    let lastScrollTop = 0;
 
     const update = () => {
       // Record current scroll before height change
@@ -72,6 +72,21 @@ export default function PostCommentsDrawer({
       sheet.classList.remove("comm_bottomSheet--keyboard");
     };
   }, [isOpen]);
+
+  const handleDeleteClick = (commentId) => {
+    setDeleteConfirmId(commentId);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deleteConfirmId) {
+      onDelete(deleteConfirmId);
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmId(null);
+  };
 
   function close() {
     onOpenChange(false);
@@ -144,7 +159,7 @@ export default function PostCommentsDrawer({
                     <div className="comm_commentText">{c.text}</div>
 
                     {currentUserId && c.user_id === currentUserId && (
-                      <button onClick={() => onDelete(c.comment_id)} className="comm_commentDeleteBtn">
+                      <button onClick={() => handleDeleteClick(c.comment_id)} className="comm_commentDeleteBtn">
                         Delete
                       </button>
                     )}
@@ -184,6 +199,25 @@ export default function PostCommentsDrawer({
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      <ModalBase
+        open={deleteConfirmId !== null}
+        onClose={handleDeleteCancel}
+        title="Delete Comment"
+        footer={
+          <>
+            <button className="modal-secondary" onClick={handleDeleteCancel}>
+              Cancel
+            </button>
+            <button className="modal-danger" onClick={handleDeleteConfirm}>
+              Delete
+            </button>
+          </>
+        }
+      >
+        <p>Are you sure you want to delete this comment? This action cannot be undone.</p>
+      </ModalBase>
     </>
   );
 }
