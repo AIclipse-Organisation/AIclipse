@@ -14,7 +14,9 @@
 
 <body class="app">
   <div class="app-container">
-    {% set page_title = 'Results' %} {% include 'partials/topbar.html' %}
+    {% set page_title = 'Results' %}
+    {% set show_back = True %}
+    {% include 'partials/topbar.html' %}
     <main class="screen results-screen">
       {% set flow_step = 3 %}
       {% set flow_title = 'Results' %}

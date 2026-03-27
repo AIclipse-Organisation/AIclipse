@@ -119,7 +119,7 @@ body.app .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
+  padding: 10px 12px;
   height: 56px;
   box-sizing: border-box;
 }
@@ -160,7 +160,25 @@ body.app .hamburger-line {
   border-radius: 2px;
 }
 
+body.app .topbar-back-btn {
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
 /* Logo */
+body.app .topbar-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+}
+
 body.app .topbar-logo img {
   width: -webkit-fill-available;
   max-height: 2vh;
