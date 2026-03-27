@@ -1,9 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
-export default function BottomNav() {
+const NAVBAR_HEIGHT = 58;
+const SCROLL_UP_THRESHOLD = 80; // User must scroll up this much before it triggers
+const DAMPING_FACTOR = 0.6;
+
+export default function BottomNav({ hideOnScroll = false }) {
   const [showNotifDot, setShowNotifDot] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const offsetRef = useRef(0); // Track offset in a ref to avoid stale closures
+  const lastScrollY = useRef(0);
+  const scrollUpAccum = useRef(0);
+
+  // Sync ref with state
+  useEffect(() => {
+    offsetRef.current = offset;
+  }, [offset]);
 
   useEffect(() => {
     let alive = true;
@@ -35,8 +48,51 @@ export default function BottomNav() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!hideOnScroll) return;
+
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      const delta = currentY - lastScrollY.current;
+      lastScrollY.current = currentY;
+
+      // Apply damping to make movement feel "heavier"
+      const dampenedDelta = delta * DAMPING_FACTOR;
+
+      if (currentY <= 80) {
+        setOffset(0);
+        scrollUpAccum.current = 0;
+      } else if (delta > 0) {
+        // Scrolling down - hide bar
+        setOffset((prev) => Math.min(NAVBAR_HEIGHT, prev + dampenedDelta));
+        // Reset scroll up accumulator when moving down
+        scrollUpAccum.current = 0;
+      } else {
+        // Scrolling up - show bar
+        scrollUpAccum.current -= delta; // accumulating raw negative delta
+        
+        // TRIGGER LOGIC:
+        // 1. If fully hidden: wait for threshold to trigger appearance
+        // 2. If already partially visible: move immediately with scroll for smoothness
+        const isFullyHidden = offsetRef.current >= NAVBAR_HEIGHT;
+        const hasTriggered = scrollUpAccum.current >= SCROLL_UP_THRESHOLD;
+
+        if (!isFullyHidden || hasTriggered) {
+          setOffset((prev) => Math.max(0, prev + dampenedDelta));
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [hideOnScroll]);
+
+  const navStyle = hideOnScroll
+    ? { transform: `translateX(-50%) translateY(${offset}px)` }
+    : undefined;
+
   return (
-    <nav className="navbar" id="bottom-nav" aria-label="Bottom navigation">
+    <nav className="navbar" id="bottom-nav" aria-label="Bottom navigation" style={navStyle}>
       <a href="/community" aria-label="Home" className="active">
         <svg
           xmlns="http://www.w3.org/2000/svg"

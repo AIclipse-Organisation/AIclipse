@@ -7,15 +7,30 @@
 <div id="tutorial-user-scope" data-user-id="{{ tutorial_user_id }}" hidden></div>
 
 <div class="topbar">
+  {% if show_dynamic_back %}
+  <button id="topbar-back-dynamic" class="topbar-back-btn" type="button" aria-label="Go back" hidden>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CFB87C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  </button>
   <button id="menu-toggle" class="menu-button" type="button" aria-label="Menu">
     <span class="hamburger-line"></span>
     <span class="hamburger-line"></span>
     <span class="hamburger-line"></span>
   </button>
-
-  <div class="topbar-center">
-    <span class="topbar-screen-name">{{ page_title }}</span>
-  </div>
+  {% elif show_back %}
+  <button class="topbar-back-btn" type="button" aria-label="Go back" onclick="window.history.length > 1 ? window.history.back() : window.location.href='/upload'">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CFB87C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  </button>
+  {% else %}
+  <button id="menu-toggle" class="menu-button" type="button" aria-label="Menu">
+    <span class="hamburger-line"></span>
+    <span class="hamburger-line"></span>
+    <span class="hamburger-line"></span>
+  </button>
+  {% endif %}
 
   <div class="topbar-logo">
     <img src="/static/images/aiclipse_logo_gold.png" alt="Logo">
@@ -143,21 +158,38 @@
 <script src="/static/js/auth-ui.js" defer></script>
 <script>
   (function () {
-    var lastScrollTop = 0;
+    var TOPBAR_HEIGHT = 56;
+    var SHOW_AT_TOP = 80;
+    var SCROLL_UP_THRESHOLD = 80;
 
     document.addEventListener('DOMContentLoaded', function () {
       var topbar = document.querySelector('.topbar');
       var container = document.querySelector('.app-container');
       if (!topbar || !container) return;
 
+      var lastScrollTop = 0;
+      var offset = 0;
+      var scrollUpAccum = 0;
+
       container.addEventListener('scroll', function () {
         var currentTop = container.scrollTop;
-        if (currentTop > lastScrollTop && currentTop > 50) {
-          topbar.classList.add('topbar--hidden');
-        } else {
-          topbar.classList.remove('topbar--hidden');
-        }
+        var delta = currentTop - lastScrollTop;
         lastScrollTop = currentTop;
+
+        if (currentTop <= SHOW_AT_TOP) {
+          offset = 0;
+          scrollUpAccum = 0;
+        } else if (delta > 0) {
+          offset = Math.max(-TOPBAR_HEIGHT, offset - delta);
+          scrollUpAccum = 0;
+        } else {
+          scrollUpAccum -= delta;
+          if (scrollUpAccum >= SCROLL_UP_THRESHOLD) {
+            offset = Math.min(0, offset - delta);
+          }
+        }
+
+        topbar.style.transform = 'translateX(-50%) translateY(' + offset + 'px)';
       }, { passive: true });
     });
   })();

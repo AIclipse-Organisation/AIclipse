@@ -33,13 +33,6 @@ build:
         manual:
           - src: "**/*.py"
             dest: .
-    # - image: aiclipse/jobs
-    #   context: jobs
-    #   docker: { dockerfile: Dockerfile }
-    #   sync:
-    #     manual:
-    #       - src: "**/*.py"
-    #         dest: .
     - image: aiclipse/detector
       context: detector
       docker: { dockerfile: Dockerfile }
@@ -50,13 +43,6 @@ build:
     - image: aiclipse/model-cycle
       context: model-cycle
       docker: { dockerfile: Dockerfile.dev }
-    # - image: aiclipse/plans
-    #   context: plans
-    #   docker: { dockerfile: Dockerfile }
-    #   sync:
-    #     manual:
-    #       - src: "**/*.py"
-    #         dest: .
     - image: aiclipse/billing
       context: billing
       docker: { dockerfile: Dockerfile }
@@ -77,13 +63,6 @@ build:
             dest: .
           - src: "static/**/*.js"
             dest: .
-    # - image: aiclipse/observer
-    #   context: observer
-    #   docker: { dockerfile: Dockerfile }
-    #   sync:
-    #     manual:
-    #       - src: "**/*.py"
-    #         dest: .
     - image: aiclipse/community
       context: community
       docker: { dockerfile: Dockerfile.dev }
@@ -124,9 +103,6 @@ profiles:
           docker: { dockerfile: Dockerfile }
         - image: aiclipse/model-cycle
           context: model-cycle
-          docker: { dockerfile: Dockerfile }
-        - image: aiclipse/plans
-          context: plans
           docker: { dockerfile: Dockerfile }
         - image: aiclipse/billing
           context: billing

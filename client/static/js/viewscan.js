@@ -1172,12 +1172,15 @@ function setupShowComments(img) {
   };
 
   // Open/close helpers
+  const navbar = document.querySelector(".navbar");
+
   const openDrawer = () => {
     const pid = getPostId(currentScan);
     if (!pid) return;
     backdrop.hidden = false;
     sheet.classList.add("comm_bottomSheet--open");
     document.getElementById("app-container")?.style.setProperty("overflow", "hidden");
+    if (navbar) navbar.hidden = true;
     attachKeyboardListener();
     if (!sheet.dataset.loaded) {
       loadComments(pid);
@@ -1189,6 +1192,7 @@ function setupShowComments(img) {
     backdrop.hidden = true;
     sheet.classList.remove("comm_bottomSheet--open");
     document.getElementById("app-container")?.style.removeProperty("overflow");
+    if (navbar) navbar.hidden = false;
     detachKeyboardListener();
   };
 
@@ -1320,10 +1324,8 @@ function setupShowComments(img) {
 // -------------------------
 function setupDeletePost(img) {
   const actionBtn = document.getElementById("btn-delete-post");
-  const statusEl = document.getElementById("delete-post-status");
 
-  if (!actionBtn || !statusEl) {
-    if (actionBtn) actionBtn.style.display = "none";
+  if (!actionBtn) {
     return;
   }
 
@@ -1335,13 +1337,6 @@ function setupDeletePost(img) {
   if (!shouldShow) {
     return;
   }
-
-  const setStatus = (text, kind) => {
-    statusEl.classList.remove("is-error", "is-success");
-    if (kind === "error") statusEl.classList.add("is-error");
-    if (kind === "success") statusEl.classList.add("is-success");
-    statusEl.textContent = text || "";
-  };
 
   const modal = document.getElementById("delete-modal");
   const modalConfirm = document.getElementById("modal-confirm");
@@ -1378,7 +1373,6 @@ function setupDeletePost(img) {
       hideModal();
       actionBtn.disabled = true;
       actionBtn.textContent = "Making private...";
-      setStatus("Making private...", null);
 
       try {
         const res = await fetch(`/image/${encodeURIComponent(currentScan.image_id)}`, {
@@ -1394,16 +1388,13 @@ function setupDeletePost(img) {
           throw new Error(data.error || data.detail || `Failed to make private (${res.status})`);
         }
 
-        setStatus("✓ Post made private. Redirecting...", "success");
-
         currentScan.is_public = false;
         sessionStorage.setItem("selectedScan", JSON.stringify(currentScan));
 
         setTimeout(() => {
           window.location.href = "/profile";
-        }, 800);
+        }, 600);
       } catch (err) {
-        setStatus(err?.message || "Failed to make private.", "error");
         actionBtn.disabled = false;
         actionBtn.textContent = "Make Private";
       }
@@ -1419,31 +1410,22 @@ function setupDeletePost(img) {
 }
 
 // -------------------------
-// Delete Scan (UNCHANGED)
+// Delete Scan
 // -------------------------
 function setupDeleteScan(img) {
   const deleteBtn = document.getElementById("btn-delete-scan");
-  const statusEl = document.getElementById("delete-scan-status");
 
-  if (!deleteBtn || !statusEl) {
-    if (deleteBtn) deleteBtn.style.display = "none";
+  if (!deleteBtn) {
     return;
   }
 
-  // Show for private scans, OR for public scans where no community post was found
-  const shouldShow = !!(img && img.image_id && (isPrivateScan(img) || !getPostId(img)));
+  // Show delete button for all scans owned by user
+  const shouldShow = !!(img && img.image_id);
   deleteBtn.style.display = shouldShow ? "flex" : "none";
 
   if (!shouldShow) {
     return;
   }
-
-  const setStatus = (text, kind) => {
-    statusEl.classList.remove("is-error", "is-success");
-    if (kind === "error") statusEl.classList.add("is-error");
-    if (kind === "success") statusEl.classList.add("is-success");
-    statusEl.textContent = text || "";
-  };
 
   const modal = document.getElementById("delete-scan-modal");
   const modalConfirm = document.getElementById("scan-modal-confirm");
@@ -1480,7 +1462,6 @@ function setupDeleteScan(img) {
       hideModal();
       deleteBtn.disabled = true;
       deleteBtn.textContent = "Deleting...";
-      setStatus("Deleting scan...", null);
 
       try {
         const res = await fetch(`/image/${encodeURIComponent(currentScan.image_id)}`, {
@@ -1495,18 +1476,15 @@ function setupDeleteScan(img) {
           throw new Error(data.error || data.detail || `Failed to delete scan (${res.status})`);
         }
 
-        setStatus("✓ Scan deleted. Redirecting...", "success");
-
         sessionStorage.removeItem("selectedScan");
         sessionStorage.removeItem("selectedScanTitle");
 
         setTimeout(() => {
           window.location.href = "/profile";
-        }, 800);
+        }, 600);
       } catch (err) {
-        setStatus(err?.message || "Failed to delete scan.", "error");
         deleteBtn.disabled = false;
-        deleteBtn.textContent = "Delete Scan";
+        deleteBtn.textContent = "Delete";
       }
     });
   }

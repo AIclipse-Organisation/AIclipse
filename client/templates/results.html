@@ -9,13 +9,21 @@
   <link rel="stylesheet" href="/static/css/upload.css" />
   <link rel="stylesheet" href="/static/css/loader.css" />
   <link rel="stylesheet" href="/static/css/viewscan.css" />
+  <link rel="stylesheet" href="/static/css/flow-header.css" />
 </head>
 
 <body class="app">
   <div class="app-container">
-    {% set page_title = 'Results' %} {% include 'partials/topbar.html' %}
-    <main class="screen">
-      <div class="grid">
+    {% set page_title = 'Results' %}
+    {% set show_back = True %}
+    {% include 'partials/topbar.html' %}
+    <main class="screen results-screen">
+      {% set flow_step = 3 %}
+      {% set flow_title = 'Results' %}
+      {% set flow_instruction = 'Review your detection results below' %}
+      {% include 'partials/flow-header.html' %}
+
+      <div class="results-content">
         <div class="results-imageFrame">
           <img id="preview-image" alt="Selected image preview" />
         </div>
@@ -48,56 +56,58 @@
               </div>
 
               <p id="detect-verdict" class="verdict-text label-neutral" hidden>—</p>
-
-              <input id="save-public" type="checkbox" hidden />
-
-              <!-- Toggle row -->
-              <div class="res-toggle">
-                <button type="button" class="res-toggle__btn is-selected" id="mode-private">
-                  <img src="/static/images/lock.png" alt="" />
-                  <span>Private</span>
-                </button>
-                <button type="button" class="res-toggle__btn" id="mode-public">
-                  <img src="/static/images/icons8-community-100.png" alt="" />
-                  <span>Public</span>
-                </button>
-              </div>
-
-              <!-- Save + Delete row -->
-              <div class="comm_voteButtonRow res-actionRow">
-                <button id="btn-save" disabled type="button" class="comm_voteMainBtn vs-actionBtn res-saveBtn">
-                  <span class="comm_actionText">Confirm &amp; Save</span>
-                </button>
-                <button id="btn-delete" type="button" class="comm_voteMainBtn vs-actionBtn vs-deleteBtn">
-                  <svg class="comm_icon vs-svgIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-                  </svg>
-                  <span class="comm_actionText">Delete</span>
-                </button>
-              </div>
-
-              <div id="delete-modal" class="modal-overlay" hidden>
-                <div class="modal">
-                  <h3 class="modal-title">Delete scan?</h3>
-                  <p class="modal-text">This action cannot be undone.</p>
-                  <div class="modal-actions">
-                    <button id="cancel-delete" class="secondary" type="button">
-                      Cancel
-                    </button>
-                    <button id="confirm-delete" class="danger" type="button">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="results-actions">
+        <input id="save-public" type="checkbox" hidden />
+
+        <!-- Toggle row -->
+        <div class="res-toggle">
+          <button type="button" class="res-toggle__btn is-selected" id="mode-private">
+            <img src="/static/images/lock.png" alt="" />
+            <span>Private</span>
+          </button>
+          <button type="button" class="res-toggle__btn" id="mode-public">
+            <img src="/static/images/icons8-community-100.png" alt="" />
+            <span>Public</span>
+          </button>
+        </div>
+
+        <!-- Save + Delete row -->
+        <div class="comm_voteButtonRow res-actionRow">
+          <button id="btn-delete" type="button" class="comm_voteMainBtn vs-actionBtn vs-deleteBtn btn-flow-primary">
+            <svg class="comm_icon vs-svgIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+            </svg>
+            Delete
+          </button>
+          <button id="btn-save" disabled type="button" class="comm_voteMainBtn vs-actionBtn res-saveBtn btn-flow-primary">
+            Save
+          </button>
+        </div>
+      </div>
+
+      <div id="delete-modal" class="modal-overlay" hidden>
+        <div class="modal">
+          <h3 class="modal-title">Delete scan?</h3>
+          <p class="modal-text">This action cannot be undone.</p>
+          <div class="modal-actions">
+            <button id="cancel-delete" class="secondary" type="button">
+              Cancel
+            </button>
+            <button id="confirm-delete" class="danger" type="button">
+              Delete
+            </button>
           </div>
         </div>
       </div>
     </main>
 
-    {% include 'partials/navbar.html' %}
   </div>
+  {% include 'partials/navbar.html' %}
 
   <!-- Publish to Community Modal -->
   <div id="publish-modal" class="modal-overlay" hidden>
@@ -112,7 +122,7 @@
       <div id="publish-modal-status" class="make-public-status"></div>
       <div class="modal-actions">
         <button type="button" id="publish-modal-cancel" class="secondary">Cancel</button>
-        <button type="button" id="publish-modal-confirm" class="primary-gold">Confirm</button>
+        <button type="button" id="publish-modal-confirm" class="primary-gold btn-flow-primary">Confirm</button>
       </div>
     </div>
   </div>

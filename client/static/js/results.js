@@ -320,7 +320,7 @@ window.addEventListener("DOMContentLoaded", () => {
     setSelected(modePrivate, !isPublic);
 
     if (btnSave) {
-      btnSave.textContent = isPublic ? "Publish to Community" : "Confirm & Save";
+      btnSave.textContent = "Save";
     }
 
     if (fromUser && window.AIclipseTutorial && typeof window.AIclipseTutorial.emit === "function") {

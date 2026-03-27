@@ -13,6 +13,7 @@
     <div class="app-container">
       {% set page_title = 'Profile' %} {% include 'partials/topbar.html' %}
 
+      <main class="screen screen--flush">
       <div class="profileScreen">
         <section class="profile-summary" aria-label="Profile summary">
           <div class="profile-avatar">
@@ -113,9 +114,9 @@
         <div id="scans-status" class="status-message"></div>
         <div id="scans-container" class="scans-grid"></div>
       </div>
-
-      {% include 'partials/navbar.html' %}
+      </main>
     </div>
+    {% include 'partials/navbar.html' %}
 
     <!-- Delete Account Modal -->
     <div

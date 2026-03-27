@@ -31,6 +31,9 @@ metadata:
 spec:
   serviceName: mongo-headless
   replicas: 1
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
       app: mongo
@@ -67,17 +70,16 @@ spec:
               containerPort: 27017
           startupProbe:
             tcpSocket: { port: mongo }
-            periodSeconds: 1
-            failureThreshold: 60
+            periodSeconds: 2
+            failureThreshold: 90
           readinessProbe:
             tcpSocket: { port: mongo }
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
             tcpSocket: { port: mongo }
-            initialDelaySeconds: 60
             periodSeconds: 10
-            failureThreshold: 3
+            failureThreshold: 5
           resources:
             requests: { cpu: "100m", memory: "512Mi" }
             limits: { cpu: "500m", memory: "2Gi" }
