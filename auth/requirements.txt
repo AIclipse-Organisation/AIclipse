@@ -1,4 +1,4 @@
-fastapi==0.129.2
+fastapi==0.135.2
 uvicorn[standard]==0.41.0
 PyJWT==2.12.1
 cryptography==46.0.5
