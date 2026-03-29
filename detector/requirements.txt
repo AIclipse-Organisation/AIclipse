@@ -3,7 +3,7 @@ uvicorn[standard]==0.41.0
 pymongo==4.16.0
 redis==7.1.0
 requests==2.33.0
-transformers==5.1.0
+transformers==5.4.0
 Pillow==12.1.1
 httpx==0.28.1
 numpy==2.3.5
