@@ -1,8 +1,8 @@
 fastapi==0.129.2
-uvicorn[standard]==0.41.0
+uvicorn[standard]==0.42.0
 pymongo==4.16.0
 redis==7.1.0
-boto3==1.42.44
+boto3==1.42.78
 python-multipart==0.0.22
 pytest==9.0.2
 httpx==0.28.1
