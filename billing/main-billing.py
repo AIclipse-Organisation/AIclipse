@@ -483,6 +483,14 @@ async def stripe_webhook(request: Request):
         logger.error("DB not available; cannot persist billing updates.")
         return {"status": "db unavailable"}
 
+    # Stripe can retry delivery for the same event id; ignore already processed
+    # mutating events to avoid duplicate audit/billing rows.
+    if event_id and event_type in {"checkout.session.completed", "customer.subscription.deleted"}:
+        existing = plan_coll.find_one({"stripe_event_id": event_id})
+        if isinstance(existing, dict) and existing.get("stripe_event_id") == event_id:
+            logger.info("Duplicate webhook event ignored: id=%s type=%s", event_id, event_type)
+            return {"status": "ignored", "reason": "duplicate_event", "event_id": event_id}
+
     # --- checkout completed ---
     if event_type == "checkout.session.completed":
         session = event["data"]["object"]
