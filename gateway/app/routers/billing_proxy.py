@@ -94,6 +94,7 @@ async def api_billing_cancel_at_period_end(request: Request, payload: dict = Bod
     )
 
 
+@router.post("/billing/webhook")
 @router.post("/api/billing/webhook")
 async def api_billing_stripe_webhook(request: Request):
     """Forward Stripe webhook events to the billing service with raw bytes intact.

@@ -175,3 +175,35 @@ async def test_api_billing_webhook_no_authorization_header_forwarded(client, pat
         headers={"stripe-signature": "t=1,v1=xyz", "content-type": "application/json"},
     )
     assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_billing_webhook_alias_route_works_for_ingress_rewrite(client, patch_upstreams):
+    """Ingress rewrites /api/billing/webhook to /billing/webhook, so both must work."""
+
+    raw_payload = b'{"type":"checkout.session.completed","data":{"object":{}}}'
+    sig_header = "t=1234,v1=abcdef"
+
+    def webhook_handler(req: httpx.Request) -> httpx.Response:
+        assert req.url.path == "/webhook"
+        assert req.content == raw_payload
+        assert req.headers.get("stripe-signature") == sig_header
+        return httpx.Response(status_code=200, json={"received": True})
+
+    patch_upstreams.add(
+        host="billing-srv",
+        method="POST",
+        path="/webhook",
+        handler=webhook_handler,
+    )
+
+    r = await client.post(
+        "/billing/webhook",
+        content=raw_payload,
+        headers={
+            "stripe-signature": sig_header,
+            "content-type": "application/json",
+        },
+    )
+    assert r.status_code == 200
+    assert r.json() == {"received": True}

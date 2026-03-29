@@ -315,6 +315,23 @@ def test_webhook_checkout_completed_missing_user_id_ignored(client, state):
     assert response.json() == {"status": "ignored", "reason": "missing_user_id"}
 
 
+def test_webhook_duplicate_checkout_event_ignored(client, state):
+    state["plan_coll"].find_one.side_effect = [{"stripe_event_id": "evt_dup_1"}]
+    state["webhook_construct"].return_value = {
+        "id": "evt_dup_1",
+        "type": "checkout.session.completed",
+        "data": {"object": {"id": "cs_123", "metadata": {"user_id": "user_1", "plan_id": "2"}}},
+    }
+
+    response = client.post("/webhook", data="{}", headers={"stripe-signature": "sig"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ignored", "reason": "duplicate_event", "event_id": "evt_dup_1"}
+    state["users_coll"].update_one.assert_not_called()
+    state["plan_coll"].insert_one.assert_not_called()
+    state["billing_coll"].insert_one.assert_not_called()
+
+
 def test_webhook_subscription_deleted_cancels_plan(client, state):
     state["billing_coll"].find_one.return_value = {
         "user_id": "user_1",
@@ -338,6 +355,24 @@ def test_webhook_subscription_deleted_cancels_plan(client, state):
     state["users_coll"].update_one.assert_called()
     state["billing_coll"].update_many.assert_called()
     state["billing_coll"].insert_one.assert_called()
+
+
+def test_webhook_duplicate_subscription_deleted_event_ignored(client, state):
+    state["plan_coll"].find_one.side_effect = [{"stripe_event_id": "evt_dup_del_1"}]
+    state["webhook_construct"].return_value = {
+        "id": "evt_dup_del_1",
+        "type": "customer.subscription.deleted",
+        "data": {"object": {"id": "sub_123", "customer": "cus_123", "current_period_end": 1_900_000_000}},
+    }
+
+    response = client.post("/webhook", data="{}", headers={"stripe-signature": "sig"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ignored", "reason": "duplicate_event", "event_id": "evt_dup_del_1"}
+    state["users_coll"].update_one.assert_not_called()
+    state["billing_coll"].update_many.assert_not_called()
+    state["plan_coll"].insert_one.assert_not_called()
+    state["billing_coll"].insert_one.assert_not_called()
 
 
 def test_webhook_subscription_updated_marks_cancel_scheduled(client, state):
