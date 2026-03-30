@@ -224,6 +224,9 @@ textarea {
 
   position: relative;
   user-select: none;
+}
+
+#upload-frame {
   touch-action: none;
 }
 
