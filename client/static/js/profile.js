@@ -56,7 +56,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("detail-email").textContent = user.email || "-";
     currentUserPlan = Number(user.plan ?? 0);
     document.getElementById("detail-plan").textContent =
-      currentUserPlan === 0 ? "Free Trial" : `Plan ${currentUserPlan}`;
+      currentUserPlan === 0 ? "Free" : "Premium";
 
     document.getElementById("detail-created").textContent = formatDateDMY(user.created_at);
 
