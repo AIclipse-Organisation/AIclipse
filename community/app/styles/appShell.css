@@ -488,3 +488,60 @@ body::-webkit-scrollbar {
   transform: translateX(0);
   display: flex !important;
 }
+
+@media (max-width: 440px) {
+  .app .topbar {
+    height: 48px;
+    padding: 8px 10px;
+  }
+
+  .app .topbar-screen-name {
+    font-size: 16px;
+  }
+
+  .app .menu-button {
+    padding: 4px 6px;
+  }
+
+  .app .hamburger-line {
+    width: 18px;
+  }
+
+  .app .screen {
+    padding-top: 48px;
+  }
+
+  .app .screen.screen--profile {
+    padding-top: 48px;
+  }
+
+  .drawer-header {
+    padding: 12px 16px;
+  }
+
+  .close-button {
+    font-size: 1.5rem;
+  }
+
+  .drawer-links {
+    padding: 10px 0;
+  }
+
+  .drawer-links a,
+  .drawer-links .logout-button,
+  .drawer-links .tutorial-button {
+    padding: 10px 16px;
+    font-size: 0.875rem;
+  }
+
+  .drawer-link-icon,
+  .drawer-link-icon svg {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+  }
+
+  .drawer-separator {
+    margin: 6px 16px;
+  }
+}
