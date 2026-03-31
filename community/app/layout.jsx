@@ -46,6 +46,7 @@ export default async function RootLayout({ children }) {
     <html lang="en">
       <head>
         <title>AIclipse</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
         <link rel="stylesheet" href="/static/css/tutorial.css" />
       </head>
       <body data-tutorial-user={String(user?.user_id || "")}>
