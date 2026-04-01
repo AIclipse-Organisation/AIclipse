@@ -457,6 +457,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const clearImageBtn = document.getElementById("btn-clear-image");
     clearImageBtn?.addEventListener("click", clearImage);
 
+    clearImageBtn?.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+    });
+
     const topbarBackBtn = document.getElementById("topbar-back-dynamic");
     topbarBackBtn?.addEventListener("click", clearImage);
   })();
