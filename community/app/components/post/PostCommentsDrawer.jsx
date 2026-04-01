@@ -44,30 +44,54 @@ export default function PostCommentsDrawer({
     const body = bodyRef.current;
     if (!sheet || !body) return;
 
+    let lastOffset = 0;
+    let rafId = null;
+
     const update = () => {
-      // Record current scroll before height change
-      const currentScroll = body.scrollTop;
-      
-      const offset = Math.max(0, window.innerHeight - vv.height);
-      sheet.style.setProperty("--kb-offset", `${offset}px`);
+      // Cancel any pending frame to avoid stacking
+      if (rafId) cancelAnimationFrame(rafId);
 
-      if (offset > 0) {
-        sheet.classList.add("comm_bottomSheet--keyboard");
-      } else {
-        sheet.classList.remove("comm_bottomSheet--keyboard");
-      }
+      rafId = requestAnimationFrame(() => {
+        // Calculate keyboard offset using visualViewport
+        const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
 
-      // Restore scroll after layout stabilizes
-      requestAnimationFrame(() => {
-        body.scrollTop = currentScroll;
+        // Only update if offset changed significantly (avoid micro-adjustments)
+        if (Math.abs(offset - lastOffset) < 2) return;
+        lastOffset = offset;
+
+        // Record scroll position before layout change
+        const currentScroll = body.scrollTop;
+
+        sheet.style.setProperty("--kb-offset", `${offset}px`);
+
+        if (offset > 50) {
+          // Keyboard is likely open
+          sheet.classList.add("comm_bottomSheet--keyboard");
+          // Scroll to bottom to keep input visible
+          requestAnimationFrame(() => {
+            body.scrollTop = body.scrollHeight;
+          });
+        } else {
+          sheet.classList.remove("comm_bottomSheet--keyboard");
+          // Restore previous scroll
+          requestAnimationFrame(() => {
+            body.scrollTop = currentScroll;
+          });
+        }
       });
     };
 
+    // Use both resize and scroll events for iOS Safari compatibility
     vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
     update();
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
       sheet.style.removeProperty("--kb-offset");
       sheet.classList.remove("comm_bottomSheet--keyboard");
     };

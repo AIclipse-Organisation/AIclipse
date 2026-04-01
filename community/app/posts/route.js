@@ -247,14 +247,15 @@ export async function POST(req) {
     try {
       const GATEWAY_URI = process.env.GATEWAY_URI;
       const imageUpdateUrl = `${GATEWAY_URI}/image/${safeImageId}`;
+      const token = extractToken(req);
 
       await fetch(imageUpdateUrl, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify({
-          user_id: authenticatedUserId,
           is_public: true,
         }),
       });
