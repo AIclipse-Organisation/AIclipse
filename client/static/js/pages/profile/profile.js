@@ -3,6 +3,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const statusEl = document.getElementById("user-details-status");
   const containerEl = document.getElementById("user-details-container");
   let currentUserPlan = 0;
+  let hasPaidPlan = false;
 
   function formatDateDMY(value) {
     if (!value) return "-";
@@ -55,6 +56,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       user.user_name || "-";
     document.getElementById("detail-email").textContent = user.email || "-";
     currentUserPlan = Number(user.plan ?? 0);
+    hasPaidPlan = currentUserPlan > 0;
     document.getElementById("detail-plan").textContent =
       currentUserPlan === 0 ? "Free" : "Premium";
 
@@ -353,7 +355,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  await loadSubscriptionStatus();
+  if (hasPaidPlan) {
+    await loadSubscriptionStatus();
+  }
 
   // =========================
   // Delete account confirm modal logic
