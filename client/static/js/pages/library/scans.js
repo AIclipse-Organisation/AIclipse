@@ -4,18 +4,6 @@
 
 let allScans = [];
 
-function readBootstrappedScans() {
-  const el = document.getElementById("scans-page-model");
-  if (!el) return null;
-
-  try {
-    const parsed = JSON.parse(el.textContent || "null");
-    return Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
 // -------------------------
 // Helper: Get Visibility
 // -------------------------
@@ -222,16 +210,6 @@ async function loadScans() {
 
 if (typeof window !== "undefined") {
   window.addEventListener("DOMContentLoaded", () => {
-    const bootstrappedScans = readBootstrappedScans();
-    if (bootstrappedScans) {
-      allScans = bootstrappedScans;
-      renderScans();
-      void enrichModerationStatuses(allScans).then(() => {
-        renderScans();
-      });
-      return;
-    }
-
     loadScans();
   });
 }
@@ -239,7 +217,6 @@ if (typeof window !== "undefined") {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     applyModerationStatuses,
-    readBootstrappedScans,
     getVisibility,
   };
 }

@@ -131,6 +131,9 @@ def build_community_blueprint(*, deps: RouteDeps):
     @bp.post("/community/posts/report")
     def community_report():
         token = get_access_token(request)
+        if not token:
+            return json_missing_auth(community_shape=True)
+
         try:
             report_data = request.get_json(force=True)
         except Exception:
@@ -140,7 +143,7 @@ def build_community_blueprint(*, deps: RouteDeps):
             method="POST",
             base_url=deps.gateway_uri,
             path="/community/posts/report",
-            token=token or "",
+            token=token,
             json_body=report_data,
             invalid_json_detail="Invalid JSON from gateway on /community/posts/report",
         )
