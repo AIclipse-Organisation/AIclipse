@@ -93,9 +93,53 @@ function goToCommunity() {
   window.location.href = "/community";
 }
 
+const NOTIFICATION_BADGE_CACHE_KEY = "aiclipse:notifications:unread-count";
+const NOTIFICATION_BADGE_CACHE_TTL_MS = 15 * 1000;
+
+function readUnreadBadgeCache() {
+  try {
+    const raw = sessionStorage.getItem(NOTIFICATION_BADGE_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const unread = Number(parsed?.unread);
+    const fetchedAt = Number(parsed?.fetchedAt);
+    if (!Number.isFinite(unread) || !Number.isFinite(fetchedAt)) return null;
+    if ((Date.now() - fetchedAt) > NOTIFICATION_BADGE_CACHE_TTL_MS) return null;
+
+    return unread;
+  } catch {
+    return null;
+  }
+}
+
+function writeUnreadBadgeCache(unread) {
+  try {
+    sessionStorage.setItem(
+      NOTIFICATION_BADGE_CACHE_KEY,
+      JSON.stringify({
+        unread,
+        fetchedAt: Date.now(),
+      }),
+    );
+  } catch {}
+}
+
+function clearUnreadBadgeCache() {
+  try {
+    sessionStorage.removeItem(NOTIFICATION_BADGE_CACHE_KEY);
+  } catch {}
+}
+
 async function updateNotificationDot() {
   const dot = document.getElementById("notif-dot");
   if (!dot) return;
+
+  const cachedUnread = readUnreadBadgeCache();
+  if (cachedUnread !== null) {
+    dot.hidden = cachedUnread <= 0;
+    return;
+  }
 
   try {
     const res = await fetch("/community/notifications/unread-count", {
@@ -104,14 +148,18 @@ async function updateNotificationDot() {
     });
 
     if (!res.ok) {
+      clearUnreadBadgeCache();
       dot.hidden = true;
       return;
     }
 
     const data = await res.json().catch(() => ({}));
-    const unread = Number(data?.unread_count || 0);
+    const unreadRaw = Number(data?.unread_count ?? 0);
+    const unread = Number.isFinite(unreadRaw) ? unreadRaw : 0;
+    writeUnreadBadgeCache(unread);
     dot.hidden = unread <= 0;
   } catch {
+    clearUnreadBadgeCache();
     dot.hidden = true;
   }
 }
@@ -131,5 +179,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 window.addEventListener("notifications:updated", () => {
+  clearUnreadBadgeCache();
   updateNotificationDot();
 });

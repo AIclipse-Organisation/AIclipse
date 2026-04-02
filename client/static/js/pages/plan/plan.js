@@ -96,7 +96,8 @@ function updateUsageUI(usageData) {
   const used = Number(
     usageData.monthly_usage ?? usageData.monthly_usage_count ?? usageData.usage ?? 0
   );
-  const limit = Number(usageData.limit ?? usageData.monthly_limit ?? 10) || 10;
+  const limitRaw = Number(usageData.limit ?? usageData.monthly_limit ?? 10);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 10;
   const remaining =
     usageData.remaining !== undefined && usageData.remaining !== null
       ? Number(usageData.remaining)
