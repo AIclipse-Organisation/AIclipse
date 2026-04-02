@@ -3,7 +3,7 @@ import pytest
 
 try:
     from tests.conftest import make_auth_token
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     from gateway.tests.conftest import make_auth_token
 
 
@@ -60,3 +60,27 @@ async def test_community_images_proxies_media(client, patch_upstreams):
     r = await client.get("/community/images")
     assert r.status_code == 200
     assert r.json()["items"][0]["image_id"] == "img1"
+
+
+@pytest.mark.asyncio
+async def test_patch_image_accepts_internal_forwarded_user(client, patch_upstreams):
+    def media_patch_handler(req: httpx.Request) -> httpx.Response:
+        assert req.url.params.get("user_id") == "u_comm"
+        assert req.url.params.get("is_public") == "true"
+        assert req.headers.get("x-is-admin") == "true"
+        return httpx.Response(status_code=200, json={"ok": True})
+
+    patch_upstreams.add(host="media", method="PATCH", path="/image/img_internal", handler=media_patch_handler)
+
+    r = await client.patch(
+        "/image/img_internal",
+        headers={
+            "X-Internal-Token": "test-internal-token",
+            "X-User-Id": "u_comm",
+            "X-User-Is-Admin": "true",
+            "X-User-Email": "u_comm@example.com",
+        },
+        json={"is_public": True},
+    )
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}

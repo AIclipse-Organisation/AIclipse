@@ -26,46 +26,6 @@ function getVisibility(img) {
 }
 
 // -------------------------
-// Compute REAL% (No changes here)
-// -------------------------
-function clamp01(n) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return 0;
-  return Math.max(0, Math.min(1, x));
-}
-
-function cleanLabelText(raw) {
-  const s = (raw || "").toString();
-  return s.replace(/^\s*\d+(\.\d+)?%\s*/i, "").trim();
-}
-
-function computeRealPct(img) {
-  const rawLabel = cleanLabelText(img?.label || img?.result || "Unknown");
-  const labelLower = rawLabel.toLowerCase();
-
-  const confidenceRaw = Number.isFinite(img?.confidence)
-    ? img.confidence
-    : (img?.score ?? 0);
-
-  const confidence = clamp01(confidenceRaw);
-
-  const isAi =
-    labelLower.includes("ai") ||
-    labelLower.includes("fake") ||
-    labelLower.includes("deepfake");
-
-  const isReal = labelLower.includes("real") && !isAi;
-
-  let realProb = isReal ? confidence : 1 - confidence;
-  realProb = clamp01(realProb);
-
-  return {
-    label: rawLabel || "Unknown",
-    realPct: (realProb * 100).toFixed(2),
-  };
-}
-
-// -------------------------
 // DOM helpers
 // -------------------------
 function clearEl(el) {
@@ -281,8 +241,5 @@ if (typeof module !== "undefined" && module.exports) {
     applyModerationStatuses,
     readBootstrappedScans,
     getVisibility,
-    clamp01,
-    cleanLabelText,
-    computeRealPct,
   };
 }

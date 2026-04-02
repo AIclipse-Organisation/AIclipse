@@ -46,7 +46,6 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
                 image_id=image_id,
                 token=token,
                 gateway_base_url=deps.gateway_uri,
-                community_base_url=deps.community_uri,
             )
             if status == 200 and isinstance(data, dict):
                 if viewer:
@@ -82,7 +81,7 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
             token=token,
             image_id=image_id,
             description=description,
-            community_base_url=deps.community_uri,
+            gateway_base_url=deps.gateway_uri,
         )
         return jsonify(data), status
 
@@ -117,7 +116,6 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
             description=description,
             image_result=image_result,
             gateway_base_url=deps.gateway_uri,
-            community_base_url=deps.community_uri,
         )
         return jsonify(data), status
 
@@ -151,7 +149,7 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
     def viewscan_comments_route(image_id: str):
         data, status = list_viewscan_comments(
             image_id=image_id,
-            community_base_url=deps.community_uri,
+            gateway_base_url=deps.gateway_uri,
         )
         return jsonify(data), status
 
@@ -189,7 +187,7 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
             text=text,
             viewer_user_id=str(viewer["user_id"]).strip(),
             viewer_name=viewer_name,
-            community_base_url=deps.community_uri,
+            gateway_base_url=deps.gateway_uri,
         )
 
         if status == 401:
@@ -211,7 +209,7 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
         data, status = delete_viewscan_comment(
             token=token,
             comment_id=comment_id,
-            community_base_url=deps.community_uri,
+            gateway_base_url=deps.gateway_uri,
         )
 
         if status == 401:

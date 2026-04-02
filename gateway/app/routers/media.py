@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, Response
 from app.core.image_safety import sniff_and_validate_image
 from app.core.media_url import build_media_image_url
 from app.core.tokens import validate_detection_token
-from app.deps import get_current_user
+from app.deps import get_current_user, get_current_user_or_internal
 from app.models import UpdateImageRequest, UserContext
 
 router = APIRouter()
@@ -171,7 +171,7 @@ async def gateway_update_image(
     request: Request,
     image_id: str = Path(...),
     body: UpdateImageRequest = Body(...),
-    user: UserContext = Depends(get_current_user),
+    user: UserContext = Depends(get_current_user_or_internal),
 ):
     s = request.app.state.settings
 
@@ -240,7 +240,7 @@ async def gateway_get_community_images(request: Request):
 async def gateway_delete_image(
     request: Request,
     image_id: str = Path(...),
-    user: UserContext = Depends(get_current_user),
+    user: UserContext = Depends(get_current_user_or_internal),
 ):
     s = request.app.state.settings
 

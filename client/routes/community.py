@@ -7,7 +7,7 @@ from flask import Blueprint, jsonify, request
 
 from auth.cookies import get_access_token
 from routes.common import RouteDeps, json_missing_auth
-from services.integrations.community import proxy_community_request
+from services.integrations.gateway import proxy_gateway_json_request
 
 
 def build_community_blueprint(*, deps: RouteDeps):
@@ -24,12 +24,13 @@ def build_community_blueprint(*, deps: RouteDeps):
         except Exception:
             return jsonify({"error": "Invalid JSON"}), 400
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="POST",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/posts",
             token=token,
             json_body=post_data,
+            invalid_json_detail="Invalid JSON from gateway on /community/posts",
         )
         if status == 502:
             logging.exception("Community /posts request failed")
@@ -39,11 +40,14 @@ def build_community_blueprint(*, deps: RouteDeps):
 
     @bp.get("/community/posts")
     def get_community_posts():
-        data, status = proxy_community_request(
+        token = get_access_token(request)
+        data, status = proxy_gateway_json_request(
             method="GET",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/posts",
+            token=token or "",
             params=dict(request.args),
+            invalid_json_detail="Invalid JSON from gateway on /community/posts",
         )
         return jsonify(data), status
 
@@ -58,12 +62,13 @@ def build_community_blueprint(*, deps: RouteDeps):
         except Exception:
             return jsonify({"error": "Invalid JSON"}), 400
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="POST",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/posts/vote",
             token=token,
             json_body=vote_data,
+            invalid_json_detail="Invalid JSON from gateway on /community/posts/vote",
         )
         return jsonify(data), status
 
@@ -75,11 +80,13 @@ def build_community_blueprint(*, deps: RouteDeps):
         if not re.fullmatch(r"[A-Za-z0-9_-]+", post_id):
             return jsonify({"error": "Invalid post_id parameter"}), 400
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="GET",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/posts/comments",
+            token="",
             params={"post_id": post_id},
+            invalid_json_detail="Invalid JSON from gateway on /community/posts/comments",
         )
         return jsonify(data), status
 
@@ -94,12 +101,13 @@ def build_community_blueprint(*, deps: RouteDeps):
         except Exception:
             return jsonify({"error": "Invalid JSON"}), 400
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="POST",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/posts/comments",
             token=token,
             json_body=comment_data,
+            invalid_json_detail="Invalid JSON from gateway on /community/posts/comments",
         )
         return jsonify(data), status
 
@@ -110,26 +118,31 @@ def build_community_blueprint(*, deps: RouteDeps):
         except Exception:
             return jsonify({"error": "Invalid JSON"}), 400
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="POST",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/posts/click",
+            token="",
             json_body=click_data,
+            invalid_json_detail="Invalid JSON from gateway on /community/posts/click",
         )
         return jsonify(data), status
 
     @bp.post("/community/posts/report")
     def community_report():
+        token = get_access_token(request)
         try:
             report_data = request.get_json(force=True)
         except Exception:
             return jsonify({"error": "Invalid JSON"}), 400
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="POST",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/posts/report",
+            token=token or "",
             json_body=report_data,
+            invalid_json_detail="Invalid JSON from gateway on /community/posts/report",
         )
         return jsonify(data), status
 

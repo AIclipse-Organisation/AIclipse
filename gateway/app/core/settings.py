@@ -20,6 +20,7 @@ def _get_int_env(name: str, default: int) -> int:
 class Settings:
     auth_uri: Optional[str]
     billing_uri: Optional[str]
+    community_uri: Optional[str]
     media_uri: Optional[str]
     detector_uri: Optional[str]
     model_cycle_uri: Optional[str]
@@ -43,6 +44,7 @@ class Settings:
         return Settings(
             auth_uri=os.getenv("AUTH_URI"),
             billing_uri=os.getenv("BILLING_URI"),
+            community_uri=os.getenv("COMMUNITY_URI"),
             media_uri=os.getenv("MEDIA_URI"),
             detector_uri=os.getenv("DETECTOR_URI"),
             detection_token_secret=os.getenv("DETECTION_TOKEN_SECRET"),

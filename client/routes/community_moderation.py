@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 
 from routes.common import RouteDeps
-from services.integrations.community import proxy_community_request
+from services.integrations.gateway import proxy_gateway_json_request
 
 
 def build_community_moderation_blueprint(*, deps: RouteDeps):
@@ -16,11 +16,13 @@ def build_community_moderation_blueprint(*, deps: RouteDeps):
         except Exception:
             return jsonify({"error": "Invalid JSON"}), 400
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="POST",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/posts/moderation-status",
+            token="",
             json_body=moderation_data,
+            invalid_json_detail="Invalid JSON from gateway on /community/posts/moderation-status",
         )
         return jsonify(data), status
 

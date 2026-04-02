@@ -19,7 +19,6 @@ function initNavDrawer() {
   const drawer = document.getElementById("nav-drawer");
   const overlay = document.getElementById("menu-overlay");
   const close = document.getElementById("close-menu");
-  const logoutBtn = document.getElementById("drawer-logout");
 
   if (!toggle || !drawer || !overlay) return;
   if (toggle.dataset.bound === "true") return;
@@ -53,18 +52,6 @@ function initNavDrawer() {
 
   if (close) {
     close.addEventListener("click", toggleDrawer);
-  }
-
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", async (e) => {
-      e.preventDefault();
-      try {
-        const res = await fetch("/logout", { method: "POST" });
-        if (res.ok) window.location.href = "/";
-      } catch (err) {
-        console.error("Logout failed", err);
-      }
-    });
   }
 
   window.AIclipseNavDrawer = {

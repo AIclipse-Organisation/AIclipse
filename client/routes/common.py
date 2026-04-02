@@ -15,7 +15,6 @@ from services.auth.session import get_session_user, resolve_current_user
 class RouteDeps:
     gateway: GatewayClient
     gateway_uri: str
-    community_uri: str
 
 
 MAX_TEXT_FIELD_LENGTH = 1000

@@ -10,10 +10,9 @@ def _gateway_url(*, base_url: str, path: str) -> str:
 
 
 def _gateway_headers(*, token: str, json_body: bool = False) -> dict[str, str]:
-    headers = {
-        "Accept": "application/json",
-        "Authorization": f"Bearer {token}",
-    }
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     if json_body:
         headers["Content-Type"] = "application/json"
     return headers

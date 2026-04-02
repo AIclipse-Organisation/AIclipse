@@ -4,12 +4,11 @@ import requests
 
 from services.community.lookup import fetch_post_id_for_image
 from services.community.parsing import extract_post_id, parse_json_response
-from services.integrations.community import community_headers, community_url
 from services.integrations.gateway import proxy_gateway_json_request
 
 
 def _community_posts_url(*, base_url: str) -> str:
-    return community_url(base_url=base_url, path="/community/posts")
+    return base_url.rstrip("/") + "/community/posts"
 
 
 def _patch_post_description(
@@ -17,15 +16,19 @@ def _patch_post_description(
     token: str,
     post_id: str,
     description: str,
-    community_base_url: str,
+    gateway_base_url: str,
     timeout_seconds: int,
 ) -> tuple[dict, int]:
     try:
         resp = requests.patch(
-            _community_posts_url(base_url=community_base_url),
+            _community_posts_url(base_url=gateway_base_url),
             params={"post_id": post_id},
             json={"description": description},
-            headers=community_headers(token=token, json_body=True),
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
             timeout=timeout_seconds,
         )
     except requests.RequestException:
@@ -40,12 +43,12 @@ def _create_post_for_image(
     image_id: str,
     description: str,
     image_result: dict,
-    community_base_url: str,
+    gateway_base_url: str,
     timeout_seconds: int,
 ) -> tuple[dict, int]:
     try:
         resp = requests.post(
-            _community_posts_url(base_url=community_base_url),
+            _community_posts_url(base_url=gateway_base_url),
             json={
                 "image_id": image_id,
                 "description": description,
@@ -55,7 +58,11 @@ def _create_post_for_image(
                     "confidence": image_result.get("confidence"),
                 },
             },
-            headers=community_headers(token=token, json_body=True),
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
             timeout=timeout_seconds,
         )
     except requests.RequestException:
@@ -90,13 +97,13 @@ def publish_viewscan(
     description: str,
     image_result: dict,
     gateway_base_url: str,
-    community_base_url: str,
     timeout_seconds: int = 10,
 ) -> tuple[dict, int]:
     post_id = fetch_post_id_for_image(
         image_id=image_id,
-        community_base_url=community_base_url,
+        gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
+        token=token,
     )
 
     if post_id:
@@ -104,7 +111,7 @@ def publish_viewscan(
             token=token,
             post_id=post_id,
             description=description,
-            community_base_url=community_base_url,
+            gateway_base_url=gateway_base_url,
             timeout_seconds=timeout_seconds,
         )
         if patch_status not in (200, 201):
@@ -115,12 +122,13 @@ def publish_viewscan(
             image_id=image_id,
             description=description,
             image_result=image_result,
-            community_base_url=community_base_url,
+            gateway_base_url=gateway_base_url,
             timeout_seconds=timeout_seconds,
         )
         if create_status not in (200, 201):
             return create_payload, create_status
         post_id = extract_post_id(create_payload)
+        return {"image_id": image_id, "post_id": post_id, "is_public": True}, 200
 
     image_payload, image_status = _set_image_visibility(
         token=token,
@@ -160,13 +168,14 @@ def update_viewscan_description(
     token: str,
     image_id: str,
     description: str,
-    community_base_url: str,
+    gateway_base_url: str,
     timeout_seconds: int = 10,
 ) -> tuple[dict, int]:
     post_id = fetch_post_id_for_image(
         image_id=image_id,
-        community_base_url=community_base_url,
+        gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
+        token=token,
     )
     if not post_id:
         return {"detail": "Post not found for image"}, 404
@@ -175,7 +184,7 @@ def update_viewscan_description(
         token=token,
         post_id=post_id,
         description=description,
-        community_base_url=community_base_url,
+        gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
     )
     if status not in (200, 201):

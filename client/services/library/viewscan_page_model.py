@@ -4,11 +4,8 @@ from typing import Any
 
 import requests
 
-from services.integrations.community import community_headers, community_url
-
-
 def _community_posts_url(*, base_url: str) -> str:
-    return community_url(base_url=base_url, path="/community/posts")
+    return base_url.rstrip("/") + "/community/posts"
 
 
 def _extract_item(payload: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -106,13 +103,13 @@ def _fetch_image_item(
 def _fetch_public_post_for_image(
     *,
     image_id: str,
-    community_base_url: str,
+    gateway_base_url: str,
     timeout_seconds: int,
 ) -> dict[str, Any] | None:
     try:
         resp = requests.get(
-            _community_posts_url(base_url=community_base_url),
-            headers=community_headers(),
+            _community_posts_url(base_url=gateway_base_url),
+            headers={"Accept": "application/json"},
             params={"image_id": image_id},
             timeout=timeout_seconds,
         )
@@ -135,7 +132,6 @@ def build_viewscan_page_model(
     image_id: str,
     token: str,
     gateway_base_url: str,
-    community_base_url: str,
     timeout_seconds: int = 10,
 ) -> tuple[dict[str, Any], int]:
     image, image_error, image_status = _fetch_image_item(
@@ -153,7 +149,7 @@ def build_viewscan_page_model(
 
     post = _fetch_public_post_for_image(
         image_id=image_id,
-        community_base_url=community_base_url,
+        gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
     )
     if not post:

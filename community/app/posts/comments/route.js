@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
-import jwt from "jsonwebtoken";
 import {
   validateUserId,
   validatePostId,
@@ -9,6 +8,7 @@ import {
 import { getRedis } from "@/lib/redis/redis";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 import { recordActivity, awardPoints, SCORES } from "@/lib/gamification/scoring.js";
+import { getTrustedUser } from "@/app/lib/trustedUser";
 
 export const runtime = "nodejs";
 
@@ -20,52 +20,6 @@ const FLUSH_ZSET = "comments:flush_at";
 const FLUSH_DEBOUNCE_MS = 30_000; // 30 seconds
 const FLUSH_MAX_WAIT_SEC = 60;
 const DELTA_TTL_SECONDS = 60 * 60; // 1 hour safety TTL
-
-// Helper function to extract and verify JWT token from Authorization header or cookie
-function getAuthenticatedUserId(req) {
-  let token = null;
-
-  // Try Authorization header first
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const parts = authHeader.split(" ");
-    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
-      token = parts[1];
-    }
-  }
-
-  // Fallback to cookie if no Authorization header
-  if (!token) {
-    const cookieHeader = req.headers.get("cookie");
-    if (cookieHeader) {
-      const cookies = Object.fromEntries(
-        cookieHeader.split("; ").map((c) => {
-          const [key, ...v] = c.split("=");
-          return [key, v.join("=")];
-        }),
-      );
-      token = cookies.access_token;
-    }
-  }
-
-  if (!token) {
-    throw new Error("Missing authentication token");
-  }
-
-  try {
-    // Decode without verification to get the user_id
-    // In production, you should verify the JWT signature using the public key from auth service
-    const decoded = jwt.decode(token);
-
-    if (!decoded || !decoded.sub) {
-      throw new Error("Invalid token payload");
-    }
-
-    return decoded.sub; // user_id is stored in 'sub' claim
-  } catch (err) {
-    throw new Error("Invalid or expired token");
-  }
-}
 
 // Generates a unique comment ID. Timestamp + random suffix
 function makeCommentId() {
@@ -143,16 +97,16 @@ export async function GET(req) {
 // Stores user_name so the UI can display it without extra lookups.
 export async function POST(req) {
   try {
-    // Verify authentication and get authenticated user_id from JWT token
-    let authenticatedUserId;
+    let currentUser;
     try {
-      authenticatedUserId = getAuthenticatedUserId(req);
+      currentUser = getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
         { status: 401 },
       );
     }
+    const authenticatedUserId = currentUser.user_id;
 
     const body = await req.json().catch(() => null);
 
@@ -306,16 +260,16 @@ export async function POST(req) {
 // Allows a user to delete their own comment
 export async function DELETE(req) {
   try {
-    // Verify authentication and get authenticated user_id from JWT token
-    let authenticatedUserId;
+    let currentUser;
     try {
-      authenticatedUserId = getAuthenticatedUserId(req);
+      currentUser = getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
         { status: 401 },
       );
     }
+    const authenticatedUserId = currentUser.user_id;
 
     // Get comment_id from query parameters
     const { searchParams } = new URL(req.url);

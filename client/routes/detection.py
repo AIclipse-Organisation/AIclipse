@@ -128,7 +128,6 @@ def build_detection_blueprint(*, deps: RouteDeps):
             description=description,
             user_id=str(viewer.get("user_id")) if viewer and viewer.get("user_id") else None,
             gateway_base_url=deps.gateway_uri,
-            community_base_url=deps.community_uri,
         )
 
         if status == 401:

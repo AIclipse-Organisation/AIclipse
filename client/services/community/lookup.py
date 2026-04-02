@@ -8,13 +8,18 @@ from services.community.parsing import extract_post_id
 def fetch_post_id_for_image(
     *,
     image_id: str,
-    community_base_url: str,
+    gateway_base_url: str,
     timeout_seconds: int,
+    token: str | None = None,
 ) -> str | None:
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     try:
         resp = requests.get(
-            community_base_url.rstrip("/") + "/community/posts",
-            headers={"Accept": "application/json"},
+            gateway_base_url.rstrip("/") + "/community/posts",
+            headers=headers,
             params={"image_id": image_id},
             timeout=timeout_seconds,
         )

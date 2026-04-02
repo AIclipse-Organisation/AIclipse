@@ -219,15 +219,6 @@ body.app .topbar-user {
   color: #CFB87C;
 }
 
-body.app #current-user-chip {
-  font-size: 12px;
-  line-height: 1;
-  padding: 2px 4px;
-  border-radius: 999px;
-  white-space: nowrap;
-  color: #CFB87C;
-}
-
 /* Page title */
 
 body.app .page-header {

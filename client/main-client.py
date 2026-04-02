@@ -47,7 +47,6 @@ app.config["TEMPLATES_AUTO_RELOAD"] = current_env not in ("prod", "production")
 print(f"[*] Starting Client Service in {current_env} mode")
 
 GATEWAY_URI = os.getenv("GATEWAY_URI") or ""
-COMMUNITY_URI = os.getenv("COMMUNITY_URI") or ""
 
 if is_prod:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -68,7 +67,6 @@ def is_signup_enabled() -> bool:
 deps = RouteDeps(
     gateway=gateway,
     gateway_uri=GATEWAY_URI,
-    community_uri=COMMUNITY_URI,
 )
 
 app.register_blueprint(build_auth_blueprint(gateway, is_signup_enabled=is_signup_enabled))

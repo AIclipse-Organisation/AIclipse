@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request
 
 from routes.common import RouteDeps, get_required_token, parse_json_body_or_400
-from services.integrations.community import proxy_community_request
+from services.integrations.gateway import proxy_gateway_json_request
 
 
 def build_notifications_blueprint(*, deps: RouteDeps):
@@ -24,12 +24,13 @@ def build_notifications_blueprint(*, deps: RouteDeps):
         if unread_only is not None:
             params["unread_only"] = unread_only
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="GET",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/notifications",
             token=token,
             params=params,
+            invalid_json_detail="Invalid JSON from gateway on /community/notifications",
         )
         return jsonify(data), status
 
@@ -39,11 +40,12 @@ def build_notifications_blueprint(*, deps: RouteDeps):
         if auth_error:
             return auth_error
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="GET",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/notifications/unread-count",
             token=token,
+            invalid_json_detail="Invalid JSON from gateway on /community/notifications/unread-count",
         )
         return jsonify(data), status
 
@@ -57,12 +59,13 @@ def build_notifications_blueprint(*, deps: RouteDeps):
         if body_error:
             return jsonify({"error": "Invalid JSON"}), 400
 
-        data, status = proxy_community_request(
+        data, status = proxy_gateway_json_request(
             method="POST",
-            base_url=deps.community_uri,
+            base_url=deps.gateway_uri,
             path="/community/notifications/read",
             token=token,
             json_body=body,
+            invalid_json_detail="Invalid JSON from gateway on /community/notifications/read",
         )
         return jsonify(data), status
 

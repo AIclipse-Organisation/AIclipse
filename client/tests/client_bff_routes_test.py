@@ -267,7 +267,7 @@ def test_community_comments_rejects_invalid_post_id_without_calling_backend(main
 def test_community_moderation_status_forwards_request_correctly(main_client_module, monkeypatch):
     def fake_request(method, url, headers=None, json=None, params=None, timeout=None):
         assert method == "POST"
-        assert url == "http://community.test/community/posts/moderation-status"
+        assert url == "http://gateway.test/community/posts/moderation-status"
         assert json == {"image_ids": ["img_123", "img_456"]}
         assert headers["Content-Type"] == "application/json"
         assert headers["Accept"] == "application/json"
@@ -318,13 +318,13 @@ def test_community_moderation_status_handles_service_unavailable(main_client_mod
     )
 
     assert resp.status_code == 502
-    assert resp.get_json() == {"detail": "Community service unreachable"}
+    assert resp.get_json() == {"detail": "Gateway unreachable"}
 
 
 def test_create_community_post_uses_proxy_status_and_token(main_client_module, monkeypatch):
     def fake_request(method, url, headers=None, json=None, params=None, timeout=None):
         assert method == "POST"
-        assert url == "http://community.test/community/posts"
+        assert url == "http://gateway.test/community/posts"
         assert headers == {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -349,7 +349,7 @@ def test_create_community_post_uses_proxy_status_and_token(main_client_module, m
 def test_community_notifications_read_returns_proxy_status(main_client_module, monkeypatch):
     def fake_request(method, url, headers=None, json=None, params=None, timeout=None):
         assert method == "POST"
-        assert url == "http://community.test/community/notifications/read"
+        assert url == "http://gateway.test/community/notifications/read"
         assert headers == {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -386,12 +386,7 @@ def test_viewscan_html_route_bootstraps_canonical_image_id(main_client_module):
     assert 'data-image-id="img_123"' in html
 
 
-def test_profile_route_bootstraps_initial_scans_when_gateway_images_are_available(main_client_module, monkeypatch):
-    proxy_call = Mock(return_value=({"items": [{"image_id": "img_123", "url": "https://cdn.example/img.png"}]}, 200))
-    monkeypatch.setattr(main_client_module.route_library, "proxy_gateway_json_request", proxy_call)
-    import routes.profile as route_profile
-    monkeypatch.setattr(route_profile, "proxy_gateway_json_request", proxy_call)
-
+def test_profile_route_does_not_inline_scans_bootstrap(main_client_module):
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
     with client.session_transaction() as sess:
@@ -402,8 +397,7 @@ def test_profile_route_bootstraps_initial_scans_when_gateway_images_are_availabl
 
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    assert 'id="scans-page-model"' in html
-    assert '"image_id": "img_123"' in html
+    assert 'id="scans-page-model"' not in html
 
 
 def test_viewscan_html_route_embeds_server_page_model_when_available(main_client_module, monkeypatch):
@@ -468,7 +462,7 @@ def test_viewscan_html_route_embeds_public_page_model_from_gateway_and_community
                 },
             )
 
-        if url == "http://community.test/community/posts":
+        if url == "http://gateway.test/community/posts":
             assert headers == {"Accept": "application/json"}
             assert params == {"image_id": "img_123"}
             assert timeout == 10
@@ -631,23 +625,20 @@ def test_results_save_public_publishes_with_server_side_user_context(main_client
                 "timeout": timeout,
             }
         )
-        assert method == "POST"
         if url == "http://gateway.test/upload/image":
+            assert method == "POST"
             assert params is None
+            assert data["is_public"] == "false"
             return ResponseStub(201, {"body": {"image_id": "img_public", "label": "fake", "confidence": 0.9}})
-        raise AssertionError(f"Unexpected request {method} {url}")
-
-    def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
-        if url == "http://community.test/community/posts":
+        if url == "http://gateway.test/community/posts":
+            assert method == "POST"
             assert headers["Authorization"] == "Bearer user-token"
-            assert json["user_id"] == "u_server"
             assert json["image_id"] == "img_public"
             assert json["description"] == "Server-owned publish"
             return ResponseStub(200, {"post_id": "post_123"})
-        raise AssertionError(f"Unexpected POST {url}")
+        raise AssertionError(f"Unexpected request {method} {url}")
 
     monkeypatch.setattr(main_client_module.requests, "request", fake_request)
-    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
@@ -670,21 +661,21 @@ def test_results_save_public_publishes_with_server_side_user_context(main_client
     assert resp.get_json()["image_id"] == "img_public"
     assert resp.get_json()["post_id"] == "post_123"
     assert resp.get_json()["published"] is True
-    assert len(calls) == 1
+    assert len(calls) == 2
 
 
 def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client_module, monkeypatch):
     calls = []
 
     def fake_get(url, headers=None, params=None, timeout=None):
-        if url == "http://community.test/community/posts":
+        if url == "http://gateway.test/community/posts":
             assert params == {"image_id": "img_123"}
             return ResponseStub(200, {"items": []})
         raise AssertionError(f"Unexpected GET {url}")
 
     def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
         calls.append({"url": url, "headers": headers, "json": json, "timeout": timeout})
-        if url == "http://community.test/community/posts":
+        if url == "http://gateway.test/community/posts":
             assert headers["Authorization"] == "Bearer user-token"
             assert json["image_id"] == "img_123"
             assert json["description"] == "Hello world"
@@ -724,13 +715,13 @@ def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client
 
 def test_viewscan_update_description_hides_post_lookup_behind_image_id(main_client_module, monkeypatch):
     def fake_get(url, headers=None, params=None, timeout=None):
-        if url == "http://community.test/community/posts":
+        if url == "http://gateway.test/community/posts":
             assert params == {"image_id": "img_123"}
             return ResponseStub(200, {"items": [{"post_id": "post_9", "image_id": "img_123"}]})
         raise AssertionError(f"Unexpected GET {url}")
 
     def fake_patch(url, headers=None, params=None, json=None, timeout=None):
-        assert url == "http://community.test/community/posts"
+        assert url == "http://gateway.test/community/posts"
         assert headers["Authorization"] == "Bearer user-token"
         assert params == {"post_id": "post_9"}
         assert json == {"description": "Updated text"}
@@ -800,20 +791,20 @@ def test_viewscan_comments_routes_hide_post_lookup_and_user_context(main_client_
 
     def fake_get(url, headers=None, params=None, timeout=None):
         get_calls.append((url, headers, params, timeout))
-        if url == "http://community.test/community/posts":
+        if url == "http://gateway.test/community/posts":
             return ResponseStub(200, {"items": [{"post_id": "post_123", "image_id": "img_123"}]})
-        if url == "http://community.test/community/posts/comments":
+        if url == "http://gateway.test/community/posts/comments":
             return ResponseStub(200, {"items": [{"comment_id": "c_1", "text": "hello"}]})
         raise AssertionError(f"Unexpected GET {url}")
 
     def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
         post_calls.append((url, json, headers, timeout))
-        assert url == "http://community.test/community/posts/comments"
+        assert url == "http://gateway.test/community/posts/comments"
         return ResponseStub(201, {"comment_id": "c_2", "text": "Nice", "comment_count": 3})
 
     def fake_delete(url, headers=None, params=None, timeout=None):
         delete_calls.append((url, headers, params, timeout))
-        assert url == "http://community.test/community/posts/comments"
+        assert url == "http://gateway.test/community/posts/comments"
         return ResponseStub(200, {"comment_id": "c_2", "comment_count": 2})
 
     monkeypatch.setattr(main_client_module.requests, "get", fake_get)
@@ -837,13 +828,18 @@ def test_viewscan_comments_routes_hide_post_lookup_and_user_context(main_client_
     assert delete_resp.get_json() == {"comment_id": "c_2", "comment_count": 2}
 
     assert get_calls == [
-        ("http://community.test/community/posts", {"Accept": "application/json"}, {"image_id": "img_123"}, 10),
-        ("http://community.test/community/posts/comments", {"Accept": "application/json"}, {"post_id": "post_123"}, 10),
-        ("http://community.test/community/posts", {"Accept": "application/json"}, {"image_id": "img_123"}, 10),
+        ("http://gateway.test/community/posts", {"Accept": "application/json"}, {"image_id": "img_123"}, 10),
+        ("http://gateway.test/community/posts/comments", {"Accept": "application/json"}, {"post_id": "post_123"}, 10),
+        (
+            "http://gateway.test/community/posts",
+            {"Accept": "application/json", "Authorization": "Bearer user-token"},
+            {"image_id": "img_123"},
+            10,
+        ),
     ]
     assert post_calls == [
         (
-            "http://community.test/community/posts/comments",
+            "http://gateway.test/community/posts/comments",
             {
                 "post_id": "post_123",
                 "user_id": "u_42",
@@ -860,7 +856,7 @@ def test_viewscan_comments_routes_hide_post_lookup_and_user_context(main_client_
     ]
     assert delete_calls == [
         (
-            "http://community.test/community/posts/comments",
+            "http://gateway.test/community/posts/comments",
             {"Accept": "application/json", "Authorization": "Bearer user-token"},
             {"comment_id": "c_2"},
             10,

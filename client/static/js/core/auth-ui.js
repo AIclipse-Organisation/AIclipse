@@ -1,8 +1,4 @@
 (function () {
-  function getChip() {
-    return document.getElementById("current-user-chip");
-  }
-
   function getDrawerNameEl() {
     return document.getElementById("drawer-user-name");
   }
@@ -13,37 +9,11 @@
     return s;
   }
 
-  function applyChipName(name) {
-    const chip = getChip();
-    if (!chip) return;
-
-    const n = normalizeName(name);
-
-    if (n) {
-      chip.textContent = n;
-      chip.classList.remove("muted");
-      chip.classList.add("success");
-    } else {
-      chip.textContent = "Not signed in";
-      chip.classList.remove("success");
-      chip.classList.add("muted");
-    }
-  }
-
-  function applyDrawerLabel() {
+  function applyDrawerLabel(name) {
     const drawer = getDrawerNameEl();
     if (!drawer) return;
-    drawer.textContent = "Menu";
-  }
-
-  function readNameFromDom() {
-    const chip = getChip();
-    if (!chip) return "";
-    const fromData = normalizeName(chip.dataset.userName || chip.dataset.username);
-    if (fromData) return fromData;
-    const fromText = normalizeName(chip.textContent);
-    if (fromText && fromText !== "Not signed in") return fromText;
-    return "";
+    const normalized = normalizeName(name);
+    drawer.textContent = normalized || "Menu";
   }
 
   async function doLogout() {
@@ -66,25 +36,19 @@
   }
 
   function init() {
-    const existing = readNameFromDom();
-    applyChipName(existing);
-    applyDrawerLabel();
+    applyDrawerLabel("");
     bindLogout();
   }
 
   window.AuthUI = {
     init,
     setUser: (user) => {
-      if (user && typeof user === "object") {
-        applyChipName(user.user_name || user.email || "");
-      } else {
-        applyChipName("");
-      }
-      applyDrawerLabel();
+      applyDrawerLabel(
+        user && typeof user === "object" ? user.user_name || user.email || "" : "",
+      );
     },
     clear: () => {
-      applyChipName("");
-      applyDrawerLabel();
+      applyDrawerLabel("");
     },
     logout: doLogout,
   };

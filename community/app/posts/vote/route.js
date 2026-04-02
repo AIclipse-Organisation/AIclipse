@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
-import jwt from "jsonwebtoken";
 import { validateUserId, validatePostId } from "../validation.js";
 import { getRedis } from "@/lib/redis/redis";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 import { recordActivity, awardPoints, SCORES } from "@/lib/gamification/scoring.js";
+import { getTrustedUser } from "@/app/lib/trustedUser";
 
 export const runtime = "nodejs";
 
@@ -18,48 +18,18 @@ const FLUSH_DEBOUNCE_MS = 5_000; // 30 seconds
 const FLUSH_MAX_WAIT_SEC = 60; // max wait: 1 minute
 const DELTA_TTL_SECONDS = 60 * 60; // safety TTL 1 hour
 
-function getAuthenticatedUserId(req) {
-  let token = null;
-
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const parts = authHeader.split(" ");
-    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
-      token = parts[1];
-    }
-  }
-
-  if (!token) {
-    const cookieHeader = req.headers.get("cookie");
-    if (cookieHeader) {
-      const cookies = Object.fromEntries(
-        cookieHeader.split("; ").map((c) => {
-          const [key, ...v] = c.split("=");
-          return [key, v.join("=")];
-        }),
-      );
-      token = cookies.access_token;
-    }
-  }
-
-  if (!token) throw new Error("Missing authentication token");
-
-  const decoded = jwt.decode(token);
-  if (!decoded || !decoded.sub) throw new Error("Invalid token payload");
-  return decoded.sub;
-}
-
 export async function POST(req) {
   try {
-    let authenticatedUserId;
+    let currentUser;
     try {
-      authenticatedUserId = getAuthenticatedUserId(req);
+      currentUser = getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
         { status: 401 },
       );
     }
+    const authenticatedUserId = currentUser.user_id;
 
     const body = await req.json().catch(() => null);
 

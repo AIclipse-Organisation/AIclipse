@@ -30,6 +30,10 @@ def _require_internal_token(request: Request) -> str:
     return require_setting("INTERNAL_AUTH_TOKEN", s.internal_auth_token)
 
 
+def _parse_bool_header(value: Optional[str]) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 async def _exchange_api_key_for_jwt(request: Request, api_key: str) -> Tuple[str, int]:
     """
     Exchange API key -> short-lived RS256 JWT in Auth service.
@@ -93,6 +97,7 @@ async def get_current_user(
         email=payload.get("email"),
         is_admin=bool(payload.get("is_admin", False)),
         plan=payload.get("plan"),
+        user_name=payload.get("user_name"),
         token=token,
     )
 
@@ -126,10 +131,63 @@ async def get_current_user_any(
             email=payload.get("email"),
             is_admin=bool(payload.get("is_admin", False)),
             plan=payload.get("plan"),
+            user_name=payload.get("user_name"),
             token=jwt_token,
         )
 
     return await get_current_user(request, authorization=authorization)
+
+
+async def get_internal_user(
+    request: Request,
+    x_internal_token: Optional[str] = Header(None, alias="X-Internal-Token"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name"),
+    x_user_is_admin: Optional[str] = Header(None, alias="X-User-Is-Admin"),
+) -> UserContext:
+    expected_token = _require_internal_token(request)
+    if x_internal_token != expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid internal auth token",
+        )
+
+    user_id = str(x_user_id or "").strip()
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing forwarded user id",
+        )
+
+    return UserContext(
+        user_id=user_id,
+        email=(str(x_user_email).strip() or None) if x_user_email is not None else None,
+        user_name=(str(x_user_name).strip() or None) if x_user_name is not None else None,
+        is_admin=_parse_bool_header(x_user_is_admin),
+    )
+
+
+async def get_current_user_or_internal(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    x_internal_token: Optional[str] = Header(None, alias="X-Internal-Token"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name"),
+    x_user_is_admin: Optional[str] = Header(None, alias="X-User-Is-Admin"),
+) -> UserContext:
+    if authorization:
+        return await get_current_user(request, authorization=authorization)
+
+    return await get_internal_user(
+        request,
+        x_internal_token=x_internal_token,
+        x_user_id=x_user_id,
+        x_user_email=x_user_email,
+        x_user_name=x_user_name,
+        x_user_is_admin=x_user_is_admin,
+    )
 
 
 async def get_current_admin(user: UserContext = Depends(get_current_user)) -> UserContext:

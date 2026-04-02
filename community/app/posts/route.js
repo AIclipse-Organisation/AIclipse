@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
-import jwt from "jsonwebtoken";
 import {
-  validateUserId,
   validateImageId,
   validatePostId,
 } from "./validation.js";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 import { recordActivity, SCORES } from "@/lib/gamification/scoring.js";
+import {
+  buildGatewayIdentityHeaders,
+  getOptionalTrustedUser,
+  getTrustedUser,
+} from "@/app/lib/trustedUser";
 
 import { getRedis } from "@/lib/redis/redis";
 
@@ -70,77 +73,6 @@ function createdAtToUnixSeconds(created_at) {
   return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
 }
 
-// Helper function to extract and verify JWT token from Authorization header or cookie
-function getAuthenticatedUserId(req) {
-  let token = null;
-
-  // Try Authorization header first
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const parts = authHeader.split(" ");
-    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
-      token = parts[1];
-    }
-  }
-
-  // Fallback to cookie if no Authorization header
-  if (!token) {
-    const cookieHeader = req.headers.get("cookie");
-    if (cookieHeader) {
-      const cookies = Object.fromEntries(
-        cookieHeader.split("; ").map((c) => {
-          const [key, ...v] = c.split("=");
-          return [key, v.join("=")];
-        }),
-      );
-      token = cookies.access_token;
-    }
-  }
-
-  if (!token) {
-    throw new Error("Missing authentication token");
-  }
-
-  try {
-    // Decode without verification to get the user_id
-    const decoded = jwt.decode(token);
-
-    if (!decoded || !decoded.sub) {
-      throw new Error("Invalid token payload");
-    }
-
-    return decoded.sub; // user_id is stored in 'sub' claim
-  } catch (err) {
-    throw new Error("Invalid or expired token");
-  }
-}
-
-// Helper function to extract raw JWT token from request (for forwarding to other services)
-function extractToken(req) {
-  // Try Authorization header first
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const parts = authHeader.split(" ");
-    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
-      return parts[1];
-    }
-  }
-
-  // Fallback to cookie
-  const cookieHeader = req.headers.get("cookie");
-  if (cookieHeader) {
-    const cookies = Object.fromEntries(
-      cookieHeader.split("; ").map((c) => {
-        const [key, ...v] = c.split("=");
-        return [key, v.join("=")];
-      }),
-    );
-    return cookies.access_token || null;
-  }
-
-  return null;
-}
-
 // Generates a unique post ID. Uses timestamp and random number to reduce chance of collisions.
 function makePostId() {
   return `post_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -148,10 +80,9 @@ function makePostId() {
 
 export async function POST(req) {
   try {
-    // 1. Verify authentication and get authenticated user_id directly from JWT token
-    let authenticatedUserId;
+    let currentUser;
     try {
-      authenticatedUserId = getAuthenticatedUserId(req);
+      currentUser = getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
@@ -160,6 +91,7 @@ export async function POST(req) {
     }
 
     const body = await req.json().catch(() => null);
+    const authenticatedUserId = currentUser.user_id;
 
     // 2. Extract content from body
     const image_id = body?.image_id || null;
@@ -247,14 +179,10 @@ export async function POST(req) {
     try {
       const GATEWAY_URI = process.env.GATEWAY_URI;
       const imageUpdateUrl = `${GATEWAY_URI}/image/${safeImageId}`;
-      const token = extractToken(req);
 
       await fetch(imageUpdateUrl, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
+        headers: buildGatewayIdentityHeaders(currentUser),
         body: JSON.stringify({
           is_public: true,
         }),
@@ -278,16 +206,16 @@ export async function POST(req) {
 // Allows a user to update their own post's description
 export async function PATCH(req) {
   try {
-    // Verify authentication and get authenticated user_id from JWT token
-    let authenticatedUserId;
+    let currentUser;
     try {
-      authenticatedUserId = getAuthenticatedUserId(req);
+      currentUser = getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
         { status: 401 },
       );
     }
+    const authenticatedUserId = currentUser.user_id;
 
     // Get post_id from query parameters
     const { searchParams } = new URL(req.url);
@@ -382,27 +310,7 @@ export async function PATCH(req) {
 // Allows a user to delete their own post
 export async function DELETE(req) {
   try {
-    // 1. Get the token from the request
-    const token = extractToken(req);
-    if (!token) {
-      return NextResponse.json({ error: "Missing token" }, { status: 401 });
-    }
-
-    // FETCH USER STATUS FROM GATEWAY
-    const GATEWAY_URI = process.env.GATEWAY_URI;
-    const meRes = await fetch(`${GATEWAY_URI}/auth/me`, {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      cache: "no-store",
-    });
-
-    if (!meRes.ok) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const currentUser = await meRes.json();
+    const currentUser = getTrustedUser(req);
     const authenticatedUserId = currentUser.user_id;
     const isAdmin = currentUser.is_admin === true;
 
@@ -480,9 +388,10 @@ export async function DELETE(req) {
     // Delete from S3/Gateway if image_id exists
     if (post.image_id) {
       try {
+        const GATEWAY_URI = process.env.GATEWAY_URI;
         await fetch(`${GATEWAY_URI}/image/${post.image_id}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: buildGatewayIdentityHeaders(currentUser),
         });
       } catch (e) {
         console.error("Gateway cleanup failed", e);
@@ -522,12 +431,7 @@ export async function GET(req) {
     const filterImageId = searchParams.get("image_id") || null;
     const filterPostId = searchParams.get("post_id") || null;
 
-    let currentUserId = null;
-    try {
-      currentUserId = getAuthenticatedUserId(req);
-    } catch (e) {
-      console.log("User not logged in :" + e);
-    }
+    const currentUserId = getOptionalTrustedUser(req)?.user_id || null;
 
     // 1) public image ids
     const publicImages = await imagesCol

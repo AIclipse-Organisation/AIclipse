@@ -1,60 +1,29 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
-import jwt from "jsonwebtoken";
 import {
   ensureNotificationIndexes,
   trimNotificationRetention,
   capNotificationsForUser,
 } from "@/lib/notifications/notifications.js";
+import { getTrustedUser } from "@/app/lib/trustedUser";
 
 export const runtime = "nodejs";
 
 const NOTIFICATIONS_COLLECTION = "community.notifications";
 const USERS_COLLECTION = "auth.users";
 
-function getAuthenticatedUserId(req) {
-  // Try to read access token from Authorization header first.
-  let token = null;
-
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const parts = authHeader.split(" ");
-    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
-      token = parts[1];
-    }
-  }
-
-  if (!token) {
-    const cookieHeader = req.headers.get("cookie");
-    if (cookieHeader) {
-      const cookies = Object.fromEntries(
-        cookieHeader.split("; ").map((c) => {
-          const [key, ...v] = c.split("=");
-          return [key, v.join("=")];
-        }),
-      );
-      token = cookies.access_token;
-    }
-  }
-
-  if (!token) throw new Error("Missing authentication token");
-
-  const decoded = jwt.decode(token);
-  if (!decoded || !decoded.sub) throw new Error("Invalid token payload");
-  return decoded.sub;
-}
-
 export async function GET(req) {
   try {
-    let authenticatedUserId;
+    let currentUser;
     try {
-      authenticatedUserId = getAuthenticatedUserId(req);
+      currentUser = getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
         { status: 401 },
       );
     }
+    const authenticatedUserId = currentUser.user_id;
 
     const { searchParams } = new URL(req.url);
     const unreadOnly = String(searchParams.get("unread_only") || "").toLowerCase() === "true";

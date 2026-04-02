@@ -12,7 +12,7 @@ function isPublicPath(pathname) {
 
 async function isTokenValid(token) {
   const gateway = process.env.GATEWAY_URI;
-  if (!gateway) return false;
+  if (!gateway) return null;
 
   try {
     const res = await fetch(`${gateway}/auth/me`, {
@@ -22,9 +22,10 @@ async function isTokenValid(token) {
       },
       cache: "no-store",
     });
-    return res.ok;
+    if (!res.ok) return null;
+    return await res.json();
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -55,10 +56,28 @@ export async function middleware(request) {
   const token = request.cookies.get("access_token")?.value;
   if (!token) return redirectToLogin(request);
 
-  const ok = await isTokenValid(token);
-  if (!ok) return redirectToLogin(request);
+  const user = await isTokenValid(token);
+  if (!user?.user_id) return redirectToLogin(request);
 
-  return NextResponse.next();
+  const forwardedHeaders = new Headers(request.headers);
+  const internalToken = String(process.env.INTERNAL_AUTH_TOKEN || "").trim();
+  if (internalToken) {
+    forwardedHeaders.set("x-internal-token", internalToken);
+  }
+  forwardedHeaders.set("x-user-id", String(user.user_id));
+  forwardedHeaders.set("x-user-is-admin", user.is_admin ? "true" : "false");
+  if (user.email) {
+    forwardedHeaders.set("x-user-email", String(user.email));
+  }
+  if (user.user_name) {
+    forwardedHeaders.set("x-user-name", String(user.user_name));
+  }
+
+  return NextResponse.next({
+    request: {
+      headers: forwardedHeaders,
+    },
+  });
 }
 
 export const config = {

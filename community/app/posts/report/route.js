@@ -1,64 +1,13 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
 import { validatePostId } from "../validation.js";
-import jwt from "jsonwebtoken";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
+import { buildGatewayIdentityHeaders, getTrustedUser } from "@/app/lib/trustedUser";
 
 export const runtime = "nodejs";
 
 
 const POSTS_COLLECTION = "community.posts";
-
-function extractToken(req) {
-  let token = null;
-
-  // Try Authorization header first
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const parts = authHeader.split(" ");
-    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
-      token = parts[1];
-    }
-  }
-
-  // Fallback to cookie if no Authorization header
-  if (!token) {
-    const cookieHeader = req.headers.get("cookie");
-    if (cookieHeader) {
-      const cookies = Object.fromEntries(
-        cookieHeader.split("; ").map((c) => {
-          const [key, ...v] = c.split("=");
-          return [key, v.join("=")];
-        }),
-      );
-      token = cookies.access_token;
-    }
-  }
-
-  return token;
-}
-
-function getAuthenticatedUserId(req) {
-  const token = extractToken(req);
-
-  if (!token) {
-    throw new Error("Missing authentication token");
-  }
-
-  try {
-    // Decode without verification to get the user_id
-    // In production, you should verify the JWT signature using the public key from auth service
-    const decoded = jwt.decode(token);
-
-    if (!decoded || !decoded.sub) {
-      throw new Error("Invalid token payload");
-    }
-
-    return decoded.sub; // user_id is stored in 'sub' claim
-  } catch (err) {
-    throw new Error("Invalid or expired token");
-  }
-}
 
 //  POST /community/posts/report
 //  body: { post_id }
@@ -67,12 +16,13 @@ function getAuthenticatedUserId(req) {
 
 export async function POST(req) {
   try {
-    let reporterId;
+    let currentUser;
     try {
-      reporterId = getAuthenticatedUserId(req);
+      currentUser = getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const reporterId = currentUser.user_id;
 
     const body = await req.json().catch(() => null);
     const { post_id, reason = "General Flag", details = "" } = body || {};
@@ -125,7 +75,11 @@ export async function POST(req) {
 // PATCH /community/posts/report
 export async function PATCH(req) {
   try {
-    const adminUserId = getAuthenticatedUserId(req);
+    const currentUser = getTrustedUser(req);
+    if (!currentUser.is_admin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const adminUserId = currentUser.user_id;
     const { post_id, action, note } = await req.json();
 
     const db = await getDb();
@@ -154,14 +108,10 @@ export async function PATCH(req) {
       updateDoc.$set.is_removed = true;
 
       try {
-        const token = extractToken(req);
         const GATEWAY_URI = process.env.GATEWAY_URI;
         await fetch(`${GATEWAY_URI}/image/${post.image_id}`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
+          headers: buildGatewayIdentityHeaders(currentUser),
           body: JSON.stringify({ is_public: false })
         });
       } catch (err) { console.error("Gateway Sync Failed", err); }
@@ -197,6 +147,11 @@ export async function PATCH(req) {
 
 export async function GET(req) {
   try {
+    const currentUser = getTrustedUser(req);
+    if (!currentUser.is_admin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const db = await getDb();
     const postsCol = db.collection(POSTS_COLLECTION);
     const imagesCol = db.collection("images");
