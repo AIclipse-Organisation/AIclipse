@@ -1,0 +1,136 @@
+from __future__ import annotations
+
+import logging
+import re
+
+from flask import Blueprint, jsonify, request
+
+from auth.cookies import get_access_token
+from routes.common import RouteDeps, json_missing_auth
+from services.integrations.community import proxy_community_request
+
+
+def build_community_blueprint(*, deps: RouteDeps):
+    bp = Blueprint("community", __name__)
+
+    @bp.post("/community/posts")
+    def create_community_post():
+        token = get_access_token(request)
+        if not token:
+            return json_missing_auth(community_shape=True)
+
+        try:
+            post_data = request.get_json(force=True)
+        except Exception:
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        data, status = proxy_community_request(
+            method="POST",
+            base_url=deps.community_uri,
+            path="/community/posts",
+            token=token,
+            json_body=post_data,
+        )
+        if status == 502:
+            logging.exception("Community /posts request failed")
+            return jsonify(data), status
+
+        return jsonify(data), status
+
+    @bp.get("/community/posts")
+    def get_community_posts():
+        data, status = proxy_community_request(
+            method="GET",
+            base_url=deps.community_uri,
+            path="/community/posts",
+            params=dict(request.args),
+        )
+        return jsonify(data), status
+
+    @bp.post("/community/posts/vote")
+    def community_vote():
+        token = get_access_token(request)
+        if not token:
+            return json_missing_auth(community_shape=True)
+
+        try:
+            vote_data = request.get_json(force=True)
+        except Exception:
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        data, status = proxy_community_request(
+            method="POST",
+            base_url=deps.community_uri,
+            path="/community/posts/vote",
+            token=token,
+            json_body=vote_data,
+        )
+        return jsonify(data), status
+
+    @bp.get("/community/posts/comments")
+    def get_community_comments():
+        post_id = request.args.get("post_id")
+        if not post_id:
+            return jsonify({"error": "Missing post_id parameter"}), 400
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", post_id):
+            return jsonify({"error": "Invalid post_id parameter"}), 400
+
+        data, status = proxy_community_request(
+            method="GET",
+            base_url=deps.community_uri,
+            path="/community/posts/comments",
+            params={"post_id": post_id},
+        )
+        return jsonify(data), status
+
+    @bp.post("/community/posts/comments")
+    def create_community_comment():
+        token = get_access_token(request)
+        if not token:
+            return json_missing_auth(community_shape=True)
+
+        try:
+            comment_data = request.get_json(force=True)
+        except Exception:
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        data, status = proxy_community_request(
+            method="POST",
+            base_url=deps.community_uri,
+            path="/community/posts/comments",
+            token=token,
+            json_body=comment_data,
+        )
+        return jsonify(data), status
+
+    @bp.post("/community/posts/click")
+    def community_click():
+        try:
+            click_data = request.get_json(force=True)
+        except Exception:
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        data, status = proxy_community_request(
+            method="POST",
+            base_url=deps.community_uri,
+            path="/community/posts/click",
+            json_body=click_data,
+        )
+        return jsonify(data), status
+
+    @bp.post("/community/posts/report")
+    def community_report():
+        try:
+            report_data = request.get_json(force=True)
+        except Exception:
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        data, status = proxy_community_request(
+            method="POST",
+            base_url=deps.community_uri,
+            path="/community/posts/report",
+            json_body=report_data,
+        )
+        return jsonify(data), status
+
+    return bp

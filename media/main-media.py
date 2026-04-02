@@ -57,13 +57,40 @@ PRESIGN_PRIVATE_EXPIRES_S = 300
 PRESIGN_PUBLIC_EXPIRES_S = 3600
 
 # ---- mongo ----
-images = None
-try:
-    mc = MongoClient(MONGO_URI)
-    mc.admin.command("ping")
-    images = mc[MONGO_DB].images
-except Exception:
-    images = None
+mc = None
+
+
+def _build_mongo_client() -> MongoClient:
+    return MongoClient(
+        MONGO_URI,
+        serverSelectionTimeoutMS=2000,
+        connectTimeoutMS=2000,
+        socketTimeoutMS=2000,
+    )
+
+
+def get_images_collection():
+    global mc
+
+    if not MONGO_URI or not MONGO_DB:
+        return None
+
+    for _ in range(2):
+        try:
+            if mc is None:
+                mc = _build_mongo_client()
+            mc.admin.command("ping")
+            return mc[MONGO_DB].images
+        except Exception:
+            logging.exception("mongo connection unavailable")
+            if mc is not None:
+                try:
+                    mc.close()
+                except Exception:
+                    logging.exception("failed to close stale mongo client")
+            mc = None
+
+    return None
 
 # ---- s3 / minio ----
 _s3_cfg = Config(signature_version="s3v4", s3={"addressing_style": "path"})
@@ -168,6 +195,29 @@ def attach_url(doc: dict) -> dict:
     return d
 
 
+def delete_object_if_present(key: str) -> None:
+    try:
+        s3_internal.delete_object(Bucket=S3_BUCKET, Key=key)
+    except ClientError:
+        logging.exception("s3 delete_object failed for rollback")
+
+
+def persist_image_document(doc: dict, *, s3_key: str) -> dict:
+    images = get_images_collection()
+    if images is None:
+        delete_object_if_present(s3_key)
+        raise HTTPException(status_code=503, detail="Image metadata store unavailable")
+
+    try:
+        res = images.insert_one(doc)
+        doc["_id"] = res.inserted_id
+        return doc
+    except Exception:
+        logging.exception("mongo insert failed")
+        delete_object_if_present(s3_key)
+        raise HTTPException(status_code=503, detail="Failed to persist image metadata")
+
+
 # --------------------------------------------------
 # BEST PRACTICE: ObjectId-safe response model
 # --------------------------------------------------
@@ -251,18 +301,14 @@ async def upload_image(
         "is_reported": False,
     }
 
-    if images is not None:
-        try:
-            res = images.insert_one(doc)
-            doc["_id"] = res.inserted_id 
-        except Exception:
-            logging.exception("mongo insert failed")
+    doc = persist_image_document(doc, s3_key=key)
 
     return attach_url(doc)
 
 
 @app.get("/images")
 def list_images(user_id: str | None = None, is_public: bool | None = None):
+    images = get_images_collection()
     if images is None:
         return {"items": []}
 
@@ -284,6 +330,7 @@ def list_images(user_id: str | None = None, is_public: bool | None = None):
 
 @app.get("/image/{image_id}")
 def get_image(image_id: str, user_id: str | None = None):
+    images = get_images_collection()
     if images is None:
         raise HTTPException(status_code=404, detail="Not found")
 
@@ -308,6 +355,7 @@ def update_image(
     Update an image's is_public field.
     Only the owner or admin can update the image.
     """
+    images = get_images_collection()
     if images is None:
         raise HTTPException(status_code=404, detail="Not found")
 
@@ -360,6 +408,7 @@ def delete_image(
     Delete an image from both MinIO storage and MongoDB.
     Only the owner or admin can delete the image.
     """
+    images = get_images_collection()
     if images is None:
         raise HTTPException(status_code=404, detail="Not found")
 

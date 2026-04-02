@@ -1,0 +1,205 @@
+{% set user_name = current_user.get('user_name') if current_user else '' %}
+{% set email = current_user.get('email') if current_user else '' %}
+{% set display_name = user_name or email %}
+{% set tutorial_user_id = current_user.get('user_id') if current_user else '' %}
+
+<div id="tutorial-user-scope" data-user-id="{{ tutorial_user_id }}" hidden></div>
+
+<div class="topbar">
+  {% if show_dynamic_back %}
+  <button id="topbar-back-dynamic" class="topbar-back-btn" type="button" aria-label="Go back" hidden>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CFB87C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  </button>
+  <button id="menu-toggle" class="menu-button" type="button" aria-label="Menu">
+    <span class="hamburger-line"></span>
+    <span class="hamburger-line"></span>
+    <span class="hamburger-line"></span>
+  </button>
+  {% elif show_back %}
+  <button class="topbar-back-btn" type="button" aria-label="Go back" onclick="window.history.length > 1 ? window.history.back() : window.location.href='/upload'">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CFB87C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  </button>
+  {% else %}
+  <button id="menu-toggle" class="menu-button" type="button" aria-label="Menu">
+    <span class="hamburger-line"></span>
+    <span class="hamburger-line"></span>
+    <span class="hamburger-line"></span>
+  </button>
+  {% endif %}
+
+  <div class="topbar-logo">
+    <img src="{{ asset_url('images/aiclipse_logo_gold.png') }}" alt="Logo">
+  </div>
+</div>
+
+<div id="menu-overlay" class="menu-overlay"></div>
+<aside id="nav-drawer" class="nav-drawer">
+  <div class="drawer-header">
+    <div id="drawer-user-name">Menu</div>
+    <button id="close-menu" class="close-button" type="button" aria-label="Close menu">&times;</button>
+  </div>
+  
+  <nav class="drawer-links">
+    <a href="/community">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </span>
+      <span>Home</span>
+    </a>
+
+    <a href="/profile">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </span>
+      <span>Profile</span>
+    </a>
+
+    <a href="/upload">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="12" y1="8" x2="12" y2="16"></line>
+          <line x1="8" y1="12" x2="16" y2="12"></line>
+        </svg>
+      </span>
+      <span>Upload</span>
+    </a>
+
+    <a href="/notification">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path>
+        </svg>
+      </span>
+      <span>Notifications</span>
+    </a>
+
+    <a href="/plan">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 3h12l4 6-10 13L2 9Z"></path>
+          <path d="M2 9h20"></path>
+        </svg>
+      </span>
+      <span>Subscription Plan</span>
+    </a>
+
+    <div class="drawer-separator"></div>
+
+    <a href="/tutorials">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3"></path>
+          <path d="M12 17h.01"></path>
+        </svg>
+      </span>
+      <span>Tutorials</span>
+    </a>
+
+    <a href="/contact">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </span>
+      <span>Contact Us</span>
+    </a>
+
+    <a href="/dev">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+      </span>
+      <span>For Devs</span>
+    </a>
+
+    {% if is_admin %}
+      <a href="/admin" class="admin-link">
+        <span class="drawer-link-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7l7-4z"></path>
+            <path d="M9 12l2 2 4-4"></path>
+          </svg>
+        </span>
+        <span>Admin Dashboard</span>
+      </a>
+    {% endif %}
+
+    <div class="drawer-separator"></div>
+
+    <button id="drawer-logout" class="logout-button" type="button">
+      <span class="drawer-link-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </span>
+      <span>Logout</span>
+    </button>
+  </nav>
+</aside>
+
+<script>
+  window.__AICLIPSE_STATIC_VERSION = {{ static_asset_version|tojson }};
+  window.AIclipseAssetUrl = function (path) {
+    var clean = String(path || '').replace(/^\/+/, '');
+    var base = '/static/' + clean;
+    if (!window.__AICLIPSE_STATIC_VERSION) return base;
+    return base + '?v=' + encodeURIComponent(window.__AICLIPSE_STATIC_VERSION);
+  };
+</script>
+<script src="{{ asset_url('js/core/auth-ui.js') }}" defer></script>
+<script>
+  (function () {
+    var TOPBAR_HEIGHT = 56;
+    var SHOW_AT_TOP = 80;
+    var SCROLL_UP_THRESHOLD = 80;
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var topbar = document.querySelector('.topbar');
+      var container = document.querySelector('.app-container');
+      if (!topbar || !container) return;
+
+      var lastScrollTop = 0;
+      var offset = 0;
+      var scrollUpAccum = 0;
+
+      container.addEventListener('scroll', function () {
+        var currentTop = container.scrollTop;
+        var delta = currentTop - lastScrollTop;
+        lastScrollTop = currentTop;
+
+        if (currentTop <= SHOW_AT_TOP) {
+          offset = 0;
+          scrollUpAccum = 0;
+        } else if (delta > 0) {
+          offset = Math.max(-TOPBAR_HEIGHT, offset - delta);
+          scrollUpAccum = 0;
+        } else {
+          scrollUpAccum -= delta;
+          if (scrollUpAccum >= SCROLL_UP_THRESHOLD) {
+            offset = Math.min(0, offset - delta);
+          }
+        }
+
+        topbar.style.transform = 'translateX(-50%) translateY(' + offset + 'px)';
+      }, { passive: true });
+    });
+  })();
+</script>
+<script src="{{ asset_url('js/tutorials/loader.js') }}" defer></script>

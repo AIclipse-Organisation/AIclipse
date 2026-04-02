@@ -299,14 +299,9 @@ export default function PostBox({
         closeMenu={() => setMenuOpen(false)}
         onViewScan={() => {
           setMenuOpen(false);
-          const scan = {
-            ...image,
-            url: image?.url || image?.image_url || image?.imageUrl || image?.s3_path,
-            verdict: image?.result?.verdict ?? image?.verdict,
-            confidence: image?.result?.confidence ?? image?.confidence,
-          };
-          sessionStorage.setItem("selectedScan", JSON.stringify(scan));
-          window.location.href = "/viewscan";
+          const imageId = String(image?.image_id || "").trim();
+          if (!imageId) return;
+          window.location.href = `/viewscan/${encodeURIComponent(imageId)}`;
         }}
         onOpenReport={() => {
           onOpen();

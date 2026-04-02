@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AIclipse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="{{ asset_url('css/core/styles.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/pages/profile/profile.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/pages/library/scans.css') }}" />
+  </head>
+
+  <body class="app">
+    <div class="app-container">
+      <script id="scans-page-model" type="application/json">{{ initial_scans_items|default(None)|tojson }}</script>
+      {% set page_title = 'Profile' %} {% include 'partials/navigation/topbar.html' %}
+
+      <main class="screen screen--flush">
+      <div class="profileScreen">
+        <section class="profile-summary" aria-label="Profile summary">
+          <div class="profile-avatar">
+            <img
+              src="{{ asset_url('images/profile.png') }}"
+              alt="Profile"
+              class="profile-avatar-img"
+            />
+          </div>
+
+          <div class="profile-identity">
+            <div class="profile-name-row">
+              <div id="detail-username" class="profile-username">-</div>
+              <span id="detail-plan" class="profile-badge plan-badge">-</span>
+            </div>
+
+            <div id="detail-email" class="profile-email">-</div>
+
+            <div class="profile-meta-row">
+              Member since <span id="detail-created">-</span> &bull; Monthly
+              Usage: <span id="detail-monthly-usage">-</span>
+            </div>
+          </div>
+          <button id="btn-settings" class="profile-settings-btn">⚙</button>
+        </section>
+
+        <div id="user-details-status" class="status-message"></div>
+
+        <section class="user-details-section" aria-label="User stats">
+          <div id="user-details-container" style="visibility: hidden">
+            <div class="stats-xp-wrapper">
+              <div class="user-details-container">
+                <div class="user-detail-item">
+                  <div class="detail-text">
+                    <span id="detail-accuracy-level" class="detail-value"
+                      >-</span
+                    >
+                    <span class="detail-label">Level</span>
+                  </div>
+                </div>
+
+                <div class="user-detail-item">
+                  <img
+                    src="{{ asset_url('images/fire.png') }}"
+                    alt=""
+                    class="detail-icon"
+                    aria-hidden="true"
+                  />
+                  <div class="detail-text">
+                    <span id="detail-streak" class="detail-value">0</span>
+                    <span class="detail-label">Streak</span>
+                  </div>
+                </div>
+
+                <div class="user-detail-item">
+                  <img
+                    src="{{ asset_url('images/Star.png') }}"
+                    alt=""
+                    class="detail-icon"
+                    aria-hidden="true"
+                  />
+                  <div class="detail-text">
+                    <span id="detail-score" class="detail-value">0</span>
+                    <span class="detail-label">Score</span>
+                  </div>
+                </div>
+
+                <div class="user-detail-item">
+                  <img
+                    src="{{ asset_url('images/target.png') }}"
+                    alt=""
+                    class="detail-icon"
+                    aria-hidden="true"
+                  />
+                  <div class="detail-text">
+                    <span id="detail-accuracy" class="detail-value">—</span>
+                    <span class="detail-label">Accuracy</span>
+                  </div>
+                </div>
+              </div>
+              <div class="profile-xp-bar">
+                <span id="profile-xp-level-label" class="profile-xp-label"
+                  >Lv.1</span
+                >
+                <div class="profile-xp-track">
+                  <div id="profile-xp-fill" class="profile-xp-fill"></div>
+                </div>
+                <span id="profile-xp-next-label" class="profile-xp-label"
+                  >Lv.2</span
+                >
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="scansScreen">
+        <div id="scans-status" class="status-message"></div>
+        <div id="scans-container" class="scans-grid"></div>
+      </div>
+      </main>
+    </div>
+    {% include 'partials/navigation/navbar.html' %}
+
+    <!-- Delete Account Modal -->
+    <div
+      id="delete-account-modal"
+      class="delete-modal-overlay"
+      hidden
+      aria-hidden="true"
+    >
+      <div
+        class="delete-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-account-title"
+        aria-describedby="delete-account-text"
+      >
+        <h2 id="delete-account-title" class="delete-modal-title">
+          Delete account?
+        </h2>
+
+        <p id="delete-account-text" class="delete-modal-text">
+          This action is permanent. Your account and related access will be
+          removed.
+        </p>
+
+        <div class="delete-modal-actions">
+          <button
+            id="cancel-delete-account"
+            type="button"
+            class="delete-modal-btn delete-modal-btn-secondary"
+          >
+            Cancel
+          </button>
+
+          <button
+            id="confirm-delete-account"
+            type="button"
+            class="delete-modal-btn delete-modal-btn-danger"
+          >
+            Yes, delete permanently
+          </button>
+        </div>
+      </div>
+    </div>
+
+  <div id="settings-sheet-overlay" class="delete-modal-overlay" hidden aria-hidden="true">
+    <div class="delete-modal" role="dialog" aria-label="Account settings">
+      <h2 class="delete-modal-title">Account</h2>
+      <p id="subscription-status-hint" class="delete-modal-text" hidden>
+        Subscription active.
+      </p>
+      <div class="delete-modal-actions settings-modal-actions">
+        <button id="btn-cancel-subscription" class="delete-modal-btn delete-modal-btn-secondary" type="button" hidden>
+          Cancel subscription
+        </button>
+        <button id="btn-delete-account" class="delete-modal-btn delete-modal-btn-danger" type="button">
+          🗑 Delete account
+        </button>
+        <button id="btn-close-settings" class="delete-modal-btn delete-modal-btn-secondary" type="button">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cancel-subscription-modal" class="delete-modal-overlay" hidden aria-hidden="true">
+    <div class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="cancel-subscription-title">
+      <h2 id="cancel-subscription-title" class="delete-modal-title">Cancel subscription?</h2>
+      <p class="delete-modal-text">
+        Your plan remains active until the end of your current billing period.
+      </p>
+
+      <label for="cancel-reason-select" class="cancel-reason-label">Reason for cancellation</label>
+      <select id="cancel-reason-select" class="cancel-reason-select" required>
+        <option value="">Select a cancellation reason</option>
+        <option value="Too expensive">Too expensive</option>
+        <option value="Not using it enough">Not using it enough</option>
+        <option value="Technical issues">Technical issues</option>
+        <option value="Switching to another service">Switching to another service</option>
+        <option value="Other">Other</option>
+      </select>
+
+      <div class="delete-modal-actions">
+        <button id="cancel-subscription-close" type="button" class="delete-modal-btn delete-modal-btn-secondary">
+          Keep subscription
+        </button>
+        <button id="confirm-cancel-subscription" type="button" class="delete-modal-btn delete-modal-btn-danger">
+          Confirm cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cancel-subscription-success-modal" class="delete-modal-overlay" hidden aria-hidden="true">
+    <div class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="cancel-success-title">
+      <h2 id="cancel-success-title" class="delete-modal-title">Subscription canceled successfully</h2>
+      <p id="cancel-success-text" class="delete-modal-text">
+        Your subscription remains active until your billing period ends.
+      </p>
+      <div class="delete-modal-actions">
+        <button id="cancel-success-close" type="button" class="delete-modal-btn delete-modal-btn-secondary">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ asset_url('js/core/navigation.js') }}"></script>
+  <script src="{{ asset_url('js/core/app.js') }}"></script>
+  <script src="{{ asset_url('js/pages/profile/profile.js') }}"></script>
+  <script src="{{ asset_url('js/pages/library/scans.js') }}"></script>
+</body>
+
+</html>

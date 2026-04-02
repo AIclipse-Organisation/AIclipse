@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>AIclipse{% block title_suffix %}{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="{{ asset_url('css/core/styles.css') }}" />
     {% block styles %}{% endblock %}
   </head>
 
@@ -13,20 +13,19 @@
       {% set page_title = self.page_title() %}
       {% block page_title %}{% endblock %}
 
-      {% include 'partials/topbar.html' %}
+      {% include 'partials/navigation/topbar.html' %}
 
       <main class="screen{% block screen_class %}{% endblock %}">
         {% block content %}{% endblock %}
       </main>
     </div>
 
-    {% include 'partials/navbar.html' %}
+    {% include 'partials/navigation/navbar.html' %}
 
     {% block modals %}{% endblock %}
 
-    <script src="/static/js/include.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/main.js"></script>
+    <script src="{{ asset_url('js/core/navigation.js') }}"></script>
+    <script src="{{ asset_url('js/core/app.js') }}"></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

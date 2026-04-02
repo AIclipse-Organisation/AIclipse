@@ -4,8 +4,9 @@ import time
 
 from flask import Flask, make_response, redirect, request, session
 
-from .core import clear_access_cookie, get_access_token, is_api_request
+from .cookies import clear_access_cookie, get_access_token
 from .gateway import GatewayClient
+from .request_policy import is_api_request
 
 
 def register_auth_middleware(app: Flask, gateway: GatewayClient, *, cache_ttl_seconds: int = 30) -> None:

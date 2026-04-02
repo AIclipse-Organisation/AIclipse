@@ -3,7 +3,7 @@ const {
   clamp01,
   cleanLabelText,
   computeRealPct,
-} = require("../static/js/scans.js");
+} = require("../static/js/pages/library/scans.js");
 
 // These tests validate the core scan-page helper logic.
 describe("client scans JavaScript logic", () => {
