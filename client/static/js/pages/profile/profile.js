@@ -86,7 +86,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     // Show container and hide status
     statusEl.textContent = "";
     statusEl.className = "status-message";
-    containerEl.style.visibility = "visible";
+    containerEl.classList.add("is-ready");
 
     // Animate profile XP fill after container is visible (two frames to guarantee transition fires)
     requestAnimationFrame(() => {
@@ -324,6 +324,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
         },
         credentials: "include",
         body: JSON.stringify({ reason: selectedReason }),
@@ -425,7 +426,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       try {
         const response = await fetch("/auth/me", {
           method: "DELETE",
-          headers: { Accept: "application/json" },
+          headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
           credentials: "include",
         });
 

@@ -6,7 +6,7 @@
     <span class="mono">file</span> and include your API key in
     <span class="mono">X-Api-Key</span>.
   </p>
-  <div class="docs-callout" style="margin-top: 10px">
+  <div class="docs-callout docs-block-gap-sm">
     <div class="docs-callout-title">Important</div>
     <div class="muted">
       Do not set <span class="mono">Content-Type</span> manually.
@@ -15,7 +15,7 @@
       automatically.
     </div>
   </div>
-  <div class="code-block" style="margin-top: 12px">
+  <div class="code-block docs-block-gap-md">
     <div class="code-top">
       <div class="code-label">cURL</div>
       <button class="copy-code" type="button" data-copy-target="#code-curl" aria-label="Copy cURL" title="Copy">Copy</button>
@@ -71,7 +71,7 @@
       <div class="cell mono">required</div>
     </div>
   </div>
-  <div class="code-block" style="margin-top: 12px">
+  <div class="code-block docs-block-gap-md">
     <div class="code-top">
       <div class="code-label">Structure</div>
       <button class="copy-code" type="button" data-copy-target="#code-structure" aria-label="Copy request structure" title="Copy">Copy</button>
@@ -98,7 +98,7 @@ Body (multipart/form-data):
   -H "Accept: application/json" \
   -F "file=@./image.jpg"</code></pre>
   </div>
-  <div class="code-block" style="margin-top: 12px">
+  <div class="code-block docs-block-gap-md">
     <div class="code-top">
       <div class="code-label">Python (requests)</div>
       <button class="copy-code" type="button" data-copy-target="#code-example-python" aria-label="Copy Python example" title="Copy">Copy</button>
@@ -131,7 +131,7 @@ print(res.status_code, res.json())</code></pre>
     <div class="row"><div class="cell mono">confidence</div><div class="cell">Confidence score</div><div class="cell mono">number</div></div>
     <div class="row"><div class="cell mono">detection_token</div><div class="cell">Short-lived token bound to the image</div><div class="cell mono">string</div></div>
   </div>
-  <div class="code-block" style="margin-top: 12px">
+  <div class="code-block docs-block-gap-md">
     <div class="code-top">
       <div class="code-label">Example JSON</div>
       <button class="copy-code" type="button" data-copy-target="#code-json" aria-label="Copy response" title="Copy">Copy</button>
@@ -147,20 +147,20 @@ print(res.status_code, res.json())</code></pre>
 
 <section class="card docs-section" id="postman">
   <h3>Postman</h3>
-  <div class="docs-callout" style="margin-top: 8px">
+  <div class="docs-callout docs-block-gap-xs">
     <div class="docs-callout-title">Recommended</div>
     <div class="muted">
       Use Postman’s API Key auth. It still sends the key as a
       header — it’s just a cleaner UI for managing it.
     </div>
   </div>
-  <ol class="muted" style="margin-top: 10px">
+  <ol class="muted docs-list-gap-sm">
     <li>Set URL: <span class="mono">https://aiclipse.online/api/v1/checks</span></li>
     <li>Authorization → Type: <span class="mono">API Key</span><br />Key: <span class="mono">X-Api-Key</span><br />Value: <span class="mono">&lt;YOUR_API_KEY&gt;</span><br />Add to: <span class="mono">Header</span></li>
     <li>Headers: <span class="mono">Accept</span> = <span class="mono">application/json</span></li>
     <li>Body → <span class="mono">form-data</span> → key <span class="mono">file</span> (type <span class="mono">File</span>) → pick an image</li>
   </ol>
-  <div class="docs-callout" style="margin-top: 12px">
+  <div class="docs-callout docs-block-gap-md">
     <div class="docs-callout-title">Important</div>
     <div class="muted">
       Do not add <span class="mono">Content-Type</span> manually
@@ -168,7 +168,7 @@ print(res.status_code, res.json())</code></pre>
       automatically.
     </div>
   </div>
-  <div class="docs-callout" style="margin-top: 12px">
+  <div class="docs-callout docs-block-gap-md">
     <div class="docs-callout-title">Common mistake</div>
     <div class="muted">
       If the field name is not exactly
@@ -187,7 +187,7 @@ print(res.status_code, res.json())</code></pre>
     <div class="row"><div class="cell mono">415</div><div class="cell">Unsupported/invalid image</div><div class="cell mono">{"detail":"Unsupported image format"}</div></div>
     <div class="row"><div class="cell mono">502</div><div class="cell">Upstream unreachable/error</div><div class="cell mono">{"detail":"Detector unreachable: ..."}</div></div>
   </div>
-  <div class="code-block" style="margin-top: 12px">
+  <div class="code-block docs-block-gap-md">
     <div class="code-top">
       <div class="code-label">Wrong example (missing file key)</div>
       <button class="copy-code" type="button" data-copy-target="#code-wrong" aria-label="Copy wrong example" title="Copy">Copy</button>
@@ -201,7 +201,7 @@ print(res.status_code, res.json())</code></pre>
 
 <section class="card docs-section" id="limits">
   <h3>Limits</h3>
-  <ul class="muted" style="margin-top: 8px">
+  <ul class="muted docs-list-gap-xs">
     <li>Formats: JPEG, PNG</li>
     <li>Max file size: 20 MB</li>
     <li>Max dimensions: 12000×12000</li>

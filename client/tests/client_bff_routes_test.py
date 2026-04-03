@@ -413,7 +413,13 @@ def test_viewscan_html_route_embeds_server_page_model_when_available(main_client
             )
         raise AssertionError(f"Unexpected GET {url}")
 
+    def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
+        assert url == "http://gateway.test/community/posts/moderation-status"
+        assert json == {"image_ids": ["img_123"]}
+        return ResponseStub(200, {"items": []})
+
     monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
@@ -455,6 +461,7 @@ def test_viewscan_html_route_embeds_public_page_model_from_gateway_and_community
                 {
                     "item": {
                         "image_id": "img_123",
+                        "user_id": "u_1",
                         "is_public": True,
                         "verdict": "fake",
                         "confidence": 0.91,
@@ -484,7 +491,15 @@ def test_viewscan_html_route_embeds_public_page_model_from_gateway_and_community
 
         raise AssertionError(f"Unexpected GET {url}")
 
+    def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
+        assert url == "http://gateway.test/community/posts/moderation-status"
+        assert json == {"image_ids": ["img_123"]}
+        assert headers == {"Accept": "application/json", "Content-Type": "application/json"}
+        assert timeout == 10
+        return ResponseStub(200, {"items": []})
+
     monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
@@ -499,6 +514,123 @@ def test_viewscan_html_route_embeds_public_page_model_from_gateway_and_community
     assert '"description": "Community description"' in html
     assert '"comment_count": 3' in html
     assert '"user_id": "u_1"' in html
+    assert '"actions": {' in html
+    assert '"show_delete_scan": true' in html
+    assert '"show_make_private": true' in html
+    assert '"show_publish": false' in html
+    assert '"show_edit_description": true' in html
+    assert '"show_comments": true' in html
+
+
+def test_viewscan_html_route_carries_post_owner_into_merged_image_when_media_payload_lacks_it(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "user@example.com", "is_admin": False}, 200)
+    )
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if url == "http://gateway.test/image/img_123":
+            return ResponseStub(
+                200,
+                {
+                    "item": {
+                        "image_id": "img_123",
+                        "is_public": True,
+                        "verdict": "fake",
+                        "confidence": 0.91,
+                    }
+                },
+            )
+
+        if url == "http://gateway.test/community/posts":
+            return ResponseStub(
+                200,
+                {
+                    "items": [
+                        {
+                            "post_id": "post_9",
+                            "image_id": "img_123",
+                            "user_id": "u_1",
+                            "user_name": "Roma Dev",
+                            "description": "Community description",
+                        }
+                    ]
+                },
+            )
+
+        raise AssertionError(f"Unexpected GET {url}")
+
+    def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
+        assert url == "http://gateway.test/community/posts/moderation-status"
+        assert json == {"image_ids": ["img_123"]}
+        return ResponseStub(200, {"items": []})
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "user-token")
+
+    resp = client.get("/viewscan/img_123")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert '"user_id": "u_1"' in html
+    assert '"user_name": "Roma Dev"' in html
+    assert '"show_make_private": true' in html
+    assert '"show_edit_description": true' in html
+
+
+def test_viewscan_html_route_action_state_does_not_depend_on_post_id(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "user@example.com", "is_admin": False}, 200)
+    )
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if url == "http://gateway.test/image/img_123":
+            return ResponseStub(
+                200,
+                {
+                    "item": {
+                        "image_id": "img_123",
+                        "user_id": "u_1",
+                        "is_public": True,
+                    }
+                },
+            )
+
+        if url == "http://gateway.test/community/posts":
+            return ResponseStub(
+                200,
+                {
+                    "items": [
+                        {
+                            "image_id": "img_123",
+                            "description": "Community description",
+                        }
+                    ]
+                },
+            )
+
+        raise AssertionError(f"Unexpected GET {url}")
+
+    def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
+        assert url == "http://gateway.test/community/posts/moderation-status"
+        assert json == {"image_ids": ["img_123"]}
+        return ResponseStub(200, {"items": []})
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "user-token")
+
+    resp = client.get("/viewscan/img_123")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert '"show_delete_scan": true' in html
+    assert '"show_make_private": true' in html
+    assert '"show_edit_description": true' in html
 
 
 def test_viewscan_html_route_embeds_private_image_without_community_lookup(main_client_module, monkeypatch):
@@ -513,13 +645,20 @@ def test_viewscan_html_route_embeds_private_image_without_community_lookup(main_
                 {
                     "item": {
                         "image_id": "img_private",
+                        "user_id": "u_1",
                         "is_public": False,
                     }
                 },
             )
         raise AssertionError(f"Unexpected GET {url}")
 
+    def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
+        assert url == "http://gateway.test/community/posts/moderation-status"
+        assert json == {"image_ids": ["img_private"]}
+        return ResponseStub(200, {"items": []})
+
     monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
@@ -531,6 +670,62 @@ def test_viewscan_html_route_embeds_private_image_without_community_lookup(main_
     assert '"image_id": "img_private"' in html
     assert '"user_id": "u_1"' in html
     assert '"post":' not in html
+    assert '"show_delete_scan": true' in html
+    assert '"show_publish": true' in html
+    assert '"show_make_private": false' in html
+    assert '"show_edit_description": false' in html
+    assert '"show_comments": false' in html
+
+
+def test_viewscan_html_route_embeds_removed_moderation_state_for_private_scan(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "user@example.com", "is_admin": False}, 200)
+    )
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if url == "http://gateway.test/image/img_private":
+            return ResponseStub(
+                200,
+                {
+                    "item": {
+                        "image_id": "img_private",
+                        "user_id": "u_1",
+                        "is_public": False,
+                    }
+                },
+            )
+        raise AssertionError(f"Unexpected GET {url}")
+
+    def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
+        assert url == "http://gateway.test/community/posts/moderation-status"
+        assert json == {"image_ids": ["img_private"]}
+        return ResponseStub(
+            200,
+            {
+                "items": [
+                    {
+                        "image_id": "img_private",
+                        "moderation_status": "removed",
+                        "moderation_reason": "Content removed by moderation team",
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "user-token")
+
+    resp = client.get("/viewscan/img_private")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert '"moderation_status": "removed"' in html
+    assert '"moderation_reason": "Content removed by moderation team"' in html
+    assert '"show_publish": false' in html
+    assert '"show_make_private": false' in html
 
 
 def test_results_route_bootstraps_server_viewer_context(main_client_module):
@@ -901,6 +1096,30 @@ def test_public_html_routes_are_sent_with_no_store_cache_policy(main_client_modu
     assert resp.status_code == 200
     assert resp.headers["Cache-Control"] == "no-store, max-age=0, must-revalidate"
     assert resp.headers["Pragma"] == "no-cache"
+
+
+def test_public_html_routes_include_hardened_security_headers(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/")
+
+    csp = resp.headers["Content-Security-Policy"]
+    directives = {
+        segment.strip().split(" ", 1)[0]: segment.strip()
+        for segment in csp.split(";")
+        if segment.strip()
+    }
+
+    assert resp.headers["X-Content-Type-Options"] == "nosniff"
+    assert resp.headers["X-Frame-Options"] == "DENY"
+    assert directives["script-src"] == "script-src 'self'"
+    assert directives["script-src-elem"] == "script-src-elem 'self'"
+    assert directives["script-src-attr"] == "script-src-attr 'none'"
+    assert directives["object-src"] == "object-src 'none'"
+    assert directives["form-action"] == "form-action 'self'"
+    assert directives["style-src-elem"] == "style-src-elem 'self'"
+    assert directives["style-src-attr"] == "style-src-attr 'unsafe-inline'"
+    assert directives["img-src"] == "img-src 'self' data: blob: https: http:"
 
 
 def test_versioned_static_assets_are_cacheable_and_immutable(main_client_module):

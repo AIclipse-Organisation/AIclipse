@@ -12,6 +12,7 @@
     formatDate,
     getBootstrappedImageId,
     getCurrentScan,
+    getCurrentActions,
     getPostId,
     isPrivateScan,
     markNotificationsReadForPost,
@@ -263,7 +264,7 @@
   }
 
   async function renderScan(img, title) {
-    setCurrentContext(img, shared.getCurrentViewer());
+    setCurrentContext(img, shared.getCurrentViewer(), getCurrentActions());
 
     const card = document.getElementById("viewscan-card");
     const imageEl = document.getElementById("viewscan-image");
@@ -288,11 +289,11 @@
     if (img.url) {
       imageEl.src = img.url;
       imageEl.alt = title || "Selected scan image";
-      imageEl.style.display = "";
+      imageEl.hidden = false;
     } else {
       imageEl.removeAttribute("src");
       imageEl.alt = "No image available.";
-      imageEl.style.display = "none";
+      imageEl.hidden = true;
     }
 
     renderAiclipseCard(img);
@@ -321,14 +322,16 @@
     let img = null;
     let title = null;
     let viewer = null;
+    let actionsState = null;
     const initialPageModel = readBootstrappedPageModel();
     if (initialPageModel) {
       img = initialPageModel.image || null;
       title = initialPageModel.title || null;
       viewer = initialPageModel.viewer || null;
+      actionsState = initialPageModel.actions || null;
     }
 
-    setCurrentContext(img, viewer);
+    setCurrentContext(img, viewer, actionsState);
     await renderScan(img, title);
   });
 })();

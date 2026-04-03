@@ -59,6 +59,15 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 31536000
 gateway = GatewayClient(GATEWAY_URI)
 
 
+def _build_img_src_directive() -> str:
+    # Dev environments often serve presigned or internal media URLs over plain HTTP.
+    # Keep production strict while allowing local development to render those images.
+    schemes = ["'self'", "data:", "blob:", "https:"]
+    if not is_prod:
+        schemes.append("http:")
+    return "img-src " + " ".join(schemes)
+
+
 def is_signup_enabled() -> bool:
     toggles = cfg.get_client_config()
     return bool(toggles.get("sign-up", True))
@@ -96,7 +105,26 @@ def inject_common_context():
 
 
 @app.after_request
-def apply_cache_policy(resp):
+def apply_security_and_cache_headers(resp):
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "object-src 'none'; "
+        "script-src 'self'; "
+        "script-src-elem 'self'; "
+        "script-src-attr 'none'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "style-src-elem 'self'; "
+        "style-src-attr 'unsafe-inline'; "
+        f"{_build_img_src_directive()}; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'"
+    )
+
     path = request.path or ""
     is_static = path.startswith("/static/")
 

@@ -10,12 +10,16 @@ describe("viewscan template contract", () => {
     expect(html).toMatch(/data-image-id="\{\{ initial_image_id or '' \}\}"/);
   });
 
-  test("embeds optional server-composed page model bootstrap", () => {
+  test("embeds server-composed page model bootstrap", () => {
     expect(html).toMatch(/id="viewscan-page-model"/);
     expect(html).toMatch(/\{\{ initial_viewscan_page_model\|default\(None\)\|tojson \}\}/);
   });
 
   test("loads split viewscan scripts in dependency order", () => {
     expect(html).toMatch(/<script src="\{\{ asset_url\('js\/pages\/library\/viewscan\/model\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/pages\/library\/viewscan\/comments\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/pages\/library\/viewscan\/actions\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/pages\/library\/viewscan\/index\.js'\) \}\}"><\/script>/);
+  });
+
+  test("viewscan template does not rely on inline style attributes", () => {
+    expect(html).not.toMatch(/style="/);
   });
 });

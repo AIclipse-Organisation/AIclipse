@@ -86,12 +86,12 @@ function updateUsageUI(usageData) {
 
   if (!usageData || isUnlimited) {
     // Hide usage info for unlimited plans
-    usageInfoDiv.style.display = "none";
+    usageInfoDiv.hidden = true;
     return;
   }
 
   // Show usage info for free plan
-  usageInfoDiv.style.display = "block";
+  usageInfoDiv.hidden = false;
 
   const used = Number(
     usageData.monthly_usage ?? usageData.monthly_usage_count ?? usageData.usage ?? 0
@@ -114,16 +114,8 @@ function updateUsageUI(usageData) {
 
   if (usageFill) {
     usageFill.style.width = `${percentage}%`;
-  
-    
-    // Change color based on usage
-    if (percentage >= 90) {
-      usageFill.style.background = "linear-gradient(90deg, #f44336, #d32f2f)";
-    } else if (percentage >= 70) {
-      usageFill.style.background = "linear-gradient(90deg, #ff9800, #f57c00)";
-    } else {
-      usageFill.style.background = "linear-gradient(90deg, #CFB87C, #bda669)";
-    }
+    usageFill.classList.toggle("usage-fill--warn", percentage >= 70 && percentage < 90);
+    usageFill.classList.toggle("usage-fill--danger", percentage >= 90);
   }
 }
 

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from flask import Blueprint, jsonify, redirect, render_template
 
 from routes.common import (
@@ -12,6 +10,7 @@ from routes.common import (
     read_bounded_text,
     resolve_viewer_for_page_or_redirect,
     resolve_viewer_or_error,
+    validate_resource_id,
 )
 from services.library.viewscan import (
     build_viewscan_page_model,
@@ -34,6 +33,10 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
 
     @bp.get("/viewscan/<string:image_id>")
     def viewscan_by_image(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         token, _ = get_required_token()
         initial_page_model = None
 
@@ -46,10 +49,9 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
                 image_id=image_id,
                 token=token,
                 gateway_base_url=deps.gateway_uri,
+                viewer=viewer if isinstance(viewer, dict) else None,
             )
             if status == 200 and isinstance(data, dict):
-                if viewer:
-                    data["viewer"] = viewer
                 initial_page_model = data
 
         return render_template(
@@ -60,6 +62,10 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
 
     @bp.patch("/viewscan/<string:image_id>/description")
     def viewscan_update_description(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         token, auth_error = get_required_token()
         if auth_error:
             return auth_error
@@ -87,6 +93,10 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
 
     @bp.post("/viewscan/<string:image_id>/publish")
     def viewscan_publish_route(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         token, auth_error = get_required_token()
         if auth_error:
             return auth_error
@@ -121,6 +131,10 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
 
     @bp.post("/viewscan/<string:image_id>/make-private")
     def viewscan_make_private_route(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         token, auth_error = get_required_token()
         if auth_error:
             return auth_error
@@ -134,6 +148,10 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
 
     @bp.delete("/viewscan/<string:image_id>")
     def viewscan_delete_route(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         token, auth_error = get_required_token()
         if auth_error:
             return auth_error
@@ -147,6 +165,10 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
 
     @bp.get("/viewscan/<string:image_id>/comments")
     def viewscan_comments_route(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         data, status = list_viewscan_comments(
             image_id=image_id,
             gateway_base_url=deps.gateway_uri,
@@ -155,6 +177,10 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
 
     @bp.post("/viewscan/<string:image_id>/comments")
     def viewscan_create_comment_route(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         token, auth_error = get_required_token()
         if auth_error:
             return auth_error
@@ -199,8 +225,9 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
     def viewscan_delete_comment_route(image_id: str, comment_id: str):
         del image_id
 
-        if not re.fullmatch(r"[A-Za-z0-9_-]+", comment_id):
-            return jsonify({"detail": "Invalid comment_id"}), 400
+        id_error = validate_resource_id(comment_id, name="comment_id")
+        if id_error:
+            return id_error
 
         token, auth_error = get_required_token()
         if auth_error:

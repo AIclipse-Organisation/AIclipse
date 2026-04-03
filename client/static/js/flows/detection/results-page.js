@@ -325,6 +325,7 @@
       try {
         const res = await fetch("/results/save", {
           method: "POST",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
           body: formData,
           credentials: "include",
         });

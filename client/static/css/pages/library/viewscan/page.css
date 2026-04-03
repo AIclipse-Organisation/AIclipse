@@ -119,6 +119,10 @@ body.app .page-underline {
   background: transparent;
 }
 
+#app-container.is-comments-open .screen {
+  overflow: hidden;
+}
+
 /* Back button ABOVE image */
 .back-to-scans-btn {
   --btn-outline-color: #e04646;
@@ -518,7 +522,10 @@ body.app .page-underline {
 #private-description-placeholder[hidden],
 #vs-upload-date[hidden],
 #scan-quick-meta[hidden],
-#btn-comments[hidden] {
+#btn-comments[hidden],
+#btn-make-public[hidden],
+#btn-delete-post[hidden],
+#btn-delete-scan[hidden] {
   display: none !important;
 }
 

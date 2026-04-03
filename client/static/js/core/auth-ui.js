@@ -18,7 +18,7 @@
 
   async function doLogout() {
     try {
-      await fetch("/logout", { method: "POST", headers: { Accept: "application/json" }, credentials: "include" });
+      await fetch("/logout", { method: "POST", headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }, credentials: "include" });
     } catch {}
     window.location.href = "/";
   }

@@ -84,6 +84,10 @@
   border-bottom-color: rgba(207, 184, 124, 0.8);
 }
 
+.screen .dev-docs-link {
+  margin-top: 8px;
+}
+
 /* =========================
    STATUS BAR
 ========================= */
@@ -128,6 +132,10 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.screen .dev-actions-row {
+  margin-top: 10px;
 }
 
 /* =========================
@@ -186,6 +194,10 @@
   position: relative;
 }
 
+.screen .dev-copy-field {
+  margin-top: 6px;
+}
+
 .screen input[type="text"] {
   width: 100%;
   box-sizing: border-box;
@@ -199,6 +211,10 @@
 
   font-size: 13px;
   outline: none;
+}
+
+.screen .copy-icon-svg {
+  display: block;
 }
 
 .screen input[type="text"]:focus {

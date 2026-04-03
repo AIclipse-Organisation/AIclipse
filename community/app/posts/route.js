@@ -82,7 +82,7 @@ export async function POST(req) {
   try {
     let currentUser;
     try {
-      currentUser = getTrustedUser(req);
+      currentUser = await getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
@@ -208,7 +208,7 @@ export async function PATCH(req) {
   try {
     let currentUser;
     try {
-      currentUser = getTrustedUser(req);
+      currentUser = await getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },
@@ -310,7 +310,7 @@ export async function PATCH(req) {
 // Allows a user to delete their own post
 export async function DELETE(req) {
   try {
-    const currentUser = getTrustedUser(req);
+    const currentUser = await getTrustedUser(req);
     const authenticatedUserId = currentUser.user_id;
     const isAdmin = currentUser.is_admin === true;
 
@@ -431,7 +431,7 @@ export async function GET(req) {
     const filterImageId = searchParams.get("image_id") || null;
     const filterPostId = searchParams.get("post_id") || null;
 
-    const currentUserId = getOptionalTrustedUser(req)?.user_id || null;
+    const currentUserId = (await getOptionalTrustedUser(req))?.user_id || null;
 
     // 1) public image ids
     const publicImages = await imagesCol

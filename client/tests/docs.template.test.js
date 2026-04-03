@@ -3,6 +3,7 @@ const path = require("path");
 
 describe("docs template contract", () => {
   const html = fs.readFileSync(path.join(__dirname, "../templates/pages/support/docs.html"), "utf8");
+  const sectionsHtml = fs.readFileSync(path.join(__dirname, "../static/content/support/docs-sections.html"), "utf8");
 
   test("keeps docs shell and toc in the initial template", () => {
     expect(html).toMatch(/class="docs-shell"/);
@@ -15,5 +16,9 @@ describe("docs template contract", () => {
     expect(html).toMatch(/id="docs-content-status"/);
     expect(html).not.toMatch(/id="code-example-python"/);
     expect(html).toMatch(/<script src="\{\{ asset_url\('js\/pages\/support\/docs\.js'\) \}\}"><\/script>/);
+  });
+
+  test("external docs content does not rely on inline style attributes", () => {
+    expect(sectionsHtml).not.toMatch(/style="/);
   });
 });

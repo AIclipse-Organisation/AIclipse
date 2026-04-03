@@ -8,7 +8,7 @@
   async function jsonFetch(method, url, body, options = {}) {
     const opts = {
       method,
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
       credentials: "include",
     };
 

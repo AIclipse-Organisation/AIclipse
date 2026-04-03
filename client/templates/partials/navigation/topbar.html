@@ -1,8 +1,9 @@
 {% set tutorial_user_id = current_user.get('user_id') if current_user else '' %}
 
 <div id="tutorial-user-scope" data-user-id="{{ tutorial_user_id }}" hidden></div>
+<div id="app-asset-context" data-static-version="{{ static_asset_version|default('', true) }}" hidden></div>
 
-<div class="topbar">
+<div class="topbar" data-autohide="true">
   {% if show_dynamic_back %}
   <button id="topbar-back-dynamic" class="topbar-back-btn" type="button" aria-label="Go back" hidden>
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CFB87C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -15,7 +16,13 @@
     <span class="hamburger-line"></span>
   </button>
   {% elif show_back %}
-  <button class="topbar-back-btn" type="button" aria-label="Go back" onclick="window.history.length > 1 ? window.history.back() : window.location.href='/upload'">
+  <button
+    class="topbar-back-btn"
+    type="button"
+    aria-label="Go back"
+    data-nav-back="true"
+    data-back-fallback="/upload"
+  >
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CFB87C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="15 18 9 12 15 6" />
     </svg>
@@ -33,7 +40,7 @@
   </div>
 </div>
 
-<div id="menu-overlay" class="menu-overlay"></div>
+<div id="menu-overlay" class="menu-overlay" hidden></div>
 <aside id="nav-drawer" class="nav-drawer">
   <div class="drawer-header">
     <div id="drawer-user-name">Menu</div>
@@ -150,52 +157,4 @@
     </button>
   </nav>
 </aside>
-
-<script>
-  window.__AICLIPSE_STATIC_VERSION = {{ static_asset_version|tojson }};
-  window.AIclipseAssetUrl = function (path) {
-    var clean = String(path || '').replace(/^\/+/, '');
-    var base = '/static/' + clean;
-    if (!window.__AICLIPSE_STATIC_VERSION) return base;
-    return base + '?v=' + encodeURIComponent(window.__AICLIPSE_STATIC_VERSION);
-  };
-</script>
 <script src="{{ asset_url('js/core/auth-ui.js') }}" defer></script>
-<script>
-  (function () {
-    var TOPBAR_HEIGHT = 56;
-    var SHOW_AT_TOP = 80;
-    var SCROLL_UP_THRESHOLD = 80;
-
-    document.addEventListener('DOMContentLoaded', function () {
-      var topbar = document.querySelector('.topbar');
-      var container = document.querySelector('.app-container');
-      if (!topbar || !container) return;
-
-      var lastScrollTop = 0;
-      var offset = 0;
-      var scrollUpAccum = 0;
-
-      container.addEventListener('scroll', function () {
-        var currentTop = container.scrollTop;
-        var delta = currentTop - lastScrollTop;
-        lastScrollTop = currentTop;
-
-        if (currentTop <= SHOW_AT_TOP) {
-          offset = 0;
-          scrollUpAccum = 0;
-        } else if (delta > 0) {
-          offset = Math.max(-TOPBAR_HEIGHT, offset - delta);
-          scrollUpAccum = 0;
-        } else {
-          scrollUpAccum -= delta;
-          if (scrollUpAccum >= SCROLL_UP_THRESHOLD) {
-            offset = Math.min(0, offset - delta);
-          }
-        }
-
-        topbar.style.transform = 'translateX(-50%) translateY(' + offset + 'px)';
-      }, { passive: true });
-    });
-  })();
-</script>

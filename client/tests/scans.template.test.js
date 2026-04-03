@@ -19,8 +19,8 @@ describe("scans HTML template contract", () => {
     expect(html).toMatch(/<script src="\{\{ asset_url\('js\/pages\/library\/scans\.js'\) \}\}"><\/script>/);
   });
 
-  test("profile page provides the scans bootstrap contract", () => {
-    expect(profileHtml).toMatch(/id="scans-page-model"/);
+  test("profile page keeps scans rendering client-driven instead of inlining a scans bootstrap model", () => {
+    expect(profileHtml).not.toMatch(/id="scans-page-model"/);
     expect(profileHtml).toMatch(/id="scans-container"/);
     expect(profileHtml).toMatch(/asset_url\('js\/pages\/library\/scans\.js'\)/);
   });

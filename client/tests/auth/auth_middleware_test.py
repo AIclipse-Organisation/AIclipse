@@ -20,7 +20,7 @@ def test_middleware_redirects_and_clears_session_when_cookie_is_missing(auth_app
     resp = client.get("/protected")
 
     assert resp.status_code == 302
-    assert resp.headers["Location"].endswith("/")
+    assert resp.headers["Location"].endswith("/login")
     assert "Cache-Control" in resp.headers
     assert "access_token=" not in "\n".join(resp.headers.getlist("Set-Cookie"))
     gateway.fetch_me.assert_not_called()
@@ -71,7 +71,7 @@ def test_middleware_revalidates_stale_session_and_clears_cookie_on_failure(auth_
     clear_cookie_header = "\n".join(resp.headers.getlist("Set-Cookie"))
 
     assert resp.status_code == 302
-    assert resp.headers["Location"].endswith("/")
+    assert resp.headers["Location"].endswith("/login")
     assert "access_token=" in clear_cookie_header
     assert "Expires=Thu, 01 Jan 1970" in clear_cookie_header
     assert "Secure" in clear_cookie_header
@@ -79,3 +79,41 @@ def test_middleware_revalidates_stale_session_and_clears_cookie_on_failure(auth_
 
     with client.session_transaction() as sess:
         assert dict(sess) == {}
+
+
+def test_middleware_blocks_cross_site_mutation_when_auth_cookie_is_present(auth_app_factory):
+    gateway = Mock()
+    app, _ = auth_app_factory(gateway=gateway, with_blueprint=False, with_middleware=True)
+
+    @app.post("/protected-action")
+    def protected_action():
+        return "OK", 200
+
+    client = app.test_client()
+    client.set_cookie("access_token", "user-token")
+
+    resp = client.post("/protected-action", headers={"Origin": "https://evil.example"})
+
+    assert resp.status_code == 403
+    assert resp.get_json() == {"detail": "Cross-site request blocked"}
+    gateway.fetch_me.assert_not_called()
+
+
+def test_middleware_allows_same_origin_mutation_when_auth_cookie_is_present(auth_app_factory):
+    gateway = Mock()
+    app, _ = auth_app_factory(gateway=gateway, with_blueprint=False, with_middleware=True)
+
+    @app.post("/protected-action")
+    def protected_action():
+        return "OK", 200
+
+    client = app.test_client()
+    client.set_cookie("access_token", "user-token")
+    with client.session_transaction() as sess:
+        sess["current_user"] = {"user_id": 123}
+        sess["auth_checked_at"] = int(time.time())
+
+    resp = client.post("/protected-action", headers={"Origin": "http://localhost"})
+
+    assert resp.status_code == 200
+    assert resp.get_data(as_text=True) == "OK"

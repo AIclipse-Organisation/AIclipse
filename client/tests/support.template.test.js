@@ -4,6 +4,7 @@ const path = require("path");
 describe("support page template contract", () => {
   const contactHtml = fs.readFileSync(path.join(__dirname, "../templates/pages/support/contact.html"), "utf8");
   const devHtml = fs.readFileSync(path.join(__dirname, "../templates/pages/support/dev.html"), "utf8");
+  const docsHtml = fs.readFileSync(path.join(__dirname, "../templates/pages/support/docs.html"), "utf8");
   const loginHtml = fs.readFileSync(path.join(__dirname, "../templates/pages/public/login.html"), "utf8");
 
   test("contact page does not load an empty page-specific script", () => {
@@ -22,6 +23,12 @@ describe("support page template contract", () => {
   });
 
   test("docs page loads shared status runtime before support scripts", () => {
-    expect(fs.readFileSync(path.join(__dirname, "../templates/pages/support/docs.html"), "utf8")).toMatch(/<script src="\{\{ asset_url\('js\/core\/status\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/pages\/support\/shared\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/pages\/support\/docs\.js'\) \}\}"><\/script>/);
+    expect(docsHtml).toMatch(/<script src="\{\{ asset_url\('js\/core\/status\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/pages\/support\/shared\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/pages\/support\/docs\.js'\) \}\}"><\/script>/);
+  });
+
+  test("login, docs, and dev templates do not rely on inline style attributes", () => {
+    expect(loginHtml).not.toMatch(/style="/);
+    expect(docsHtml).not.toMatch(/style="/);
+    expect(devHtml).not.toMatch(/style="/);
   });
 });

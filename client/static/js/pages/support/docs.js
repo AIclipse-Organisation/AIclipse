@@ -43,7 +43,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     for (const el of copyEls) {
       if (el.dataset.bound === "1") continue;
       el.dataset.bound = "1";
-      el.style.cursor = "pointer";
+      el.classList.add("docs-copyable");
       el.setAttribute("role", "button");
       el.setAttribute("tabindex", "0");
       el.setAttribute("title", el.getAttribute("title") || "Copy");

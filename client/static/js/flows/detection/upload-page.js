@@ -477,6 +477,7 @@
 
         const res = await fetch("/checks", {
           method: "POST",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
           body: formData,
           credentials: "include",
         });

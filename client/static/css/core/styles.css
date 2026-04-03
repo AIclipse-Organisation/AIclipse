@@ -367,7 +367,10 @@ body.app main {
   right: max(0px, calc(50vw - 240px));
   background: rgba(0, 0, 0, 0.7);
   z-index: 2000;
-  display: none;
+}
+
+.menu-overlay[hidden] {
+  display: none !important;
 }
 
 /* Drawer styles */

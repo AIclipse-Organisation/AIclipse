@@ -164,7 +164,7 @@ async function enrichModerationStatuses(scans) {
 
     const modRes = await fetch("/community/posts/moderation-status", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       credentials: "include",
       cache: "no-store",
       body: JSON.stringify({ image_ids: imageIds }),

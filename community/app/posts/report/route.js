@@ -18,7 +18,7 @@ export async function POST(req) {
   try {
     let currentUser;
     try {
-      currentUser = getTrustedUser(req);
+      currentUser = await getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -75,7 +75,7 @@ export async function POST(req) {
 // PATCH /community/posts/report
 export async function PATCH(req) {
   try {
-    const currentUser = getTrustedUser(req);
+    const currentUser = await getTrustedUser(req);
     if (!currentUser.is_admin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -147,7 +147,7 @@ export async function PATCH(req) {
 
 export async function GET(req) {
   try {
-    const currentUser = getTrustedUser(req);
+    const currentUser = await getTrustedUser(req);
     if (!currentUser.is_admin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

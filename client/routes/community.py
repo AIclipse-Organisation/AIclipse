@@ -6,7 +6,7 @@ import re
 from flask import Blueprint, jsonify, request
 
 from auth.cookies import get_access_token
-from routes.common import RouteDeps, json_missing_auth
+from routes.common import RouteDeps, json_missing_auth, parse_json_body_or_400
 from services.integrations.gateway import proxy_gateway_json_request
 
 
@@ -19,10 +19,9 @@ def build_community_blueprint(*, deps: RouteDeps):
         if not token:
             return json_missing_auth(community_shape=True)
 
-        try:
-            post_data = request.get_json(force=True)
-        except Exception:
-            return jsonify({"error": "Invalid JSON"}), 400
+        post_data, body_error = parse_json_body_or_400(invalid_detail="Invalid JSON", error_field="error")
+        if body_error:
+            return body_error
 
         data, status = proxy_gateway_json_request(
             method="POST",
@@ -57,10 +56,9 @@ def build_community_blueprint(*, deps: RouteDeps):
         if not token:
             return json_missing_auth(community_shape=True)
 
-        try:
-            vote_data = request.get_json(force=True)
-        except Exception:
-            return jsonify({"error": "Invalid JSON"}), 400
+        vote_data, body_error = parse_json_body_or_400(invalid_detail="Invalid JSON", error_field="error")
+        if body_error:
+            return body_error
 
         data, status = proxy_gateway_json_request(
             method="POST",
@@ -96,10 +94,9 @@ def build_community_blueprint(*, deps: RouteDeps):
         if not token:
             return json_missing_auth(community_shape=True)
 
-        try:
-            comment_data = request.get_json(force=True)
-        except Exception:
-            return jsonify({"error": "Invalid JSON"}), 400
+        comment_data, body_error = parse_json_body_or_400(invalid_detail="Invalid JSON", error_field="error")
+        if body_error:
+            return body_error
 
         data, status = proxy_gateway_json_request(
             method="POST",
@@ -113,10 +110,9 @@ def build_community_blueprint(*, deps: RouteDeps):
 
     @bp.post("/community/posts/click")
     def community_click():
-        try:
-            click_data = request.get_json(force=True)
-        except Exception:
-            return jsonify({"error": "Invalid JSON"}), 400
+        click_data, body_error = parse_json_body_or_400(invalid_detail="Invalid JSON", error_field="error")
+        if body_error:
+            return body_error
 
         data, status = proxy_gateway_json_request(
             method="POST",
@@ -134,10 +130,9 @@ def build_community_blueprint(*, deps: RouteDeps):
         if not token:
             return json_missing_auth(community_shape=True)
 
-        try:
-            report_data = request.get_json(force=True)
-        except Exception:
-            return jsonify({"error": "Invalid JSON"}), 400
+        report_data, body_error = parse_json_body_or_400(invalid_detail="Invalid JSON", error_field="error")
+        if body_error:
+            return body_error
 
         data, status = proxy_gateway_json_request(
             method="POST",

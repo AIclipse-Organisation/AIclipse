@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
-from routes.common import RouteDeps
+from routes.common import RouteDeps, parse_json_body_or_400
 from services.integrations.gateway import proxy_gateway_json_request
 
 
@@ -11,10 +11,12 @@ def build_community_moderation_blueprint(*, deps: RouteDeps):
 
     @bp.post("/community/posts/moderation-status")
     def community_moderation_status():
-        try:
-            moderation_data = request.get_json(force=True)
-        except Exception:
-            return jsonify({"error": "Invalid JSON"}), 400
+        moderation_data, body_error = parse_json_body_or_400(
+            invalid_detail="Invalid JSON",
+            error_field="error",
+        )
+        if body_error:
+            return body_error
 
         data, status = proxy_gateway_json_request(
             method="POST",

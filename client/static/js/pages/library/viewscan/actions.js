@@ -1,4 +1,21 @@
+function normalizeViewscanActionState(actions) {
+  const state = actions && typeof actions === "object" ? actions : {};
+  return {
+    showDeleteScan: state.show_delete_scan === true,
+    showPublish: state.show_publish === true,
+    showMakePrivate: state.show_make_private === true,
+    showEditDescription: state.show_edit_description === true,
+  };
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    normalizeViewscanActionState,
+  };
+}
+
 (function initViewscanActions() {
+  if (typeof window === "undefined") return;
   if (window.AIclipseViewscanActions) return;
 
   const shared = window.AIclipseViewscanShared;
@@ -6,14 +23,37 @@
 
   const {
     ensureStylesheet,
+    getCurrentActions,
     getCurrentScan,
-    getPostId,
-    isPrivateScan,
   } = shared;
   const assetUrl = window.AIclipseAssetUrl;
 
   function ensureModalStylesheet() {
     return ensureStylesheet("viewscan-modals-css", assetUrl("css/pages/library/viewscan/modals.css"));
+  }
+
+  function setHidden(el, shouldHide) {
+    if (el) el.hidden = !!shouldHide;
+  }
+
+  function getActionState() {
+    const actions = getCurrentActions();
+    if (!actions || typeof actions !== "object") return {};
+    return actions;
+  }
+
+  function syncActionButtons() {
+    const publishBtn = document.getElementById("btn-make-public");
+    const makePrivateBtn = document.getElementById("btn-delete-post");
+    const deleteBtn = document.getElementById("btn-delete-scan");
+    const editDescriptionBtn = document.getElementById("btn-edit-description");
+
+    const visible = normalizeViewscanActionState(getActionState());
+
+    setHidden(publishBtn, !visible.showPublish);
+    setHidden(makePrivateBtn, !visible.showMakePrivate);
+    setHidden(deleteBtn, !visible.showDeleteScan);
+    setHidden(editDescriptionBtn, !visible.showEditDescription);
   }
 
   async function patchDescriptionByImageId(imageId, description) {
@@ -43,13 +83,14 @@
     const statusEl = document.getElementById("edit-description-status");
     const saveBtn = document.getElementById("edit-description-save");
     const cancelBtn = document.getElementById("edit-description-cancel");
+    const actions = getActionState();
 
     if (!modal || !openBtn || !input || !statusEl || !saveBtn || !cancelBtn) {
-      if (openBtn) openBtn.hidden = !(img && getPostId(img));
+      if (openBtn) openBtn.hidden = actions.show_edit_description !== true;
       return;
     }
 
-    const shouldShow = !!getPostId(img);
+    const shouldShow = actions.show_edit_description === true;
     openBtn.hidden = !shouldShow;
     if (!shouldShow) return;
 
@@ -171,8 +212,9 @@
     const actionBtn = document.getElementById("btn-delete-post");
     if (!actionBtn) return;
 
-    const shouldShow = !!(getPostId(img) && !isPrivateScan(img));
-    actionBtn.style.display = shouldShow ? "flex" : "none";
+    syncActionButtons();
+
+    const shouldShow = !actionBtn.hidden;
     if (!shouldShow) return;
 
     void ensureModalStylesheet();
@@ -194,7 +236,7 @@
     if (!actionBtn.dataset.bound) {
       actionBtn.dataset.bound = "1";
       actionBtn.addEventListener("click", () => {
-        if (!getPostId(getCurrentScan())) return;
+        if (!getCurrentScan()?.image_id) return;
         showModal();
       });
     }
@@ -249,8 +291,9 @@
     const deleteBtn = document.getElementById("btn-delete-scan");
     if (!deleteBtn) return;
 
-    const shouldShow = !!img?.image_id;
-    deleteBtn.style.display = shouldShow ? "flex" : "none";
+    syncActionButtons();
+
+    const shouldShow = !deleteBtn.hidden;
     if (!shouldShow) return;
 
     void ensureModalStylesheet();
@@ -357,13 +400,13 @@
     const formStatus = document.getElementById("make-public-status");
 
     if (!makePublicBtn || !modal || !formInput || !publishBtn || !cancelBtn || !formStatus) {
-      if (makePublicBtn) makePublicBtn.style.display = isPrivateScan(img) ? "flex" : "none";
+      syncActionButtons();
       return;
     }
 
-    const isModerated = img?.moderation_status === "removed";
-    const shouldShow = isPrivateScan(img) && !isModerated;
-    makePublicBtn.style.display = shouldShow ? "flex" : "none";
+    syncActionButtons();
+
+    const shouldShow = !makePublicBtn.hidden;
     if (!shouldShow) return;
 
     void ensureModalStylesheet();

@@ -7,9 +7,9 @@
   const {
     clearEl,
     ensureStylesheet,
+    getCurrentActions,
     getCurrentScan,
     getCurrentViewer,
-    isPrivateScan,
     makeEl,
   } = shared;
   const assetUrl = window.AIclipseAssetUrl;
@@ -41,6 +41,10 @@
     return ensureStylesheet("viewscan-comments-css", assetUrl("css/pages/library/viewscan/comments.css"));
   }
 
+  function setHidden(el, shouldHide) {
+    if (el) el.hidden = !!shouldHide;
+  }
+
   function setupShowComments(img) {
     const triggerBtn = document.getElementById("btn-comments");
     const sheet = document.getElementById("comments-sheet");
@@ -54,8 +58,9 @@
     if (!triggerBtn || !sheet || !backdrop || !listEl) return;
 
     const imageId = img?.image_id ? String(img.image_id) : "";
-    const shouldShow = !!(imageId && !isPrivateScan(img) && img?.is_public === true);
-    triggerBtn.style.display = shouldShow ? "flex" : "none";
+    const actions = getCurrentActions();
+    const shouldShow = !!(imageId && actions?.show_comments === true);
+    setHidden(triggerBtn, !shouldShow);
     if (!shouldShow) return;
 
     void ensureCommentsStylesheet();
@@ -188,7 +193,7 @@
       await ensureCommentsStylesheet();
       backdrop.hidden = false;
       sheet.classList.add("comm_bottomSheet--open");
-      document.getElementById("app-container")?.style.setProperty("overflow", "hidden");
+      document.getElementById("app-container")?.classList.add("is-comments-open");
       if (navbar) navbar.hidden = true;
       attachKeyboardListener();
       if (!sheet.dataset.loaded) {
@@ -200,7 +205,7 @@
     const closeDrawer = () => {
       backdrop.hidden = true;
       sheet.classList.remove("comm_bottomSheet--open");
-      document.getElementById("app-container")?.style.removeProperty("overflow");
+      document.getElementById("app-container")?.classList.remove("is-comments-open");
       if (navbar) navbar.hidden = false;
       detachKeyboardListener();
     };

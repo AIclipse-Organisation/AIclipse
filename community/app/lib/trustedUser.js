@@ -1,48 +1,96 @@
-const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
+import { cookies } from "next/headers";
 
-function normalizedHeader(headersLike, name) {
-  if (!headersLike || typeof headersLike.get !== "function") return "";
-  return String(headersLike.get(name) || "").trim();
+function cleanToken(value) {
+  if (!value) return "";
+  return String(value).replace(/^Bearer\s+/i, "").replace(/"/g, "").trim();
 }
 
-function parseBooleanHeader(value) {
-  return TRUE_VALUES.has(String(value || "").trim().toLowerCase());
-}
-
-function requireTrustedHeaders(headersLike) {
-  const expectedToken = String(process.env.INTERNAL_AUTH_TOKEN || "").trim();
-  const actualToken = normalizedHeader(headersLike, "x-internal-token");
-  if (!expectedToken || actualToken !== expectedToken) {
-    throw new Error("Missing or invalid trusted request token");
-  }
-
-  const user_id = normalizedHeader(headersLike, "x-user-id");
+function normalizeGatewayUser(user) {
+  const user_id = String(user?.user_id || "").trim();
   if (!user_id) {
-    throw new Error("Missing forwarded user id");
+    throw new Error("Missing gateway user id");
   }
 
   return {
     user_id,
-    email: normalizedHeader(headersLike, "x-user-email") || null,
-    user_name: normalizedHeader(headersLike, "x-user-name") || null,
-    is_admin: parseBooleanHeader(normalizedHeader(headersLike, "x-user-is-admin")),
+    email: user?.email ? String(user.email) : null,
+    user_name: user?.user_name ? String(user.user_name) : null,
+    is_admin: Boolean(user?.is_admin),
   };
 }
 
-export function getTrustedUser(req) {
-  return requireTrustedHeaders(req?.headers);
+function getTokenFromRequest(req) {
+  const authHeader = req?.headers?.get?.("authorization");
+  const bearerToken = cleanToken(authHeader);
+  if (bearerToken) {
+    return bearerToken;
+  }
+
+  const cookieToken = req?.cookies?.get?.("access_token")?.value;
+  return cleanToken(cookieToken);
 }
 
-export function getOptionalTrustedUser(req) {
+async function getTokenFromServerCookies() {
+  const cookieStore = await cookies();
+  return cleanToken(cookieStore.get("access_token")?.value);
+}
+
+async function getAccessToken(req) {
+  const requestToken = getTokenFromRequest(req);
+  if (requestToken) {
+    return requestToken;
+  }
+  return getTokenFromServerCookies();
+}
+
+async function fetchGatewayUser(accessToken) {
+  const gateway = String(process.env.GATEWAY_URI || "").trim();
+  if (!gateway) {
+    throw new Error("Missing GATEWAY_URI");
+  }
+  if (!accessToken) {
+    throw new Error("Missing access token");
+  }
+
+  let response;
   try {
-    return requireTrustedHeaders(req?.headers);
+    response = await fetch(`${gateway}/auth/me`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("Gateway auth/me unreachable");
+  }
+
+  if (!response.ok) {
+    throw new Error(`Gateway auth/me ${response.status}`);
+  }
+
+  return normalizeGatewayUser(await response.json());
+}
+
+async function resolveTrustedUser(req) {
+  const accessToken = await getAccessToken(req);
+  return fetchGatewayUser(accessToken);
+}
+
+export async function getTrustedUser(req) {
+  return resolveTrustedUser(req);
+}
+
+export async function getOptionalTrustedUser(req) {
+  try {
+    return await resolveTrustedUser(req);
   } catch {
     return null;
   }
 }
 
-export function getTrustedUserFromHeaderStore(headerStore) {
-  return requireTrustedHeaders(headerStore);
+export async function getTrustedUserForAppShell() {
+  return resolveTrustedUser();
 }
 
 export function buildGatewayIdentityHeaders(user) {

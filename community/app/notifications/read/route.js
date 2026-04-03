@@ -12,7 +12,7 @@ export async function POST(req) {
   try {
     let currentUser;
     try {
-      currentUser = getTrustedUser(req);
+      currentUser = await getTrustedUser(req);
     } catch (authErr) {
       return NextResponse.json(
         { error: "Unauthorized", detail: String(authErr) },

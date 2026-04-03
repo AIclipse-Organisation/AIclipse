@@ -294,6 +294,14 @@
   gap: 14px;
 }
 
+.docs-shell .docs-hero-title {
+  margin: 0 0 18px;
+}
+
+.docs-shell .docs-hero-copy {
+  margin: 0;
+}
+
 .docs-shell .docs-hero-top {
   display: flex;
   align-items: flex-start;
@@ -498,6 +506,24 @@
   text-transform: uppercase;
   color: rgba(207, 184, 124, 0.92);
   margin-bottom: 6px;
+}
+
+.docs-shell .docs-block-gap-xs,
+.docs-shell .docs-list-gap-xs {
+  margin-top: 8px;
+}
+
+.docs-shell .docs-block-gap-sm,
+.docs-shell .docs-list-gap-sm {
+  margin-top: 10px;
+}
+
+.docs-shell .docs-block-gap-md {
+  margin-top: 12px;
+}
+
+.docs-shell .docs-copyable {
+  cursor: pointer;
 }
 
 /* Tables */

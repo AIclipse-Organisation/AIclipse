@@ -57,7 +57,7 @@ def build_notifications_blueprint(*, deps: RouteDeps):
 
         body, body_error = parse_json_body_or_400()
         if body_error:
-            return jsonify({"error": "Invalid JSON"}), 400
+            return body_error
 
         data, status = proxy_gateway_json_request(
             method="POST",

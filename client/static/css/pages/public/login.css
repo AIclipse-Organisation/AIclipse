@@ -565,6 +565,10 @@ input:-webkit-autofill:active {
   padding: 28px 0 16px;
 }
 
+.auth-details-extra[hidden] {
+  display: none !important;
+}
+
 /* =========================
    RESPONSIVE
 ========================= */

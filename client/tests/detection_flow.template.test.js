@@ -5,12 +5,36 @@ describe("detection flow template contract", () => {
   const uploadHtml = fs.readFileSync(path.join(__dirname, "../templates/pages/detection/upload.html"), "utf8");
   const resultsHtml = fs.readFileSync(path.join(__dirname, "../templates/pages/detection/results.html"), "utf8");
 
+  function expectScriptOrder(html, paths) {
+    let lastIndex = -1;
+    for (const scriptPath of paths) {
+      const marker = `asset_url('${scriptPath}')`;
+      const index = html.indexOf(marker);
+      expect(index).toBeGreaterThan(lastIndex);
+      lastIndex = index;
+    }
+  }
+
   test("upload page loads shared detection flow scripts before upload bootstrap", () => {
-    expect(uploadHtml).toMatch(/<script src="\{\{ asset_url\('js\/core\/http\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/core\/status\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/flows\/detection\/store\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/flows\/detection\/shared\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/flows\/detection\/upload-page\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/pages\/detection\/upload\.js'\) \}\}"><\/script>/);
+    expectScriptOrder(uploadHtml, [
+      "js/core/http.js",
+      "js/core/status.js",
+      "js/flows/detection/store.js",
+      "js/flows/detection/shared.js",
+      "js/flows/detection/upload-page.js",
+      "js/pages/detection/upload.js",
+    ]);
   });
 
   test("results page loads results-specific detection flow scripts without upload runtime", () => {
-    expect(resultsHtml).toMatch(/<script src="\{\{ asset_url\('js\/core\/http\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/core\/status\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/flows\/detection\/store\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/flows\/detection\/shared\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/flows\/detection\/results-page\.js'\) \}\}"><\/script>\s*<script src="\{\{ asset_url\('js\/pages\/detection\/results\.js'\) \}\}"><\/script>/);
+    expectScriptOrder(resultsHtml, [
+      "js/core/http.js",
+      "js/core/status.js",
+      "js/flows/detection/store.js",
+      "js/flows/detection/shared.js",
+      "js/flows/detection/results-page.js",
+      "js/pages/detection/results.js",
+    ]);
     expect(resultsHtml).not.toMatch(/<script src="\{\{ asset_url\('js\/pages\/detection\/upload\.js'\) \}\}"><\/script>/);
   });
 
@@ -23,5 +47,9 @@ describe("detection flow template contract", () => {
     expect(resultsHtml).toMatch(/<link rel="stylesheet" href="\{\{ asset_url\('css\/pages\/detection\/results\.css'\) \}\}" \/>/);
     expect(resultsHtml).not.toMatch(/asset_url\('css\/pages\/detection\/upload\.css'\)/);
     expect(resultsHtml).not.toMatch(/asset_url\('css\/pages\/library\/viewscan\/page\.css'\)/);
+  });
+
+  test("results template does not rely on inline style attributes", () => {
+    expect(resultsHtml).not.toMatch(/style="/);
   });
 });

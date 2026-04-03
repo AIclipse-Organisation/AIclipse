@@ -1,3 +1,16 @@
+function initAssetUrlHelper() {
+  const contextEl = document.getElementById("app-asset-context");
+  const staticVersion = String(contextEl?.dataset?.staticVersion || "").trim();
+
+  window.__AICLIPSE_STATIC_VERSION = staticVersion;
+  window.AIclipseAssetUrl = function assetUrl(path) {
+    const clean = String(path || "").replace(/^\/+/, "");
+    const base = `/static/${clean}`;
+    if (!staticVersion) return base;
+    return `${base}?v=${encodeURIComponent(staticVersion)}`;
+  };
+}
+
 function setActiveNavLink() {
   const nav = document.getElementById("bottom-nav");
   if (!nav) return;
@@ -29,12 +42,12 @@ function initNavDrawer() {
 
   function openDrawer() {
     drawer.classList.add("active");
-    overlay.style.display = "block";
+    overlay.hidden = false;
   }
 
   function closeDrawer() {
     drawer.classList.remove("active");
-    overlay.style.display = "none";
+    overlay.hidden = true;
   }
 
   function toggleDrawer(e) {
@@ -62,6 +75,66 @@ function initNavDrawer() {
   };
 
   toggle.dataset.bound = "true";
+  overlay.hidden = true;
+}
+
+function initBackButtons() {
+  document.querySelectorAll("[data-nav-back='true']").forEach((button) => {
+    if (button.dataset.bound === "true") return;
+
+    button.addEventListener("click", () => {
+      const fallbackHref = button.getAttribute("data-back-fallback") || "/";
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+      window.location.href = fallbackHref;
+    });
+
+    button.dataset.bound = "true";
+  });
+}
+
+function initTopbarAutoHide() {
+  const topbar = document.querySelector(".topbar[data-autohide='true']");
+  const container = document.querySelector(".app-container");
+  if (!topbar || !container) return;
+  if (container.dataset.topbarAutohideBound === "true") return;
+
+  const TOPBAR_HEIGHT = 56;
+  const SHOW_AT_TOP = 80;
+  const SCROLL_UP_THRESHOLD = 80;
+
+  let lastScrollTop = 0;
+  let offset = 0;
+  let scrollUpAccum = 0;
+
+  container.addEventListener(
+    "scroll",
+    () => {
+      const currentTop = container.scrollTop;
+      const delta = currentTop - lastScrollTop;
+      lastScrollTop = currentTop;
+
+      if (currentTop <= SHOW_AT_TOP) {
+        offset = 0;
+        scrollUpAccum = 0;
+      } else if (delta > 0) {
+        offset = Math.max(-TOPBAR_HEIGHT, offset - delta);
+        scrollUpAccum = 0;
+      } else {
+        scrollUpAccum -= delta;
+        if (scrollUpAccum >= SCROLL_UP_THRESHOLD) {
+          offset = Math.min(0, offset - delta);
+        }
+      }
+
+      topbar.style.transform = `translateX(-50%) translateY(${offset}px)`;
+    },
+    { passive: true },
+  );
+
+  container.dataset.topbarAutohideBound = "true";
 }
 
 function initAuthTabs() {
@@ -164,9 +237,13 @@ async function updateNotificationDot() {
   }
 }
 
+initAssetUrlHelper();
+
 document.addEventListener("DOMContentLoaded", () => {
   setActiveNavLink();
   initNavDrawer();
+  initBackButtons();
+  initTopbarAutoHide();
   initAuthTabs();
 
   const isNotificationPage = window.location.pathname === "/notification";

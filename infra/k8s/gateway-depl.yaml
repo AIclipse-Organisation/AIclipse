@@ -24,6 +24,8 @@ spec:
               value: "http://media-srv:3000"
             - name: BILLING_URI
               value: "http://billing-srv:3000"
+            - name: COMMUNITY_URI
+              value: "http://community-srv:3000"
             - name: DETECTOR_URI
               value: "http://detector-srv:3000"
             - name: MODEL_CYCLE_URI

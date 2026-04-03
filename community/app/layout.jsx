@@ -7,15 +7,16 @@ import ShellWrapper from "./components/ShellWrapper";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getLoginUrlFromHeaders } from "../externalOrigin";
-import { getTrustedUserFromHeaderStore } from "./lib/trustedUser";
+import { getTrustedUserForAppShell } from "./lib/trustedUser";
 
 export default async function RootLayout({ children }) {
   const h = await headers();
   const loginUrl = getLoginUrlFromHeaders(h);
   let user = null;
   try {
-    user = getTrustedUserFromHeaderStore(h);
-  } catch {
+    user = await getTrustedUserForAppShell();
+  } catch (error) {
+    console.warn(`[community] layout redirect (${error?.message || "missing_trusted_headers"})`);
     redirect(loginUrl);
   }
 

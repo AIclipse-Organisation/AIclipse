@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,6 +10,14 @@ from auth.cookies import clear_access_cookie, get_access_token
 from auth.gateway import GatewayClient
 from services.plan.subscription import resolve_billing_user
 from services.auth.session import get_session_user, resolve_current_user
+
+_SAFE_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def validate_resource_id(value: str, *, name: str = "id"):
+    if _SAFE_ID_RE.fullmatch(value):
+        return None
+    return jsonify({"detail": f"Invalid {name}"}), 400
 
 
 @dataclass(frozen=True)
@@ -40,11 +49,20 @@ def get_required_token(*, community_shape: bool = False) -> tuple[str | None, An
     return None, json_missing_auth(community_shape=community_shape)
 
 
-def parse_json_body_or_400():
-    try:
-        return request.get_json(force=True), None
-    except Exception:
-        return None, (jsonify({"detail": "Invalid JSON body"}), 400)
+def parse_json_body_or_400(
+    *,
+    invalid_detail: str = "Invalid JSON body",
+    wrong_content_type_detail: str = "Expected application/json",
+    error_field: str = "detail",
+):
+    if not request.is_json:
+        return None, (jsonify({error_field: wrong_content_type_detail}), 415)
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return None, (jsonify({error_field: invalid_detail}), 400)
+
+    return body, None
 
 
 def read_bounded_text(

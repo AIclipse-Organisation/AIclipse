@@ -3,6 +3,7 @@
 
   let currentScan = null;
   let currentViewer = null;
+  let currentActions = null;
   const markedNotificationPostIds = new Set();
 
   function getBootstrapEl() {
@@ -32,9 +33,10 @@
     return new URLSearchParams(window.location.search || "");
   }
 
-  function setCurrentContext(nextScan, nextViewer) {
+  function setCurrentContext(nextScan, nextViewer, nextActions) {
     currentScan = nextScan || null;
     currentViewer = nextViewer || null;
+    currentActions = nextActions || null;
   }
 
   function getCurrentScan() {
@@ -43,6 +45,10 @@
 
   function getCurrentViewer() {
     return currentViewer;
+  }
+
+  function getCurrentActions() {
+    return currentActions;
   }
 
   function clearEl(el) {
@@ -178,7 +184,7 @@
     await fetch("/community/notifications/read", {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: { "Content-Type": "application/json", Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ post_id: normalizedPostId }),
     }).catch(() => null);
 
@@ -199,6 +205,7 @@
     formatDate,
     getBootstrappedImageId,
     getCurrentScan,
+    getCurrentActions,
     getCurrentViewer,
     getPostId,
     isPrivateScan,

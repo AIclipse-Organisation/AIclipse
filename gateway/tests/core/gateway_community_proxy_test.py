@@ -58,3 +58,48 @@ async def test_community_posts_create_proxies_authenticated_user(client, patch_u
     )
     assert response.status_code == 201
     assert response.json()["post_id"] == "post_new"
+
+
+@pytest.mark.asyncio
+async def test_community_moderation_status_proxies_json_response(client, patch_upstreams):
+    def moderation_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("accept") == "application/json"
+        assert req.headers.get("content-type", "").startswith("application/json")
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.read() == b'{"image_ids":["img_123"]}'
+        return httpx.Response(
+            status_code=200,
+            json={
+                "items": [
+                    {
+                        "image_id": "img_123",
+                        "moderation_status": "removed",
+                        "moderation_reason": "Content removed by moderation team",
+                    }
+                ]
+            },
+        )
+
+    patch_upstreams.add(
+        host="community",
+        method="POST",
+        path="/community/posts/moderation-status",
+        handler=moderation_handler,
+    )
+
+    response = await client.post(
+        "/community/posts/moderation-status",
+        json={"image_ids": ["img_123"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [
+            {
+                "image_id": "img_123",
+                "moderation_status": "removed",
+                "moderation_reason": "Content removed by moderation team",
+            }
+        ]
+    }

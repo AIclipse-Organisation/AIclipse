@@ -23,7 +23,7 @@
 
         <div id="status-message"></div>
 
-        <div id="usage-info" class="usage-info" style="display: none">
+        <div id="usage-info" class="usage-info" hidden>
           <h2>Your Usage</h2>
           <p id="usage-text"></p>
           <div class="usage-bar">
@@ -86,7 +86,6 @@
       </div>
     </div>
 
-    <script src="https://js.stripe.com/v3/"></script>
     <script src="{{ asset_url('js/core/navigation.js') }}"></script>
     <script src="{{ asset_url('js/core/app.js') }}"></script>
     <script src="{{ asset_url('js/core/http.js') }}"></script>

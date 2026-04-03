@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template
 
 from routes.common import (
     RouteDeps,
     call_gateway_json_or_error,
     get_required_token,
+    parse_json_body_or_400,
     resolve_billing_user_or_error,
 )
 from services.plan.subscription import (
@@ -47,7 +48,10 @@ def build_plan_blueprint(*, deps: RouteDeps):
         if auth_error:
             return auth_error
 
-        payload = request.get_json(force=True, silent=True) or {}
+        payload, body_error = parse_json_body_or_400()
+        if body_error:
+            return body_error
+
         plan_id = parse_plan_id(payload.get("plan_id"))
         if plan_id is None:
             return jsonify({"detail": "Invalid plan_id"}), 400
@@ -105,7 +109,10 @@ def build_plan_blueprint(*, deps: RouteDeps):
         if auth_error:
             return auth_error
 
-        payload = request.get_json(force=True, silent=True) or {}
+        payload, body_error = parse_json_body_or_400()
+        if body_error:
+            return body_error
+
         reason = payload.get("reason")
         if not isinstance(reason, str) or not reason.strip():
             return jsonify({"detail": "Cancellation reason is required"}), 400

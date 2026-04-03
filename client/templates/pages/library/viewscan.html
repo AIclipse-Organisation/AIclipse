@@ -60,15 +60,15 @@
               <div class="comm_barIconCol">
                 <img src="{{ asset_url('images/aiclipse_moon.png') }}" alt="" class="comm_resultIcon" />
               </div>
-              <span class="comm_zoneLabel comm_zoneLabel--safe" style="left: 20%">Real</span>
-              <span class="comm_zoneLabel comm_zoneLabel--neutral" style="left: 50%">Suspicious</span>
-              <span class="comm_zoneLabel comm_zoneLabel--risk" style="left: 80%">Fake</span>
+              <span class="comm_zoneLabel comm_zoneLabel--safe comm_zoneLabel--at-20">Real</span>
+              <span class="comm_zoneLabel comm_zoneLabel--neutral comm_zoneLabel--at-50">Suspicious</span>
+              <span class="comm_zoneLabel comm_zoneLabel--risk comm_zoneLabel--at-80">Fake</span>
 
               <div class="comm_progressPanel" aria-hidden="true" title="AI probability">
                 <div class="comm_progressBar">
-                  <div id="aiclipse-fill" class="comm_progressFill" data-p="0" style="width: 0px"></div>
-                  <div class="comm_barMarker" style="left: 38%"></div>
-                  <div class="comm_barMarker" style="left: 62%"></div>
+                  <div id="aiclipse-fill" class="comm_progressFill" data-p="0"></div>
+                  <div class="comm_barMarker comm_barMarker--at-38"></div>
+                  <div class="comm_barMarker comm_barMarker--at-62"></div>
                   <span class="comm_barPercent" id="aiclipse-percent">0%</span>
                 </div>
               </div>
@@ -96,7 +96,7 @@
                     <span class="comm_voteCount" id="community-real-count">0 votes</span>
                   </div>
                   <div class="comm_voteTrack">
-                    <div class="comm_voteFill comm_voteFill--real" id="community-real-fill" style="width: 0px"></div>
+                    <div class="comm_voteFill comm_voteFill--real" id="community-real-fill"></div>
                     <span class="comm_votePct" id="community-real-pct">0%</span>
                   </div>
                 </div>
@@ -107,7 +107,7 @@
                     <span class="comm_voteCount" id="community-fake-count">0 votes</span>
                   </div>
                   <div class="comm_voteTrack">
-                    <div class="comm_voteFill comm_voteFill--fake" id="community-fake-fill" style="width: 0px"></div>
+                    <div class="comm_voteFill comm_voteFill--fake" id="community-fake-fill"></div>
                     <span class="comm_votePct" id="community-fake-pct">0%</span>
                   </div>
                 </div>

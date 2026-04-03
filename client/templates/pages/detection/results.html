@@ -41,15 +41,15 @@
                   <div class="comm_barIconCol">
                     <img src="{{ asset_url('images/aiclipse_moon.png') }}" alt="" class="comm_resultIcon" />
                   </div>
-                  <span class="comm_zoneLabel comm_zoneLabel--safe" style="left: 20%">Real</span>
-                  <span class="comm_zoneLabel comm_zoneLabel--neutral" style="left: 50%">Suspicious</span>
-                  <span class="comm_zoneLabel comm_zoneLabel--risk" style="left: 80%">Fake</span>
+                  <span class="comm_zoneLabel comm_zoneLabel--safe comm_zoneLabel--at-20">Real</span>
+                  <span class="comm_zoneLabel comm_zoneLabel--neutral comm_zoneLabel--at-50">Suspicious</span>
+                  <span class="comm_zoneLabel comm_zoneLabel--risk comm_zoneLabel--at-80">Fake</span>
 
                   <div class="comm_progressPanel" aria-hidden="true" title="AI probability">
                     <div class="comm_progressBar">
-                      <div class="comm_progressFill" id="ai-fill" data-p="0" style="width: 0px"></div>
-                      <div class="comm_barMarker" style="left: 38%"></div>
-                      <div class="comm_barMarker" style="left: 62%"></div>
+                      <div class="comm_progressFill" id="ai-fill" data-p="0"></div>
+                      <div class="comm_barMarker comm_barMarker--at-38"></div>
+                      <div class="comm_barMarker comm_barMarker--at-62"></div>
                       <span class="comm_barPercent" id="ai-percent">0%</span>
                     </div>
                   </div>

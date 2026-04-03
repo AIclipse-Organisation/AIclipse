@@ -47,7 +47,7 @@
     const overlay = document.getElementById("menu-overlay");
 
     if (drawer) drawer.classList.add("active");
-    if (overlay) overlay.style.display = "block";
+    if (overlay) overlay.hidden = false;
   }
 
   registry.registerModule({

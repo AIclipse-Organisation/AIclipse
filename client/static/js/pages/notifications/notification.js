@@ -126,7 +126,7 @@ async function markAllNotificationsRead() {
   await fetch("/community/notifications/read", {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
     body: JSON.stringify({ mark_all: true }),
   }).catch(() => null);
 

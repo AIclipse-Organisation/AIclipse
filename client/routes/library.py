@@ -6,6 +6,7 @@ from routes.common import (
     RouteDeps,
     get_required_token,
     parse_json_body_or_400,
+    validate_resource_id,
 )
 from services.integrations.gateway import proxy_gateway_json_request
 
@@ -40,6 +41,10 @@ def build_library_blueprint(*, deps: RouteDeps):
 
     @bp.get("/image/<string:image_id>")
     def get_image(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         token, auth_error = get_required_token()
         if auth_error:
             return auth_error
@@ -55,6 +60,10 @@ def build_library_blueprint(*, deps: RouteDeps):
 
     @bp.patch("/image/<string:image_id>")
     def update_image(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         token, auth_error = get_required_token()
         if auth_error:
             return auth_error
@@ -75,6 +84,10 @@ def build_library_blueprint(*, deps: RouteDeps):
 
     @bp.delete("/image/<string:image_id>")
     def delete_image(image_id: str):
+        id_error = validate_resource_id(image_id, name="image_id")
+        if id_error:
+            return id_error
+
         token, auth_error = get_required_token()
         if auth_error:
             return auth_error

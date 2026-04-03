@@ -122,6 +122,10 @@
       text-align: center;
     }
 
+    .usage-info[hidden] {
+      display: none !important;
+    }
+
     .usage-info h2 {
       margin: 0 0 6px;
       font-size: 20px;
@@ -160,6 +164,14 @@
       justify-content: center;
       color: white;
       font-weight: bold;
+    }
+
+    .usage-fill.usage-fill--warn {
+      background: linear-gradient(90deg, #ff9800, #f57c00);
+    }
+
+    .usage-fill.usage-fill--danger {
+      background: linear-gradient(90deg, #f44336, #d32f2f);
     }
 
     .status-message {

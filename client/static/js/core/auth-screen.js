@@ -50,13 +50,10 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function switchAuthMode(mode) {
-    if (mode === "signup") {
-      if (signupPanel) signupPanel.style.display = "block";
-      if (loginPanel) loginPanel.style.display = "none";
-    } else {
-      if (signupPanel) signupPanel.style.display = "none";
-      if (loginPanel) loginPanel.style.display = "block";
-    }
+    const panels = document.querySelector(".auth-panels");
+    if (panels) panels.dataset.mode = mode === "signup" ? "signup" : "login";
+    if (loginContent) loginContent.hidden = false;
+    if (loginSpinner) loginSpinner.hidden = true;
 
     if (signupStatus) signupStatus.innerHTML = "";
     if (loginStatus) loginStatus.innerHTML = "";
@@ -90,9 +87,9 @@ window.addEventListener("DOMContentLoaded", () => {
   if (signupHowFoundSelect) {
     const syncHowFoundDetailVisibility = () => {
       const isOther = signupHowFoundSelect.value === "other";
-      if (signupHowFoundDetailLabel) signupHowFoundDetailLabel.style.display = isOther ? "block" : "none";
+      if (signupHowFoundDetailLabel) signupHowFoundDetailLabel.hidden = !isOther;
       if (signupHowFoundDetail) {
-        signupHowFoundDetail.style.display = isOther ? "block" : "none";
+        signupHowFoundDetail.hidden = !isOther;
         if (!isOther) signupHowFoundDetail.value = "";
       }
     };
@@ -167,8 +164,9 @@ window.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      if (signupPanel) signupPanel.style.display = "none";
-      if (loginSpinner) loginSpinner.style.display = "block";
+      switchAuthMode("login");
+      if (loginContent) loginContent.hidden = true;
+      if (loginSpinner) loginSpinner.hidden = false;
 
       btnSignupEl.disabled = true;
       setStatus(signupStatus, "info", "Submitting access request...");
@@ -185,9 +183,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
         if (res.ok) {
           requestSubmitted = true;
-          if (loginSpinner) loginSpinner.style.display = "none";
-          if (signupPanel) signupPanel.style.display = "block";
-          if (loginPanel) loginPanel.style.display = "none";
+          switchAuthMode("signup");
           setStatus(
             signupStatus,
             "success",
@@ -210,7 +206,7 @@ window.addEventListener("DOMContentLoaded", () => {
       } finally {
         if (!requestSubmitted) {
           btnSignupEl.disabled = false;
-          if (loginSpinner) loginSpinner.style.display = "none";
+          if (loginSpinner) loginSpinner.hidden = true;
         }
       }
     });
@@ -227,8 +223,8 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      if (loginContent) loginContent.style.display = "none";
-      if (loginSpinner) loginSpinner.style.display = "block";
+      if (loginContent) loginContent.hidden = true;
+      if (loginSpinner) loginSpinner.hidden = false;
       setStatus(loginStatus, "info", "");
 
       try {
@@ -238,15 +234,15 @@ window.addEventListener("DOMContentLoaded", () => {
           setStatus(loginStatus, "success", "Logged in.");
           window.location.href = "/upload";
         } else {
-          if (loginContent) loginContent.style.display = "block";
-          if (loginSpinner) loginSpinner.style.display = "none";
+          if (loginContent) loginContent.hidden = false;
+          if (loginSpinner) loginSpinner.hidden = true;
           const normalized = normalizeApiErrorDetail(data);
           setStatus(loginStatus, "error", normalized.message || `Login failed (${res.status})`);
         }
       } catch (err) {
         console.error(err);
-        if (loginContent) loginContent.style.display = "block";
-        if (loginSpinner) loginSpinner.style.display = "none";
+        if (loginContent) loginContent.hidden = false;
+        if (loginSpinner) loginSpinner.hidden = true;
         setStatus(loginStatus, "error", "Network error during login.");
       } finally {
         btnLogin.disabled = false;
