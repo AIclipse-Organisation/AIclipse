@@ -17,7 +17,7 @@ async def test_community_posts_get_proxies_without_auth(client, patch_upstreams)
     patch_upstreams.add(
         host="community",
         method="GET",
-        path="/community/posts",
+        path="/community/internal/posts",
         handler=community_posts_handler,
     )
 
@@ -47,7 +47,7 @@ async def test_community_posts_create_proxies_authenticated_user(client, patch_u
     patch_upstreams.add(
         host="community",
         method="POST",
-        path="/community/posts",
+        path="/community/internal/posts",
         handler=community_create_handler,
     )
 
@@ -83,7 +83,7 @@ async def test_community_posts_patch_proxies_authenticated_user(client, patch_up
     patch_upstreams.add(
         host="community",
         method="PATCH",
-        path="/community/posts",
+        path="/community/internal/posts",
         handler=community_patch_handler,
     )
 
@@ -122,7 +122,7 @@ async def test_community_moderation_status_proxies_json_response(client, patch_u
     patch_upstreams.add(
         host="community",
         method="POST",
-        path="/community/posts/moderation-status",
+        path="/community/internal/posts/moderation-status",
         handler=moderation_handler,
     )
 
@@ -154,7 +154,7 @@ async def test_community_comments_get_proxies_with_internal_token(client, patch_
     patch_upstreams.add(
         host="community",
         method="GET",
-        path="/community/posts/comments",
+        path="/community/internal/posts/comments",
         handler=comments_handler,
     )
 
@@ -175,7 +175,7 @@ async def test_community_posts_click_proxies_with_internal_token(client, patch_u
     patch_upstreams.add(
         host="community",
         method="POST",
-        path="/community/posts/click",
+        path="/community/internal/posts/click",
         handler=click_handler,
     )
 
@@ -183,3 +183,41 @@ async def test_community_posts_click_proxies_with_internal_token(client, patch_u
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_community_notifications_unread_count_proxies_with_forwarded_identity(
+    client,
+    patch_upstreams,
+    auth_keypair,
+):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_notify",
+        email="u_notify@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    def unread_count_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_notify"
+        assert req.headers.get("x-user-email") == "u_notify@example.com"
+        assert req.headers.get("x-user-is-admin") == "false"
+        return httpx.Response(status_code=200, json={"unread_count": 3})
+
+    patch_upstreams.add(
+        host="community",
+        method="GET",
+        path="/community/internal/notifications/unread-count",
+        handler=unread_count_handler,
+    )
+
+    response = await client.get(
+        "/community/notifications/unread-count",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"unread_count": 3}

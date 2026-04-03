@@ -1,10 +1,10 @@
-import { getBrowserUser } from "@/app/lib/browserUser";
+import { getForwardedUser } from "@/app/lib/internalUser";
 import { createCommentsRouteHandlers } from "@/app/lib/routes/commentsRoute";
 
 export const runtime = "nodejs";
 
 const handlers = createCommentsRouteHandlers({
-  requireUser: getBrowserUser,
+  requireUser: getForwardedUser,
 });
 
 export const GET = handlers.GET;

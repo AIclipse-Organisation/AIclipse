@@ -1,12 +1,11 @@
-import { getBrowserUser, getOptionalBrowserUser } from "@/app/lib/browserUser";
-import { buildGatewayIdentityHeaders } from "@/app/lib/internalUser";
+import { getForwardedUser, getOptionalForwardedUser, buildGatewayIdentityHeaders } from "@/app/lib/internalUser";
 import { createPostsRouteHandlers } from "@/app/lib/routes/postsRoute";
 
 export const runtime = "nodejs";
 
 const handlers = createPostsRouteHandlers({
-  requireUser: getBrowserUser,
-  optionalUser: getOptionalBrowserUser,
+  requireUser: getForwardedUser,
+  optionalUser: getOptionalForwardedUser,
   buildGatewayIdentityHeaders,
 });
 
