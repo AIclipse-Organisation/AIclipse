@@ -103,3 +103,96 @@ def test_upload_image_rolls_back_when_metadata_store_unavailable(client, monkeyp
     assert len(delete_calls) == 1
     assert delete_calls[0]["Bucket"] == main_media.S3_BUCKET
     assert delete_calls[0]["Key"].endswith(".png")
+
+
+def test_list_images_returns_503_when_metadata_store_is_unavailable(client, monkeypatch):
+    monkeypatch.setattr(main_media, "get_images_collection", lambda: None)
+
+    response = client.get("/images", params={"user_id": "test_user"})
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Image metadata store unavailable"
+
+
+def test_lookup_images_returns_public_items_with_presigned_urls(client, monkeypatch):
+    class _Cursor:
+        def __init__(self, items):
+            self._items = items
+
+        def __iter__(self):
+            return iter(self._items)
+
+    class _ImagesCollection:
+        def __init__(self, items):
+            self._items = items
+
+        def find(self, query, projection):
+            assert query == {
+                "image_id": {"$in": ["img_a", "img_b"]},
+                "is_public": True,
+            }
+            assert projection == {"_id": 0}
+            return _Cursor(self._items)
+
+    monkeypatch.setattr(
+        main_media,
+        "get_images_collection",
+        lambda: _ImagesCollection(
+            [
+                {
+                    "image_id": "img_b",
+                    "user_id": "u_1",
+                    "s3_key": "img_b.png",
+                    "verdict": "ok",
+                    "label": "real",
+                    "confidence": 0.9,
+                    "is_public": True,
+                    "uploaded_at": "2026-04-03T00:00:00Z",
+                    "is_reported": False,
+                },
+                {
+                    "image_id": "img_a",
+                    "user_id": "u_1",
+                    "s3_key": "img_a.png",
+                    "verdict": "ok",
+                    "label": "real",
+                    "confidence": 0.8,
+                    "is_public": True,
+                    "uploaded_at": "2026-04-03T00:00:00Z",
+                    "is_reported": False,
+                },
+            ]
+        ),
+    )
+
+    response = client.post("/images/lookup", json={"image_ids": ["img_a", "img_b", "img_a"]})
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "items": [
+            {
+                "image_id": "img_a",
+                "user_id": "u_1",
+                "s3_key": "img_a.png",
+                "verdict": "ok",
+                "label": "real",
+                "confidence": 0.8,
+                "is_public": True,
+                "uploaded_at": "2026-04-03T00:00:00Z",
+                "is_reported": False,
+                "url": "https://cdn.test/img_a.png",
+            },
+            {
+                "image_id": "img_b",
+                "user_id": "u_1",
+                "s3_key": "img_b.png",
+                "verdict": "ok",
+                "label": "real",
+                "confidence": 0.9,
+                "is_public": True,
+                "uploaded_at": "2026-04-03T00:00:00Z",
+                "is_reported": False,
+                "url": "https://cdn.test/img_b.png",
+            },
+        ]
+    }

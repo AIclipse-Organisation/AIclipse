@@ -1,13 +1,7 @@
 from __future__ import annotations
 
-import requests
-
-from services.community.posts import extract_post_id, fetch_post_id_for_image, parse_community_json_response
+from services.community.posts import extract_post_id, fetch_post_for_image, require_post_id
 from services.integrations.gateway import proxy_gateway_json_request
-
-
-def _community_posts_url(*, base_url: str) -> str:
-    return base_url.rstrip("/") + "/community/posts"
 
 
 def _patch_post_description(
@@ -18,22 +12,16 @@ def _patch_post_description(
     gateway_base_url: str,
     timeout_seconds: int,
 ) -> tuple[dict, int]:
-    try:
-        resp = requests.patch(
-            _community_posts_url(base_url=gateway_base_url),
-            params={"post_id": post_id},
-            json={"description": description},
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
-            },
-            timeout=timeout_seconds,
-        )
-    except requests.RequestException:
-        return {"detail": "Community service unreachable"}, 502
-
-    return parse_community_json_response(resp, detail="Non-JSON response from community service")
+    return proxy_gateway_json_request(
+        method="PATCH",
+        base_url=gateway_base_url,
+        path="/community/posts",
+        token=token,
+        params={"post_id": post_id},
+        json_body={"description": description},
+        timeout_seconds=timeout_seconds,
+        invalid_json_detail="Invalid JSON from gateway on /community/posts",
+    )
 
 
 def _create_post_for_image(
@@ -45,29 +33,23 @@ def _create_post_for_image(
     gateway_base_url: str,
     timeout_seconds: int,
 ) -> tuple[dict, int]:
-    try:
-        resp = requests.post(
-            _community_posts_url(base_url=gateway_base_url),
-            json={
-                "image_id": image_id,
-                "description": description,
-                "result": {
-                    "verdict": image_result.get("verdict"),
-                    "label": image_result.get("label"),
-                    "confidence": image_result.get("confidence"),
-                },
+    return proxy_gateway_json_request(
+        method="POST",
+        base_url=gateway_base_url,
+        path="/community/posts",
+        token=token,
+        json_body={
+            "image_id": image_id,
+            "description": description,
+            "result": {
+                "verdict": image_result.get("verdict"),
+                "label": image_result.get("label"),
+                "confidence": image_result.get("confidence"),
             },
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
-            },
-            timeout=timeout_seconds,
-        )
-    except requests.RequestException:
-        return {"detail": "Community service unreachable"}, 502
-
-    return parse_community_json_response(resp, detail="Non-JSON response from community service")
+        },
+        timeout_seconds=timeout_seconds,
+        invalid_json_detail="Invalid JSON from gateway on /community/posts",
+    )
 
 
 def _set_image_visibility(
@@ -98,17 +80,28 @@ def publish_viewscan(
     gateway_base_url: str,
     timeout_seconds: int = 10,
 ) -> tuple[dict, int]:
-    post_id = fetch_post_id_for_image(
+    post_lookup = fetch_post_for_image(
         image_id=image_id,
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
         token=token,
     )
+    if post_lookup.is_error:
+        return {"detail": post_lookup.detail or "Failed to resolve community post for image"}, post_lookup.status
 
-    if post_id:
+    if post_lookup.is_found:
+        post_id, post_error, post_status = require_post_id(
+            post_lookup,
+            missing_detail="Post not found for image",
+            invalid_detail="Community post is missing post_id",
+            lookup_detail="Failed to resolve community post for image",
+        )
+        if post_error:
+            return post_error, post_status
+
         patch_payload, patch_status = _patch_post_description(
             token=token,
-            post_id=post_id,
+            post_id=post_id or "",
             description=description,
             gateway_base_url=gateway_base_url,
             timeout_seconds=timeout_seconds,
@@ -170,18 +163,24 @@ def update_viewscan_description(
     gateway_base_url: str,
     timeout_seconds: int = 10,
 ) -> tuple[dict, int]:
-    post_id = fetch_post_id_for_image(
+    post_lookup = fetch_post_for_image(
         image_id=image_id,
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
         token=token,
     )
-    if not post_id:
-        return {"detail": "Post not found for image"}, 404
+    post_id, post_error, post_status = require_post_id(
+        post_lookup,
+        missing_detail="Post not found for image",
+        invalid_detail="Community post is missing post_id",
+        lookup_detail="Failed to resolve community post for image",
+    )
+    if post_error:
+        return post_error, post_status
 
     payload, status = _patch_post_description(
         token=token,
-        post_id=post_id,
+        post_id=post_id or "",
         description=description,
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,

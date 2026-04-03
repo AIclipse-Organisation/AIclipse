@@ -32,7 +32,7 @@ def build_community_blueprint(*, deps: RouteDeps):
             invalid_json_detail="Invalid JSON from gateway on /community/posts",
         )
         if status == 502:
-            logging.exception("Community /posts request failed")
+            logging.error("Community /posts request failed: %s", data.get("detail") if isinstance(data, dict) else "Gateway unreachable")
             return jsonify(data), status
 
         return jsonify(data), status

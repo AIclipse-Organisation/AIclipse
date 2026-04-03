@@ -30,13 +30,15 @@ def list_images_page(
         return payload, status
 
     scan_items = [item for item in items if isinstance(item, dict)]
-    moderation_by_image_id = fetch_moderation_statuses(
+    moderation_lookup = fetch_moderation_statuses(
         image_ids=[str(item.get("image_id") or "").strip() for item in scan_items],
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
     )
+    if moderation_lookup.is_error:
+        return {"detail": moderation_lookup.detail or "Failed to load moderation state"}, moderation_lookup.status
 
     return {
         **payload,
-        "items": merge_moderation_fields_for_items(scan_items, moderation_by_image_id),
+        "items": merge_moderation_fields_for_items(scan_items, moderation_lookup.items),
     }, status

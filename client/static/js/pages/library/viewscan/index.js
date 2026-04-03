@@ -263,6 +263,32 @@
     }
   }
 
+  function renderError(detail, title) {
+    const titleEl = document.getElementById("viewscan-title");
+    const section = document.getElementById("description-header-section");
+    const textEl = document.getElementById("description-text");
+    const privatePlaceholder = document.getElementById("private-description-placeholder");
+    const card = document.getElementById("viewscan-card");
+
+    if (titleEl) {
+      titleEl.textContent = title || "View Scan";
+    }
+    if (card) {
+      card.hidden = true;
+    }
+    if (privatePlaceholder) {
+      privatePlaceholder.hidden = true;
+    }
+    if (section) {
+      section.hidden = false;
+    }
+    if (textEl) {
+      textEl.hidden = false;
+      textEl.classList.add("is-moderated-reason");
+      textEl.textContent = detail || "View Scan is temporarily unavailable.";
+    }
+  }
+
   async function renderScan(img, title) {
     setCurrentContext(img, shared.getCurrentViewer(), getCurrentActions());
 
@@ -325,6 +351,10 @@
     let actionsState = null;
     const initialPageModel = readBootstrappedPageModel();
     if (initialPageModel) {
+      if (initialPageModel.error) {
+        renderError(initialPageModel.error.detail, initialPageModel.title);
+        return;
+      }
       img = initialPageModel.image || null;
       title = initialPageModel.title || null;
       viewer = initialPageModel.viewer || null;

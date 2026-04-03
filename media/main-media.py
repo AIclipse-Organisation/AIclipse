@@ -195,6 +195,13 @@ def attach_url(doc: dict) -> dict:
     return d
 
 
+def attach_required_url(doc: dict) -> dict:
+    d = attach_url(doc)
+    if d.get("s3_key") and not d.get("url"):
+        raise HTTPException(status_code=503, detail="Image storage unavailable")
+    return d
+
+
 def delete_object_if_present(key: str) -> None:
     try:
         s3_internal.delete_object(Bucket=S3_BUCKET, Key=key)
@@ -246,6 +253,10 @@ class ImageOut(BaseModel):
         arbitrary_types_allowed=True,
         populate_by_name=True,
     )
+
+
+class ImageLookupIn(BaseModel):
+    image_ids: list[str]
 
 
 # --------------------------------------------------
@@ -310,7 +321,7 @@ async def upload_image(
 def list_images(user_id: str | None = None, is_public: bool | None = None):
     images = get_images_collection()
     if images is None:
-        return {"items": []}
+        raise HTTPException(status_code=503, detail="Image metadata store unavailable")
 
     q = {}
     if user_id is not None:
@@ -324,22 +335,53 @@ def list_images(user_id: str | None = None, is_public: bool | None = None):
         .limit(200)
     )
 
-    items = [attach_url(it) for it in items]
+    items = [attach_required_url(it) for it in items]
     return {"items": items}
+
+
+@app.post("/images/lookup")
+def lookup_images(body: ImageLookupIn):
+    images = get_images_collection()
+    if images is None:
+        raise HTTPException(status_code=503, detail="Image metadata store unavailable")
+
+    image_ids = []
+    seen = set()
+    for raw_id in body.image_ids:
+        image_id = str(raw_id or "").strip()
+        if not image_id or image_id in seen:
+            continue
+        seen.add(image_id)
+        image_ids.append(image_id)
+
+    if not image_ids:
+        return {"items": []}
+
+    items = list(
+        images.find(
+            {
+                "image_id": {"$in": image_ids},
+                "is_public": True,
+            },
+            {"_id": 0},
+        )
+    )
+    item_map = {item["image_id"]: attach_required_url(item) for item in items}
+    return {"items": [item_map[image_id] for image_id in image_ids if image_id in item_map]}
 
 
 @app.get("/image/{image_id}")
 def get_image(image_id: str, user_id: str | None = None):
     images = get_images_collection()
     if images is None:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(status_code=503, detail="Image metadata store unavailable")
 
     doc = images.find_one({"image_id": image_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Not found")
 
     if (user_id is not None and doc.get("user_id") == user_id) or doc.get("is_public") is True:
-        return attach_url(doc)
+        return attach_required_url(doc)
 
     raise HTTPException(status_code=404, detail="Not found")
 
@@ -357,7 +399,7 @@ def update_image(
     """
     images = get_images_collection()
     if images is None:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(status_code=503, detail="Image metadata store unavailable")
 
     # Find the image document
     doc = images.find_one({"image_id": image_id}, {"_id": 0})
@@ -395,7 +437,7 @@ def update_image(
         sanitize_for_log(user_id),
         sanitize_for_log(str(x_is_admin)),
     )
-    return attach_url(updated_doc)
+    return attach_required_url(updated_doc)
 
 
 @app.delete("/image/{image_id}")
@@ -410,7 +452,7 @@ def delete_image(
     """
     images = get_images_collection()
     if images is None:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(status_code=503, detail="Image metadata store unavailable")
 
     # Find the image document
     doc = images.find_one({"image_id": image_id}, {"_id": 0})

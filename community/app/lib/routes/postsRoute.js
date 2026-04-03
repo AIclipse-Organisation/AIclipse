@@ -4,6 +4,7 @@ import { validateImageId, validatePostId } from "@/app/posts/validation.js";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 import { recordActivity, SCORES } from "@/lib/gamification/scoring.js";
 import { getRedis } from "@/lib/redis/redis";
+import { fetchPublicImagesByIds, mergeItemsWithPublicImages } from "@/app/lib/publicImages";
 
 const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
@@ -335,7 +336,6 @@ export function createPostsRouteHandlers({
       try {
         const db = await getDb();
         const col = db.collection(POSTS_COLLECTION);
-        const imagesCol = db.collection("images");
 
         const { searchParams } = new URL(req.url);
         const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
@@ -345,14 +345,8 @@ export function createPostsRouteHandlers({
         const filterImageId = searchParams.get("image_id") || null;
         const filterPostId = searchParams.get("post_id") || null;
 
-        const publicImages = await imagesCol
-          .find({ is_public: true }, { projection: { image_id: 1 } })
-          .toArray();
-        const publicImageIds = publicImages.map((img) => img.image_id);
-
         let posts;
         const query = {
-          image_id: { $in: publicImageIds },
           is_deleted: { $ne: true },
           is_removed: { $ne: true },
           ...(filterUserId ? { user_id: filterUserId } : {}),
@@ -521,29 +515,23 @@ export function createPostsRouteHandlers({
           return new Date(b.created_at) - new Date(a.created_at);
         });
 
-        const paginatedItems = ranked.slice(skip, skip + limit);
-        const paginatedImageIds = paginatedItems.map((post) => post.image_id);
-        const imagesForPage = await imagesCol
-          .find({ image_id: { $in: paginatedImageIds } })
-          .toArray();
-
-        const imageMap = new Map(imagesForPage.map((img) => [img.image_id, img]));
-        const finalItems = paginatedItems.map((post) => {
-          const imgData = imageMap.get(post.image_id) || {};
-          return { ...imgData, ...post };
-        });
+        const resolvedImages = await fetchPublicImagesByIds(
+          ranked.map((post) => post.image_id),
+        );
+        const visibleItems = mergeItemsWithPublicImages(ranked, resolvedImages);
+        const paginatedItems = visibleItems.slice(skip, skip + limit);
 
         return NextResponse.json(
           {
-            items: finalItems,
-            hasMore: ranked.length > skip + limit,
+            items: paginatedItems,
+            hasMore: visibleItems.length > skip + limit,
           },
           { status: 200 },
         );
       } catch (err) {
         return NextResponse.json(
-          { error: "Failed to list posts", detail: String(err) },
-          { status: 500 },
+          { error: "Failed to list posts", detail: err?.message || String(err) },
+          { status: err?.status || 500 },
         );
       }
     },

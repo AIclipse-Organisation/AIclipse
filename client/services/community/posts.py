@@ -1,24 +1,39 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
-import requests
+from services.integrations.gateway import proxy_gateway_json_request
 
 
-def parse_community_json_response(
-    resp: requests.Response,
-    *,
-    detail: str,
-) -> tuple[dict[str, Any], int]:
-    try:
-        payload = resp.json()
-    except ValueError:
-        return {"detail": detail}, 502
+@dataclass(frozen=True)
+class PostLookupResult:
+    post: dict[str, Any] | None
+    status: int
+    detail: str | None = None
 
-    if isinstance(payload, dict):
-        return payload, resp.status_code
+    @property
+    def is_found(self) -> bool:
+        return self.status == 200 and isinstance(self.post, dict)
 
-    return {"detail": detail}, 502
+    @property
+    def is_missing(self) -> bool:
+        return self.status == 404 and self.post is None
+
+    @property
+    def is_error(self) -> bool:
+        return not self.is_found and not self.is_missing
+
+
+@dataclass(frozen=True)
+class ModerationLookupResult:
+    items: dict[str, dict[str, Any]]
+    status: int
+    detail: str | None = None
+
+    @property
+    def is_error(self) -> bool:
+        return self.status != 200
 
 
 def extract_post_id(payload: dict[str, Any] | None) -> str | None:
@@ -82,52 +97,68 @@ def find_post_for_image(payload: dict[str, Any] | None, *, image_id: str) -> dic
     return None
 
 
+def read_lookup_error_detail(payload: dict[str, Any] | None, *, default: str) -> str:
+    if not isinstance(payload, dict):
+        return default
+
+    for field in ("detail", "error", "message"):
+        value = payload.get(field)
+        if value is not None:
+            text = str(value).strip()
+            if text:
+                return text
+
+    return default
+
+
+def require_post_id(
+    lookup: PostLookupResult,
+    *,
+    missing_detail: str,
+    invalid_detail: str,
+    lookup_detail: str,
+) -> tuple[str | None, dict[str, Any] | None, int]:
+    if lookup.is_missing:
+        return None, {"detail": missing_detail}, 404
+
+    if lookup.is_error:
+        return None, {"detail": lookup.detail or lookup_detail}, lookup.status
+
+    post_id = extract_post_id(lookup.post)
+    if not post_id:
+        return None, {"detail": invalid_detail}, 502
+
+    return post_id, None, 200
+
+
 def fetch_post_for_image(
     *,
     image_id: str,
     gateway_base_url: str,
     timeout_seconds: int,
     token: str | None = None,
-) -> dict[str, Any] | None:
-    headers = {"Accept": "application/json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-
-    try:
-        resp = requests.get(
-            gateway_base_url.rstrip("/") + "/community/posts",
-            headers=headers,
-            params={"image_id": image_id},
-            timeout=timeout_seconds,
-        )
-    except requests.RequestException:
-        return None
-
-    if resp.status_code != 200:
-        return None
-
-    try:
-        payload = resp.json()
-    except ValueError:
-        return None
-
-    return find_post_for_image(payload, image_id=image_id)
-
-
-def fetch_post_id_for_image(
-    *,
-    image_id: str,
-    gateway_base_url: str,
-    timeout_seconds: int,
-    token: str | None = None,
-) -> str | None:
-    post = fetch_post_for_image(
-        image_id=image_id,
-        gateway_base_url=gateway_base_url,
+) -> PostLookupResult:
+    payload, status = proxy_gateway_json_request(
+        method="GET",
+        base_url=gateway_base_url,
+        path="/community/posts",
+        token=token or "",
+        params={"image_id": image_id},
         timeout_seconds=timeout_seconds,
-        token=token,
+        invalid_json_detail="Invalid JSON from gateway on /community/posts",
     )
-    return extract_post_id(post)
+    if status != 200:
+        return PostLookupResult(
+            post=None,
+            status=status,
+            detail=read_lookup_error_detail(payload, default="Community post lookup failed"),
+        )
+
+    post = find_post_for_image(payload, image_id=image_id)
+    if not post:
+        return PostLookupResult(post=None, status=404, detail="Post not found for image")
+
+    return PostLookupResult(post=post, status=200)
 
 
 def fetch_moderation_statuses(
@@ -135,32 +166,34 @@ def fetch_moderation_statuses(
     image_ids: list[str],
     gateway_base_url: str,
     timeout_seconds: int,
-) -> dict[str, dict[str, Any]]:
+) -> ModerationLookupResult:
     requested_ids = [str(image_id).strip() for image_id in image_ids if str(image_id or "").strip()]
     if not requested_ids:
-        return {}
+        return ModerationLookupResult(items={}, status=200)
 
-    try:
-        resp = requests.post(
-            gateway_base_url.rstrip("/") + "/community/posts/moderation-status",
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
-            json={"image_ids": requested_ids},
-            timeout=timeout_seconds,
+    payload, status = proxy_gateway_json_request(
+        method="POST",
+        base_url=gateway_base_url,
+        path="/community/posts/moderation-status",
+        token="",
+        json_body={"image_ids": requested_ids},
+        timeout_seconds=timeout_seconds,
+        invalid_json_detail="Invalid JSON from gateway on /community/posts/moderation-status",
+    )
+    if status != 200:
+        return ModerationLookupResult(
+            items={},
+            status=status,
+            detail=read_lookup_error_detail(payload, default="Moderation lookup failed"),
         )
-    except requests.RequestException:
-        return {}
-
-    if resp.status_code != 200:
-        return {}
-
-    try:
-        payload = resp.json()
-    except ValueError:
-        return {}
 
     items = payload.get("items") if isinstance(payload, dict) else None
     if not isinstance(items, list):
-        return {}
+        return ModerationLookupResult(
+            items={},
+            status=502,
+            detail="Invalid moderation payload from gateway",
+        )
 
     moderation_by_image_id: dict[str, dict[str, Any]] = {}
     for item in items:
@@ -170,7 +203,7 @@ def fetch_moderation_statuses(
         if item_image_id:
             moderation_by_image_id[item_image_id] = item
 
-    return moderation_by_image_id
+    return ModerationLookupResult(items=moderation_by_image_id, status=200)
 
 
 def merge_moderation_fields(

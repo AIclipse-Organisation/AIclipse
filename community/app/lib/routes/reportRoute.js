@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
 import { validatePostId } from "@/app/posts/validation.js";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
+import { fetchPublicImagesByIds, mergeItemsWithPublicImages } from "@/app/lib/publicImages";
 
 const POSTS_COLLECTION = "community.posts";
 
@@ -172,7 +173,6 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
       try {
         const db = await getDb();
         const postsCol = db.collection(POSTS_COLLECTION);
-        const imagesCol = db.collection("images");
 
         const reportedPosts = await postsCol
           .find({
@@ -187,23 +187,16 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
           return NextResponse.json({ items: [] }, { status: 200 });
         }
 
-        const imageIds = reportedPosts.map((post) => post.image_id).filter((id) => id != null);
-        const imageDocs = await imagesCol.find({ image_id: { $in: imageIds } }).toArray();
-        const imageMap = {};
-        imageDocs.forEach((img) => {
-          imageMap[img.image_id] = img.url;
-        });
-
-        const items = reportedPosts.map((post) => ({
-          ...post,
-          url: imageMap[post.image_id] || null,
-        }));
+        const images = await fetchPublicImagesByIds(
+          reportedPosts.map((post) => post.image_id),
+        );
+        const items = mergeItemsWithPublicImages(reportedPosts, images);
 
         return NextResponse.json({ items }, { status: 200 });
       } catch (err) {
         return NextResponse.json(
-          { error: "Failed to fetch reporting queue", detail: String(err) },
-          { status: 500 },
+          { error: "Failed to fetch reporting queue", detail: err?.message || String(err) },
+          { status: err?.status || 500 },
         );
       }
     },

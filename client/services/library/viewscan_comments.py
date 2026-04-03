@@ -1,12 +1,7 @@
 from __future__ import annotations
 
-import requests
-
-from services.community.posts import fetch_post_id_for_image, parse_community_json_response
-
-
-def _community_comments_url(*, base_url: str) -> str:
-    return base_url.rstrip("/") + "/community/posts/comments"
+from services.community.posts import fetch_post_for_image, require_post_id
+from services.integrations.gateway import proxy_gateway_json_request
 
 
 def list_viewscan_comments(
@@ -15,25 +10,31 @@ def list_viewscan_comments(
     gateway_base_url: str,
     timeout_seconds: int = 10,
 ) -> tuple[dict, int]:
-    post_id = fetch_post_id_for_image(
+    post_lookup = fetch_post_for_image(
         image_id=image_id,
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
     )
-    if not post_id:
+    if post_lookup.is_missing:
         return {"items": []}, 200
+    post_id, post_error, post_status = require_post_id(
+        post_lookup,
+        missing_detail="Post not found for image",
+        invalid_detail="Community post is missing post_id",
+        lookup_detail="Failed to resolve community post for image",
+    )
+    if post_error:
+        return post_error, post_status
 
-    try:
-        resp = requests.get(
-            _community_comments_url(base_url=gateway_base_url),
-            headers={"Accept": "application/json"},
-            params={"post_id": post_id},
-            timeout=timeout_seconds,
-        )
-    except requests.RequestException:
-        return {"detail": "Community service unreachable"}, 502
-
-    return parse_community_json_response(resp, detail="Non-JSON response from community service")
+    return proxy_gateway_json_request(
+        method="GET",
+        base_url=gateway_base_url,
+        path="/community/posts/comments",
+        token="",
+        params={"post_id": post_id},
+        timeout_seconds=timeout_seconds,
+        invalid_json_detail="Invalid JSON from gateway on /community/posts/comments",
+    )
 
 
 def create_viewscan_comment(
@@ -46,35 +47,35 @@ def create_viewscan_comment(
     gateway_base_url: str,
     timeout_seconds: int = 10,
 ) -> tuple[dict, int]:
-    post_id = fetch_post_id_for_image(
+    post_lookup = fetch_post_for_image(
         image_id=image_id,
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
         token=token,
     )
-    if not post_id:
-        return {"detail": "Post not found for image"}, 404
+    post_id, post_error, post_status = require_post_id(
+        post_lookup,
+        missing_detail="Post not found for image",
+        invalid_detail="Community post is missing post_id",
+        lookup_detail="Failed to resolve community post for image",
+    )
+    if post_error:
+        return post_error, post_status
 
-    try:
-        resp = requests.post(
-            _community_comments_url(base_url=gateway_base_url),
-            json={
-                "post_id": post_id,
-                "user_id": viewer_user_id,
-                "user_name": viewer_name,
-                "text": text,
-            },
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
-            },
-            timeout=timeout_seconds,
-        )
-    except requests.RequestException:
-        return {"detail": "Community service unreachable"}, 502
-
-    return parse_community_json_response(resp, detail="Non-JSON response from community service")
+    return proxy_gateway_json_request(
+        method="POST",
+        base_url=gateway_base_url,
+        path="/community/posts/comments",
+        token=token,
+        json_body={
+            "post_id": post_id,
+            "user_id": viewer_user_id,
+            "user_name": viewer_name,
+            "text": text,
+        },
+        timeout_seconds=timeout_seconds,
+        invalid_json_detail="Invalid JSON from gateway on /community/posts/comments",
+    )
 
 
 def delete_viewscan_comment(
@@ -84,17 +85,12 @@ def delete_viewscan_comment(
     gateway_base_url: str,
     timeout_seconds: int = 10,
 ) -> tuple[dict, int]:
-    try:
-        resp = requests.delete(
-            _community_comments_url(base_url=gateway_base_url),
-            headers={
-                "Accept": "application/json",
-                "Authorization": f"Bearer {token}",
-            },
-            params={"comment_id": comment_id},
-            timeout=timeout_seconds,
-        )
-    except requests.RequestException:
-        return {"detail": "Community service unreachable"}, 502
-
-    return parse_community_json_response(resp, detail="Non-JSON response from community service")
+    return proxy_gateway_json_request(
+        method="DELETE",
+        base_url=gateway_base_url,
+        path="/community/posts/comments",
+        token=token,
+        params={"comment_id": comment_id},
+        timeout_seconds=timeout_seconds,
+        invalid_json_detail="Invalid JSON from gateway on /community/posts/comments",
+    )

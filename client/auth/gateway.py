@@ -5,6 +5,11 @@ from typing import Any
 
 import requests
 
+from services.integrations.gateway import (
+    parse_gateway_json_response,
+    request_gateway_response,
+)
+
 
 class GatewayClient:
     def __init__(self, base_url: str, *, timeout_seconds: int = 10):
@@ -104,7 +109,7 @@ class GatewayClient:
                 return {"detail": "Gateway unreachable"}, status
             return None, status
 
-        return self._decode_optional_json(resp, invalid_json_detail=invalid_json_detail)
+        return parse_gateway_json_response(resp, invalid_json_detail=invalid_json_detail)
 
     def _request_response(
         self,
@@ -116,35 +121,19 @@ class GatewayClient:
         timeout_seconds: int | None = None,
         failure_log: str,
     ) -> tuple[requests.Response | None, int]:
-        request_kwargs: dict[str, Any] = {
-            "method": method,
-            "url": self._url(path),
-            "headers": self._headers(token),
-            "timeout": self.timeout_seconds if timeout_seconds is None else timeout_seconds,
-        }
-        if json_data is not None:
-            request_kwargs["json"] = json_data
+        resp, status = request_gateway_response(
+            method=method,
+            base_url=self.base_url,
+            path=path,
+            token=token,
+            json_body=json_data,
+            timeout_seconds=self.timeout_seconds if timeout_seconds is None else timeout_seconds,
+        )
+        if resp is not None:
+            return resp, status
 
-        try:
-            if method.upper() == "GET":
-                return requests.get(
-                    request_kwargs["url"],
-                    headers=request_kwargs["headers"],
-                    timeout=request_kwargs["timeout"],
-                ), 200
-            return requests.request(**request_kwargs), 200
-        except requests.RequestException:
-            logging.exception(failure_log)
-            return None, 502
-
-    def _url(self, path: str) -> str:
-        return f"{self.base_url}{path}"
-
-    def _headers(self, token: str | None = None) -> dict[str, str]:
-        headers: dict[str, str] = {"Accept": "application/json"}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        return headers
+        logging.error(failure_log)
+        return None, 502
 
     def _decode_required_json(
         self,
@@ -156,16 +145,3 @@ class GatewayClient:
             return resp.json(), resp.status_code
         except ValueError:
             return None, invalid_json_status
-
-    def _decode_optional_json(
-        self,
-        resp: requests.Response,
-        *,
-        invalid_json_detail: str | None,
-    ) -> tuple[dict[str, Any] | None, int]:
-        try:
-            return resp.json(), resp.status_code
-        except ValueError:
-            if invalid_json_detail is None:
-                return None, resp.status_code
-            return {"detail": invalid_json_detail}, resp.status_code

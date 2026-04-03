@@ -13,8 +13,7 @@ export default function ProfilePostsGrid({ userId }) {
   useEffect(() => {
     async function load() {
       try {
-        const [imgsRes, postsRes, meRes] = await Promise.all([
-          fetch("/community/images", { credentials: "include" }),
+        const [postsRes, meRes] = await Promise.all([
           fetch(`/community/posts?user_id=${encodeURIComponent(userId)}&limit=50`, {
             credentials: "include",
           }),
@@ -27,28 +26,13 @@ export default function ProfilePostsGrid({ userId }) {
           setCurrentUserName(me?.user_name || me?.email || null);
         }
 
-        if (!imgsRes.ok || !postsRes.ok) {
+        if (!postsRes.ok) {
           setError("Failed to load posts.");
           return;
         }
 
-        const imgsData = await imgsRes.json();
         const postsData = await postsRes.json();
-
-        const imageMap = {};
-        for (const img of imgsData.items || []) {
-          imageMap[img.image_id] = img;
-        }
-
-        const merged = (postsData.items || [])
-          .map((post) => {
-            const img = imageMap[post.image_id];
-            if (!img) return null;
-            return { ...img, ...post };
-          })
-          .filter(Boolean);
-
-        setItems(merged);
+        setItems(Array.isArray(postsData.items) ? postsData.items : []);
       } catch (err) {
         setError("Failed to load posts.");
       } finally {

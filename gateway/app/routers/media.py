@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, Response
 from app.core.image_safety import sniff_and_validate_image
 from app.core.media_url import build_media_image_url
 from app.core.tokens import validate_detection_token
-from app.deps import get_current_user, get_current_user_or_internal
+from app.deps import get_current_user, get_current_user_or_internal, require_internal_request
 from app.models import UpdateImageRequest, UserContext
 
 router = APIRouter()
@@ -111,27 +111,57 @@ async def gateway_get_my_images(
 ):
     s = request.app.state.settings
 
-    if s.media_uri:
-        params = {"user_id": user.user_id}
-        if is_public is not None:
-            params["is_public"] = "true" if is_public else "false"
+    if not s.media_uri:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unavailable")
 
-        url = s.media_uri.rstrip("/") + "/images"
-        client: httpx.AsyncClient = request.app.state.http
+    params = {"user_id": user.user_id}
+    if is_public is not None:
+        params["is_public"] = "true" if is_public else "false"
 
-        try:
-            resp = await client.get(url, params=params, timeout=10.0)
-        except httpx.RequestError:
-            pass
-        else:
-            if resp.status_code == 200:
-                return Response(
-                    content=resp.content,
-                    status_code=resp.status_code,
-                    media_type=resp.headers.get("content-type", "application/json"),
-                )
+    url = s.media_uri.rstrip("/") + "/images"
+    client: httpx.AsyncClient = request.app.state.http
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"items": []})
+    try:
+        resp = await client.get(url, params=params, timeout=10.0)
+    except httpx.RequestError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
+
+    if resp.status_code == 200:
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+
+    raise HTTPException(status_code=resp.status_code, detail=f"Media service error: {resp.status_code}")
+
+
+@router.post("/internal/images/lookup")
+async def gateway_lookup_public_images(
+    request: Request,
+    body: dict = Body(...),
+    _internal_ok: bool = Depends(require_internal_request),
+):
+    s = request.app.state.settings
+
+    if not s.media_uri:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unavailable")
+
+    url = s.media_uri.rstrip("/") + "/images/lookup"
+    client: httpx.AsyncClient = request.app.state.http
+    try:
+        resp = await client.post(url, json=body, timeout=10.0)
+    except httpx.RequestError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
+
+    if resp.status_code == 200:
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+
+    raise HTTPException(status_code=resp.status_code, detail=f"Media service error: {resp.status_code}")
 
 
 @router.get("/image/{image_id}")
@@ -143,7 +173,7 @@ async def gateway_get_image(
     s = request.app.state.settings
 
     if not s.media_uri:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unavailable")
 
     url = build_media_image_url(request, image_id)
     params = {"user_id": user.user_id}
@@ -152,7 +182,7 @@ async def gateway_get_image(
     try:
         resp = await client.get(url, params=params, timeout=10.0)
     except httpx.RequestError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
 
     if resp.status_code == 200:
         return Response(
@@ -176,7 +206,7 @@ async def gateway_update_image(
     s = request.app.state.settings
 
     if not s.media_uri:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unavailable")
 
     url = build_media_image_url(request, image_id)
     params = {"user_id": user.user_id}
@@ -212,30 +242,6 @@ async def gateway_update_image(
     raise HTTPException(status_code=resp.status_code, detail=f"Media service error: {resp.status_code}")
 
 
-@router.get("/community/images")
-async def gateway_get_community_images(request: Request):
-    s = request.app.state.settings
-
-    if s.media_uri:
-        url = s.media_uri.rstrip("/") + "/images"
-        params = {"is_public": "true"}
-
-        client: httpx.AsyncClient = request.app.state.http
-        try:
-            resp = await client.get(url, params=params, timeout=10.0)
-        except httpx.RequestError:
-            pass
-        else:
-            if resp.status_code == 200:
-                return Response(
-                    content=resp.content,
-                    status_code=resp.status_code,
-                    media_type=resp.headers.get("content-type", "application/json"),
-                )
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"items": []})
-
-
 @router.delete("/image/{image_id}")
 async def gateway_delete_image(
     request: Request,
@@ -258,7 +264,7 @@ async def gateway_delete_image(
     try:
         resp = await client.delete(url, params=params, headers=headers, timeout=10.0)
     except httpx.RequestError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
 
     if resp.status_code == 200:
         return Response(

@@ -39,10 +39,10 @@ def test_fetch_me_returns_502_when_gateway_returns_invalid_json(monkeypatch):
 
 
 def test_call_json_returns_unreachable_error_when_request_fails(monkeypatch):
-    def fake_request(**kwargs):
+    def fake_patch(*args, **kwargs):
         raise requests.RequestException("boom")
 
-    monkeypatch.setattr(requests, "request", fake_request)
+    monkeypatch.setattr(requests, "patch", fake_patch)
 
     client = GatewayClient("http://gateway.test", timeout_seconds=13)
     data, status = client.call_json("PATCH", "/auth/me", token="abc", json_data={"name": "Neo"})
@@ -54,18 +54,18 @@ def test_call_json_returns_unreachable_error_when_request_fails(monkeypatch):
 def test_call_json_adds_invalid_json_fallback_and_preserves_status(monkeypatch):
     captured = {}
 
-    def fake_request(**kwargs):
-        captured.update(kwargs)
+    def fake_delete(url, headers=None, params=None, timeout=None):
+        captured.update(url=url, headers=headers, params=params, timeout=timeout)
         return ResponseStub(418, json_exc=ValueError("bad json"))
 
-    monkeypatch.setattr(requests, "request", fake_request)
+    monkeypatch.setattr(requests, "delete", fake_delete)
 
     client = GatewayClient("http://gateway.test", timeout_seconds=13)
     data, status = client.call_json("DELETE", "/auth/api-key", token=None)
 
     assert status == 418
     assert data == {"detail": "Invalid JSON from gateway"}
-    assert captured["method"] == "DELETE"
     assert captured["url"] == "http://gateway.test/auth/api-key"
     assert captured["headers"] == {"Accept": "application/json"}
+    assert captured["params"] is None
     assert captured["timeout"] == 13

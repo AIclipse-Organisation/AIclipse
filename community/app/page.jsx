@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react"; // Added useRef and useCallback
+import { useEffect, useState, useRef, useCallback } from "react";
 import PostBox from "./components/post/PostBox";
 import LoadingGrid from "./components/common/LoadingGrid";
 
@@ -18,15 +18,12 @@ export default function Page() {
   const [initialLoad, setInitialLoad] = useState(true); // Dedicated initial loading state
 
   const observerTarget = useRef(null); // Sentinel ref for infinite scroll
-
-  const imageMapRef = useRef(new Map());
   const loadPosts = useCallback(
     async (pageNum, signal) => {
       if (loading) return;
       setLoading(true);
 
       try {
-        // 1. Fetch the paginated posts
         const postsRes = await fetch(
           `/community/posts?page=${pageNum}&limit=12`,
           { credentials: "include", signal },
@@ -36,38 +33,15 @@ export default function Page() {
         const posts = await postsRes.json().catch(() => ({}));
         const postItems = posts.items || [];
 
-        // 2. THE FIX: Fetch the images ONLY on page 1 (or if our cache is empty)
-        if (pageNum === 1 || imageMapRef.current.size === 0) {
-          const imgsRes = await fetch("/community/images", {
-            credentials: "include",
-            signal,
-          });
-          if (imgsRes.ok) {
-            const imgs = await imgsRes.json().catch(() => ({}));
-            const imagesList = imgs.items || [];
-            // Store in a Ref so it persists across infinite scrolls without triggering React re-renders
-            imageMapRef.current = new Map(
-              imagesList.map((img) => [img.image_id, img]),
-            );
-          }
-        }
-
-        // 3. Merge the posts with our cached image URLs
         const merged = postItems.map((post, index) => {
-          // Grab the image data (with the proper URL) from our cache
-          const img = imageMapRef.current.get(post.image_id) || {};
-
-          // --- MVP TRENDING FIX ---
           const hasEngagement =
             Number(post.up_vote_count) > 0 || Number(post.comment_count) > 0;
           const isTrending = pageNum === 1 && index < 3 && hasEngagement;
 
-          return { ...img, ...post, isTrending };
+          return { ...post, isTrending };
         });
 
-        // Append items if page > 1, replace if page 1
         setItems((prev) => (pageNum === 1 ? merged : [...prev, ...merged]));
-
         setHasMore(posts.hasMore ?? merged.length >= 12);
       } catch (e) {
         if (e.name !== "AbortError") {
@@ -103,7 +77,6 @@ export default function Page() {
     );
   };
 
-  // --- INITIAL DATA LOAD (Session + Page 1) ---
   useEffect(() => {
     let alive = true;
     const abortController = new AbortController();
@@ -130,7 +103,6 @@ export default function Page() {
           }
         }
 
-        // Initial load of first page
         await loadPosts(1, signal);
       } catch (err) {
         if (err.name !== "AbortError") console.error(err);
@@ -145,16 +117,14 @@ export default function Page() {
     };
   }, []);
 
-  // --- INFINITE SCROLL OBSERVER ---
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        // If bottom sentinel is visible and we aren't already loading...
         if (entries[0].isIntersecting && hasMore && !loading && !initialLoad) {
           setPage((prev) => prev + 1);
         }
       },
-      { threshold: 0.1, rootMargin: "300px" }, // Start loading 300px before reaching bottom
+      { threshold: 0.1, rootMargin: "300px" },
     );
 
     if (observerTarget.current) {
@@ -164,7 +134,6 @@ export default function Page() {
     return () => observer.disconnect();
   }, [hasMore, loading, initialLoad]);
 
-  // --- TRIGGER LOADING ON PAGE CHANGE ---
   useEffect(() => {
     if (page > 1) {
       loadPosts(page);
@@ -204,7 +173,6 @@ export default function Page() {
           ))}
         </div>
 
-        {/* SENTINEL: This invisible div detects the bottom scroll */}
         <div ref={observerTarget} className="flex justify-center py-10 w-full">
           {loading && (
             <div className="animate-pulse text-gray-400 text-sm">

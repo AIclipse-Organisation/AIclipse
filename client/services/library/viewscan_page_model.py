@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-import requests
-
 from services.community.posts import fetch_moderation_statuses, fetch_post_for_image, merge_moderation_fields
+from services.integrations.gateway import proxy_gateway_json_request
 
 
 def _extract_item(payload: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -71,22 +70,16 @@ def _fetch_image_item(
     gateway_base_url: str,
     timeout_seconds: int,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, int]:
-    try:
-        resp = requests.get(
-            gateway_base_url.rstrip("/") + f"/image/{image_id}",
-            headers={"Accept": "application/json", "Authorization": f"Bearer {token}"},
-            timeout=timeout_seconds,
-        )
-    except requests.RequestException:
-        return None, {"detail": "Gateway unreachable"}, 502
-
-    try:
-        payload = resp.json()
-    except ValueError:
-        return None, {"detail": "Invalid JSON from gateway on /image"}, 502
-
-    if resp.status_code != 200:
-        return None, payload if isinstance(payload, dict) else {"detail": "Image lookup failed"}, resp.status_code
+    payload, status = proxy_gateway_json_request(
+        method="GET",
+        base_url=gateway_base_url,
+        path=f"/image/{image_id}",
+        token=token,
+        timeout_seconds=timeout_seconds,
+        invalid_json_detail="Invalid JSON from gateway on /image",
+    )
+    if status != 200:
+        return None, payload if isinstance(payload, dict) else {"detail": "Image lookup failed"}, status
 
     image = _extract_item(payload)
     if not image:
@@ -112,12 +105,15 @@ def build_viewscan_page_model(
     if image_error:
         return image_error, image_status
 
-    moderation_by_image_id = fetch_moderation_statuses(
+    moderation_lookup = fetch_moderation_statuses(
         image_ids=[image_id],
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
     )
-    image = merge_moderation_fields(image, moderation_by_image_id.get(str(image_id).strip()))
+    if moderation_lookup.is_error:
+        return {"detail": moderation_lookup.detail or "Failed to load moderation state"}, moderation_lookup.status
+
+    image = merge_moderation_fields(image, moderation_lookup.items.get(str(image_id).strip()))
 
     page_model: dict[str, Any] = {"image": image, "title": "View Scan"}
     if not image.get("is_public"):
@@ -126,19 +122,18 @@ def build_viewscan_page_model(
         page_model["actions"] = _build_viewscan_actions(image=page_model["image"], viewer=viewer)
         return page_model, 200
 
-    post = fetch_post_for_image(
+    post_lookup = fetch_post_for_image(
         image_id=image_id,
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
     )
-    if not post:
-        if viewer:
-            page_model["viewer"] = viewer
-        page_model["actions"] = _build_viewscan_actions(image=page_model["image"], viewer=viewer)
-        return page_model, 200
+    if post_lookup.is_error:
+        return {"detail": post_lookup.detail or "Failed to load community post"}, post_lookup.status
+    if post_lookup.is_missing:
+        return {"detail": "Public image is missing community post"}, 502
 
-    page_model["image"] = _merge_post_fields(image, post)
-    page_model["post"] = post
+    page_model["image"] = _merge_post_fields(image, post_lookup.post or {})
+    page_model["post"] = post_lookup.post
     if viewer:
         page_model["viewer"] = viewer
     page_model["actions"] = _build_viewscan_actions(image=page_model["image"], viewer=viewer)

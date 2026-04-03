@@ -1,7 +1,6 @@
 from typing import Optional
 
-import httpx
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Request
 
 from app.core.http_proxy import proxy_json
 from app.core.settings import require_setting
@@ -179,36 +178,18 @@ async def gateway_community_posts_report(
 
 @router.post("/community/posts/moderation-status")
 async def gateway_community_posts_moderation_status(request: Request, payload: dict = Body(...)):
-    client: httpx.AsyncClient = request.app.state.http
-    url = _community_base_url(request).rstrip("/") + "/community/internal/posts/moderation-status"
-
-    try:
-        resp = await client.post(
-            url,
-            json=payload,
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                **(_auth_headers(request) or {}),
-            },
-            timeout=_timeout(request),
-        )
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Upstream request failed: {exc}",
-        )
-
-    if 500 <= resp.status_code <= 599:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Upstream service error",
-        )
-
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        media_type="application/json",
+    return await proxy_json(
+        request,
+        "POST",
+        _community_base_url(request),
+        "/community/internal/posts/moderation-status",
+        json_body=payload,
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            **(_auth_headers(request) or {}),
+        },
+        timeout_s=_timeout(request),
     )
 
 

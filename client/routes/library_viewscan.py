@@ -51,14 +51,25 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
                 gateway_base_url=deps.gateway_uri,
                 viewer=viewer if isinstance(viewer, dict) else None,
             )
-            if status == 200 and isinstance(data, dict):
-                initial_page_model = data
+            if isinstance(data, dict):
+                if status == 200:
+                    initial_page_model = data
+                else:
+                    initial_page_model = {
+                        "title": "View Scan",
+                        "viewer": viewer if isinstance(viewer, dict) else None,
+                        "error": data,
+                    }
+
+        response_status = 200
+        if isinstance(initial_page_model, dict) and initial_page_model.get("error"):
+            response_status = status
 
         return render_template(
             "pages/library/viewscan.html",
             initial_image_id=image_id,
             initial_viewscan_page_model=initial_page_model,
-        )
+        ), response_status
 
     @bp.patch("/viewscan/<string:image_id>/description")
     def viewscan_update_description(image_id: str):

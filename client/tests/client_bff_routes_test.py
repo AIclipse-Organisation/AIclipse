@@ -265,17 +265,15 @@ def test_community_comments_rejects_invalid_post_id_without_calling_backend(main
 
 
 def test_community_moderation_status_forwards_request_correctly(main_client_module, monkeypatch):
-    def fake_request(method, url, headers=None, json=None, params=None, timeout=None):
-        assert method == "POST"
+    def fake_post(url, headers=None, json=None, timeout=None):
         assert url == "http://gateway.test/community/posts/moderation-status"
         assert json == {"image_ids": ["img_123", "img_456"]}
         assert headers["Content-Type"] == "application/json"
         assert headers["Accept"] == "application/json"
-        assert params is None
         assert timeout == 10
         return ResponseStub(200, {"items": [{"image_id": "img_123", "moderation_status": "removed"}]})
 
-    monkeypatch.setattr(main_client_module.requests, "request", fake_request)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     resp = client.post(
@@ -305,10 +303,10 @@ def test_community_moderation_status_handles_invalid_json(main_client_module):
 
 
 def test_community_moderation_status_handles_service_unavailable(main_client_module, monkeypatch):
-    def fake_request(method, url, headers=None, json=None, params=None, timeout=None):
+    def fake_post(url, headers=None, json=None, timeout=None):
         raise main_client_module.requests.RequestException("Connection failed")
 
-    monkeypatch.setattr(main_client_module.requests, "request", fake_request)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     resp = client.post(
@@ -322,8 +320,7 @@ def test_community_moderation_status_handles_service_unavailable(main_client_mod
 
 
 def test_create_community_post_uses_proxy_status_and_token(main_client_module, monkeypatch):
-    def fake_request(method, url, headers=None, json=None, params=None, timeout=None):
-        assert method == "POST"
+    def fake_post(url, headers=None, json=None, timeout=None):
         assert url == "http://gateway.test/community/posts"
         assert headers == {
             "Accept": "application/json",
@@ -331,11 +328,10 @@ def test_create_community_post_uses_proxy_status_and_token(main_client_module, m
             "Authorization": "Bearer user-token",
         }
         assert json == {"image_id": "img_123", "description": "hello"}
-        assert params is None
         assert timeout == 10
         return ResponseStub(201, {"post_id": "post_123"})
 
-    monkeypatch.setattr(main_client_module.requests, "request", fake_request)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
@@ -347,8 +343,7 @@ def test_create_community_post_uses_proxy_status_and_token(main_client_module, m
 
 
 def test_community_notifications_read_returns_proxy_status(main_client_module, monkeypatch):
-    def fake_request(method, url, headers=None, json=None, params=None, timeout=None):
-        assert method == "POST"
+    def fake_post(url, headers=None, json=None, timeout=None):
         assert url == "http://gateway.test/community/notifications/read"
         assert headers == {
             "Accept": "application/json",
@@ -356,11 +351,10 @@ def test_community_notifications_read_returns_proxy_status(main_client_module, m
             "Authorization": "Bearer notify-token",
         }
         assert json == {"notification_ids": ["n_1"]}
-        assert params is None
         assert timeout == 10
         return ResponseStub(204, {})
 
-    monkeypatch.setattr(main_client_module.requests, "request", fake_request)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "notify-token")
@@ -370,10 +364,22 @@ def test_community_notifications_read_returns_proxy_status(main_client_module, m
     assert resp.status_code == 204
 
 
-def test_viewscan_html_route_bootstraps_canonical_image_id(main_client_module):
+def test_viewscan_html_route_bootstraps_canonical_image_id(main_client_module, monkeypatch):
     main_client_module.gateway.fetch_me = Mock(
         return_value=({"user_id": "u_1", "email": "user@example.com", "is_admin": False}, 200)
     )
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if url == "http://gateway.test/image/img_123":
+            return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": False}})
+        raise AssertionError(f"Unexpected GET {url}")
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        assert url == "http://gateway.test/community/posts/moderation-status"
+        return ResponseStub(200, {"items": []})
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
@@ -728,6 +734,42 @@ def test_viewscan_html_route_embeds_removed_moderation_state_for_private_scan(ma
     assert '"show_make_private": false' in html
 
 
+def test_viewscan_html_route_returns_explicit_error_when_moderation_lookup_fails(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "user@example.com", "is_admin": False}, 200)
+    )
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if url == "http://gateway.test/image/img_private":
+            return ResponseStub(
+                200,
+                {
+                    "item": {
+                        "image_id": "img_private",
+                        "user_id": "u_1",
+                        "is_public": False,
+                    }
+                },
+            )
+        raise AssertionError(f"Unexpected GET {url}")
+
+    def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
+        assert url == "http://gateway.test/community/posts/moderation-status"
+        return ResponseStub(502, {"detail": "Moderation lookup failed"})
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "user-token")
+
+    resp = client.get("/viewscan/img_private")
+
+    assert resp.status_code == 502
+    html = resp.get_data(as_text=True)
+    assert "Moderation lookup failed" in html
+
+
 def test_results_route_bootstraps_server_viewer_context(main_client_module):
     main_client_module.gateway.fetch_me = Mock(
         return_value=({"user_id": "u_results", "email": "viewer@example.com", "is_admin": False}, 200)
@@ -805,10 +847,11 @@ def test_results_save_private_uses_single_server_owned_upload_flow(main_client_m
 
 
 def test_results_save_public_publishes_with_server_side_user_context(main_client_module, monkeypatch):
-    calls = []
+    request_calls = []
+    post_calls = []
 
     def fake_request(method, url, headers=None, data=None, files=None, json=None, params=None, timeout=None):
-        calls.append(
+        request_calls.append(
             {
                 "method": method,
                 "url": url,
@@ -825,15 +868,26 @@ def test_results_save_public_publishes_with_server_side_user_context(main_client
             assert params is None
             assert data["is_public"] == "false"
             return ResponseStub(201, {"body": {"image_id": "img_public", "label": "fake", "confidence": 0.9}})
-        if url == "http://gateway.test/community/posts":
-            assert method == "POST"
-            assert headers["Authorization"] == "Bearer user-token"
-            assert json["image_id"] == "img_public"
-            assert json["description"] == "Server-owned publish"
-            return ResponseStub(200, {"post_id": "post_123"})
         raise AssertionError(f"Unexpected request {method} {url}")
 
+    def fake_post(url, headers=None, data=None, files=None, json=None, params=None, timeout=None):
+        post_calls.append(
+            {
+                "url": url,
+                "headers": headers,
+                "json": json,
+                "params": params,
+                "timeout": timeout,
+            }
+        )
+        assert url == "http://gateway.test/community/posts"
+        assert headers["Authorization"] == "Bearer user-token"
+        assert json["image_id"] == "img_public"
+        assert json["description"] == "Server-owned publish"
+        return ResponseStub(200, {"post_id": "post_123"})
+
     monkeypatch.setattr(main_client_module.requests, "request", fake_request)
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
@@ -856,7 +910,8 @@ def test_results_save_public_publishes_with_server_side_user_context(main_client
     assert resp.get_json()["image_id"] == "img_public"
     assert resp.get_json()["post_id"] == "post_123"
     assert resp.get_json()["published"] is True
-    assert len(calls) == 2
+    assert len(request_calls) == 1
+    assert len(post_calls) == 1
 
 
 def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client_module, monkeypatch):
@@ -878,18 +933,17 @@ def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client
             return ResponseStub(201, {"post_id": "post_new"})
         raise AssertionError(f"Unexpected POST {url}")
 
-    def fake_request(method, url, headers=None, params=None, json=None, timeout=None):
-        assert method == "PATCH"
+    def fake_patch(url, headers=None, params=None, json=None, timeout=None):
         if url == "http://gateway.test/image/img_123":
             assert headers["Authorization"] == "Bearer user-token"
             assert json == {"is_public": True}
             assert params is None
             return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": True}})
-        raise AssertionError(f"Unexpected request {method} {url}")
+        raise AssertionError(f"Unexpected PATCH {url}")
 
     monkeypatch.setattr(main_client_module.requests, "get", fake_get)
     monkeypatch.setattr(main_client_module.requests, "post", fake_post)
-    monkeypatch.setattr(main_client_module.requests, "request", fake_request)
+    monkeypatch.setattr(main_client_module.requests, "patch", fake_patch)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
@@ -906,6 +960,32 @@ def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client
     assert resp.get_json()["post_id"] == "post_new"
     assert resp.get_json()["is_public"] is True
     assert len(calls) == 1
+
+
+def test_viewscan_publish_fails_closed_when_post_lookup_errors(main_client_module, monkeypatch):
+    create_post = Mock(side_effect=AssertionError("publish must not create a duplicate post"))
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        assert url == "http://gateway.test/community/posts"
+        return ResponseStub(502, {"detail": "Gateway unreachable"})
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "post", create_post)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "user-token")
+    with client.session_transaction() as sess:
+        sess["current_user"] = {"user_id": "u_1", "email": "u@example.com", "is_admin": False}
+        sess["auth_checked_at"] = 9999999999
+
+    resp = client.post(
+        "/viewscan/img_123/publish",
+        json={"description": "Hello world", "verdict": "fake", "label": "fake", "confidence": 0.91},
+    )
+
+    assert resp.status_code == 502
+    assert resp.get_json() == {"detail": "Gateway unreachable"}
+    create_post.assert_not_called()
 
 
 def test_viewscan_update_description_hides_post_lookup_behind_image_id(main_client_module, monkeypatch):
@@ -942,21 +1022,21 @@ def test_viewscan_make_private_and_delete_use_server_owned_routes(main_client_mo
     patch_calls = []
     delete_calls = []
 
-    def fake_request(method, url, headers=None, params=None, json=None, timeout=None):
+    def fake_patch(url, headers=None, params=None, json=None, timeout=None):
         assert params is None
-        if method == "PATCH":
-            patch_calls.append(url)
-            assert url == "http://gateway.test/image/img_123"
-            assert json == {"is_public": False}
-            return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": False}})
-        if method == "DELETE":
-            delete_calls.append(url)
-            assert url == "http://gateway.test/image/img_123"
-            assert json is None
-            return ResponseStub(200, {"deleted": True})
-        raise AssertionError(f"Unexpected request {method} {url}")
+        patch_calls.append(url)
+        assert url == "http://gateway.test/image/img_123"
+        assert json == {"is_public": False}
+        return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": False}})
 
-    monkeypatch.setattr(main_client_module.requests, "request", fake_request)
+    def fake_delete(url, headers=None, params=None, timeout=None):
+        assert params is None
+        delete_calls.append(url)
+        assert url == "http://gateway.test/image/img_123"
+        return ResponseStub(200, {"deleted": True})
+
+    monkeypatch.setattr(main_client_module.requests, "patch", fake_patch)
+    monkeypatch.setattr(main_client_module.requests, "delete", fake_delete)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
