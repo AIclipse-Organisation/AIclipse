@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from unittest.mock import Mock
 
 
@@ -29,9 +28,10 @@ def test_middleware_redirects_and_clears_session_when_cookie_is_missing(auth_app
         assert dict(sess) == {}
 
 
-def test_middleware_uses_recent_session_cache_and_skips_gateway_lookup(auth_app_factory):
+def test_middleware_revalidates_protected_pages_even_when_session_has_cached_user(auth_app_factory):
     gateway = Mock()
-    app, _ = auth_app_factory(gateway=gateway, with_blueprint=False, with_middleware=True, cache_ttl=30)
+    gateway.fetch_me.return_value = ({"user_id": 123, "is_admin": False}, 200)
+    app, _ = auth_app_factory(gateway=gateway, with_blueprint=False, with_middleware=True)
 
     @app.get("/protected")
     def protected():
@@ -41,20 +41,19 @@ def test_middleware_uses_recent_session_cache_and_skips_gateway_lookup(auth_app_
     client.set_cookie("access_token", "cached-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": 123}
-        sess["auth_checked_at"] = int(time.time())
 
     resp = client.get("/protected")
 
     assert resp.status_code == 200
     assert resp.get_data(as_text=True) == "OK"
-    gateway.fetch_me.assert_not_called()
+    gateway.fetch_me.assert_called_once_with("cached-token")
 
 
 def test_middleware_revalidates_stale_session_and_clears_cookie_on_failure(auth_app_factory):
     gateway = Mock()
     gateway.fetch_me.return_value = (None, 401)
 
-    app, _ = auth_app_factory(gateway=gateway, with_blueprint=False, with_middleware=True, cache_ttl=30)
+    app, _ = auth_app_factory(gateway=gateway, with_blueprint=False, with_middleware=True)
 
     @app.get("/protected")
     def protected():
@@ -64,7 +63,6 @@ def test_middleware_revalidates_stale_session_and_clears_cookie_on_failure(auth_
     client.set_cookie("access_token", "expired-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": 1}
-        sess["auth_checked_at"] = int(time.time()) - 60
         sess["extra"] = "should disappear"
 
     resp = client.get("/protected", headers={"X-Forwarded-Proto": "https"})
@@ -101,6 +99,7 @@ def test_middleware_blocks_cross_site_mutation_when_auth_cookie_is_present(auth_
 
 def test_middleware_allows_same_origin_mutation_when_auth_cookie_is_present(auth_app_factory):
     gateway = Mock()
+    gateway.fetch_me.return_value = ({"user_id": 123, "is_admin": False}, 200)
     app, _ = auth_app_factory(gateway=gateway, with_blueprint=False, with_middleware=True)
 
     @app.post("/protected-action")
@@ -111,9 +110,9 @@ def test_middleware_allows_same_origin_mutation_when_auth_cookie_is_present(auth
     client.set_cookie("access_token", "user-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": 123}
-        sess["auth_checked_at"] = int(time.time())
 
     resp = client.post("/protected-action", headers={"Origin": "http://localhost"})
 
     assert resp.status_code == 200
     assert resp.get_data(as_text=True) == "OK"
+    gateway.fetch_me.assert_called_once_with("user-token")

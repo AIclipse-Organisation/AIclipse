@@ -99,6 +99,9 @@ def test_checks_returns_502_when_gateway_answers_with_non_json(main_client_modul
 
 
 def test_billing_subscription_status_uses_session_user_and_proxies(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_42", "email": "u42@example.com", "is_admin": False}, 200)
+    )
     main_client_module.gateway.call_json = Mock(
         return_value=({"status": "active", "cancel_at_period_end": False}, 200)
     )
@@ -393,11 +396,14 @@ def test_viewscan_html_route_bootstraps_canonical_image_id(main_client_module, m
 
 
 def test_profile_route_does_not_inline_scans_bootstrap(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "user@example.com", "is_admin": False}, 200)
+    )
+
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": "u_1", "email": "user@example.com", "is_admin": False}
-        sess["auth_checked_at"] = 9999999999
 
     resp = client.get("/profile")
 
@@ -784,7 +790,6 @@ def test_results_route_bootstraps_server_viewer_context(main_client_module):
             "email": "viewer@example.com",
             "is_admin": False,
         }
-        sess["auth_checked_at"] = 9999999999
 
     resp = client.get("/results")
 
@@ -795,6 +800,9 @@ def test_results_route_bootstraps_server_viewer_context(main_client_module):
 
 
 def test_results_save_private_uses_single_server_owned_upload_flow(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "u@example.com", "is_admin": False}, 200)
+    )
     calls = []
 
     def fake_request(method, url, headers=None, data=None, files=None, json=None, params=None, timeout=None):
@@ -827,7 +835,6 @@ def test_results_save_private_uses_single_server_owned_upload_flow(main_client_m
     client.set_cookie("access_token", "user-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": "u_1", "email": "u@example.com", "is_admin": False}
-        sess["auth_checked_at"] = 9999999999
 
     resp = client.post(
         "/results/save",
@@ -847,6 +854,9 @@ def test_results_save_private_uses_single_server_owned_upload_flow(main_client_m
 
 
 def test_results_save_public_publishes_with_server_side_user_context(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_server", "email": "u@example.com", "is_admin": False}, 200)
+    )
     request_calls = []
     post_calls = []
 
@@ -893,7 +903,6 @@ def test_results_save_public_publishes_with_server_side_user_context(main_client
     client.set_cookie("access_token", "user-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": "u_server", "email": "u@example.com", "is_admin": False}
-        sess["auth_checked_at"] = 9999999999
 
     resp = client.post(
         "/results/save",
@@ -915,6 +924,9 @@ def test_results_save_public_publishes_with_server_side_user_context(main_client
 
 
 def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "u@example.com", "is_admin": False}, 200)
+    )
     calls = []
 
     def fake_get(url, headers=None, params=None, timeout=None):
@@ -949,7 +961,6 @@ def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client
     client.set_cookie("access_token", "user-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": "u_1", "email": "u@example.com", "is_admin": False}
-        sess["auth_checked_at"] = 9999999999
 
     resp = client.post(
         "/viewscan/img_123/publish",
@@ -963,6 +974,9 @@ def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client
 
 
 def test_viewscan_publish_fails_closed_when_post_lookup_errors(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "u@example.com", "is_admin": False}, 200)
+    )
     create_post = Mock(side_effect=AssertionError("publish must not create a duplicate post"))
 
     def fake_get(url, headers=None, params=None, timeout=None):
@@ -976,7 +990,6 @@ def test_viewscan_publish_fails_closed_when_post_lookup_errors(main_client_modul
     client.set_cookie("access_token", "user-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": "u_1", "email": "u@example.com", "is_admin": False}
-        sess["auth_checked_at"] = 9999999999
 
     resp = client.post(
         "/viewscan/img_123/publish",
@@ -989,6 +1002,10 @@ def test_viewscan_publish_fails_closed_when_post_lookup_errors(main_client_modul
 
 
 def test_viewscan_update_description_hides_post_lookup_behind_image_id(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "u@example.com", "is_admin": False}, 200)
+    )
+
     def fake_get(url, headers=None, params=None, timeout=None):
         if url == "http://gateway.test/community/posts":
             assert params == {"image_id": "img_123"}
@@ -1009,7 +1026,6 @@ def test_viewscan_update_description_hides_post_lookup_behind_image_id(main_clie
     client.set_cookie("access_token", "user-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": "u_1", "email": "u@example.com", "is_admin": False}
-        sess["auth_checked_at"] = 9999999999
 
     resp = client.patch("/viewscan/img_123/description", json={"description": "Updated text"})
 
@@ -1019,6 +1035,9 @@ def test_viewscan_update_description_hides_post_lookup_behind_image_id(main_clie
 
 
 def test_viewscan_make_private_and_delete_use_server_owned_routes(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "u@example.com", "is_admin": False}, 200)
+    )
     patch_calls = []
     delete_calls = []
 
@@ -1042,7 +1061,6 @@ def test_viewscan_make_private_and_delete_use_server_owned_routes(main_client_mo
     client.set_cookie("access_token", "user-token")
     with client.session_transaction() as sess:
         sess["current_user"] = {"user_id": "u_1", "email": "u@example.com", "is_admin": False}
-        sess["auth_checked_at"] = 9999999999
 
     private_resp = client.post("/viewscan/img_123/make-private")
     delete_resp = client.delete("/viewscan/img_123")
@@ -1117,8 +1135,6 @@ def test_viewscan_comments_routes_hide_post_lookup_and_user_context(main_client_
             "http://gateway.test/community/posts/comments",
             {
                 "post_id": "post_123",
-                "user_id": "u_42",
-                "user_name": "Roma Dev",
                 "text": "Nice",
             },
             {

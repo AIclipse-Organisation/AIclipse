@@ -42,8 +42,6 @@ def create_viewscan_comment(
     token: str,
     image_id: str,
     text: str,
-    viewer_user_id: str,
-    viewer_name: str,
     gateway_base_url: str,
     timeout_seconds: int = 10,
 ) -> tuple[dict, int]:
@@ -69,8 +67,6 @@ def create_viewscan_comment(
         token=token,
         json_body={
             "post_id": post_id,
-            "user_id": viewer_user_id,
-            "user_name": viewer_name,
             "text": text,
         },
         timeout_seconds=timeout_seconds,

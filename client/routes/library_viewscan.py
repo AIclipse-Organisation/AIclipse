@@ -9,7 +9,6 @@ from routes.common import (
     parse_json_body_or_400,
     read_bounded_text,
     resolve_viewer_for_page_or_redirect,
-    resolve_viewer_or_error,
     validate_resource_id,
 )
 from services.library.viewscan import (
@@ -209,21 +208,10 @@ def build_library_viewscan_blueprint(*, deps: RouteDeps):
         if text_error:
             return text_error
 
-        viewer, viewer_error = resolve_viewer_or_error(
-            deps=deps,
-            token=token,
-            missing_detail="Missing authenticated user context for comment",
-        )
-        if viewer_error:
-            return viewer_error
-
-        viewer_name = str(viewer.get("user_name") or viewer.get("name") or viewer.get("user_id") or "").strip()
         data, status = create_viewscan_comment(
             token=token,
             image_id=image_id,
             text=text,
-            viewer_user_id=str(viewer["user_id"]).strip(),
-            viewer_name=viewer_name,
             gateway_base_url=deps.gateway_uri,
         )
 

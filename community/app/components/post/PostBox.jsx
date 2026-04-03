@@ -27,7 +27,6 @@ import PostCommentsDrawer from "./PostCommentsDrawer";
 export default function PostBox({
   image,
   currentUserId,
-  currentUserName,
   onVoteUpdate,
   onPostDelete,
 }) {
@@ -135,7 +134,7 @@ export default function PostBox({
     setError("");
     setBusy(true);
     try {
-      const result = await voteOnPost(postId, currentUserId, direction);
+      const result = await voteOnPost(postId, direction);
       setUp(result.up_vote_count);
       setDown(result.down_vote_count);
       setUserVote(result.user_vote);
@@ -171,12 +170,7 @@ export default function PostBox({
     if (!postId || !currentUserId || !commentText.trim()) return;
     setCommentsBusy(true);
     try {
-      const data = await submitCommentAPI(
-        postId,
-        currentUserId,
-        currentUserName,
-        commentText.trim(),
-      );
+      const data = await submitCommentAPI(postId, commentText.trim());
       setComments((arr) => [data, ...arr]);
       setCommentText("");
       

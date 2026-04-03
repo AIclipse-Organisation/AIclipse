@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
-import { validateUserId, validatePostId } from "@/app/posts/validation.js";
+import { validatePostId } from "@/app/posts/validation.js";
 import { getRedis } from "@/lib/redis/redis";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 import { recordActivity, awardPoints, SCORES } from "@/lib/gamification/scoring.js";
@@ -34,34 +34,21 @@ export function createVoteHandler({ requireUser }) {
     try {
       const body = await req.json().catch(() => null);
       const post_id = body?.post_id || null;
-      const user_id = body?.user_id || null;
       const vote = body?.vote || null;
 
-      if (!post_id || !user_id || (vote !== "up" && vote !== "down")) {
+      if (!post_id || (vote !== "up" && vote !== "down")) {
         return NextResponse.json(
-          { error: "Missing/invalid fields: post_id, user_id, vote('up'|'down')" },
+          { error: "Missing/invalid fields: post_id, vote('up'|'down')" },
           { status: 400 },
         );
       }
-
-      const userIdValidation = validateUserId(user_id);
-      if (!userIdValidation.valid) {
-        return NextResponse.json({ error: userIdValidation.error }, { status: 400 });
-      }
-      const safeUserId = userIdValidation.value;
 
       const postIdValidation = validatePostId(post_id);
       if (!postIdValidation.valid) {
         return NextResponse.json({ error: postIdValidation.error }, { status: 400 });
       }
       const safePostId = postIdValidation.value;
-
-      if (safeUserId !== authenticatedUserId) {
-        return NextResponse.json(
-          { error: "Forbidden: Cannot vote on behalf of other users" },
-          { status: 403 },
-        );
-      }
+      const safeUserId = authenticatedUserId;
 
       const db = await getDb();
       const posts = db.collection(POSTS_COLLECTION);

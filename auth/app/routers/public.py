@@ -14,6 +14,7 @@ from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from app.services.passwords import (
     PasswordService,
@@ -411,11 +412,14 @@ async def update_me(request: Request, body: UpdateMeRequest, user: TokenUser = D
             raise HTTPException(status_code=404, detail="User not found")
         return build_user_public(doc)
 
-    result = await users.find_one_and_update(
-        {"user_id": user.user_id},
-        {"$set": update_doc},
-        return_document=ReturnDocument.AFTER,
-    )
+    try:
+        result = await users.find_one_and_update(
+            {"user_id": user.user_id},
+            {"$set": update_doc},
+            return_document=ReturnDocument.AFTER,
+        )
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Email already registered")
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
 

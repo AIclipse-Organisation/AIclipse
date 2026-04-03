@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
 import { validatePostId } from "@/app/posts/validation.js";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
-import { fetchPublicImagesByIds, mergeItemsWithPublicImages } from "@/app/lib/publicImages";
+import { fetchPublicImagesByIds, resolveRenderableItemsWithPublicImages } from "@/app/lib/publicImages";
+import { setImageVisibilityOrThrow } from "@/app/lib/gatewayImages";
+import { updatePostStateWithImageSyncOrRollback } from "@/app/lib/postStateSync";
 
 const POSTS_COLLECTION = "community.posts";
 
@@ -106,28 +108,33 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
           timestamp: new Date(),
         };
 
-        const updateDoc = {
-          $set: {
-            is_reported: false,
-            last_moderated_at: new Date(),
-          },
-          $push: { moderation_log: logEntry },
+        const nextModerationState = {
+          is_reported: false,
+          last_moderated_at: new Date(),
         };
 
         if (action === "remove") {
-          updateDoc.$set.moderation_status = "removed";
-          updateDoc.$set.is_removed = true;
+          nextModerationState.moderation_status = "removed";
+          nextModerationState.is_removed = true;
 
-          try {
-            const gatewayUri = process.env.GATEWAY_URI;
-            await fetch(`${gatewayUri}/image/${post.image_id}`, {
-              method: "PATCH",
-              headers: buildGatewayIdentityHeaders(currentUser),
-              body: JSON.stringify({ is_public: false }),
-            });
-          } catch (err) {
-            console.error("Gateway Sync Failed", err);
-          }
+          await updatePostStateWithImageSyncOrRollback({
+            postsCol,
+            previousPost: post,
+            nextState: nextModerationState,
+            rollbackFields: [
+              "is_reported",
+              "last_moderated_at",
+              "moderation_status",
+              "is_removed",
+            ],
+            syncImage: () =>
+              setImageVisibilityOrThrow({
+                imageId: post.image_id,
+                isPublic: false,
+                user: currentUser,
+                buildGatewayIdentityHeaders,
+              }),
+          });
 
           if (post.user_id && post.user_id !== adminUserId) {
             try {
@@ -145,11 +152,29 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
             }
           }
         } else if (action === "dismiss") {
-          updateDoc.$set.moderation_status = "cleared";
-          updateDoc.$set.is_removed = false;
+          await postsCol.updateOne(
+            { post_id },
+            {
+              $set: {
+                ...nextModerationState,
+                moderation_status: "cleared",
+                is_removed: false,
+              },
+              $push: { moderation_log: logEntry },
+            },
+          );
+          return NextResponse.json({ message: `Post ${action}ed.` });
         }
 
-        await postsCol.updateOne({ post_id }, updateDoc);
+        try {
+          await postsCol.updateOne(
+            { post_id },
+            { $push: { moderation_log: logEntry } },
+          );
+        } catch (logErr) {
+          console.error("Failed to append moderation log:", logErr);
+        }
+
         return NextResponse.json({ message: `Post ${action}ed.` });
       } catch (err) {
         return NextResponse.json(
@@ -190,7 +215,22 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
         const images = await fetchPublicImagesByIds(
           reportedPosts.map((post) => post.image_id),
         );
-        const items = mergeItemsWithPublicImages(reportedPosts, images);
+        const { items, missingImageIds } = resolveRenderableItemsWithPublicImages(
+          reportedPosts,
+          images,
+        );
+        if (missingImageIds.length > 0) {
+          console.error(
+            "Reported posts skipped unresolved public images:",
+            missingImageIds.filter(Boolean),
+          );
+        }
+        if (reportedPosts.length > 0 && items.length === 0) {
+          return NextResponse.json(
+            { error: "Failed to fetch reporting queue", detail: "Reporting queue contains unresolved image references" },
+            { status: 502 },
+          );
+        }
 
         return NextResponse.json({ items }, { status: 200 });
       } catch (err) {

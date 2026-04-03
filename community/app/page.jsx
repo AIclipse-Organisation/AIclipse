@@ -3,13 +3,13 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import PostBox from "./components/post/PostBox";
 import LoadingGrid from "./components/common/LoadingGrid";
+import { mergeFeedItems } from "./lib/feedPagination";
 
 export default function Page() {
   const [items, setItems] = useState([]);
 
   // session info (needed for voting/commenting inside PostBox)
   const [currentUserId, setCurrentUserId] = useState(null);
-  const [currentUserName, setCurrentUserName] = useState(null);
 
   const [error, setError] = useState(null); // displayable error message
   const [loading, setLoading] = useState(false); // Changed to false initially to allow controlled triggers
@@ -41,7 +41,7 @@ export default function Page() {
           return { ...post, isTrending };
         });
 
-        setItems((prev) => (pageNum === 1 ? merged : [...prev, ...merged]));
+        setItems((prev) => (pageNum === 1 ? merged : mergeFeedItems(prev, merged)));
         setHasMore(posts.hasMore ?? merged.length >= 12);
       } catch (e) {
         if (e.name !== "AbortError") {
@@ -99,7 +99,6 @@ export default function Page() {
           const me = await meRes.json().catch(() => null);
           if (alive) {
             setCurrentUserId(me?.user_id || null);
-            setCurrentUserName(me?.user_name || me?.email || null);
           }
         }
 
@@ -166,7 +165,6 @@ export default function Page() {
               key={img.post_id}
               image={img}
               currentUserId={currentUserId}
-              currentUserName={currentUserName}
               onVoteUpdate={handleVoteUpdate}
               onPostDelete={handlePostDelete}
             />

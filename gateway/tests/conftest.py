@@ -232,6 +232,25 @@ def patch_upstreams(gateway_mod, upstream_router, auth_keypair, monkeypatch) -> 
 
     upstream_router.add(host="auth", method="GET", path="/.well-known/jwks.json", handler=_jwks_handler)
 
+    def _usage_check_handler(_req: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=200,
+            json={
+                "allowed": True,
+                "plan": 0,
+                "unlimited": False,
+                "monthly_usage": 0,
+                "limit": 10,
+                "remaining": 10,
+            },
+        )
+
+    def _usage_increment_handler(_req: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=200, json={"incremented": True, "monthly_usage": 1})
+
+    upstream_router.add(host="auth", method="POST", path="/usage/check", handler=_usage_check_handler)
+    upstream_router.add(host="auth", method="POST", path="/usage/increment", handler=_usage_increment_handler)
+
     return upstream_router
 
 

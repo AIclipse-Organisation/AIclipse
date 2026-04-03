@@ -21,11 +21,7 @@ spec.loader.exec_module(main_media)
 
 @pytest.fixture()
 def client(monkeypatch):
-    async def _fake_model_version():
-        return "v-test"
-
     monkeypatch.setattr(main_media, "ensure_bucket", lambda: None)
-    monkeypatch.setattr(main_media, "fetch_current_model_version", _fake_model_version)
     monkeypatch.setattr(main_media, "presigned_get_url_for_key", lambda key, is_public: f"https://cdn.test/{key}")
     return TestClient(main_media.app)
 
@@ -53,6 +49,7 @@ def test_upload_image_success(client, monkeypatch):
             "verdict": "ok",
             "label": "real",
             "confidence": "0.85",
+            "model_version": "v-test",
             "is_public": "true",
         },
     )
@@ -93,6 +90,7 @@ def test_upload_image_rolls_back_when_metadata_store_unavailable(client, monkeyp
             "verdict": "ok",
             "label": "real",
             "confidence": "0.85",
+            "model_version": "v-test",
             "is_public": "true",
         },
     )
@@ -112,6 +110,23 @@ def test_list_images_returns_503_when_metadata_store_is_unavailable(client, monk
 
     assert response.status_code == 503
     assert response.json()["detail"] == "Image metadata store unavailable"
+
+
+def test_upload_image_requires_model_version(client):
+    fake_image = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+    response = client.post(
+        "/upload/image",
+        files={"file": ("test.png", fake_image, "image/png")},
+        data={
+            "user_id": "test_user",
+            "verdict": "ok",
+            "label": "real",
+            "confidence": "0.85",
+            "is_public": "true",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_lookup_images_returns_public_items_with_presigned_urls(client, monkeypatch):

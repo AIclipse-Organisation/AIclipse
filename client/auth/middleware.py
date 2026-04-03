@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, make_response, redirect, request, session
@@ -8,6 +7,7 @@ from flask import Flask, jsonify, make_response, redirect, request, session
 from .cookies import clear_access_cookie, get_access_token
 from .gateway import GatewayClient
 from .request_policy import is_api_request
+from services.auth.session import store_authenticated_user
 
 MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
@@ -29,7 +29,7 @@ def _normalize_origin(url: str | None) -> str | None:
     return f"{scheme}://{hostname}"
 
 
-def register_auth_middleware(app: Flask, gateway: GatewayClient, *, cache_ttl_seconds: int = 30) -> None:
+def register_auth_middleware(app: Flask, gateway: GatewayClient) -> None:
     def is_public_path(path: str) -> bool:
         return (
             path == "/"
@@ -95,17 +95,9 @@ def register_auth_middleware(app: Flask, gateway: GatewayClient, *, cache_ttl_se
             session.clear()
             return redirect_to_login(clear_cookie=False)
 
-        now = int(time.time())
-        checked_at = int(session.get("auth_checked_at") or 0)
-
-        if session.get("current_user") and (now - checked_at) < cache_ttl_seconds:
-            return None
-
         user, status = gateway.fetch_me(token)
         if status == 200 and isinstance(user, dict):
-            session["current_user"] = user
-            session["is_admin"] = bool(user.get("is_admin"))
-            session["auth_checked_at"] = now
+            store_authenticated_user(user)
             return None
 
         session.clear()

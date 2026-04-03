@@ -3,7 +3,7 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Path, Query, Request, UploadFile, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from app.core.image_safety import sniff_and_validate_image
 from app.core.media_url import build_media_image_url
@@ -43,8 +43,9 @@ async def gateway_upload_image(
     verdict = payload.get("verdict")
     label = payload.get("label")
     confidence = payload.get("confidence")
+    model_version = payload.get("model_version")
 
-    if verdict is None or label is None or confidence is None:
+    if verdict is None or label is None or confidence is None or model_version is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="detection_token missing detection fields",
@@ -62,6 +63,7 @@ async def gateway_upload_image(
             "verdict": (None, str(verdict)),
             "label": (None, str(label)),
             "confidence": (None, str(confidence)),
+            "model_version": (None, str(model_version)),
             "is_public": (None, "true" if is_public else "false"),
         }
 
@@ -69,7 +71,10 @@ async def gateway_upload_image(
         try:
             resp = await client.post(url, files=files, headers=headers, timeout=20.0)
         except httpx.RequestError:
-            pass
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Media service unreachable",
+            )
         else:
             if resp.status_code == 201:
                 return Response(
@@ -77,30 +82,15 @@ async def gateway_upload_image(
                     status_code=resp.status_code,
                     media_type=resp.headers.get("content-type", "application/json"),
                 )
-            if resp.status_code >= 500:
-                pass
+            raise HTTPException(
+                status_code=resp.status_code,
+                detail=f"Media service error: {resp.status_code}",
+            )
 
-    image_id = str(uuid.uuid4())
-    image_payload = {
-        "image_id": image_id,
-        "user_id": user.user_id,
-        "verdict": verdict,
-        "label": label,
-        "confidence": confidence,
-        "is_public": bool(is_public),
-        "uploaded_at": "1970-01-01T00:00:00Z",
-        "is_reported": False,
-        "url": f"https://example.invalid/images/{image_id}",
-    }
-
-    response_body = {
-        "verdict": verdict,
-        "label": label,
-        "confidence": confidence,
-        "image": image_payload,
-    }
-
-    return JSONResponse(status_code=status.HTTP_201_CREATED, content=response_body)
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Media service unavailable",
+    )
 
 
 @router.get("/images")

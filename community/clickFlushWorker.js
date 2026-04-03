@@ -1,16 +1,10 @@
-import { getDb } from "./lib/mongo/mongo.js";
-import { getRedis } from "./lib/redis/redis.js";
+import { runFlushWorker } from "./lib/workers/flushWorker.js";
 
-const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
 const FLUSH_ZSET = "clicks:flush_at";
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-async function flushOnce({ redis, posts }) {
+async function flushOnce({ redis, collection: posts }) {
   const nowSec = Math.floor(Date.now() / 1000);
 
   // Pull due post IDs
@@ -66,30 +60,11 @@ async function flushOnce({ redis, posts }) {
   return duePostIds.length;
 }
 
-async function main() {
-  const redis = getRedis();
-
-  console.log("[clickFlushWorker] Connecting to MongoDB...");
-  
-    const db = await getDb();
-    const posts = db.collection(POSTS_COLLECTION);
-
-  console.log("[clickFlushWorker] started");
-
-  while (true) {
-    try {
-      const n = await flushOnce({ redis, posts });
-      // Adaptive sleep: run faster if we found work, slower if idle
-      await sleep(n ? 250 : 1000);
-    } catch (e) {
-      console.error("[clickFlushWorker] Loop error:", e?.message || e);
-      // Prevent tight error loops
-      await sleep(1000);
-    }
-  }
-}
-
-main().catch((e) => {
+runFlushWorker({
+  name: "clickFlushWorker",
+  collectionName: POSTS_COLLECTION,
+  flushOnce,
+}).catch((e) => {
   console.error("[clickFlushWorker] fatal:", e);
   process.exit(1);
 });

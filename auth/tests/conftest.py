@@ -204,6 +204,13 @@ class FakeUsersColl:
             return None
 
         set_doc = update.get("$set", {})
+        next_email = (set_doc.get("email") or doc.get("email") or "").strip().lower()
+        if next_email:
+            for existing in self.docs.values():
+                if existing.get("user_id") == doc.get("user_id"):
+                    continue
+                if (existing.get("email") or "").strip().lower() == next_email:
+                    raise DuplicateKeyError("duplicate email")
         doc.update(set_doc)
         self.docs[doc["user_id"]] = dict(doc)
         return dict(doc)

@@ -49,3 +49,52 @@ test("community routes do not read raw images collection directly", () => {
   assert.match(postsRoute, /fetchPublicImagesByIds/);
   assert.match(reportRoute, /fetchPublicImagesByIds/);
 });
+
+test("community post and moderation routes use canonical gateway image sync helpers", () => {
+  const postsRoute = readRepoFile("app/lib/routes/postsRoute.js");
+  const reportRoute = readRepoFile("app/lib/routes/reportRoute.js");
+
+  assert.match(postsRoute, /setImageVisibilityOrThrow/);
+  assert.match(postsRoute, /deleteImageOrThrow/);
+  assert.match(postsRoute, /createPostWithImageSyncOrRollback/);
+  assert.match(postsRoute, /updatePostStateWithImageSyncOrRollback/);
+  assert.match(reportRoute, /setImageVisibilityOrThrow/);
+  assert.match(reportRoute, /updatePostStateWithImageSyncOrRollback/);
+
+  assert.doesNotMatch(postsRoute, /Failed to mark image as public:/);
+  assert.doesNotMatch(postsRoute, /Gateway cleanup failed/);
+  assert.doesNotMatch(reportRoute, /Gateway Sync Failed/);
+});
+
+test("comment and vote routes derive identity from authenticated user instead of request body", () => {
+  const commentsRoute = readRepoFile("app/lib/routes/commentsRoute.js");
+  const voteRoute = readRepoFile("app/lib/routes/voteRoute.js");
+  const postBoxActions = readRepoFile("app/components/post/postBoxActions.js");
+
+  assert.doesNotMatch(commentsRoute, /body\?\.user_id/);
+  assert.doesNotMatch(commentsRoute, /body\?\.user_name/);
+  assert.match(commentsRoute, /authenticatedUserId/);
+  assert.match(commentsRoute, /authenticatedUserName/);
+
+  assert.doesNotMatch(voteRoute, /body\?\.user_id/);
+  assert.match(voteRoute, /authenticatedUserId/);
+
+  assert.doesNotMatch(postBoxActions, /user_id:/);
+  assert.doesNotMatch(postBoxActions, /user_name:/);
+});
+
+test("notification read routes do not perform index or retention maintenance work", () => {
+  const notificationsRoute = readRepoFile("app/lib/routes/notificationsRoute.js");
+
+  assert.doesNotMatch(notificationsRoute, /ensureNotificationIndexes/);
+  assert.doesNotMatch(notificationsRoute, /trimNotificationRetention/);
+  assert.doesNotMatch(notificationsRoute, /capNotificationsForUser/);
+});
+
+test("feed route does not use fixed 600/300 candidate limits", () => {
+  const postsRoute = readRepoFile("app/lib/routes/postsRoute.js");
+
+  assert.match(postsRoute, /buildFeedCandidateWindow/);
+  assert.doesNotMatch(postsRoute, /\.limit\(600\)/);
+  assert.doesNotMatch(postsRoute, /\.limit\(300\)/);
+});

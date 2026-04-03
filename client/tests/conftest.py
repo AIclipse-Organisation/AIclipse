@@ -40,7 +40,7 @@ def auth_app_factory():
     from auth.middleware import register_auth_middleware
     from auth.routes import build_auth_blueprint
 
-    def _factory(*, gateway=None, signup_enabled=lambda: True, with_blueprint=True, with_middleware=False, cache_ttl=30):
+    def _factory(*, gateway=None, signup_enabled=lambda: True, with_blueprint=True, with_middleware=False):
         app = Flask(__name__)
         app.secret_key = "test-secret"
         app.config.update(TESTING=True)
@@ -56,7 +56,7 @@ def auth_app_factory():
         if with_blueprint:
             app.register_blueprint(build_auth_blueprint(gateway, is_signup_enabled=signup_enabled))
         if with_middleware:
-            register_auth_middleware(app, gateway, cache_ttl_seconds=cache_ttl)
+            register_auth_middleware(app, gateway)
         return app, gateway
 
     return _factory

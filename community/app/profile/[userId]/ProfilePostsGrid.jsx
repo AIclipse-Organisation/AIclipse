@@ -8,7 +8,6 @@ export default function ProfilePostsGrid({ userId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
-  const [currentUserName, setCurrentUserName] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -23,7 +22,6 @@ export default function ProfilePostsGrid({ userId }) {
         if (meRes.ok) {
           const me = await meRes.json().catch(() => null);
           setCurrentUserId(me?.user_id || null);
-          setCurrentUserName(me?.user_name || me?.email || null);
         }
 
         if (!postsRes.ok) {
@@ -60,7 +58,7 @@ export default function ProfilePostsGrid({ userId }) {
       <div className="pub-profile-posts-title">Posts</div>
       <div className="comm_grid">
         {items.map((item) => (
-          <PostBox key={item.post_id} image={item} currentUserId={currentUserId} currentUserName={currentUserName} />
+          <PostBox key={item.post_id} image={item} currentUserId={currentUserId} />
         ))}
       </div>
     </div>

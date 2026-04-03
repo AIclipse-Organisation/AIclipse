@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, render_template, request
 
+from auth.cookies import get_access_token
 from routes.common import (
     RouteDeps,
     clear_session_and_return_unauthorized_json,
@@ -9,7 +10,7 @@ from routes.common import (
     get_required_token,
     resolve_viewer_or_error,
 )
-from services.auth.session import get_session_user
+from services.auth.session import resolve_current_user
 from services.integrations.gateway import proxy_gateway_multipart_request
 from services.detection.scan_workflow import perform_results_save
 
@@ -23,7 +24,12 @@ def build_detection_blueprint(*, deps: RouteDeps):
 
     @bp.get("/results")
     def results():
-        viewer = get_session_user() or {}
+        viewer = {}
+        token = get_access_token(request)
+        if token:
+            resolved_viewer, status = resolve_current_user(deps.gateway, token)
+            if status == 200 and isinstance(resolved_viewer, dict):
+                viewer = resolved_viewer
         return render_template("pages/detection/results.html", initial_results_viewer=viewer)
 
     @bp.post("/checks")

@@ -4,7 +4,10 @@ import { validateImageId, validatePostId } from "@/app/posts/validation.js";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 import { recordActivity, SCORES } from "@/lib/gamification/scoring.js";
 import { getRedis } from "@/lib/redis/redis";
-import { fetchPublicImagesByIds, mergeItemsWithPublicImages } from "@/app/lib/publicImages";
+import { fetchPublicImagesByIds, resolveRenderableItemsWithPublicImages } from "@/app/lib/publicImages";
+import { buildFeedCandidateWindow } from "@/app/lib/feedPagination";
+import { deleteImageOrThrow, setImageVisibilityOrThrow } from "@/app/lib/gatewayImages";
+import { createPostWithImageSyncOrRollback, updatePostStateWithImageSyncOrRollback } from "@/app/lib/postStateSync";
 
 const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
@@ -136,18 +139,29 @@ export function createPostsRouteHandlers({
         };
 
         const col = db.collection(POSTS_COLLECTION);
-        await col.insertOne(doc);
-        await recordActivity(db, authenticatedUserId, SCORES.CREATE_POST, "create_post");
-
         try {
-          const gatewayUri = process.env.GATEWAY_URI;
-          await fetch(`${gatewayUri}/image/${safeImageId}`, {
-            method: "PATCH",
-            headers: buildGatewayIdentityHeaders(currentUser),
-            body: JSON.stringify({ is_public: true }),
+          await createPostWithImageSyncOrRollback({
+            postsCol: col,
+            postDoc: doc,
+            syncImage: () =>
+              setImageVisibilityOrThrow({
+                imageId: safeImageId,
+                isPublic: true,
+                user: currentUser,
+                buildGatewayIdentityHeaders,
+              }),
           });
         } catch (imageUpdateErr) {
-          console.error("Failed to mark image as public:", imageUpdateErr);
+          return NextResponse.json(
+            { error: "Failed to create post", detail: imageUpdateErr?.message || String(imageUpdateErr) },
+            { status: imageUpdateErr?.status || 502 },
+          );
+        }
+
+        try {
+          await recordActivity(db, authenticatedUserId, SCORES.CREATE_POST, "create_post");
+        } catch (activityErr) {
+          console.error("Failed to record create_post activity:", activityErr);
         }
 
         return NextResponse.json(doc, { status: 201 });
@@ -273,18 +287,42 @@ export function createPostsRouteHandlers({
           );
         }
 
-        await col.updateOne(
-          { post_id: safePostId },
-          {
-            $set: {
+        if (post.image_id) {
+          await updatePostStateWithImageSyncOrRollback({
+            postsCol: col,
+            previousPost: post,
+            nextState: {
               is_deleted: true,
-              image_id: null,
               deleted_at: new Date(),
               moderation_status: "deleted",
               deleted_by: isAdmin ? "admin" : "owner",
             },
-          },
-        );
+            rollbackFields: [
+              "is_deleted",
+              "deleted_at",
+              "moderation_status",
+              "deleted_by",
+            ],
+            syncImage: () =>
+              deleteImageOrThrow({
+                imageId: post.image_id,
+                user: currentUser,
+                buildGatewayIdentityHeaders,
+              }),
+          });
+        } else {
+          await col.updateOne(
+            { post_id: safePostId },
+            {
+              $set: {
+                is_deleted: true,
+                deleted_at: new Date(),
+                moderation_status: "deleted",
+                deleted_by: isAdmin ? "admin" : "owner",
+              },
+            },
+          );
+        }
 
         if (isAdmin && !isOwner && post.user_id) {
           try {
@@ -302,19 +340,11 @@ export function createPostsRouteHandlers({
           }
         }
 
-        await db.collection("community.comments").deleteMany({ post_id: safePostId });
-        await db.collection("community.votes").deleteMany({ post_id: safePostId });
-
-        if (post.image_id) {
-          try {
-            const gatewayUri = process.env.GATEWAY_URI;
-            await fetch(`${gatewayUri}/image/${post.image_id}`, {
-              method: "DELETE",
-              headers: buildGatewayIdentityHeaders(currentUser),
-            });
-          } catch (err) {
-            console.error("Gateway cleanup failed", err);
-          }
+        try {
+          await db.collection("community.comments").deleteMany({ post_id: safePostId });
+          await db.collection("community.votes").deleteMany({ post_id: safePostId });
+        } catch (cleanupErr) {
+          console.error("Failed to clean up deleted post engagement:", cleanupErr);
         }
 
         return NextResponse.json({
@@ -340,10 +370,10 @@ export function createPostsRouteHandlers({
         const { searchParams } = new URL(req.url);
         const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
         const limit = Math.max(1, parseInt(searchParams.get("limit") || "10", 10));
-        const skip = (page - 1) * limit;
         const filterUserId = searchParams.get("user_id") || null;
         const filterImageId = searchParams.get("image_id") || null;
         const filterPostId = searchParams.get("post_id") || null;
+        const window = buildFeedCandidateWindow(page, limit);
 
         let posts;
         const query = {
@@ -385,7 +415,7 @@ export function createPostsRouteHandlers({
                 },
               },
               { $sort: { is_voted: 1, created_at: -1 } },
-              { $limit: 600 },
+              { $limit: window.fetchLimit },
               { $project: { _id: 0, user_vote_data: 0 } },
             ])
             .toArray();
@@ -393,13 +423,16 @@ export function createPostsRouteHandlers({
           posts = await col
             .find(query, { projection: { _id: 0 } })
             .sort({ created_at: -1 })
-            .limit(300)
+            .limit(window.fetchLimit)
             .toArray();
         }
 
         if (!posts.length) {
-          return NextResponse.json({ items: [] }, { status: 200 });
+          return NextResponse.json({ items: [], hasMore: false }, { status: 200 });
         }
+
+        const rawHasMore = posts.length > window.candidateLimit;
+        posts = posts.slice(0, window.candidateLimit);
 
         const userVotesMap = {};
         if (currentUserId && posts.length > 0) {
@@ -518,13 +551,28 @@ export function createPostsRouteHandlers({
         const resolvedImages = await fetchPublicImagesByIds(
           ranked.map((post) => post.image_id),
         );
-        const visibleItems = mergeItemsWithPublicImages(ranked, resolvedImages);
-        const paginatedItems = visibleItems.slice(skip, skip + limit);
+        const { items: visibleItems, missingImageIds } = resolveRenderableItemsWithPublicImages(
+          ranked,
+          resolvedImages,
+        );
+        if (missingImageIds.length > 0) {
+          console.error(
+            "Community posts skipped unresolved public images:",
+            missingImageIds.filter(Boolean),
+          );
+        }
+        if (ranked.length > 0 && visibleItems.length === 0) {
+          return NextResponse.json(
+            { error: "Failed to list posts", detail: "Community feed contains unresolved image references" },
+            { status: 502 },
+          );
+        }
+        const paginatedItems = visibleItems.slice(window.pageOffset, window.pageOffset + limit);
 
         return NextResponse.json(
           {
             items: paginatedItems,
-            hasMore: visibleItems.length > skip + limit,
+            hasMore: visibleItems.length > window.pageOffset + limit || rawHasMore,
           },
           { status: 200 },
         );

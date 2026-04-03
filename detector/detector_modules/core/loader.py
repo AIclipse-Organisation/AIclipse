@@ -11,6 +11,7 @@ class ModelManager:
     def __init__(self):
         self._model = None
         self._class_names = None
+        self._current_version = MODEL_VERSION
         self._lock = threading.Lock()
 
     def get_current(self) -> Tuple[object, tuple, object]:
@@ -36,6 +37,7 @@ class ModelManager:
             with self._lock:
                 self._model = new_model
                 self._class_names = new_classes
+                self._current_version = Path(checkpoint_path).stem if checkpoint_path else MODEL_VERSION
             
             logger.info(f"Model successfully loaded from: {checkpoint_path or 'Base Model'}")
 
@@ -61,6 +63,10 @@ class ModelManager:
                 # If we are already trying to load the base model and it fails, 
                 # then the Docker image itself is broken.
                 raise RuntimeError("Critical Error: Even base model weights failed to load.")
+
+    def get_current_version(self) -> str:
+        with self._lock:
+            return self._current_version or MODEL_VERSION
 
 def cleanup_old_models(active_model_path: str):
     """
@@ -97,3 +103,7 @@ manager = ModelManager()
 
 def get_model():
     return manager.get_current()
+
+
+def get_model_version():
+    return manager.get_current_version()

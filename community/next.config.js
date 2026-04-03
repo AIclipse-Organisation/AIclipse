@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-module.exports = {
+const nextConfig = {
   basePath: "/community",
   output: "standalone",
   logging: {
@@ -24,3 +24,5 @@ module.exports = {
     return config;
   },
 };
+
+export default nextConfig;

@@ -148,6 +148,52 @@ async def test_admin_update_user_ok(client, users_coll, auth_mod):
 
 
 @pytest.mark.asyncio
+async def test_admin_update_user_returns_409_when_email_conflicts(client, users_coll, auth_mod):
+    await users_coll.insert_one(
+        {
+            "user_id": "u_admin_update_source",
+            "user_name": "Source",
+            "email": "source@example.com",
+            "password": _bcrypt_hash("oldpass"),
+            "is_admin": False,
+            "plan": 0,
+            "created_at": _now_utc(),
+            "date_of_birth": None,
+            "total_guesses": 0,
+            "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
+        }
+    )
+    await users_coll.insert_one(
+        {
+            "user_id": "u_admin_update_target",
+            "user_name": "Target",
+            "email": "target@example.com",
+            "password": _bcrypt_hash("oldpass"),
+            "is_admin": False,
+            "plan": 0,
+            "created_at": _now_utc(),
+            "date_of_birth": None,
+            "total_guesses": 0,
+            "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
+        }
+    )
+    admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
+
+    r = await client.patch(
+        "/admin/user/u_admin_update_source",
+        json={"email": "target@example.com"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert r.status_code == 409
+    assert r.json()["detail"] == "Email already registered"
+
+
+@pytest.mark.asyncio
 async def test_admin_create_user_hides_manual_password(client, users_coll, auth_mod):
     admin_token = _make_token(auth_mod, "u_admin", "admin@example.com", is_admin=True)
 

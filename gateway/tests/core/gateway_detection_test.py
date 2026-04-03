@@ -36,7 +36,15 @@ async def test_checks_ok_returns_detection_token(client, patch_upstreams, auth_k
         assert req.headers.get("x-user-id") == "u_det"
         assert req.headers.get("content-type") == "application/octet-stream"
         assert req.content == image_bytes
-        return httpx.Response(status_code=200, json={"verdict": "ok", "label": "clean", "confidence": 0.9})
+        return httpx.Response(
+            status_code=200,
+            json={
+                "verdict": "ok",
+                "label": "clean",
+                "confidence": 0.9,
+                "model_version": "v-det-1",
+            },
+        )
 
     patch_upstreams.add(host="detector", method="POST", path="/v1.0.1/checks", handler=detector_handler)
 
@@ -58,6 +66,8 @@ async def test_checks_ok_returns_detection_token(client, patch_upstreams, auth_k
     assert payload["verdict"] == "ok"
     assert payload["label"] == "clean"
     assert float(payload["confidence"]) == 0.9
+    assert payload["model_version"] == "v-det-1"
+    assert body["model_version"] == "v-det-1"
 
 
 @pytest.mark.asyncio
@@ -91,12 +101,22 @@ async def test_upload_image_validates_detection_token_and_proxies_to_media(clien
     image_bytes = PNG_1X1_BLACK
 
     def detector_handler(_req: httpx.Request) -> httpx.Response:
-        return httpx.Response(status_code=200, json={"verdict": "ok", "label": "clean", "confidence": 0.42})
+        return httpx.Response(
+            status_code=200,
+            json={
+                "verdict": "ok",
+                "label": "clean",
+                "confidence": 0.42,
+                "model_version": "v-det-2",
+            },
+        )
 
     patch_upstreams.add(host="detector", method="POST", path="/v1.0.1/checks", handler=detector_handler)
 
     def media_upload_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers.get("content-type", "").startswith("multipart/form-data")
+        assert b'name="model_version"' in req.content
+        assert b"v-det-2" in req.content
         return httpx.Response(
             status_code=201,
             json={
@@ -133,6 +153,53 @@ async def test_upload_image_validates_detection_token_and_proxies_to_media(clien
 
 
 @pytest.mark.asyncio
+async def test_upload_image_returns_503_when_media_is_unreachable(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_up",
+        email="u_up@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    image_bytes = PNG_1X1_BLACK
+
+    def detector_handler(_req: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=200,
+            json={
+                "verdict": "ok",
+                "label": "clean",
+                "confidence": 0.42,
+                "model_version": "v-det-3",
+            },
+        )
+
+    def media_upload_handler(_req: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=503, json={"detail": "Image metadata store unavailable"})
+
+    patch_upstreams.add(host="detector", method="POST", path="/v1.0.1/checks", handler=detector_handler)
+    patch_upstreams.add(host="media", method="POST", path="/upload/image", handler=media_upload_handler)
+
+    r1 = await client.post(
+        "/checks",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("x.png", image_bytes, "image/png")},
+    )
+    detection_token = r1.json()["detection_token"]
+
+    r2 = await client.post(
+        "/upload/image",
+        headers={"Authorization": f"Bearer {token}"},
+        data={"detection_token": detection_token, "is_public": "false"},
+        files={"file": ("x.png", image_bytes, "image/png")},
+    )
+
+    assert r2.status_code == 503
+    assert r2.json()["detail"] == "Media service error: 503"
+
+
+@pytest.mark.asyncio
 async def test_upload_image_rejects_modified_bytes(client, patch_upstreams, auth_keypair):
     token = make_auth_token(
         keypair=auth_keypair,
@@ -146,7 +213,15 @@ async def test_upload_image_rejects_modified_bytes(client, patch_upstreams, auth
     modified_bytes = PNG_1X1_WHITE
 
     def detector_handler(_req: httpx.Request) -> httpx.Response:
-        return httpx.Response(status_code=200, json={"verdict": "ok", "label": "clean", "confidence": 0.1})
+        return httpx.Response(
+            status_code=200,
+            json={
+                "verdict": "ok",
+                "label": "clean",
+                "confidence": 0.1,
+                "model_version": "v-det-4",
+            },
+        )
 
     patch_upstreams.add(host="detector", method="POST", path="/v1.0.1/checks", handler=detector_handler)
 
@@ -166,3 +241,71 @@ async def test_upload_image_rejects_modified_bytes(client, patch_upstreams, auth
     )
     assert r2.status_code == 400
     assert r2.json()["detail"] == "detection_token does not match uploaded image"
+
+
+@pytest.mark.asyncio
+async def test_checks_returns_503_when_usage_check_is_unreachable(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_quota",
+        email="u_quota@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    patch_upstreams.add(
+        host="auth",
+        method="POST",
+        path="/usage/check",
+        handler=lambda _req: httpx.Response(status_code=503, json={"detail": "usage unavailable"}),
+    )
+
+    r = await client.post(
+        "/checks",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("x.png", PNG_1X1_BLACK, "image/png")},
+    )
+
+    assert r.status_code == 503
+    assert r.json()["detail"] == "Usage service unavailable"
+
+
+@pytest.mark.asyncio
+async def test_checks_returns_503_when_usage_increment_fails_after_detection(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_quota_inc",
+        email="u_quota_inc@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    patch_upstreams.add(
+        host="detector",
+        method="POST",
+        path="/v1.0.1/checks",
+        handler=lambda _req: httpx.Response(
+            status_code=200,
+            json={
+                "verdict": "ok",
+                "label": "clean",
+                "confidence": 0.2,
+                "model_version": "v-det-5",
+            },
+        ),
+    )
+    patch_upstreams.add(
+        host="auth",
+        method="POST",
+        path="/usage/increment",
+        handler=lambda _req: httpx.Response(status_code=503, json={"detail": "usage unavailable"}),
+    )
+
+    r = await client.post(
+        "/checks",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("x.png", PNG_1X1_BLACK, "image/png")},
+    )
+
+    assert r.status_code == 503
+    assert r.json()["detail"] == "Usage service unavailable"

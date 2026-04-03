@@ -1,10 +1,5 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
-import {
-  ensureNotificationIndexes,
-  trimNotificationRetention,
-  capNotificationsForUser,
-} from "@/lib/notifications/notifications.js";
 
 const NOTIFICATIONS_COLLECTION = "community.notifications";
 const USERS_COLLECTION = "auth.users";
@@ -31,22 +26,6 @@ export function createNotificationsListHandler({ requireUser }) {
       const unreadOnly = String(searchParams.get("unread_only") || "").toLowerCase() === "true";
 
       const db = await getDb();
-
-      try {
-        await ensureNotificationIndexes(db);
-      } catch (err) {
-        console.warn("[notifications] index ensure failed on list:", String(err));
-      }
-      try {
-        await trimNotificationRetention(db);
-      } catch (err) {
-        console.warn("[notifications] retention trim failed on list:", String(err));
-      }
-      try {
-        await capNotificationsForUser(db, authenticatedUserId, 50);
-      } catch (err) {
-        console.warn("[notifications] cap enforcement failed on list:", String(err));
-      }
 
       const notificationsCol = db.collection(NOTIFICATIONS_COLLECTION);
       const usersCol = db.collection(USERS_COLLECTION);
@@ -114,17 +93,6 @@ export function createNotificationsUnreadCountHandler({ requireUser }) {
     try {
       const db = await getDb();
 
-      try {
-        await ensureNotificationIndexes(db);
-      } catch (err) {
-        console.warn("[notifications] index ensure failed on unread-count:", String(err));
-      }
-      try {
-        await trimNotificationRetention(db);
-      } catch (err) {
-        console.warn("[notifications] retention trim failed on unread-count:", String(err));
-      }
-
       const unread_count = await db.collection(NOTIFICATIONS_COLLECTION).countDocuments({
         recipient_user_id: authenticatedUserId,
         is_read: false,
@@ -181,16 +149,6 @@ export function createNotificationsReadHandler({ requireUser }) {
       }
 
       const db = await getDb();
-      try {
-        await ensureNotificationIndexes(db);
-      } catch (err) {
-        console.warn("[notifications] index ensure failed on read:", String(err));
-      }
-      try {
-        await trimNotificationRetention(db);
-      } catch (err) {
-        console.warn("[notifications] retention trim failed on read:", String(err));
-      }
 
       const result = await db.collection(NOTIFICATIONS_COLLECTION).updateMany(
         filter,

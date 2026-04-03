@@ -38,9 +38,9 @@ async def lifespan(app: FastAPI):
 
     # Best-effort JWKS preload; if it fails, retry lazily on first request.
     try:
-        await app.state.jwks.refresh(app, force=True)
-    except Exception as exc:
-        logging.warning("JWKS preload failed: %s", exc)
+        await app.state.jwks.refresh(app, force=True, quiet=True)
+    except Exception:
+        logging.info("JWKS preload deferred until auth service is ready")
     yield
 
     await app.state.http.aclose()

@@ -77,7 +77,7 @@ def register_profile_routes(bp: Blueprint, *, gateway: GatewayClient) -> None:
             clear_access_cookie(resp, request)
             return resp
 
-        if not bool(session.get("is_admin")):
+        if not bool(user.get("is_admin")):
             return "Forbidden: Admin access required", 403
 
         return redirect("/community/admin")

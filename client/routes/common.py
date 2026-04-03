@@ -9,7 +9,7 @@ from flask import jsonify, make_response, redirect, request, session
 from auth.cookies import clear_access_cookie, get_access_token
 from auth.gateway import GatewayClient
 from services.plan.subscription import resolve_billing_user
-from services.auth.session import get_session_user, resolve_current_user
+from services.auth.session import resolve_current_user
 
 _SAFE_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
 
@@ -82,10 +82,6 @@ def read_bounded_text(
 
 
 def resolve_viewer_or_error(*, deps: RouteDeps, token: str, missing_detail: str):
-    viewer = get_session_user()
-    if viewer and viewer.get("user_id"):
-        return viewer, None
-
     viewer, viewer_status = resolve_current_user(deps.gateway, token)
     if viewer_status == 401:
         return None, clear_session_and_return_unauthorized_json()
@@ -95,10 +91,6 @@ def resolve_viewer_or_error(*, deps: RouteDeps, token: str, missing_detail: str)
 
 
 def resolve_viewer_for_page_or_redirect(*, deps: RouteDeps, token: str):
-    viewer = get_session_user()
-    if viewer and viewer.get("user_id"):
-        return viewer, None
-
     viewer, viewer_status = resolve_current_user(deps.gateway, token)
     if viewer_status == 401:
         resp = make_response(redirect("/login"))
@@ -133,7 +125,6 @@ def resolve_billing_user_or_error(*, deps: RouteDeps, token: str):
     user, user_status = resolve_billing_user(
         gateway=deps.gateway,
         token=token,
-        user=session.get("current_user") if isinstance(session.get("current_user"), dict) else None,
     )
     if user_status == 401:
         return None, clear_session_and_return_unauthorized_json()

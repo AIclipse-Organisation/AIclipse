@@ -19,11 +19,7 @@ def resolve_billing_user(
     *,
     gateway: GatewayClient,
     token: str,
-    user: dict[str, Any] | None,
 ) -> tuple[dict[str, Any] | None, int]:
-    if isinstance(user, dict) and user.get("user_id"):
-        return user, 200
-
     return resolve_current_user(gateway, token)
 
 

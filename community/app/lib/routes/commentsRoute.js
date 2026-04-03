@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongo/mongo.js";
 import {
-  validateUserId,
   validatePostId,
   validateCommentId,
 } from "@/app/posts/validation.js";
@@ -19,6 +18,12 @@ const DELTA_TTL_SECONDS = 60 * 60;
 
 function makeCommentId() {
   return `c_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function resolveCommentAuthorName(currentUser) {
+  return String(
+    currentUser?.user_name || currentUser?.email || currentUser?.user_id || "Unknown",
+  ).trim();
 }
 
 function normalizeComment(raw) {
@@ -91,12 +96,11 @@ export function createCommentsRouteHandlers({ requireUser }) {
         return unauthorized(authErr);
       }
       const authenticatedUserId = currentUser.user_id;
+      const authenticatedUserName = resolveCommentAuthorName(currentUser);
 
       try {
         const body = await req.json().catch(() => null);
         const post_id = body?.post_id || null;
-        const user_id = body?.user_id || null;
-        const user_name = (body?.user_name || "").trim();
 
         const normalized = normalizeComment(body?.text);
         if (!normalized.ok) {
@@ -104,23 +108,10 @@ export function createCommentsRouteHandlers({ requireUser }) {
         }
         const text = normalized.text;
 
-        if (!post_id || !user_id || !user_name || !text) {
+        if (!post_id || !text) {
           return NextResponse.json(
-            { error: "Missing required fields: post_id, user_id, user_name, text" },
+            { error: "Missing required fields: post_id, text" },
             { status: 400 },
-          );
-        }
-
-        const userIdValidation = validateUserId(user_id);
-        if (!userIdValidation.valid) {
-          return NextResponse.json({ error: userIdValidation.error }, { status: 400 });
-        }
-        const safeUserId = userIdValidation.value;
-
-        if (safeUserId !== authenticatedUserId) {
-          return NextResponse.json(
-            { error: "Forbidden: Cannot post comments on behalf of other users" },
-            { status: 403 },
           );
         }
 
@@ -146,23 +137,23 @@ export function createCommentsRouteHandlers({ requireUser }) {
         const doc = {
           comment_id: makeCommentId(),
           post_id: safePostId,
-          user_id: safeUserId,
-          user_name,
+          user_id: authenticatedUserId,
+          user_name: authenticatedUserName,
           text,
           created_at: now,
           updated_at: now,
         };
 
         await commentsCol.insertOne(doc);
-        await recordActivity(db, safeUserId, SCORES.COMMENT, "comment");
+        await recordActivity(db, authenticatedUserId, SCORES.COMMENT, "comment");
 
-        if (postExists.user_id && postExists.user_id !== safeUserId) {
+        if (postExists.user_id && postExists.user_id !== authenticatedUserId) {
           await awardPoints(db, postExists.user_id, SCORES.RECEIVE_ENGAGEMENT, "receive_comment");
 
           try {
             await recordCollapsedNotification(db, {
               recipient_user_id: postExists.user_id,
-              actor_user_id: safeUserId,
+              actor_user_id: authenticatedUserId,
               post_id: safePostId,
               type: "comment",
               image_id: postExists.image_id || null,

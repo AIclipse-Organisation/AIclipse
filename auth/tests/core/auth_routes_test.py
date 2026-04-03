@@ -295,6 +295,59 @@ async def test_update_me_updates_fields(client, users_coll, auth_mod):
 
 
 @pytest.mark.asyncio
+async def test_update_me_returns_409_when_email_conflicts(client, users_coll, auth_mod):
+    await users_coll.insert_one(
+        {
+            "user_id": "u_conflict_source",
+            "user_name": "Source",
+            "email": "source@example.com",
+            "password": _bcrypt_hash("Secret123!"),
+            "is_admin": False,
+            "plan": 0,
+            "created_at": _now_utc(),
+            "date_of_birth": None,
+            "total_guesses": 0,
+            "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
+        }
+    )
+    await users_coll.insert_one(
+        {
+            "user_id": "u_conflict_target",
+            "user_name": "Target",
+            "email": "target@example.com",
+            "password": _bcrypt_hash("Secret123!"),
+            "is_admin": False,
+            "plan": 0,
+            "created_at": _now_utc(),
+            "date_of_birth": None,
+            "total_guesses": 0,
+            "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
+        }
+    )
+    token = _make_user_jwt(
+        auth_mod,
+        "u_conflict_source",
+        "source@example.com",
+        is_admin=False,
+        plan=0,
+        user_name="Source",
+    )
+
+    r = await client.patch(
+        "/me",
+        json={"email": "target@example.com"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert r.status_code == 409
+    assert r.json()["detail"] == "Email already registered"
+
+
+@pytest.mark.asyncio
 async def test_update_me_disclaimer_preference(client, users_coll, auth_mod):
     await users_coll.insert_one(
         {

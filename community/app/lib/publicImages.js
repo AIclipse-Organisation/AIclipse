@@ -53,17 +53,36 @@ function normalizeImageIds(imageIds) {
   return ids;
 }
 
-export function mergeItemsWithPublicImages(items, imageItems) {
+export function resolveRenderableItemsWithPublicImages(items, imageItems) {
   const imageMap = new Map(
     (Array.isArray(imageItems) ? imageItems : [])
       .filter((item) => item && item.image_id)
       .map((item) => [item.image_id, item]),
   );
 
-  return (Array.isArray(items) ? items : []).flatMap((item) => {
-    const image = imageMap.get(item?.image_id);
-    return image ? [{ ...image, ...item }] : [];
-  });
+  const renderableItems = [];
+  const missingImageIds = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const imageId = String(item?.image_id || "").trim();
+    if (!imageId) {
+      missingImageIds.push("");
+      continue;
+    }
+
+    const image = imageMap.get(imageId);
+    if (!image) {
+      missingImageIds.push(imageId);
+      continue;
+    }
+
+    renderableItems.push({ ...image, ...item });
+  }
+
+  return {
+    items: renderableItems,
+    missingImageIds,
+  };
 }
 
 export async function fetchPublicImagesByIds(imageIds) {

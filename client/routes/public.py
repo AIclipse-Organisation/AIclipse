@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import time
-
 from flask import Blueprint, make_response, redirect, render_template, request, session
 
 from auth.cookies import clear_access_cookie, get_access_token
 from config import cfg
 from routes.common import RouteDeps
+from services.auth.session import store_authenticated_user
 
 
 def build_public_blueprint(*, deps: RouteDeps):
@@ -29,9 +28,7 @@ def build_public_blueprint(*, deps: RouteDeps):
         if token:
             me, status = deps.gateway.fetch_me(token)
             if status == 200 and isinstance(me, dict):
-                session["current_user"] = me
-                session["is_admin"] = bool(me.get("is_admin"))
-                session["auth_checked_at"] = int(time.time())
+                store_authenticated_user(me)
                 return redirect("/upload")
 
             if status == 401:
