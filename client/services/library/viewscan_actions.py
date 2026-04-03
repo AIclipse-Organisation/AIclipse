@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import requests
 
-from services.community.lookup import fetch_post_id_for_image
-from services.community.parsing import extract_post_id, parse_json_response
+from services.community.posts import extract_post_id, fetch_post_id_for_image, parse_community_json_response
 from services.integrations.gateway import proxy_gateway_json_request
 
 
@@ -34,7 +33,7 @@ def _patch_post_description(
     except requests.RequestException:
         return {"detail": "Community service unreachable"}, 502
 
-    return parse_json_response(resp, detail="Non-JSON response from community service")
+    return parse_community_json_response(resp, detail="Non-JSON response from community service")
 
 
 def _create_post_for_image(
@@ -68,7 +67,7 @@ def _create_post_for_image(
     except requests.RequestException:
         return {"detail": "Community service unreachable"}, 502
 
-    return parse_json_response(resp, detail="Non-JSON response from community service")
+    return parse_community_json_response(resp, detail="Non-JSON response from community service")
 
 
 def _set_image_visibility(

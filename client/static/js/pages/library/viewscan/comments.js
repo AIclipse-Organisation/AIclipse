@@ -2,7 +2,9 @@
   if (window.AIclipseViewscanComments) return;
 
   const shared = window.AIclipseViewscanShared;
+  const api = window.AIclipseLibraryApi;
   if (!shared) return;
+  if (!api) return;
 
   const {
     clearEl,
@@ -145,11 +147,7 @@
       clearEl(listEl);
       listEl.appendChild(makeEl("div", "comm_loadingComments", "Loading..."));
       try {
-        const res = await fetch(`/viewscan/${encodeURIComponent(activeImageId)}/comments`, {
-          headers: { Accept: "application/json" },
-          credentials: "include",
-        });
-        const data = await res.json().catch(() => ({}));
+        const data = await api.listViewscanComments(activeImageId);
         renderComments(data.items || [], getCurrentViewer()?.user_id || null);
       } catch {
         clearEl(listEl);
@@ -161,17 +159,7 @@
       const activeImageId = getCurrentScan()?.image_id;
       if (!activeImageId) return;
       try {
-        const res = await fetch(
-          `/viewscan/${encodeURIComponent(activeImageId)}/comments/${encodeURIComponent(commentId)}`,
-          {
-            method: "DELETE",
-            credentials: "include",
-            headers: { Accept: "application/json" },
-          }
-        );
-        if (!res.ok) return;
-
-        const data = await res.json().catch(() => ({}));
+        const data = await api.removeViewscanComment(activeImageId, commentId);
         rowEl.remove();
 
         if (countEl) {
@@ -261,15 +249,7 @@
 
       postBtn.disabled = true;
       try {
-        const res = await fetch(`/viewscan/${encodeURIComponent(imageId)}/comments`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ text }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) return;
-
+        const data = await api.saveViewscanComment(imageId, { text });
         input.value = "";
         postBtn.disabled = true;
         sheet.dataset.loaded = "";

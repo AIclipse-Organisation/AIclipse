@@ -4,9 +4,7 @@ from typing import Any
 
 import requests
 
-
-def _community_posts_url(*, base_url: str) -> str:
-    return base_url.rstrip("/") + "/community/posts"
+from services.community.posts import fetch_moderation_statuses, fetch_post_for_image, merge_moderation_fields
 
 
 def _extract_item(payload: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -19,32 +17,6 @@ def _extract_item(payload: dict[str, Any] | None) -> dict[str, Any] | None:
 
     if payload.get("image_id"):
         return payload
-
-    return None
-
-
-def _find_matching_post(payload: dict[str, Any] | None, *, image_id: str) -> dict[str, Any] | None:
-    if not isinstance(payload, dict):
-        return None
-
-    candidates: list[dict[str, Any]] = []
-    if isinstance(payload.get("item"), dict):
-        candidates.append(payload["item"])
-    if isinstance(payload.get("items"), list):
-        candidates.extend(item for item in payload["items"] if isinstance(item, dict))
-    if payload.get("post_id") or payload.get("image_id"):
-        candidates.append(payload)
-
-    requested = str(image_id).strip()
-    for candidate in candidates:
-        candidate_image_id = (
-            candidate.get("image_id")
-            or candidate.get("imageId")
-            or (candidate.get("image") or {}).get("image_id")
-            or (candidate.get("image") or {}).get("id")
-        )
-        if candidate_image_id and str(candidate_image_id).strip() == requested:
-            return candidate
 
     return None
 
@@ -123,83 +95,6 @@ def _fetch_image_item(
     return image, None, 200
 
 
-def _fetch_public_post_for_image(
-    *,
-    image_id: str,
-    gateway_base_url: str,
-    timeout_seconds: int,
-) -> dict[str, Any] | None:
-    try:
-        resp = requests.get(
-            _community_posts_url(base_url=gateway_base_url),
-            headers={"Accept": "application/json"},
-            params={"image_id": image_id},
-            timeout=timeout_seconds,
-        )
-    except requests.RequestException:
-        return None
-
-    if resp.status_code != 200:
-        return None
-
-    try:
-        payload = resp.json()
-    except ValueError:
-        return None
-
-    return _find_matching_post(payload, image_id=image_id)
-
-
-def _fetch_moderation_status_for_image(
-    *,
-    image_id: str,
-    gateway_base_url: str,
-    timeout_seconds: int,
-) -> dict[str, Any] | None:
-    try:
-        resp = requests.post(
-            gateway_base_url.rstrip("/") + "/community/posts/moderation-status",
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
-            json={"image_ids": [image_id]},
-            timeout=timeout_seconds,
-        )
-    except requests.RequestException:
-        return None
-
-    if resp.status_code != 200:
-        return None
-
-    try:
-        payload = resp.json()
-    except ValueError:
-        return None
-
-    items = payload.get("items") if isinstance(payload, dict) else None
-    if not isinstance(items, list):
-        return None
-
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        candidate_image_id = str(item.get("image_id") or "").strip()
-        if candidate_image_id == str(image_id).strip():
-            return item
-
-    return None
-
-
-def _merge_moderation_fields(image: dict[str, Any], moderation: dict[str, Any] | None) -> dict[str, Any]:
-    if not moderation:
-        return image
-
-    merged = dict(image)
-    if moderation.get("moderation_status") is not None:
-        merged["moderation_status"] = moderation.get("moderation_status")
-    if moderation.get("moderation_reason") is not None:
-        merged["moderation_reason"] = moderation.get("moderation_reason")
-    return merged
-
-
 def build_viewscan_page_model(
     *,
     image_id: str,
@@ -217,12 +112,12 @@ def build_viewscan_page_model(
     if image_error:
         return image_error, image_status
 
-    moderation = _fetch_moderation_status_for_image(
-        image_id=image_id,
+    moderation_by_image_id = fetch_moderation_statuses(
+        image_ids=[image_id],
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,
     )
-    image = _merge_moderation_fields(image, moderation)
+    image = merge_moderation_fields(image, moderation_by_image_id.get(str(image_id).strip()))
 
     page_model: dict[str, Any] = {"image": image, "title": "View Scan"}
     if not image.get("is_public"):
@@ -231,7 +126,7 @@ def build_viewscan_page_model(
         page_model["actions"] = _build_viewscan_actions(image=page_model["image"], viewer=viewer)
         return page_model, 200
 
-    post = _fetch_public_post_for_image(
+    post = fetch_post_for_image(
         image_id=image_id,
         gateway_base_url=gateway_base_url,
         timeout_seconds=timeout_seconds,

@@ -1132,8 +1132,8 @@ def test_versioned_static_assets_are_cacheable_and_immutable(main_client_module)
 
 
 def test_images_api_is_sent_with_no_store_cache_policy(main_client_module, monkeypatch):
-    proxy_call = Mock(return_value=({"items": [{"image_id": "img_123"}]}, 200))
-    monkeypatch.setattr(main_client_module.route_library, "proxy_gateway_json_request", proxy_call)
+    list_images = Mock(return_value=({"items": [{"image_id": "img_123"}]}, 200))
+    monkeypatch.setattr(main_client_module.route_library, "list_images_page", list_images)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "img-token")
@@ -1144,3 +1144,8 @@ def test_images_api_is_sent_with_no_store_cache_policy(main_client_module, monke
     assert resp.get_json() == {"items": [{"image_id": "img_123"}]}
     assert resp.headers["Cache-Control"] == "no-store, max-age=0, must-revalidate"
     assert resp.headers["Pragma"] == "no-cache"
+    list_images.assert_called_once_with(
+        token="img-token",
+        gateway_base_url="http://gateway.test",
+        params={},
+    )

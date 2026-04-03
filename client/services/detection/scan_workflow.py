@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from services.community.posts import extract_post_id
 from services.integrations.gateway import proxy_gateway_json_request, proxy_gateway_multipart_request
 
 
@@ -13,15 +14,6 @@ def _resolve_image_id(payload: dict[str, Any]) -> str | None:
         or ((payload.get("body") or {}).get("image") or {}).get("image_id")
     )
     return str(image_id).strip() if image_id else None
-
-
-def _resolve_post_id(payload: dict[str, Any]) -> str | None:
-    post_id = (
-        payload.get("post_id")
-        or (payload.get("item") or {}).get("post_id")
-        or (payload.get("post") or {}).get("post_id")
-    )
-    return str(post_id).strip() if post_id else None
 
 
 def perform_results_save(
@@ -97,6 +89,6 @@ def perform_results_save(
         return post_payload, post_status
 
     result["published"] = True
-    result["post_id"] = _resolve_post_id(post_payload)
+    result["post_id"] = extract_post_id(post_payload)
     result["post"] = post_payload
     return result, 200

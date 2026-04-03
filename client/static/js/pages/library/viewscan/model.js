@@ -180,13 +180,10 @@
     const normalizedPostId = normalizeId(postId);
     if (!normalizedPostId) return;
     if (markedNotificationPostIds.has(normalizedPostId)) return;
+    const api = window.AIclipseLibraryApi;
+    if (!api) return;
 
-    await fetch("/community/notifications/read", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json", Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
-      body: JSON.stringify({ post_id: normalizedPostId }),
-    }).catch(() => null);
+    await api.markNotificationsRead(normalizedPostId).catch(() => null);
 
     markedNotificationPostIds.add(normalizedPostId);
     window.dispatchEvent(new Event("notifications:updated"));

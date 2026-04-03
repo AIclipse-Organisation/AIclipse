@@ -1,21 +1,28 @@
-// =========================
-// Scans page: fetch + render all scans
-// =========================
-
 let allScans = [];
 
-// -------------------------
-// Helper: Get Visibility
-// -------------------------
 function getVisibility(img) {
-  if (img && typeof img.is_public === "boolean")
+  if (img && typeof img.is_public === "boolean") {
     return img.is_public ? "public" : "private";
+  }
   return "private";
 }
 
-// -------------------------
-// DOM helpers
-// -------------------------
+function buildViewscanUrl(img, origin) {
+  const imageId = String(img?.image_id || "").trim();
+  if (!imageId) return null;
+
+  const resolvedOrigin =
+    origin || (typeof window !== "undefined" ? window.location.origin : "http://localhost");
+  const viewscanUrl = new URL(`/viewscan/${encodeURIComponent(imageId)}`, resolvedOrigin);
+  const postId = String(img?.post_id || img?.postId || img?.community_post_id || "").trim();
+  if (postId) {
+    viewscanUrl.searchParams.set("from", "scans");
+    viewscanUrl.searchParams.set("mark_post_id", postId);
+  }
+
+  return viewscanUrl.toString();
+}
+
 function clearEl(el) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }
@@ -41,7 +48,6 @@ function createEmptyState() {
 
   box.appendChild(iconEl);
   box.appendChild(text);
-
   wrapper.appendChild(box);
 
   const button = makeEl("button", "scans-empty-btn", "Go to Upload");
@@ -57,22 +63,13 @@ function createEmptyState() {
 function createScanCard(img, index) {
   const scanNumber = index + 1;
   const card = makeEl("div", "scan-card");
+  const viewscanUrl = buildViewscanUrl(img);
 
-  card.addEventListener("click", () => {
-    const postId = String(
-      img?.post_id || img?.postId || img?.community_post_id || "",
-    ).trim();
-    const imageId = String(img?.image_id || "").trim();
-    if (!imageId) return;
-
-    const viewscanUrl = new URL(`/viewscan/${encodeURIComponent(imageId)}`, window.location.origin);
-    if (postId) {
-      viewscanUrl.searchParams.set("from", "scans");
-      viewscanUrl.searchParams.set("mark_post_id", postId);
-    }
-
-    window.location.href = viewscanUrl.toString();
-  });
+  if (viewscanUrl) {
+    card.addEventListener("click", () => {
+      window.location.href = viewscanUrl;
+    });
+  }
 
   const row = makeEl("div", "scan-row");
   card.appendChild(row);
@@ -91,36 +88,30 @@ function createScanCard(img, index) {
     left.appendChild(makeEl("div", "image-placeholder", "No image"));
   }
 
-  // --- ADD VISIBILITY BADGE ---
-  const visibility = getVisibility(img);
-
-  if (visibility === "private") {
+  if (getVisibility(img) === "private") {
     const badge = makeEl("div", "scan-visibility-badge");
     badge.title = "Private Scan";
-    badge.innerHTML = `<svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>`;
+    badge.innerHTML =
+      '<svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>';
     left.appendChild(badge);
   }
 
-  // --- ADD MODERATION BADGE ---
   if (img.moderation_status === "removed") {
     const modBadge = makeEl("div", "scan-moderation-badge");
     modBadge.title = img.moderation_reason || "Removed by moderation";
-    modBadge.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
+    modBadge.innerHTML =
+      '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
     left.appendChild(modBadge);
   }
-
 
   return card;
 }
 
-// -------------------------
-// Skeleton Loader & Fetch
-// -------------------------
 function renderSkeletonCards(count = 9) {
   const containerEl = document.getElementById("scans-container");
   if (!containerEl) return;
   clearEl(containerEl);
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < count; i += 1) {
     containerEl.appendChild(makeEl("div", "skeleton-card"));
   }
 }
@@ -140,71 +131,22 @@ function renderScans() {
   });
 }
 
-function applyModerationStatuses(scans, moderationItems) {
-  const moderationByImageId = {};
-  (moderationItems || []).forEach((item) => {
-    if (item?.image_id) {
-      moderationByImageId[item.image_id] = item;
-    }
-  });
-
-  scans.forEach((img) => {
-    const moderation = moderationByImageId[img.image_id];
-    if (!moderation) return;
-    img.moderation_status = moderation.moderation_status;
-    img.moderation_reason = moderation.moderation_reason;
-  });
-}
-
-async function enrichModerationStatuses(scans) {
-  if (!Array.isArray(scans) || scans.length === 0) return;
-
-  try {
-    const imageIds = scans.map((img) => img.image_id).filter(Boolean);
-
-    const modRes = await fetch("/community/posts/moderation-status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-      credentials: "include",
-      cache: "no-store",
-      body: JSON.stringify({ image_ids: imageIds }),
-    });
-
-    if (!modRes.ok) return;
-
-    const modData = await modRes.json();
-    applyModerationStatuses(scans, modData.items);
-  } catch (err) {
-    console.warn("Failed to fetch moderation status:", err);
-  }
-}
-
 async function loadScans() {
   const statusEl = document.getElementById("scans-status");
   const containerEl = document.getElementById("scans-container");
-  if (!statusEl || !containerEl) return;
+  const api = window.AIclipseLibraryApi;
+  if (!statusEl || !containerEl || !api) return;
 
   statusEl.textContent = "";
   renderSkeletonCards(9);
 
   try {
-    const res = await fetch("/images", { credentials: "include", cache: "no-store" });
-    if (!res.ok) {
-      clearEl(containerEl);
-      statusEl.textContent = "Failed to load scans.";
-      return;
-    }
-
-    const data = await res.json();
-    allScans = data.items || [];
-
-    await enrichModerationStatuses(allScans);
-
-    statusEl.textContent = "";
+    const data = await api.listImages();
+    allScans = Array.isArray(data?.items) ? data.items : [];
     renderScans();
   } catch (err) {
     clearEl(containerEl);
-    statusEl.textContent = "Error loading scans.";
+    statusEl.textContent = err?.message || "Failed to load scans.";
   }
 }
 
@@ -216,7 +158,7 @@ if (typeof window !== "undefined") {
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    applyModerationStatuses,
+    buildViewscanUrl,
     getVisibility,
   };
 }

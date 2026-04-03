@@ -19,7 +19,9 @@ if (typeof module !== "undefined" && module.exports) {
   if (window.AIclipseViewscanActions) return;
 
   const shared = window.AIclipseViewscanShared;
+  const api = window.AIclipseLibraryApi;
   if (!shared) return;
+  if (!api) return;
 
   const {
     ensureStylesheet,
@@ -54,25 +56,6 @@ if (typeof module !== "undefined" && module.exports) {
     setHidden(makePrivateBtn, !visible.showMakePrivate);
     setHidden(deleteBtn, !visible.showDeleteScan);
     setHidden(editDescriptionBtn, !visible.showEditDescription);
-  }
-
-  async function patchDescriptionByImageId(imageId, description) {
-    const response = await fetch(`/viewscan/${encodeURIComponent(imageId)}/description`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ description }),
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.error || data.detail || `Failed to update (${response.status})`);
-    }
-
-    return data;
   }
 
   function setupEditDescriptionInline(img, renderDescriptionHeader) {
@@ -193,7 +176,7 @@ if (typeof module !== "undefined" && module.exports) {
         setFormStatus("Saving...", null);
 
         try {
-          await patchDescriptionByImageId(activeScan.image_id, description);
+          await api.updateViewscanDescription(activeScan.image_id, { description });
           activeScan.description = description;
           activeScan.updated_at = new Date().toISOString();
           renderDescriptionHeader(activeScan);
@@ -257,17 +240,7 @@ if (typeof module !== "undefined" && module.exports) {
         actionBtn.textContent = "Making private...";
 
         try {
-          const res = await fetch(`/viewscan/${encodeURIComponent(activeScan.image_id)}/make-private`, {
-            method: "POST",
-            credentials: "include",
-            headers: { Accept: "application/json" },
-          });
-
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            throw new Error(data.error || data.detail || `Failed to make private (${res.status})`);
-          }
-
+          await api.makeViewscanPrivate(activeScan.image_id);
           activeScan.is_public = false;
           setTimeout(() => {
             window.location.href = "/profile";
@@ -336,17 +309,7 @@ if (typeof module !== "undefined" && module.exports) {
         deleteBtn.textContent = "Deleting...";
 
         try {
-          const res = await fetch(`/viewscan/${encodeURIComponent(activeScan.image_id)}`, {
-            method: "DELETE",
-            credentials: "include",
-            headers: { Accept: "application/json" },
-          });
-
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            throw new Error(data.error || data.detail || `Failed to delete scan (${res.status})`);
-          }
-
+          await api.deleteViewscan(activeScan.image_id);
           setTimeout(() => {
             window.location.href = "/profile";
           }, 600);
@@ -366,24 +329,12 @@ if (typeof module !== "undefined" && module.exports) {
   }
 
   async function handleMakePublic(img, description) {
-    const publishRes = await fetch(`/viewscan/${encodeURIComponent(img.image_id)}/publish`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        description,
-        verdict: img.verdict || null,
-        label: img.label || null,
-        confidence: img.confidence || null,
-      }),
+    const publishData = await api.publishViewscan(img.image_id, {
+      description,
+      verdict: img.verdict || null,
+      label: img.label || null,
+      confidence: img.confidence || null,
     });
-
-    if (!publishRes.ok) {
-      const errorData = await publishRes.json().catch(() => ({}));
-      throw new Error(errorData.detail || errorData.error || `Failed to publish (${publishRes.status})`);
-    }
-
-    const publishData = await publishRes.json().catch(() => ({}));
     if (publishData.post_id) img.post_id = publishData.post_id;
     img.up_vote_count = img.up_vote_count ?? 0;
     img.down_vote_count = img.down_vote_count ?? 0;

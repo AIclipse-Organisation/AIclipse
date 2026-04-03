@@ -16,12 +16,16 @@ describe("scans HTML template contract", () => {
 
   // Ensures the scans page actually loads the script that renders data.
   test("loads scans page script", () => {
+    expect(html).toMatch(/asset_url\('js\/core\/http\.js'\)/);
+    expect(html).toMatch(/asset_url\('js\/pages\/library\/api\.js'\)/);
     expect(html).toMatch(/<script src="\{\{ asset_url\('js\/pages\/library\/scans\.js'\) \}\}"><\/script>/);
   });
 
-  test("profile page keeps scans rendering client-driven instead of inlining a scans bootstrap model", () => {
+  test("profile page keeps scans rendering client-driven with the shared library api", () => {
     expect(profileHtml).not.toMatch(/id="scans-page-model"/);
     expect(profileHtml).toMatch(/id="scans-container"/);
+    expect(profileHtml).toMatch(/asset_url\('js\/core\/http\.js'\)/);
+    expect(profileHtml).toMatch(/asset_url\('js\/pages\/library\/api\.js'\)/);
     expect(profileHtml).toMatch(/asset_url\('js\/pages\/library\/scans\.js'\)/);
   });
 });

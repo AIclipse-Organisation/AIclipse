@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import requests
 
-from services.community.lookup import fetch_post_id_for_image
-from services.community.parsing import parse_json_response
+from services.community.posts import fetch_post_id_for_image, parse_community_json_response
 
 
 def _community_comments_url(*, base_url: str) -> str:
@@ -34,7 +33,7 @@ def list_viewscan_comments(
     except requests.RequestException:
         return {"detail": "Community service unreachable"}, 502
 
-    return parse_json_response(resp, detail="Non-JSON response from community service")
+    return parse_community_json_response(resp, detail="Non-JSON response from community service")
 
 
 def create_viewscan_comment(
@@ -75,7 +74,7 @@ def create_viewscan_comment(
     except requests.RequestException:
         return {"detail": "Community service unreachable"}, 502
 
-    return parse_json_response(resp, detail="Non-JSON response from community service")
+    return parse_community_json_response(resp, detail="Non-JSON response from community service")
 
 
 def delete_viewscan_comment(
@@ -98,4 +97,4 @@ def delete_viewscan_comment(
     except requests.RequestException:
         return {"detail": "Community service unreachable"}, 502
 
-    return parse_json_response(resp, detail="Non-JSON response from community service")
+    return parse_community_json_response(resp, detail="Non-JSON response from community service")

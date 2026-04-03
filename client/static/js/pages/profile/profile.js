@@ -2,8 +2,17 @@
 window.addEventListener("DOMContentLoaded", async () => {
   const statusEl = document.getElementById("user-details-status");
   const containerEl = document.getElementById("user-details-container");
+  const http = window.AIclipseHttp;
   let currentUserPlan = 0;
   let hasPaidPlan = false;
+
+  async function requestJson(method, url, body) {
+    if (!http) {
+      throw new Error("AIclipseHttp is unavailable");
+    }
+    const { res, data } = await http.jsonFetch(method, url, body);
+    return { ok: res.ok, status: res.status, data };
+  }
 
   function formatDateDMY(value) {
     if (!value) return "-";
@@ -20,17 +29,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     statusEl.textContent = "";
     statusEl.className = "status-message";
 
-    const response = await fetch("/auth/me", {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "include",
-    });
+    const response = await requestJson("GET", "/auth/me");
 
     if (!response.ok) {
       throw new Error("Failed to fetch user details");
     }
 
-    const user = await response.json();
+    const user = response.data;
 
     // Calculate accuracy based on admin post guesses (ground truth data)
     const adminCorrect = (user.admin_guesses_correct || 0);
@@ -140,17 +145,13 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   async function loadSubscriptionStatus() {
     try {
-      const response = await fetch("/billing/subscription/status", {
-        method: "GET",
-        headers: { Accept: "application/json" },
-        credentials: "include",
-      });
+      const response = await requestJson("GET", "/billing/subscription/status");
 
       if (!response.ok) {
         return;
       }
 
-      const data = await response.json();
+      const data = response.data;
       cancellationAlreadyScheduled = Boolean(data.cancel_at_period_end);
       const rawStatus = String(data.status || "none").toLowerCase();
       const periodEndDate = data.billing_period_end ? new Date(data.billing_period_end) : null;
@@ -319,18 +320,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     confirmCancelSubBtn.disabled = true;
     try {
-      const response = await fetch("/billing/subscription/cancel-at-period-end", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        credentials: "include",
-        body: JSON.stringify({ reason: selectedReason }),
+      const response = await requestJson("POST", "/billing/subscription/cancel-at-period-end", {
+        reason: selectedReason,
       });
-
-      const data = await response.json().catch(() => ({}));
+      const data = response.data || {};
       if (!response.ok) {
         const msg = data.detail || "Unable to cancel subscription right now.";
         alert(msg);
@@ -424,18 +417,8 @@ window.addEventListener("DOMContentLoaded", async () => {
       confirmDeleteAccount.disabled = true;
 
       try {
-        const response = await fetch("/auth/me", {
-          method: "DELETE",
-          headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
-          credentials: "include",
-        });
-
-        let data = null;
-        try {
-          data = await response.json();
-        } catch (_) {
-          data = null;
-        }
+        const response = await requestJson("DELETE", "/auth/me");
+        const data = response.data || null;
 
         if (response.ok) {
           window.location.href = "/";

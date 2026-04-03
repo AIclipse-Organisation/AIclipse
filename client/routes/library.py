@@ -9,6 +9,7 @@ from routes.common import (
     validate_resource_id,
 )
 from services.integrations.gateway import proxy_gateway_json_request
+from services.library.images import list_images_page
 
 
 def build_library_blueprint(*, deps: RouteDeps):
@@ -29,13 +30,10 @@ def build_library_blueprint(*, deps: RouteDeps):
         if is_public is not None:
             params["is_public"] = is_public
 
-        data, status = proxy_gateway_json_request(
-            method="GET",
-            base_url=deps.gateway_uri,
-            path="/images",
+        data, status = list_images_page(
             token=token,
+            gateway_base_url=deps.gateway_uri,
             params=params,
-            invalid_json_detail="Invalid JSON from gateway on /images",
         )
         return jsonify(data), status
 

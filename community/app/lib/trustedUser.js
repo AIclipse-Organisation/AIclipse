@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { readForwardedTrustedUser } from "./forwardedUser";
 
 function cleanToken(value) {
   if (!value) return "";
@@ -73,6 +74,14 @@ async function fetchGatewayUser(accessToken) {
 }
 
 async function resolveTrustedUser(req) {
+  const forwardedUser = readForwardedTrustedUser(
+    req?.headers,
+    process.env.INTERNAL_AUTH_TOKEN,
+  );
+  if (forwardedUser) {
+    return forwardedUser;
+  }
+
   const accessToken = await getAccessToken(req);
   return fetchGatewayUser(accessToken);
 }

@@ -155,6 +155,7 @@ async def gateway_community_posts_click(request: Request, payload: dict = Body(.
         _community_base_url(request),
         "/community/posts/click",
         json_body=payload,
+        headers=_auth_headers(request),
         timeout_s=_timeout(request),
     )
 
@@ -231,6 +232,7 @@ async def gateway_community_comments_get(
         _community_base_url(request),
         "/community/posts/comments",
         params=params or None,
+        headers=_auth_headers(request),
         timeout_s=_timeout(request),
     )
 

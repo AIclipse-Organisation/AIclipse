@@ -61,6 +61,44 @@ async def test_community_posts_create_proxies_authenticated_user(client, patch_u
 
 
 @pytest.mark.asyncio
+async def test_community_posts_patch_proxies_authenticated_user(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_posts",
+        email="u_posts@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    def community_patch_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_posts"
+        assert req.headers.get("x-user-email") == "u_posts@example.com"
+        assert req.headers.get("x-user-is-admin") == "false"
+        assert req.url.params.get("post_id") == "post_123"
+        assert req.read() == b'{"description":"Updated"}'
+        return httpx.Response(status_code=200, json={"message": "Post updated successfully"})
+
+    patch_upstreams.add(
+        host="community",
+        method="PATCH",
+        path="/community/posts",
+        handler=community_patch_handler,
+    )
+
+    response = await client.patch(
+        "/community/posts",
+        params={"post_id": "post_123"},
+        headers={"Authorization": f"Bearer {token}"},
+        json={"description": "Updated"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Post updated successfully"
+
+
+@pytest.mark.asyncio
 async def test_community_moderation_status_proxies_json_response(client, patch_upstreams):
     def moderation_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers.get("authorization") is None
@@ -103,3 +141,45 @@ async def test_community_moderation_status_proxies_json_response(client, patch_u
             }
         ]
     }
+
+
+@pytest.mark.asyncio
+async def test_community_comments_get_proxies_with_internal_token(client, patch_upstreams):
+    def comments_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.url.params.get("post_id") == "post_123"
+        return httpx.Response(status_code=200, json={"items": [{"comment_id": "c_1"}]})
+
+    patch_upstreams.add(
+        host="community",
+        method="GET",
+        path="/community/posts/comments",
+        handler=comments_handler,
+    )
+
+    response = await client.get("/community/posts/comments", params={"post_id": "post_123"})
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [{"comment_id": "c_1"}]}
+
+
+@pytest.mark.asyncio
+async def test_community_posts_click_proxies_with_internal_token(client, patch_upstreams):
+    def click_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.read() == b'{"post_id":"post_123"}'
+        return httpx.Response(status_code=200, json={"ok": True})
+
+    patch_upstreams.add(
+        host="community",
+        method="POST",
+        path="/community/posts/click",
+        handler=click_handler,
+    )
+
+    response = await client.post("/community/posts/click", json={"post_id": "post_123"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
