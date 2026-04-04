@@ -49,6 +49,7 @@ async def lifespan(app: FastAPI):
         api_repo = ApiKeyRepo(db)
         deletion_log_repo = UserDeletionLogRepo(db)
         await user_repo.ensure_indexes()
+        await user_repo.ensure_default_user_fields()
         await api_repo.ensure_indexes()
         await deletion_log_repo.ensure_indexes()
         # Old users may have age field; migrate to date_of_birth only when explicitly requested.

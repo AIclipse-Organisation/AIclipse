@@ -564,16 +564,6 @@
       const currentUser = await shared.loadCurrentUserContext();
       global.currentUserId = currentUser?.user_id || null;
       doNotShowDisclaimerAgain = !!currentUser?.do_not_show_disclaimer_again;
-
-      if (
-        currentUser &&
-        global.AIclipseTutorial &&
-        typeof global.AIclipseTutorial.setUserScope === "function"
-      ) {
-        global.AIclipseTutorial.setUserScope(
-          currentUser.user_id || currentUser.email || currentUser.user_name || "",
-        );
-      }
     })();
   }
 

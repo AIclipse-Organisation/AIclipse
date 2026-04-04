@@ -128,6 +128,44 @@ class FakeUsersColl:
     async def create_index(self, *args, **kwargs):
         return None
 
+    async def update_many(self, flt: dict, update: dict):
+        set_doc = dict(update.get("$set", {}))
+        matched = 0
+        modified = 0
+
+        exists_filters = {
+            key: value["$exists"]
+            for key, value in flt.items()
+            if isinstance(value, dict) and "$exists" in value
+        }
+
+        for user_id, doc in list(self.docs.items()):
+            applies = True
+            for key, should_exist in exists_filters.items():
+                exists = key in doc
+                if exists != bool(should_exist):
+                    applies = False
+                    break
+            if not applies:
+                continue
+
+            matched += 1
+            next_doc = dict(doc)
+            changed = False
+            for key, value in set_doc.items():
+                if next_doc.get(key) != value:
+                    next_doc[key] = value
+                    changed = True
+            if changed:
+                self.docs[user_id] = next_doc
+                modified += 1
+
+        class _Res:
+            matched_count = matched
+            modified_count = modified
+
+        return _Res()
+
     async def insert_one(self, doc: dict):
         user_id = doc.get("user_id")
         email = (doc.get("email") or "").strip().lower()

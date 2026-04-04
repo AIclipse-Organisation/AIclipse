@@ -1,6 +1,7 @@
 {% set tutorial_user_id = current_user.get('user_id') if current_user else '' %}
+{% set tutorial_quick_start_suppressed = '1' if current_user and current_user.get('do_not_show_quick_start_again') else '0' %}
 
-<div id="tutorial-user-scope" data-user-id="{{ tutorial_user_id }}" hidden></div>
+<div id="tutorial-user-scope" data-user-id="{{ tutorial_user_id }}" data-quick-start-suppressed="{{ tutorial_quick_start_suppressed }}" hidden></div>
 <div id="app-asset-context" data-static-version="{{ static_asset_version|default('', true) }}" hidden></div>
 
 <div class="topbar" data-autohide="true">

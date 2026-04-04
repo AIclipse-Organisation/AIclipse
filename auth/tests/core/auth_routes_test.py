@@ -237,6 +237,7 @@ async def test_get_me_ok(client, users_coll, auth_mod):
     assert body["total_guesses"] == 3
     assert body["total_correct"] == 2
     assert body["do_not_show_disclaimer_again"] is False
+    assert body["do_not_show_quick_start_again"] is False
 
 
 @pytest.mark.asyncio
@@ -379,6 +380,48 @@ async def test_update_me_disclaimer_preference(client, users_coll, auth_mod):
     stored = await users_coll.find_one({"user_id": "u_me_pref"})
     assert stored is not None
     assert stored["do_not_show_disclaimer_again"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_me_quick_start_preference(client, users_coll, auth_mod):
+    await users_coll.insert_one(
+        {
+            "user_id": "u_me_quickstart",
+            "user_name": "QuickStart",
+            "email": "quickstart@example.com",
+            "password": _bcrypt_hash("Secret123!"),
+            "is_admin": False,
+            "plan": 0,
+            "created_at": _now_utc(),
+            "date_of_birth": None,
+            "total_guesses": 0,
+            "total_correct": 0,
+            "acc_guessing_ai": 0,
+            "acc_guessing_real": 0,
+            "do_not_show_disclaimer_again": False,
+            "do_not_show_quick_start_again": False,
+        }
+    )
+    token = _make_user_jwt(
+        auth_mod,
+        "u_me_quickstart",
+        "quickstart@example.com",
+        is_admin=False,
+        plan=0,
+        user_name="QuickStart",
+    )
+
+    r = await client.patch(
+        "/me",
+        json={"do_not_show_quick_start_again": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    assert r.json()["do_not_show_quick_start_again"] is True
+
+    stored = await users_coll.find_one({"user_id": "u_me_quickstart"})
+    assert stored is not None
+    assert stored["do_not_show_quick_start_again"] is True
 
 
 @pytest.mark.asyncio

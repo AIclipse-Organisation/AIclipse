@@ -59,6 +59,7 @@ class UserPublic(BaseModel):
     usage_reset_date: Optional[datetime] = None
     stripe_customer_id: Optional[str] = None
     do_not_show_disclaimer_again: bool = False
+    do_not_show_quick_start_again: bool = False
     # Gamification fields
     community_score: Optional[int] = 0
     current_streak: Optional[int] = 0
@@ -120,6 +121,7 @@ class UpdateMeRequest(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = None
     do_not_show_disclaimer_again: Optional[bool] = None
+    do_not_show_quick_start_again: Optional[bool] = None
 
 
 class TokenUser(BaseModel):
@@ -160,6 +162,7 @@ def build_user_public(doc: dict) -> UserPublic:
         usage_reset_date=doc.get("usage_reset_date"),
         stripe_customer_id=doc.get("stripe_customer_id"),
         do_not_show_disclaimer_again=bool(doc.get("do_not_show_disclaimer_again", False)),
+        do_not_show_quick_start_again=bool(doc.get("do_not_show_quick_start_again", False)),
         # Gamification fields
         community_score=doc.get("community_score", 0),
         current_streak=doc.get("current_streak", 0),
@@ -332,6 +335,7 @@ async def signup(request: Request, payload: SignupRequest):
         "usage_reset_date": None,
         "stripe_customer_id": None,
         "do_not_show_disclaimer_again": False,
+        "do_not_show_quick_start_again": False,
         "how_did_you_find_us": how_did_you_find_us,
         "how_did_you_find_us_detail": how_did_you_find_us_detail,
     }
@@ -405,6 +409,8 @@ async def update_me(request: Request, body: UpdateMeRequest, user: TokenUser = D
             raise HTTPException(status_code=400, detail=str(e))
     if "do_not_show_disclaimer_again" in raw and raw["do_not_show_disclaimer_again"] is not None:
         update_doc["do_not_show_disclaimer_again"] = bool(raw["do_not_show_disclaimer_again"])
+    if "do_not_show_quick_start_again" in raw and raw["do_not_show_quick_start_again"] is not None:
+        update_doc["do_not_show_quick_start_again"] = bool(raw["do_not_show_quick_start_again"])
 
     if not update_doc:
         doc = await users.find_one({"user_id": user.user_id})

@@ -1,4 +1,41 @@
-(function bootstrapAIclipseTutorial() {
+function shouldShowTutorialWelcome({
+  pageId,
+  welcomeSeenVersion,
+  version,
+  activeModuleId,
+  quickStartDismissed,
+}) {
+  if (pageId !== "upload") return false;
+  if (quickStartDismissed) return false;
+  if (welcomeSeenVersion === version) return false;
+  if (activeModuleId) return false;
+  return true;
+}
+
+function shouldHandleTutorialEmit({ runtime, step, eventName }) {
+  if (!runtime?.moduleId || runtime.paused) return false;
+  if (!step?.completeEvent) return false;
+  return step.completeEvent === eventName;
+}
+
+function isRenderableTutorialRect(rect, viewportWidth, viewportHeight) {
+  if (!rect) return false;
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  if (rect.right <= 0 || rect.bottom <= 0) return false;
+  if (rect.left >= viewportWidth || rect.top >= viewportHeight) return false;
+  return true;
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    shouldShowTutorialWelcome,
+    shouldHandleTutorialEmit,
+    isRenderableTutorialRect,
+  };
+}
+
+if (typeof window !== "undefined") {
+  (function bootstrapAIclipseTutorial() {
   const PAGE_MAP = {
     "/upload": "upload",
     "/results": "results",
@@ -40,6 +77,8 @@
   let autoScrolledStepKey = "";
   let hitboxMode = "hidden";
   let elevatedElements = [];
+  let activeStepCleanup = null;
+  let activeStepCleanupKey = "";
 
   function getUserScope() {
     const fromBody = document.body?.dataset?.tutorialUser;
@@ -60,6 +99,49 @@
     }
 
     return "anonymous";
+  }
+
+  function getQuickStartSuppressed() {
+    const fromBody = document.body?.dataset?.tutorialQuickStartSuppressed;
+    if (fromBody != null && fromBody !== "") {
+      return fromBody === "1";
+    }
+
+    const scopeEl = document.getElementById("tutorial-user-scope");
+    return scopeEl?.dataset?.quickStartSuppressed === "1";
+  }
+
+  function markQuickStartSuppressed() {
+    if (document.body?.dataset) {
+      document.body.dataset.tutorialQuickStartSuppressed = "1";
+    }
+
+    const scopeEl = document.getElementById("tutorial-user-scope");
+    if (scopeEl?.dataset) {
+      scopeEl.dataset.quickStartSuppressed = "1";
+    }
+  }
+
+  async function persistQuickStartDismissal() {
+    try {
+      const response = await fetch("/auth/me", {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({ do_not_show_quick_start_again: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`quick-start preference update failed (${response.status})`);
+      }
+
+      markQuickStartSuppressed();
+    } catch (error) {
+      console.warn("[tutorials] quick-start preference update failed", error);
+    }
   }
 
   const USER_SCOPE = getUserScope();
@@ -299,6 +381,18 @@
     elevatedElements = [];
   }
 
+  function runActiveStepCleanup() {
+    const cleanup = activeStepCleanup;
+    activeStepCleanup = null;
+    activeStepCleanupKey = "";
+
+    if (typeof cleanup !== "function") return;
+
+    try {
+      cleanup();
+    } catch {}
+  }
+
   function applyElevatedSelectors(step) {
     clearElevatedElements();
 
@@ -356,6 +450,7 @@
     stopTracking();
     clearOverlayStyles();
     clearElevatedElements();
+    runActiveStepCleanup();
 
     const { card } = ensureDom();
     card.innerHTML = "";
@@ -378,7 +473,7 @@
     }
 
     const rect = el.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
+    return isRenderableTutorialRect(rect, window.innerWidth, window.innerHeight);
   }
 
   function findTarget(selector) {
@@ -676,7 +771,13 @@
   }) {
     const { card } = openUi();
 
+    if (activeStepCleanup && activeStepCleanupKey !== stepKey) {
+      runActiveStepCleanup();
+    }
+
     renderedStepKey = stepKey;
+    activeStepCleanup = typeof step?.cleanup === "function" ? step.cleanup : null;
+    activeStepCleanupKey = activeStepCleanup ? stepKey : "";
 
     card.innerHTML = `
       <div class="aiclipse-tutorial-head">
@@ -740,9 +841,17 @@
     const progress = getProgress();
     const runtime = getRuntime();
 
-    if (getCurrentPageId() !== "upload") return;
-    if (progress.welcomeSeenVersion === VERSION) return;
-    if (runtime.moduleId) return;
+    if (
+      !shouldShowTutorialWelcome({
+        pageId: getCurrentPageId(),
+        welcomeSeenVersion: progress.welcomeSeenVersion,
+        version: VERSION,
+        activeModuleId: runtime.moduleId,
+        quickStartDismissed: getQuickStartSuppressed(),
+      })
+    ) {
+      return;
+    }
 
     renderCard({
       kicker: "Welcome",
@@ -761,6 +870,7 @@
             next.dismissedAt = Date.now();
             setProgress(next);
             hideUi();
+            void persistQuickStartDismissal();
           },
         },
         {
@@ -1077,11 +1187,9 @@
 
     emit(eventName, detail = {}) {
       const runtime = getRuntime();
-      if (!runtime.moduleId) return;
 
       const step = resolveStep(runtime);
-      if (!step || !step.completeEvent) return;
-      if (step.completeEvent !== eventName) return;
+      if (!shouldHandleTutorialEmit({ runtime, step, eventName })) return;
 
       if (step.advanceOnComplete === false) {
         runtime.context = { ...(runtime.context || {}), ...detail };
@@ -1190,4 +1298,5 @@
   } else {
     init();
   }
-})();
+  })();
+}

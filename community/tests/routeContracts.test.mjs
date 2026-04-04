@@ -113,3 +113,17 @@ test("feed route does not use fixed 600/300 candidate limits", () => {
   assert.doesNotMatch(postsRoute, /\.limit\(600\)/);
   assert.doesNotMatch(postsRoute, /\.limit\(300\)/);
 });
+
+test("community shell does not reference missing legacy tutorial assets", () => {
+  const layout = readRepoFile("app/layout.jsx");
+
+  assert.doesNotMatch(layout, /\/static\/css\/tutorial\.css/);
+  assert.doesNotMatch(layout, /\/static\/js\/tutorial-core\.js/);
+});
+
+test("community tutorial entry routes to the shared tutorials page", () => {
+  const topbar = readRepoFile("app/components/Topbar.jsx");
+
+  assert.match(topbar, /window\.location\.href = "\/tutorials"/);
+  assert.doesNotMatch(topbar, /openCenter/);
+});

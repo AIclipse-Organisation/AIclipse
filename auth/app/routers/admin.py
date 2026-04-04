@@ -248,6 +248,7 @@ async def admin_create_user(
         "usage_reset_date": None,
         "stripe_customer_id": None,
         "do_not_show_disclaimer_again": False,
+        "do_not_show_quick_start_again": False,
     }
 
     await users.insert_one(user_doc)
