@@ -114,6 +114,7 @@ def get_images_collection():
                 try:
                     mc.close()
                 except Exception:
+                    # Best-effort cleanup — we drop the reference either way.
                     pass
             mc = None
 

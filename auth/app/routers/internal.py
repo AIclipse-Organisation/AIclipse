@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import logging
-import math
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from pydantic import BaseModel
 
 from app.deps.authz import require_internal_token

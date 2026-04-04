@@ -53,6 +53,17 @@ billing_coll = None
 # -------------------------
 _auth_http = httpx.Client(timeout=5.0)
 
+# user_id is minted by auth as f"u_{uuid4()}". Validating at the URL
+# interpolation boundary stops path traversal (e.g. "../admin") from routing
+# the internal call to an unintended auth endpoint.
+_USER_ID_RE = re.compile(r"^u_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def _require_valid_user_id(user_id: str) -> str:
+    if not isinstance(user_id, str) or not _USER_ID_RE.match(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+    return user_id
+
 
 def _auth_headers() -> dict:
     return {"X-Internal-Token": INTERNAL_AUTH_TOKEN} if INTERNAL_AUTH_TOKEN else {}
@@ -62,6 +73,7 @@ def _read_user_plan(user_id: str) -> dict:
     """Return {"user_id", "plan", "stripe_customer_id"} or {} if not found."""
     if not AUTH_URI or not INTERNAL_AUTH_TOKEN:
         raise HTTPException(status_code=503, detail="Auth service not configured")
+    _require_valid_user_id(user_id)
     resp = _auth_http.get(f"{AUTH_URI}/internal/user/{user_id}", headers=_auth_headers())
     if resp.status_code == 404:
         return {}
@@ -73,6 +85,7 @@ def _update_user_plan(user_id: str, plan: int, stripe_customer_id: str | None = 
     """Update user plan via auth. Returns {"updated": bool, "previous_plan": int}."""
     if not AUTH_URI or not INTERNAL_AUTH_TOKEN:
         raise HTTPException(status_code=503, detail="Auth service not configured")
+    _require_valid_user_id(user_id)
     body: dict = {"plan": plan}
     if stripe_customer_id is not None:
         body["stripe_customer_id"] = stripe_customer_id
@@ -501,8 +514,11 @@ async def stripe_webhook(request: Request):
 
     event = json.loads(payload)
 
+    # Stripe-controlled strings are stripped of control chars before any log
+    # or DB use so that a crafted webhook can't forge log lines (invariant
+    # #13 in ARCHITECTURE.md). Values still pass signature verification above.
     event_type = event.get("type")
-    event_id = event.get("id")
+    event_id = RequestLogSanitizer._clean_text(event.get("id"), max_len=64)
 
     logger.info("Webhook verified: id=%s type=%s", event_id, event_type)
 
@@ -523,20 +539,25 @@ async def stripe_webhook(request: Request):
         amount_paid = meta.get("amount_paid")
         stripe_customer_id = meta.get("stripe_customer_id") or session.get("customer")
 
-        logger.info(
-            "checkout.session.completed: session=%s user_id=%s plan_id=%s amount_paid=%s customer_id=%s",
-            session_id,
-            user_id, plan_id_raw, amount_paid, stripe_customer_id
-        )
-
         try:
             new_plan = int(plan_id_raw)
         except Exception:
             new_plan = 0
 
-        if not user_id:
-            logger.warning("missing user_id in metadata; ignoring session=%s", session_id)
-            return {"status": "ignored", "reason": "missing_user_id"}
+        if not user_id or not _USER_ID_RE.match(user_id):
+            # Returning 200 here avoids Stripe retrying a permanently-bad event.
+            safe_session_id = RequestLogSanitizer._clean_text(session_id, max_len=64)
+            logger.warning("missing/invalid user_id in metadata; ignoring session=%s", safe_session_id)
+            return {"status": "ignored", "reason": "invalid_user_id"}
+        # user_id has matched _USER_ID_RE (UUID format), so this is a no-op —
+        # but it makes the sanitization explicit at the log boundary.
+        user_id = RequestLogSanitizer._clean_text(user_id, max_len=64)
+
+        logger.info(
+            "checkout.session.completed: session=%s user_id=%s plan_id=%s amount_paid=%s customer_id=%s",
+            session_id,
+            user_id, plan_id_raw, amount_paid, stripe_customer_id
+        )
 
         now = _now_utc()
         period_start = now
@@ -650,16 +671,25 @@ async def stripe_webhook(request: Request):
                 sort=[("timestamp", -1)],
             )
 
+        user_id = None
+        current_plan = 0
         if last_billing and last_billing.get("user_id"):
             user_id = last_billing["user_id"]
             current_plan = int(last_billing.get("plan", 0) or 0)
         elif last_plan and last_plan.get("user_id"):
             user_id = last_plan["user_id"]
+
+        if user_id and not _USER_ID_RE.match(user_id):
+            logger.warning("skipping deleted-subscription webhook: invalid user_id in stored record")
+            user_id = None
+        elif user_id:
+            # Idempotent for valid IDs; makes log-time sanitization explicit.
+            user_id = RequestLogSanitizer._clean_text(user_id, max_len=64)
+
+        if user_id and last_billing is None:
+            # user_id came from plan_coll; fetch current plan via auth.
             user_info = _read_user_plan(user_id)
             current_plan = int(user_info.get("plan", 0))
-        else:
-            user_id = None
-            current_plan = 0
 
         if user_id:
             now = _now_utc()

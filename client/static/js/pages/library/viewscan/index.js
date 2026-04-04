@@ -182,7 +182,7 @@
     const visibilityEl = document.getElementById("scan-quick-visibility");
     if (visibilityEl && img) {
       visibilityEl.textContent =
-        img && typeof img.is_public === "boolean" && img.is_public ? "Public" : "Private";
+        typeof img.is_public === "boolean" && img.is_public ? "Public" : "Private";
     }
 
     const uploadDateEl = document.getElementById("vs-upload-date");
