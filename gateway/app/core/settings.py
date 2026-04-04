@@ -39,8 +39,14 @@ class Settings:
     # CPU pool
     cpu_pool_workers: int
 
+    # CORS
+    allowed_origins: list
+
     @staticmethod
     def from_env() -> "Settings":
+        raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+        allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()] if raw_origins else []
+
         return Settings(
             auth_uri=os.getenv("AUTH_URI"),
             billing_uri=os.getenv("BILLING_URI"),
@@ -56,6 +62,7 @@ class Settings:
             max_pixels=40_000_000,
             http_timeout_s=10.0,
             cpu_pool_workers=_get_int_env("CPU_POOL_WORKERS", 4),
+            allowed_origins=allowed_origins,
         )
 
 

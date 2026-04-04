@@ -1,0 +1,788 @@
+openapi: 3.0.3
+info:
+  title: Community Service (Internal API)
+  version: "1.0.0"
+  description: >
+    Internal API consumed by Gateway via proxy.
+    All /community/internal/* routes require X-Internal-Token header
+    and user context forwarded in X-User-* headers.
+    Browser-facing routes at /community/* use cookie-based auth.
+servers:
+  - url: http://community-srv:3000
+
+components:
+  securitySchemes:
+    internalAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+      description: Internal service-to-service token.
+
+  schemas:
+    Post:
+      type: object
+      properties:
+        post_id:
+          type: string
+          example: "post_1714000000_abc123"
+        user_id:
+          type: string
+        user_name:
+          type: string
+        image_id:
+          type: string
+        description:
+          type: string
+          maxLength: 1000
+        result:
+          type: string
+          enum: [real, ai]
+          nullable: true
+        ground_truth:
+          type: string
+          enum: [real, ai]
+          nullable: true
+        is_admin_post:
+          type: boolean
+        clicks_count:
+          type: integer
+        up_vote_count:
+          type: integer
+        down_vote_count:
+          type: integer
+        comment_count:
+          type: integer
+        controversial_since:
+          type: number
+          nullable: true
+          description: Unix seconds when post became controversial, or null.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        user_vote:
+          type: string
+          enum: [up, down]
+          nullable: true
+          description: Current user's vote on this post (null if not voted).
+        score:
+          type: number
+          description: Ranking score used for feed ordering.
+        is_reported:
+          type: boolean
+        report_count:
+          type: integer
+        is_removed:
+          type: boolean
+        moderation_status:
+          type: string
+          enum: [removed, cleared, deleted]
+          nullable: true
+
+    Comment:
+      type: object
+      properties:
+        comment_id:
+          type: string
+          example: "c_1714000000_abc123"
+        post_id:
+          type: string
+        user_id:
+          type: string
+        user_name:
+          type: string
+        text:
+          type: string
+          maxLength: 1000
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Notification:
+      type: object
+      properties:
+        notification_id:
+          type: string
+        recipient_user_id:
+          type: string
+        actor_user_id:
+          type: string
+        actor_user_name:
+          type: string
+        post_id:
+          type: string
+        type:
+          type: string
+          enum: [vote, comment, moderation, receive_vote, receive_comment]
+        vote_value:
+          type: string
+          enum: [real, ai]
+          nullable: true
+        moderation_action:
+          type: string
+          enum: [removed, deleted]
+          nullable: true
+        moderation_reason:
+          type: string
+          nullable: true
+        image_id:
+          type: string
+          nullable: true
+        is_read:
+          type: boolean
+        event_count:
+          type: integer
+          description: Number of collapsed events in this notification.
+        created_at:
+          type: string
+          format: date-time
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreatePostRequest:
+      type: object
+      required: [image_id, description]
+      properties:
+        image_id:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+        result:
+          type: string
+          enum: [real, ai]
+          nullable: true
+        ground_truth:
+          type: string
+          enum: [real, ai]
+          nullable: true
+        is_admin_post:
+          type: boolean
+          default: false
+
+    VoteRequest:
+      type: object
+      required: [post_id, vote]
+      properties:
+        post_id:
+          type: string
+        vote:
+          type: string
+          enum: [up, down]
+
+    VoteResponse:
+      type: object
+      properties:
+        post_id:
+          type: string
+        up_vote_count:
+          type: integer
+        down_vote_count:
+          type: integer
+        user_vote:
+          type: string
+          enum: [up, down]
+        points_awarded:
+          type: integer
+
+    ClickRequest:
+      type: object
+      required: [post_id]
+      properties:
+        post_id:
+          type: string
+
+    ClickResponse:
+      type: object
+      properties:
+        post_id:
+          type: string
+        clicks_count:
+          type: integer
+        counted:
+          type: boolean
+          description: False if within 60s cooldown.
+
+    ReportRequest:
+      type: object
+      required: [post_id]
+      properties:
+        post_id:
+          type: string
+        reason:
+          type: string
+          default: "General Flag"
+        details:
+          type: string
+
+    ModerationRequest:
+      type: object
+      required: [post_id, action]
+      properties:
+        post_id:
+          type: string
+        action:
+          type: string
+          enum: [remove, dismiss]
+        note:
+          type: string
+
+    ModerationStatusRequest:
+      type: object
+      required: [image_ids]
+      properties:
+        image_ids:
+          type: array
+          items:
+            type: string
+
+    CreateCommentRequest:
+      type: object
+      required: [post_id, text]
+      properties:
+        post_id:
+          type: string
+        text:
+          type: string
+          maxLength: 1000
+
+    MarkReadRequest:
+      type: object
+      properties:
+        mark_all:
+          type: boolean
+        post_id:
+          type: string
+        notification_ids:
+          type: array
+          items:
+            type: string
+
+paths:
+  /community/healthz:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        "200":
+          description: OK (plain text "OK")
+
+  # ───────────────── Internal Posts ─────────────────
+  /community/internal/posts:
+    get:
+      summary: List posts (internal)
+      tags: [Posts]
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-User-Is-Admin
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: user_id
+          schema:
+            type: string
+        - in: query
+          name: image_id
+          schema:
+            type: string
+        - in: query
+          name: post_id
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated posts with ranking scores and vote deltas from Redis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Post"
+                  hasMore:
+                    type: boolean
+    post:
+      summary: Create post (internal)
+      tags: [Posts]
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-User-Name
+          schema:
+            type: string
+        - in: header
+          name: X-User-Is-Admin
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "201":
+          description: Post created. Image visibility synced to public via Gateway.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          description: Missing fields, invalid image_id, description too long
+        "401":
+          description: Unauthorized
+        "502":
+          description: Failed to sync image visibility
+    patch:
+      summary: Update post (internal)
+      tags: [Posts]
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                description:
+                  type: string
+                  maxLength: 1000
+      responses:
+        "200":
+          description: Post updated
+        "403":
+          description: Not post owner
+        "404":
+          description: Post not found
+    delete:
+      summary: Delete post (internal)
+      tags: [Posts]
+      description: >
+        Soft-deletes post. Admin can delete any post. Deletes associated
+        comments, votes, and image. Sends moderation notification if admin.
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-User-Is-Admin
+          schema:
+            type: string
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Post deleted
+        "403":
+          description: Not owner and not admin
+        "404":
+          description: Post not found
+
+  # ───────────────── Internal Votes ─────────────────
+  /community/internal/posts/vote:
+    post:
+      summary: Vote on post (internal)
+      tags: [Votes]
+      description: >
+        One vote per user per post (immutable). Updates user accuracy stats
+        for admin posts with ground_truth. Queues vote delta to Redis
+        (5s debounce, 60s max wait).
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteRequest"
+      responses:
+        "200":
+          description: Vote recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoteResponse"
+        "400":
+          description: Invalid input
+        "403":
+          description: Already voted on this post
+        "404":
+          description: Post not found
+
+  # ───────────────── Internal Clicks ─────────────────
+  /community/internal/posts/click:
+    post:
+      summary: Track post click (internal)
+      tags: [Clicks]
+      description: 60-second cooldown per user per post. Queues click delta to Redis.
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClickRequest"
+      responses:
+        "200":
+          description: Click tracked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClickResponse"
+        "400":
+          description: Missing post_id
+        "404":
+          description: Post not found
+
+  # ───────────────── Internal Comments ─────────────────
+  /community/internal/posts/comments:
+    get:
+      summary: List comments (internal)
+      tags: [Comments]
+      security:
+        - internalAuth: []
+      parameters:
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Up to 100 comments, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comment"
+    post:
+      summary: Create comment (internal)
+      tags: [Comments]
+      description: >
+        Text is normalized (CRLF to LF, collapsed spaces/newlines, trimmed).
+        Creates notification for post author. Queues comment delta to Redis
+        (30s debounce, 60s max wait).
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-User-Name
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Comment"
+                  - type: object
+                    properties:
+                      comment_count:
+                        type: integer
+        "400":
+          description: Invalid post_id, empty/too long comment
+        "404":
+          description: Post not found
+    delete:
+      summary: Delete comment (internal)
+      tags: [Comments]
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: comment_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comment deleted
+        "403":
+          description: Not comment author
+        "404":
+          description: Comment not found
+
+  # ───────────────── Internal Reports & Moderation ─────────────────
+  /community/internal/posts/report:
+    get:
+      summary: List reported posts (admin, internal)
+      tags: [Moderation]
+      description: Returns reported posts sorted by report_count desc. Admin only.
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Is-Admin
+          required: true
+          schema:
+            type: string
+            enum: ["true"]
+      responses:
+        "200":
+          description: Reported posts with report_history
+        "403":
+          description: Not admin
+    post:
+      summary: Report post (internal)
+      tags: [Moderation]
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "200":
+          description: Post reported
+        "404":
+          description: Post not found
+    patch:
+      summary: Moderate reported post (admin, internal)
+      tags: [Moderation]
+      description: >
+        Admin action on reported post. "remove" hides post and syncs image
+        visibility. "dismiss" clears moderation status.
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-User-Is-Admin
+          required: true
+          schema:
+            type: string
+            enum: ["true"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "200":
+          description: Moderation action applied
+
+  /community/internal/posts/moderation-status:
+    post:
+      summary: Check image moderation status (internal)
+      tags: [Moderation]
+      security:
+        - internalAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationStatusRequest"
+      responses:
+        "200":
+          description: Moderation status per image
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        image_id:
+                          type: string
+                        moderation_status:
+                          type: string
+                          enum: [removed, cleared]
+                        moderation_reason:
+                          type: string
+
+  # ───────────────── Internal Notifications ─────────────────
+  /community/internal/notifications:
+    get:
+      summary: Get notifications (internal)
+      tags: [Notifications]
+      description: Returns up to 50 notifications, collapsed by type/actor/post, sorted by last_event_at desc.
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: unread_only
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Notifications with unread_count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+                  unread_count:
+                    type: integer
+
+  /community/internal/notifications/unread-count:
+    get:
+      summary: Get unread notification count (internal)
+      tags: [Notifications]
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unread_count:
+                    type: integer
+
+  /community/internal/notifications/read:
+    post:
+      summary: Mark notifications as read (internal)
+      tags: [Notifications]
+      description: Provide one of mark_all, post_id, or notification_ids.
+      security:
+        - internalAuth: []
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkReadRequest"
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  modified_count:
+                    type: integer
+        "400":
+          description: No marking criteria provided

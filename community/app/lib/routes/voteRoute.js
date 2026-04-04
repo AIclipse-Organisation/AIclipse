@@ -4,10 +4,10 @@ import { validatePostId } from "@/app/posts/validation.js";
 import { getRedis } from "@/lib/redis/redis";
 import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
 import { recordActivity, awardPoints, SCORES } from "@/lib/gamification/scoring.js";
+import { incrementUserStats } from "@/lib/auth/authInternal.js";
 
 const POSTS_COLLECTION = "community.posts";
 const VOTES_COLLECTION = "community.votes";
-const USERS_COLLECTION = "auth.users";
 
 const FLUSH_ZSET = "votes:flush_at";
 const FLUSH_DEBOUNCE_MS = 5_000;
@@ -53,7 +53,6 @@ export function createVoteHandler({ requireUser }) {
       const db = await getDb();
       const posts = db.collection(POSTS_COLLECTION);
       const votes = db.collection(VOTES_COLLECTION);
-      const users = db.collection(USERS_COLLECTION);
 
       const postDoc = await posts.findOne(
         { post_id: safePostId },
@@ -123,18 +122,17 @@ export function createVoteHandler({ requireUser }) {
         }
       }
 
-      await users.updateOne({ user_id: safeUserId }, { $inc: incQuery });
+      await incrementUserStats(safeUserId, incQuery);
 
       const votePoints = wasCorrectAdminVote ? SCORES.CORRECT_ADMIN_VOTE : SCORES.VOTE;
       await recordActivity(
-        db,
         safeUserId,
         votePoints,
         wasCorrectAdminVote ? "correct_admin_vote" : "vote",
       );
 
       if (postDoc.user_id && postDoc.user_id !== safeUserId) {
-        await awardPoints(db, postDoc.user_id, SCORES.RECEIVE_ENGAGEMENT, "receive_vote");
+        await awardPoints(postDoc.user_id, SCORES.RECEIVE_ENGAGEMENT, "receive_vote");
         try {
           await recordCollapsedNotification(db, {
             recipient_user_id: postDoc.user_id,

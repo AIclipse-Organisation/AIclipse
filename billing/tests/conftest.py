@@ -28,13 +28,11 @@ def state(monkeypatch, billing_module):
     monkeypatch.setattr(billing_module, "STRIPE_WEBHOOK_SECRET", "whsec_test", raising=False)
     monkeypatch.setattr(billing_module, "STRIPE_PUBLISHABLE_KEY", "pk_test", raising=False)
     monkeypatch.setattr(billing_module, "CLIENT_URL", "http://localhost:5000", raising=False)
+    monkeypatch.setattr(billing_module, "AUTH_URI", "http://auth-srv:3000", raising=False)
+    monkeypatch.setattr(billing_module, "INTERNAL_AUTH_TOKEN", "internal-token", raising=False)
 
-    users_coll = Mock(name="users_coll")
     plan_coll = Mock(name="plan_coll")
     billing_coll = Mock(name="billing_coll")
-
-    users_coll.find_one.return_value = {"plan": 0}
-    users_coll.update_one.return_value = SimpleNamespace(matched_count=1, modified_count=1)
 
     plan_coll.find_one.return_value = None
     plan_coll.insert_one.return_value = SimpleNamespace(inserted_id="plan_1")
@@ -43,15 +41,28 @@ def state(monkeypatch, billing_module):
     billing_coll.update_many.return_value = SimpleNamespace(matched_count=1, modified_count=1)
     billing_coll.insert_one.return_value = SimpleNamespace(inserted_id="bill_1")
 
-    monkeypatch.setattr(billing_module, "users_coll", users_coll, raising=False)
     monkeypatch.setattr(billing_module, "plan_coll", plan_coll, raising=False)
     monkeypatch.setattr(billing_module, "billing_coll", billing_coll, raising=False)
+
+    # Auth internal API: mock at the helper layer so tests can configure the
+    # user plan billing reads and assert the update call args without poking
+    # at httpx internals.
+    auth_read = Mock(
+        name="_read_user_plan",
+        return_value={"user_id": "user_1", "plan": 0, "stripe_customer_id": "cus_123"},
+    )
+    auth_update = Mock(
+        name="_update_user_plan",
+        return_value={"updated": True, "previous_plan": 0},
+    )
+    monkeypatch.setattr(billing_module, "_read_user_plan", auth_read, raising=False)
+    monkeypatch.setattr(billing_module, "_update_user_plan", auth_update, raising=False)
 
     customer_create = Mock(return_value=SimpleNamespace(id="cus_123"))
     customer_modify = Mock(return_value=None)
     subscription_modify = Mock(return_value=SimpleNamespace(id="sub_123", current_period_end=1_900_000_000))
     checkout_create = Mock(return_value=SimpleNamespace(id="cs_123", url="https://stripe.test/checkout"))
-    webhook_construct = Mock(return_value={"id": "evt_default", "type": "unknown", "data": {"object": {}}})
+    webhook_construct = Mock(return_value=None)
 
     monkeypatch.setattr(
         billing_module.stripe,
@@ -79,9 +90,10 @@ def state(monkeypatch, billing_module):
     )
 
     return {
-        "users_coll": users_coll,
         "plan_coll": plan_coll,
         "billing_coll": billing_coll,
+        "auth_read": auth_read,
+        "auth_update": auth_update,
         "customer_create": customer_create,
         "customer_modify": customer_modify,
         "subscription_modify": subscription_modify,

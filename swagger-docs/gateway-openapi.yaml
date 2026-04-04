@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Gateway Service
-  version: "0.0.2"
+  version: "1.0.0"
 servers:
   - url: http://localhost:8080
     description: Gateway local
@@ -21,129 +21,107 @@ components:
       name: X-Api-Key
       description: >
         Developer API key. Only accepted on /v1/checks and /checks.
-        Gateway exchanges it internally for a short-lived JWT.
+        Gateway exchanges it internally for a short-lived JWT via Auth Service.
 
   schemas:
-    SavedImage:
+    DetectionResponse:
       type: object
-      description: Saved image in user's history or community.
-      required:
-        - image_id
-        - verdict
-        - label
-        - confidence
-        - is_public
-        - uploaded_at
-        - url
+      required: [verdict, label, confidence, model_version, detection_token]
       properties:
-        image_id:
-          type: string
         verdict:
           type: string
-          description: High-level verdict from detector (e.g. "ai", "human").
+          enum: [REAL, FAKE]
         label:
           type: string
-          description: Human-readable label for the verdict.
+          enum: [real, fake, suspicious]
         confidence:
           type: number
           format: float
-          description: Confidence in range [0, 1].
+          minimum: 0
+          maximum: 1
+        model_version:
+          type: string
+        detection_token:
+          type: string
+          description: >
+            HS256 token binding detection result to image bytes and user.
+            Must be passed to /upload/image. Valid for 10 minutes.
+
+    SavedImage:
+      type: object
+      required: [image_id, verdict, label, confidence, is_public, uploaded_at]
+      properties:
+        image_id:
+          type: string
+        user_id:
+          type: string
+        s3_key:
+          type: string
+        verdict:
+          type: string
+        label:
+          type: string
+        confidence:
+          type: number
+          format: float
+        model_version:
+          type: string
+          nullable: true
         is_public:
           type: boolean
         uploaded_at:
           type: string
           format: date-time
+        is_reported:
+          type: boolean
         url:
           type: string
           format: uri
-          description: URL to access the image bytes (direct or signed).
-        user_id:
-          type: string
-          description: Owner user ID (not always needed on the client).
-        is_reported:
+          description: Presigned S3 URL.
+
+    UpdateImageRequest:
+      type: object
+      properties:
+        is_public:
           type: boolean
-          description: Whether the image has been reported by users.
-
-    ApiKeyPublic:
-      type: object
-      required: [key_id, created_at, last4]
-      properties:
-        key_id:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-        last_used_at:
-          type: string
-          format: date-time
-          nullable: true
-        last4:
-          type: string
-
-    ApiKeyGetResponse:
-      type: object
-      properties:
-        key:
-          allOf:
-            - $ref: "#/components/schemas/ApiKeyPublic"
           nullable: true
 
-    ApiKeyCreateResponse:
+    UsageLimitError:
       type: object
-      required: [api_key, key]
       properties:
-        api_key:
+        error:
           type: string
-          description: Full API key in format "{key_id}.{secret}". Returned only on rotation/creation.
-        key:
-          $ref: "#/components/schemas/ApiKeyPublic"
-
-    ApiKeyRevokeResponse:
-      type: object
-      required: [revoked]
-      properties:
-        revoked:
-          type: boolean
-
-    DetectionResponse:
-      type: object
-      required: [verdict, label, confidence, detection_token]
-      properties:
-        verdict:
+          example: usage_limit_exceeded
+        message:
           type: string
-          description: High-level verdict (e.g. "ai", "human").
-        label:
-          type: string
-          description: Human-readable label for the verdict.
-        confidence:
-          type: number
-          format: float
-          description: Confidence in range [0, 1].
-        detection_token:
-          type: string
-          description: >
-            Signed token issued by Gateway that binds the detection result to the exact image bytes and user.
-            It must be passed back to /upload/image and is only validated by Gateway.
+        monthly_usage:
+          type: integer
+        limit:
+          type: integer
 
 paths:
+  # ───────────────── Health ─────────────────
   /healthz:
     get:
       summary: Health check
+      tags: [Health]
       responses:
         "200":
           description: OK
 
+  # ───────────────── Auth Proxy (Public) ─────────────────
   /auth/signup:
     post:
       summary: User signup
-      description: Register a new user account via Gateway (proxy to Auth Service).
+      tags: [Auth]
+      description: Proxy to Auth Service /signup.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [user_name, email, date_of_birth, password]
+              required: [user_name, email, date_of_birth, password, how_did_you_find_us]
               properties:
                 user_name:
                   type: string
@@ -153,23 +131,28 @@ paths:
                   format: email
                 date_of_birth:
                   type: string
-                  pattern: '^\\d{2}-\\d{2}-\\d{4}$'
-                  description: Date of birth in DD-MM-YYYY format.
+                  pattern: '^\d{2}-\d{2}-\d{4}$'
                 password:
                   type: string
                   format: password
+                how_did_you_find_us:
+                  type: string
+                  enum: [social_media, browsing, friend_or_colleague, news_article, youtube, linkedin, other]
+                how_did_you_find_us_detail:
+                  type: string
       responses:
-        "201":
-          description: User created
+        "202":
+          description: Signup request accepted (pending admin approval)
         "400":
-          description: Invalid payload
+          description: Invalid payload or weak password
         "409":
           description: Email already registered
 
   /auth/login:
     post:
       summary: User login
-      description: Authenticate and obtain a JWT access token via Gateway (proxy to Auth Service).
+      tags: [Auth]
+      description: Proxy to Auth Service /login.
       requestBody:
         required: true
         content:
@@ -186,14 +169,34 @@ paths:
                   format: password
       responses:
         "200":
-          description: Login successful
+          description: Login successful (returns JWT and user profile)
         "401":
           description: Invalid credentials
+        "403":
+          description: Account pending admin approval
 
+  /auth/public/user/{user_id}:
+    get:
+      summary: Get public user profile
+      tags: [Auth]
+      description: Proxy to Auth Service /public/user/{user_id}. No auth required.
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Public user profile
+        "404":
+          description: User not found
+
+  # ───────────────── Auth Proxy (Authenticated) ─────────────────
   /auth/me:
     get:
       summary: Get current user profile
-      description: Proxy to Auth Service /me using the JWT provided to the Gateway.
+      tags: [Auth]
       security:
         - bearerAuth: []
       responses:
@@ -203,7 +206,7 @@ paths:
           description: Unauthorized
     patch:
       summary: Update current user profile
-      description: Proxy to Auth Service /me (PATCH).
+      tags: [Auth]
       security:
         - bearerAuth: []
       requestBody:
@@ -221,6 +224,10 @@ paths:
                 password:
                   type: string
                   format: password
+                do_not_show_disclaimer_again:
+                  type: boolean
+                do_not_show_quick_start_again:
+                  type: boolean
       responses:
         "200":
           description: Updated user profile
@@ -228,9 +235,11 @@ paths:
           description: Invalid payload
         "401":
           description: Unauthorized
+        "409":
+          description: Email already registered
     delete:
       summary: Delete current user account
-      description: Proxy to Auth Service /me (DELETE).
+      tags: [Auth]
       security:
         - bearerAuth: []
       responses:
@@ -239,31 +248,152 @@ paths:
         "401":
           description: Unauthorized
 
+  # ───────────────── Auth Proxy (API Keys) ─────────────────
+  /auth/api-key:
+    get:
+      summary: Get API key metadata
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: API key metadata (or null)
+        "401":
+          description: Unauthorized
+    post:
+      summary: Create/rotate API key
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: API key created/rotated (full key returned once)
+        "401":
+          description: Unauthorized
+        "409":
+          description: Rotation conflict; retry
+    delete:
+      summary: Revoke API key
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Revocation result
+        "401":
+          description: Unauthorized
+
+  # ───────────────── Usage ─────────────────
+  /usage/check:
+    post:
+      summary: Check usage quota
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usage quota status
+        "401":
+          description: Unauthorized
+
+  /usage/increment:
+    post:
+      summary: Record usage event
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usage incremented
+        "401":
+          description: Unauthorized
+
+  # ───────────────── Auth Proxy (Admin) ─────────────────
   /auth/admin/users:
     get:
       summary: List users (admin)
-      description: Proxy to Auth Service /admin/users. Requires admin user.
+      tags: [Auth Admin]
       security:
         - bearerAuth: []
       parameters:
         - in: query
-          name: user_name
+          name: search
           schema:
             type: string
-          required: false
-          description: Optional case-insensitive partial match on user_name.
+        - in: query
+          name: is_admin
+          schema:
+            type: boolean
+        - in: query
+          name: access_status
+          schema:
+            type: string
+            enum: [approved, pending, rejected]
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [created_at, user_name, email]
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum: [asc, desc]
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: page_size
+          schema:
+            type: integer
       responses:
         "200":
-          description: List of users
+          description: Paginated user list
         "401":
           description: Unauthorized
         "403":
           description: Admin privileges required
+    post:
+      summary: Create user (admin)
+      tags: [Auth Admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_name, email, date_of_birth]
+              properties:
+                user_name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                is_admin:
+                  type: boolean
+                date_of_birth:
+                  type: string
+      responses:
+        "201":
+          description: User created
+        "400":
+          description: Weak password
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "409":
+          description: Email already registered
 
   /auth/admin/user/{user_id}:
     get:
       summary: Get user by ID (admin)
-      description: Proxy to Auth Service /admin/user/{user_id}.
+      tags: [Auth Admin]
       security:
         - bearerAuth: []
       parameters:
@@ -283,7 +413,7 @@ paths:
           description: User not found
     patch:
       summary: Update user (admin)
-      description: Proxy to Auth Service /admin/user/{user_id} (PATCH).
+      tags: [Auth Admin]
       security:
         - bearerAuth: []
       parameters:
@@ -306,10 +436,8 @@ paths:
                   format: email
                 password:
                   type: string
-                  format: password
                 date_of_birth:
                   type: string
-                  pattern: '^\\d{2}-\\d{2}-\\d{4}$'
                 is_admin:
                   type: boolean
       responses:
@@ -323,9 +451,11 @@ paths:
           description: Admin privileges required
         "404":
           description: User not found
+        "409":
+          description: Email already registered
     delete:
       summary: Delete user (admin)
-      description: Proxy to Auth Service /admin/user/{user_id} (DELETE).
+      tags: [Auth Admin]
       security:
         - bearerAuth: []
       parameters:
@@ -334,6 +464,19 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason_code]
+              properties:
+                reason_code:
+                  type: string
+                  enum: [test_purpose, user_request, spam_abuse, security, other]
+                reason_detail:
+                  type: string
       responses:
         "200":
           description: User deleted
@@ -344,64 +487,109 @@ paths:
         "404":
           description: User not found
 
-  /auth/api-key:
+  /auth/admin/user-deletion-logs:
     get:
-      summary: Get API key metadata
-      description: Proxy to Auth Service /me/api-key (metadata only).
+      summary: List deletion audit logs (admin)
+      tags: [Auth Admin]
       security:
         - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: page_size
+          schema:
+            type: integer
       responses:
         "200":
-          description: API key metadata (or null if none)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiKeyGetResponse"
+          description: Deletion logs
         "401":
           description: Unauthorized
+        "403":
+          description: Admin privileges required
 
+  /auth/admin/access-requests:
+    get:
+      summary: List pending access requests (admin)
+      tags: [Auth Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Pending access requests
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+
+  /auth/admin/access-requests/{user_id}/approve:
     post:
-      summary: Rotate API key
-      description: >
-        Proxy to Auth Service /me/api-key (rotate). Returns the full key once.
+      summary: Approve access request (admin)
+      tags: [Auth Admin]
       security:
         - bearerAuth: []
-      responses:
-        "201":
-          description: API key created/rotated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiKeyCreateResponse"
-        "401":
-          description: Unauthorized
-        "409":
-          description: Rotation conflict; retry
-
-    delete:
-      summary: Revoke API key
-      description: Proxy to Auth Service /me/api-key (revoke).
-      security:
-        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
       responses:
         "200":
-          description: Revocation status
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiKeyRevokeResponse"
+          description: User approved
         "401":
           description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "404":
+          description: No pending request
 
+  /auth/admin/access-requests/{user_id}/reject:
+    delete:
+      summary: Reject access request (admin)
+      tags: [Auth Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User rejected
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "404":
+          description: No pending request
+
+  # ───────────────── Detection ─────────────────
   /v1/checks:
     post:
-      summary: Analyze an image (no saving) - v1
+      summary: Analyze image (v1)
+      tags: [Detection]
       description: >
-        Upload an image and get AI/Deepfake detection result.
-        No image or result is persisted at this step.
-        Auth can be provided either via:
-          - Authorization: Bearer <jwt>
-          - X-Api-Key: <api_key> (developer flow; only allowed on /v1/checks and /checks)
+        Upload an image for AI/deepfake detection. No image is persisted.
+        Free tier users (plan=0) are subject to 10 scans/month quota.
+        Auth via Bearer JWT or X-Api-Key (API key only on this route and /checks).
       security:
         - bearerAuth: []
         - apiKeyAuth: []
@@ -416,10 +604,10 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: Image file (JPEG/PNG) to analyze.
+                  description: Image file (JPEG or PNG).
       responses:
         "200":
-          description: Detection result (not persisted) and detection_token
+          description: Detection result with detection_token
           content:
             application/json:
               schema:
@@ -427,25 +615,33 @@ paths:
         "400":
           description: Missing or invalid file
         "401":
-          description: Unauthorized (invalid or missing JWT / API key not allowed on this route)
+          description: Unauthorized
+        "403":
+          description: Usage limit exceeded (free tier)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    $ref: "#/components/schemas/UsageLimitError"
         "413":
-          description: Image too large
+          description: Image exceeds 20 MB
         "415":
-          description: Unsupported media type
+          description: Unsupported format or invalid dimensions (max 12000x12000, 40M pixels)
         "502":
           description: Detector service error
+        "503":
+          description: Service unavailable
         "504":
           description: Detector timeout
 
   /checks:
     post:
-      summary: Analyze an image (no saving) - legacy
+      summary: Analyze image (legacy alias)
+      tags: [Detection]
       deprecated: true
-      description: >
-        Legacy alias for /v1/checks. Same behavior and response shape.
-        Auth can be provided either via:
-          - Authorization: Bearer <jwt>
-          - X-Api-Key: <api_key> (developer flow; only allowed on /v1/checks and /checks)
+      description: Legacy alias for /v1/checks. Same behavior.
       security:
         - bearerAuth: []
         - apiKeyAuth: []
@@ -460,10 +656,9 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: Image file (JPEG/PNG) to analyze.
       responses:
         "200":
-          description: Detection result (not persisted) and detection_token
+          description: Detection result
           content:
             application/json:
               schema:
@@ -471,24 +666,27 @@ paths:
         "400":
           description: Missing or invalid file
         "401":
-          description: Unauthorized (invalid or missing JWT / API key not allowed on this route)
+          description: Unauthorized
+        "403":
+          description: Usage limit exceeded
         "413":
           description: Image too large
         "415":
-          description: Unsupported media type
+          description: Unsupported format
         "502":
           description: Detector service error
         "504":
           description: Detector timeout
 
+  # ───────────────── Image Upload & Management ─────────────────
   /upload/image:
     post:
-      summary: Save image (history / community)
+      summary: Save image after detection
+      tags: [Images]
       description: >
-        Save an image and its detection result to the user's history and optionally community.
-        The detection result is validated using detection_token issued by /v1/checks (or /checks).
-        Gateway verifies detection_token and image bytes and then forwards only trusted fields to Media.
-        detection_token is never forwarded to internal services.
+        Save an image with its detection result. Gateway validates the detection_token
+        (HS256, verifies user, image SHA256 hash, and expiry) then forwards trusted
+        fields to Media Service. The detection_token is never forwarded downstream.
       security:
         - bearerAuth: []
       requestBody:
@@ -502,53 +700,36 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: Image file (JPEG/PNG) to save.
                 detection_token:
                   type: string
-                  description: >
-                    Signed detection token obtained from /v1/checks (or /checks) for this exact image
-                    and current user. Gateway validates the token and binds it to the uploaded bytes
-                    before saving.
+                  description: Token from /v1/checks binding result to image bytes and user.
                 is_public:
                   type: boolean
-                  description: >
-                    If true, the image is public (community post).
-                    If false or omitted, the image is private (history only).
+                  description: If true, image is public. Defaults to false.
       responses:
         "201":
-          description: Image saved with detection result
+          description: Image saved
           content:
             application/json:
               schema:
-                type: object
-                required: [verdict, label, confidence, image]
-                properties:
-                  verdict:
-                    type: string
-                  label:
-                    type: string
-                  confidence:
-                    type: number
-                    format: float
-                  image:
-                    $ref: "#/components/schemas/SavedImage"
+                $ref: "#/components/schemas/SavedImage"
         "400":
-          description: Missing or invalid file or detection_token
+          description: Invalid or expired detection_token, user/image mismatch
         "401":
-          description: Unauthorized (invalid or missing JWT)
+          description: Unauthorized
         "413":
           description: Image too large
         "415":
-          description: Unsupported media type
+          description: Unsupported format
         "502":
-          description: Upstream service error (Media)
-        "504":
-          description: Upstream timeout (Media)
+          description: Media service error
+        "503":
+          description: Media service unavailable
 
   /images:
     get:
-      summary: Get current user's images (history)
-      description: Return images that belong to the authenticated user.
+      summary: Get current user's images
+      tags: [Images]
       security:
         - bearerAuth: []
       parameters:
@@ -556,11 +737,7 @@ paths:
           name: is_public
           schema:
             type: boolean
-          required: false
-          description: >
-            Optional filter. If true, return only public images of the user.
-            If false, return only private images.
-            If omitted, return all images belonging to the user.
+          description: Filter by public/private visibility.
       responses:
         "200":
           description: List of user's images
@@ -574,12 +751,12 @@ paths:
                     items:
                       $ref: "#/components/schemas/SavedImage"
         "401":
-          description: Unauthorized (invalid or missing JWT)
+          description: Unauthorized
 
   /image/{image_id}:
     get:
-      summary: Get single image metadata
-      description: Return metadata for a single saved image (owner-only in practice).
+      summary: Get single image
+      tags: [Images]
       security:
         - bearerAuth: []
       parameters:
@@ -588,22 +765,23 @@ paths:
           required: true
           schema:
             type: string
-          description: ID of the saved image.
+            pattern: '^[A-Za-z0-9_-]{1,128}$'
       responses:
         "200":
-          description: Saved image metadata
+          description: Image metadata with presigned URL
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SavedImage"
         "401":
-          description: Unauthorized (invalid or missing JWT)
+          description: Unauthorized
         "404":
-          description: Image not found or not accessible
+          description: Image not found or invalid image_id
 
-    delete:
-      summary: Delete image
-      description: Delete a saved image (owner-only).
+    patch:
+      summary: Update image metadata
+      tags: [Images]
+      description: Update image visibility. Owner or admin only.
       security:
         - bearerAuth: []
       parameters:
@@ -612,30 +790,651 @@ paths:
           required: true
           schema:
             type: string
-          description: ID of the saved image.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateImageRequest"
       responses:
         "200":
-          description: Deleted
-        "401":
-          description: Unauthorized (invalid or missing JWT)
-        "403":
-          description: You can only delete your own images
-        "404":
-          description: Image not found
-
-  /community/images:
-    get:
-      summary: Get public community images
-      description: Return a list of public images visible in the community feed.
-      responses:
-        "200":
-          description: List of public images
+          description: Updated image
           content:
             application/json:
               schema:
-                type: object
-                properties:
+                $ref: "#/components/schemas/SavedImage"
+        "400":
+          description: No valid fields to update
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not owner and not admin
+        "404":
+          description: Image not found
+
+    delete:
+      summary: Delete image
+      tags: [Images]
+      description: Delete an image. Owner or admin only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Image deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Not owner and not admin
+        "404":
+          description: Image not found
+
+  /internal/images/lookup:
+    post:
+      summary: Batch lookup public images (internal)
+      tags: [Images]
+      description: Internal endpoint for looking up public images by IDs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image_ids]
+              properties:
+                image_ids:
+                  type: array
                   items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/SavedImage"
+                    type: string
+      responses:
+        "200":
+          description: Matching public images
+
+  # ───────────────── Billing Proxy ─────────────────
+  /billing/create-checkout-session:
+    post:
+      summary: Create checkout session
+      tags: [Billing]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, plan_id, email]
+              properties:
+                user_id:
+                  type: string
+                plan_id:
+                  type: integer
+                  enum: [1, 2]
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Checkout session created
+        "400":
+          description: Invalid input
+        "503":
+          description: Billing service unavailable
+
+  /api/billing/create-checkout-session:
+    post:
+      summary: Create checkout session (API path)
+      tags: [Billing]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, plan_id, email]
+              properties:
+                user_id:
+                  type: string
+                plan_id:
+                  type: integer
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Checkout session created
+        "400":
+          description: Invalid input
+
+  /api/billing/config:
+    get:
+      summary: Get billing config
+      tags: [Billing]
+      responses:
+        "200":
+          description: Stripe publishable key
+
+  /api/billing/subscription/status:
+    get:
+      summary: Get subscription status
+      tags: [Billing]
+      parameters:
+        - in: query
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Subscription status
+        "400":
+          description: Invalid user_id
+
+  /api/billing/subscription/cancel-at-period-end:
+    post:
+      summary: Cancel subscription at period end
+      tags: [Billing]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, reason]
+              properties:
+                user_id:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Cancellation scheduled
+        "400":
+          description: Invalid input or no active subscription
+        "404":
+          description: No subscription found
+
+  /billing/webhook:
+    post:
+      summary: Stripe webhook
+      tags: [Billing]
+      description: >
+        Proxied as raw bytes to preserve Stripe signature verification.
+        Also accessible at /api/billing/webhook.
+      parameters:
+        - in: header
+          name: stripe-signature
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Webhook processed
+        "400":
+          description: Invalid payload or signature
+
+  # ───────────────── Community Proxy ─────────────────
+  /community/posts:
+    get:
+      summary: List community posts
+      tags: [Community]
+      description: Proxy to Community Service. Auth optional for read.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: user_id
+          schema:
+            type: string
+        - in: query
+          name: image_id
+          schema:
+            type: string
+        - in: query
+          name: post_id
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of posts
+    post:
+      summary: Create community post
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image_id, description]
+              properties:
+                image_id:
+                  type: string
+                description:
+                  type: string
+                  maxLength: 1000
+                result:
+                  type: string
+                  enum: [real, ai]
+                  nullable: true
+                ground_truth:
+                  type: string
+                  enum: [real, ai]
+                  nullable: true
+                is_admin_post:
+                  type: boolean
+      responses:
+        "201":
+          description: Post created
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+    patch:
+      summary: Update community post
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                description:
+                  type: string
+                  maxLength: 1000
+      responses:
+        "200":
+          description: Post updated
+        "403":
+          description: Not owner
+        "404":
+          description: Post not found
+    delete:
+      summary: Delete community post
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Post deleted
+        "403":
+          description: Not owner and not admin
+        "404":
+          description: Post not found
+
+  /community/posts/vote:
+    post:
+      summary: Vote on post
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [post_id, vote]
+              properties:
+                post_id:
+                  type: string
+                vote:
+                  type: string
+                  enum: [up, down]
+      responses:
+        "200":
+          description: Vote recorded (votes are immutable)
+        "400":
+          description: Invalid input
+        "403":
+          description: Already voted on this post
+
+  /community/posts/click:
+    post:
+      summary: Track post click
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [post_id]
+              properties:
+                post_id:
+                  type: string
+      responses:
+        "200":
+          description: Click counted (60s cooldown per user per post)
+
+  /community/posts/report:
+    post:
+      summary: Report post
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [post_id]
+              properties:
+                post_id:
+                  type: string
+                reason:
+                  type: string
+                details:
+                  type: string
+      responses:
+        "200":
+          description: Post reported
+
+  /community/posts/moderation-status:
+    post:
+      summary: Check image moderation status (internal)
+      tags: [Community]
+      description: Check if images are removed by moderation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image_ids]
+              properties:
+                image_ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Moderation status per image
+
+  /community/posts/comments:
+    get:
+      summary: List comments
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: comment_id
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of comments
+    post:
+      summary: Create comment
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [post_id, text]
+              properties:
+                post_id:
+                  type: string
+                text:
+                  type: string
+                  maxLength: 1000
+      responses:
+        "201":
+          description: Comment created
+        "400":
+          description: Invalid input
+        "404":
+          description: Post not found
+    delete:
+      summary: Delete comment
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: comment_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comment deleted
+        "403":
+          description: Not comment author
+
+  /community/notifications:
+    get:
+      summary: Get notifications
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: unread_only
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Notifications list with unread_count
+
+  /community/notifications/unread-count:
+    get:
+      summary: Get unread notification count
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Unread count
+
+  /community/notifications/read:
+    post:
+      summary: Mark notifications as read
+      tags: [Community]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mark_all:
+                  type: boolean
+                post_id:
+                  type: string
+                notification_ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Notifications marked as read
+        "400":
+          description: No marking criteria provided
+
+  # ───────────────── Admin Models Proxy ─────────────────
+  /admin/models:
+    get:
+      summary: List all model versions (admin)
+      tags: [Models]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Model version history
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+
+  /admin/models/current:
+    get:
+      summary: Get current deployed model (admin)
+      tags: [Models]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Currently deployed model
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "404":
+          description: No active model
+
+  /admin/models/train:
+    post:
+      summary: Trigger model training (admin)
+      tags: [Models]
+      security:
+        - bearerAuth: []
+      responses:
+        "202":
+          description: Training signal queued
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+
+  /admin/models/upload:
+    post:
+      summary: Upload new model (admin)
+      tags: [Models]
+      description: Upload model weights with training metadata. Max 750 MB. Timeout 10 minutes.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [File, Version]
+              properties:
+                File:
+                  type: string
+                  format: binary
+                Version:
+                  type: string
+      responses:
+        "200":
+          description: Model uploaded and deployed
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "502":
+          description: Model-cycle service error
+
+  /admin/models/{version}:
+    delete:
+      summary: Delete model version (admin)
+      tags: [Models]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: version
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Model deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "404":
+          description: Model not found
+
+  /admin/models/training-images:
+    get:
+      summary: Get training images (admin)
+      tags: [Models]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of training images
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+
+  /admin/models/images:
+    get:
+      summary: Get images for a model version (admin)
+      tags: [Models]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: version
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Images associated with model version
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required

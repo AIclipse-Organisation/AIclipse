@@ -15,7 +15,7 @@ from pydantic import BaseModel, EmailStr, Field
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
-from app.deps.authz import get_current_admin
+from app.deps.authz import get_current_admin, require_internal_token
 from app.routers.public import (
     UserPublic,
     build_user_public,
@@ -259,8 +259,7 @@ async def admin_create_user(
     )
 
 
-# Called from model-cycle so removed the admin requirement.
-@router.post("/users/accuracy", response_model=List[UserAccuracy])
+@router.post("/users/accuracy", response_model=List[UserAccuracy], dependencies=[Depends(require_internal_token)])
 async def admin_get_users_accuracy(
     request: Request,
     body: UserAccuracyRequest

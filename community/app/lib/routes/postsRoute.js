@@ -159,7 +159,7 @@ export function createPostsRouteHandlers({
         }
 
         try {
-          await recordActivity(db, authenticatedUserId, SCORES.CREATE_POST, "create_post");
+          await recordActivity(authenticatedUserId, SCORES.CREATE_POST, "create_post");
         } catch (activityErr) {
           console.error("Failed to record create_post activity:", activityErr);
         }

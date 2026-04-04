@@ -1,0 +1,228 @@
+openapi: 3.0.3
+info:
+  title: Billing Service
+  version: "1.0.0"
+servers:
+  - url: http://billing-srv:3000
+
+components:
+  schemas:
+    CheckoutRequest:
+      type: object
+      required: [user_id, plan_id, email]
+      properties:
+        user_id:
+          type: string
+          maxLength: 64
+        plan_id:
+          type: integer
+          enum: [1, 2]
+          description: "1 = AIclipse Plus (9.99 EUR/mo), 2 = Premium (19.99 EUR/mo)"
+        email:
+          type: string
+          format: email
+
+    CheckoutResponse:
+      type: object
+      required: [checkout_url, session_id]
+      properties:
+        checkout_url:
+          type: string
+          format: uri
+          description: Stripe-hosted checkout page URL.
+        session_id:
+          type: string
+
+    SubscriptionStatus:
+      type: object
+      required: [user_id, plan, status, cancel_at_period_end]
+      properties:
+        user_id:
+          type: string
+        plan:
+          type: integer
+          description: "0 = free, 1 = Plus, 2 = Premium"
+        status:
+          type: string
+          enum: [none, active, cancel_scheduled, canceled]
+        cancel_at_period_end:
+          type: boolean
+        billing_period_end:
+          type: string
+          format: date-time
+          nullable: true
+
+    CancelSubscriptionRequest:
+      type: object
+      required: [user_id, reason]
+      properties:
+        user_id:
+          type: string
+        reason:
+          type: string
+          description: Non-empty cancellation reason (required).
+
+    CancelSubscriptionResponse:
+      type: object
+      required: [ok, status, message, plan_active_until]
+      properties:
+        ok:
+          type: boolean
+        status:
+          type: string
+          example: cancel_scheduled
+        message:
+          type: string
+        plan_active_until:
+          type: string
+          format: date-time
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /config:
+    get:
+      summary: Get Stripe publishable key
+      responses:
+        "200":
+          description: Client-side billing configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [publishable_key]
+                properties:
+                  publishable_key:
+                    type: string
+                    description: Stripe publishable key for client-side setup.
+
+  /create-checkout-session:
+    post:
+      summary: Create Stripe checkout session
+      description: >
+        Creates a Stripe checkout session for a monthly subscription.
+        Reuses existing Stripe customer if available, otherwise creates one.
+        Success/cancel redirects go to CLIENT_URL/plan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutRequest"
+      responses:
+        "200":
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "400":
+          description: Invalid user_id, plan_id, or email
+        "503":
+          description: Stripe not configured or database unavailable
+
+  /subscription/status:
+    get:
+      summary: Get subscription status
+      parameters:
+        - in: query
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current subscription status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionStatus"
+        "400":
+          description: Invalid user_id
+        "503":
+          description: Database unavailable
+
+  /subscription/cancel-at-period-end:
+    post:
+      summary: Schedule subscription cancellation
+      description: >
+        Schedules cancellation at the end of the current billing period.
+        Idempotent: returns 200 if already scheduled.
+        Calls Stripe API to set cancel_at_period_end=true.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelSubscriptionRequest"
+      responses:
+        "200":
+          description: Cancellation scheduled (or already scheduled)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelSubscriptionResponse"
+        "400":
+          description: Invalid user_id, missing reason, or no active paid subscription
+        "404":
+          description: No active subscription found
+        "503":
+          description: Stripe not configured or database unavailable
+
+  /webhook:
+    post:
+      summary: Stripe webhook handler
+      description: >
+        Handles Stripe webhook events. Verifies stripe-signature header.
+        Processed events: checkout.session.completed (creates subscription),
+        customer.subscription.updated (updates billing status),
+        customer.subscription.deleted (cancels subscription, downgrades to free).
+        Duplicate events are ignored via stripe_event_id deduplication.
+      parameters:
+        - in: header
+          name: stripe-signature
+          required: true
+          schema:
+            type: string
+          description: Stripe webhook signature for payload verification.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Raw webhook payload bytes (must not be parsed before signature verification).
+      responses:
+        "200":
+          description: Event processed or ignored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success, ignored, "db unavailable"]
+                  reason:
+                    type: string
+                    description: Present when status=ignored (e.g. duplicate_event, missing_user_id).
+                  event_id:
+                    type: string
+        "400":
+          description: Invalid payload or invalid signature
+        "500":
+          description: Webhook secret not configured

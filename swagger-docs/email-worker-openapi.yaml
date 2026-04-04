@@ -1,0 +1,129 @@
+openapi: 3.0.3
+info:
+  title: Email Worker Service
+  version: "1.0.0"
+  description: >
+    Email dispatch worker with Dead Letter Queue (DLQ) management.
+    Listens to Redis streams for email send requests.
+    HTTP endpoints are internal-only.
+servers:
+  - url: http://email-worker-srv:3000
+
+components:
+  securitySchemes:
+    internalTokenAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+      description: Internal service-to-service token.
+
+  schemas:
+    DlqItem:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Redis stream message ID.
+        type:
+          type: string
+          description: Email type that failed.
+        data:
+          type: object
+          description: Original email payload.
+
+    ReplayRequest:
+      type: object
+      properties:
+        count:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 10
+          description: Number of DLQ items to replay.
+        delete_after_replay:
+          type: boolean
+          default: false
+          description: If true, remove items from DLQ after successful replay.
+
+    ReplayResponse:
+      type: object
+      properties:
+        replayed:
+          type: integer
+          description: Number of items replayed to the main stream.
+        deleted:
+          type: integer
+          description: Number of items removed from DLQ.
+        errors:
+          type: integer
+          description: Number of replay failures.
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /internal/dlq:
+    get:
+      summary: List failed email sends (DLQ)
+      description: Returns items from the Dead Letter Queue for inspection.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: query
+          name: count
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+          description: Number of items to return.
+      responses:
+        "200":
+          description: DLQ items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DlqItem"
+        "401":
+          description: Missing or invalid X-Internal-Token
+
+  /internal/dlq/replay:
+    post:
+      summary: Replay DLQ items to main stream
+      description: >
+        Re-publishes failed email sends back to the main processing stream.
+        Optionally removes them from the DLQ after replay.
+      security:
+        - internalTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplayRequest"
+      responses:
+        "200":
+          description: Replay statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplayResponse"
+        "401":
+          description: Missing or invalid X-Internal-Token

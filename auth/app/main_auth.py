@@ -15,6 +15,7 @@ from app.db.repos import UserRepo, ApiKeyRepo, UserDeletionLogRepo
 from app.routers.public import router as public_router
 from app.routers.admin import router as admin_router
 from app.routers.api_keys import router as api_keys_router
+from app.routers.internal import router as internal_router
 
 
 class _HealthzFilter(logging.Filter):
@@ -82,6 +83,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(public_router)
 app.include_router(admin_router)
 app.include_router(api_keys_router)
+app.include_router(internal_router)
 
 
 @app.exception_handler(RequestValidationError)

@@ -145,10 +145,10 @@ export function createCommentsRouteHandlers({ requireUser }) {
         };
 
         await commentsCol.insertOne(doc);
-        await recordActivity(db, authenticatedUserId, SCORES.COMMENT, "comment");
+        await recordActivity(authenticatedUserId, SCORES.COMMENT, "comment");
 
         if (postExists.user_id && postExists.user_id !== authenticatedUserId) {
-          await awardPoints(db, postExists.user_id, SCORES.RECEIVE_ENGAGEMENT, "receive_comment");
+          await awardPoints(postExists.user_id, SCORES.RECEIVE_ENGAGEMENT, "receive_comment");
 
           try {
             await recordCollapsedNotification(db, {
