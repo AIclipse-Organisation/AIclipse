@@ -2,7 +2,7 @@ fastapi==0.135.2
 uvicorn[standard]==0.42.0
 pymongo==4.16.0
 redis==7.4.0
-requests==2.33.0
+requests==2.33.1
 transformers==5.4.0
 Pillow==12.1.1
 httpx==0.28.1
