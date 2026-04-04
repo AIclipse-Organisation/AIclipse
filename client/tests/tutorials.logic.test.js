@@ -76,9 +76,9 @@ describe("quick start selector contract", () => {
   );
 
   test("quick start module targets the redesigned results DOM", () => {
-    expect(QUICK_START_SELECTORS.resultsConfidenceBar).toBe(".comm_progressPanel");
+    expect(QUICK_START_SELECTORS.resultsConfidenceCard).toBe("#detect-card");
     expect(QUICK_START_SELECTORS.resultsVisibilityToggle).toBe(".res-toggle");
-    expect(resultsHtml).toContain('class="comm_progressPanel"');
+    expect(resultsHtml).toContain('id="detect-card"');
     expect(resultsHtml).toContain('class="res-toggle"');
   });
 

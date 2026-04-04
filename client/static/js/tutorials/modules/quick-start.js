@@ -4,7 +4,7 @@ const QUICK_START_SELECTORS = Object.freeze({
   disclaimerAgree: "#disclaimer-agree",
   uploadFrame: "#upload-frame",
   analyzeButton: "#btn-check",
-  resultsConfidenceBar: ".comm_progressPanel",
+  resultsConfidenceCard: "#detect-card",
   resultsVisibilityToggle: ".res-toggle",
   resultsPrivateModeButton: "#mode-private",
   resultsSaveButton: "#btn-save",
@@ -173,10 +173,10 @@ if (typeof window !== "undefined") {
         {
           id: "quick-start-confidence-bar",
           pageId: "results",
-          selector: QUICK_START_SELECTORS.resultsConfidenceBar,
+          selector: QUICK_START_SELECTORS.resultsConfidenceCard,
           title: "",
           body: [
-            "The higher the score, the more confident the detector is that the image was AI-generated. The lower the score, the more confident it is that the image is real.",
+            "This detection bar has three zones: `Real`, `Suspicious`, and `Fake`. A low score means the model thinks the image is real. A middle score means it is unsure. A high score means it thinks the image is fake.",
           ],
           nextLabel: "Next",
           allowTargetClick: false,
