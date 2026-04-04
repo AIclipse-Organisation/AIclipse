@@ -1,4 +1,4 @@
-fastapi==0.135.2
+fastapi==0.135.3
 uvicorn[standard]==0.42.0
 redis==7.4.0
 requests==2.33.0
