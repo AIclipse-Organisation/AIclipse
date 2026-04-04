@@ -77,7 +77,7 @@ jobs:
 
       - name: Build image (load locally, no push)
         # Build once, load into the runner’s Docker; we will import into all k3d nodes.
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
