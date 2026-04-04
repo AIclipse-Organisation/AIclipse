@@ -211,3 +211,36 @@ def test_lookup_images_returns_public_items_with_presigned_urls(client, monkeypa
             },
         ]
     }
+
+
+def test_get_images_collection_throttles_repeated_mongo_outage_logs(monkeypatch):
+    warning_messages = []
+
+    class _BrokenAdmin:
+        def command(self, *_args, **_kwargs):
+            raise RuntimeError("mongo down")
+
+    class _BrokenClient:
+        def __init__(self):
+            self.admin = _BrokenAdmin()
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(main_media, "MONGO_URI", "mongodb://mongo.test")
+    monkeypatch.setattr(main_media, "MONGO_DB", "aiclipse")
+    monkeypatch.setattr(main_media, "mc", None)
+    monkeypatch.setattr(main_media, "_build_mongo_client", lambda: _BrokenClient())
+    monkeypatch.setattr(main_media.time, "monotonic", lambda: 100.0)
+    monkeypatch.setattr(main_media.logging, "warning", lambda message, *args: warning_messages.append(message % args))
+    main_media._mongo_connection_state.update(
+        {
+            "available": None,
+            "last_error_at": 0.0,
+            "last_error_message": None,
+        }
+    )
+
+    assert main_media.get_images_collection() is None
+    assert main_media.get_images_collection() is None
+    assert warning_messages == ["mongo connection unavailable: mongo down"]

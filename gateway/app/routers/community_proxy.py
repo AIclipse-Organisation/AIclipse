@@ -147,14 +147,18 @@ async def gateway_community_posts_vote(
 
 
 @router.post("/community/posts/click")
-async def gateway_community_posts_click(request: Request, payload: dict = Body(...)):
+async def gateway_community_posts_click(
+    request: Request,
+    payload: dict = Body(...),
+    user: UserContext = Depends(get_current_user),
+):
     return await proxy_json(
         request,
         "POST",
         _community_base_url(request),
         "/community/internal/posts/click",
         json_body=payload,
-        headers=_auth_headers(request),
+        headers=_auth_headers(request, user),
         timeout_s=_timeout(request),
     )
 

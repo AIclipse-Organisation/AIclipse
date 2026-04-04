@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Optional, Annotated
@@ -54,6 +55,12 @@ PRESIGN_PUBLIC_EXPIRES_S = 3600
 
 # ---- mongo ----
 mc = None
+MONGO_LOG_THROTTLE_SECONDS = 30.0
+_mongo_connection_state = {
+    "available": None,
+    "last_error_at": 0.0,
+    "last_error_message": None,
+}
 
 
 def _build_mongo_client() -> MongoClient:
@@ -63,6 +70,29 @@ def _build_mongo_client() -> MongoClient:
         connectTimeoutMS=2000,
         socketTimeoutMS=2000,
     )
+
+
+def _note_mongo_available() -> None:
+    if _mongo_connection_state["available"] is False:
+        logging.info("mongo connection restored")
+    _mongo_connection_state["available"] = True
+    _mongo_connection_state["last_error_at"] = 0.0
+    _mongo_connection_state["last_error_message"] = None
+
+
+def _note_mongo_unavailable(exc: Exception) -> None:
+    now = time.monotonic()
+    message = f"{type(exc).__name__}: {exc}"
+    should_log = (
+        _mongo_connection_state["available"] is not False
+        or _mongo_connection_state["last_error_message"] != message
+        or (now - float(_mongo_connection_state["last_error_at"])) >= MONGO_LOG_THROTTLE_SECONDS
+    )
+    if should_log:
+        logging.warning("mongo connection unavailable: %s", exc)
+        _mongo_connection_state["last_error_at"] = now
+        _mongo_connection_state["last_error_message"] = message
+    _mongo_connection_state["available"] = False
 
 
 def get_images_collection():
@@ -76,14 +106,15 @@ def get_images_collection():
             if mc is None:
                 mc = _build_mongo_client()
             mc.admin.command("ping")
+            _note_mongo_available()
             return mc[MONGO_DB].images
-        except Exception:
-            logging.exception("mongo connection unavailable")
+        except Exception as exc:
+            _note_mongo_unavailable(exc)
             if mc is not None:
                 try:
                     mc.close()
                 except Exception:
-                    logging.exception("failed to close stale mongo client")
+                    pass
             mc = None
 
     return None

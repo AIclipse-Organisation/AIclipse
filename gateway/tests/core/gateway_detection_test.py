@@ -309,3 +309,120 @@ async def test_checks_returns_503_when_usage_increment_fails_after_detection(cli
 
     assert r.status_code == 503
     assert r.json()["detail"] == "Usage service unavailable"
+
+
+@pytest.mark.asyncio
+async def test_checks_hides_usage_request_exception_details(client, gateway_mod, auth_keypair, monkeypatch):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_quota_exc",
+        email="u_quota_exc@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    original_post = gateway_mod.app.state.http.post
+
+    async def fake_post(url, *args, **kwargs):
+        if str(url).endswith("/usage/check"):
+            raise httpx.RequestError(
+                "dial tcp 10.0.0.9:3000: connect refused",
+                request=httpx.Request("POST", str(url)),
+            )
+        return await original_post(url, *args, **kwargs)
+
+    monkeypatch.setattr(gateway_mod.app.state.http, "post", fake_post)
+
+    r = await client.post(
+        "/checks",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("x.png", PNG_1X1_BLACK, "image/png")},
+    )
+
+    assert r.status_code == 503
+    assert r.json()["detail"] == "Usage service unavailable"
+
+
+@pytest.mark.asyncio
+async def test_checks_hides_detector_request_exception_details(client, gateway_mod, auth_keypair, monkeypatch):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_detector_exc",
+        email="u_detector_exc@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    original_post = gateway_mod.app.state.http.post
+
+    async def fake_post(url, *args, **kwargs):
+        if str(url).endswith("/v1.0.1/checks"):
+            raise httpx.RequestError(
+                "dial tcp 10.0.0.11:3000: connect refused",
+                request=httpx.Request("POST", str(url)),
+            )
+        return await original_post(url, *args, **kwargs)
+
+    monkeypatch.setattr(gateway_mod.app.state.http, "post", fake_post)
+
+    r = await client.post(
+        "/checks",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("x.png", PNG_1X1_BLACK, "image/png")},
+    )
+
+    assert r.status_code == 502
+    assert r.json()["detail"] == "Detector unavailable"
+
+
+@pytest.mark.asyncio
+async def test_checks_hides_usage_increment_request_exception_details(
+    client,
+    patch_upstreams,
+    gateway_mod,
+    auth_keypair,
+    monkeypatch,
+):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_quota_inc_exc",
+        email="u_quota_inc_exc@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    patch_upstreams.add(
+        host="detector",
+        method="POST",
+        path="/v1.0.1/checks",
+        handler=lambda _req: httpx.Response(
+            status_code=200,
+            json={
+                "verdict": "ok",
+                "label": "clean",
+                "confidence": 0.4,
+                "model_version": "v-det-6",
+            },
+        ),
+    )
+
+    original_post = gateway_mod.app.state.http.post
+
+    async def fake_post(url, *args, **kwargs):
+        if str(url).endswith("/usage/increment"):
+            raise httpx.RequestError(
+                "dial tcp 10.0.0.12:3000: connect refused",
+                request=httpx.Request("POST", str(url)),
+            )
+        return await original_post(url, *args, **kwargs)
+
+    monkeypatch.setattr(gateway_mod.app.state.http, "post", fake_post)
+
+    r = await client.post(
+        "/checks",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("x.png", PNG_1X1_BLACK, "image/png")},
+    )
+
+    assert r.status_code == 503
+    assert r.json()["detail"] == "Usage service unavailable"

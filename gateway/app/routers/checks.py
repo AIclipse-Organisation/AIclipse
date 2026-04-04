@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 import httpx
@@ -45,9 +46,10 @@ async def _require_scan_quota(
             timeout=10.0,
         )
     except httpx.RequestError as exc:
+        logging.warning("Usage service unavailable during quota check: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Usage service unavailable: {exc}",
+            detail="Usage service unavailable",
         )
 
     if usage_check_resp.status_code != 200:
@@ -92,9 +94,10 @@ async def _record_scan_usage(
             timeout=10.0,
         )
     except httpx.RequestError as exc:
+        logging.warning("Usage service unavailable during usage increment: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Usage service unavailable: {exc}",
+            detail="Usage service unavailable",
         )
 
     if increment_resp.status_code != 200:
@@ -134,7 +137,8 @@ async def _checks_impl(request: Request, file: UploadFile, user: UserContext) ->
     except httpx.TimeoutException:
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="timeout")
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Detector unreachable: {exc}")
+        logging.warning("Detector unavailable during scan request: %s", exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Detector unavailable")
 
     if resp.status_code in (503, 504):
         # Forward busy/timeout as-is to client (client shows generic message)

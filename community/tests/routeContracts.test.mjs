@@ -23,6 +23,21 @@ test("public and internal posts routes use distinct auth helpers", () => {
   assert.doesNotMatch(internalPostsRoute, /getBrowserUser/);
 });
 
+test("public and internal click routes use distinct auth helpers", () => {
+  const publicClickRoute = readRepoFile("app/posts/click/route.js");
+  const internalClickRoute = readRepoFile("app/internal/posts/click/route.js");
+  const clickRoute = readRepoFile("app/lib/routes/clickRoute.js");
+
+  assert.match(publicClickRoute, /getBrowserUser/);
+  assert.doesNotMatch(publicClickRoute, /getForwardedUser/);
+
+  assert.match(internalClickRoute, /getForwardedUser/);
+  assert.doesNotMatch(internalClickRoute, /getBrowserUser/);
+
+  assert.doesNotMatch(clickRoute, /body\?\.user_id/);
+  assert.match(clickRoute, /authenticatedUserId/);
+});
+
 test("community UI does not use the legacy standalone images feed", () => {
   const feedPage = readRepoFile("app/page.jsx");
   const profileGrid = readRepoFile("app/profile/[userId]/ProfilePostsGrid.jsx");

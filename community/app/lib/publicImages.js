@@ -1,11 +1,4 @@
-function parseGatewayBody(text) {
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
+import { fetchGatewayJson } from "./gatewayFetch.js";
 
 function buildLookupError(status, detail) {
   const error = new Error(detail || `Gateway image lookup failed (${status})`);
@@ -91,19 +84,21 @@ export async function fetchPublicImagesByIds(imageIds) {
     return [];
   }
 
-  const response = await fetch(getGatewayLookupUrl(), {
-    method: "POST",
-    headers: getInternalHeaders(),
-    body: JSON.stringify({ image_ids: ids }),
-    cache: "no-store",
+  const payload = await fetchGatewayJson(
+    getGatewayLookupUrl(),
+    {
+      method: "POST",
+      headers: getInternalHeaders(),
+      body: JSON.stringify({ image_ids: ids }),
+    },
+    {
+      timeoutMs: 5000,
+      errorPrefix: "Gateway image lookup",
+    },
+  ).catch((error) => {
+    throw buildLookupError(error?.status || 502, error?.message || "Gateway image lookup failed");
   });
 
-  const text = await response.text();
-  const payload = parseGatewayBody(text);
-
-  if (!response.ok) {
-    throw buildLookupError(response.status, payload?.detail || payload?.error || text);
-  }
   if (!Array.isArray(payload?.items)) {
     throw buildLookupError(502, "Invalid JSON from gateway image lookup");
   }

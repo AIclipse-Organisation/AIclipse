@@ -1,11 +1,4 @@
-function parseGatewayBody(text) {
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
+import { fetchGatewayJson } from "./gatewayFetch.js";
 
 function buildGatewayImageError(status, detail) {
   const error = new Error(detail || `Gateway image mutation failed (${status})`);
@@ -37,23 +30,25 @@ async function requestGatewayImageMutation({
   user,
   buildGatewayIdentityHeaders,
 }) {
-  const response = await fetch(buildGatewayImageUrl(imageId), {
-    method,
-    headers: buildGatewayIdentityHeaders(user),
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache: "no-store",
-  });
-
-  if (response.ok) {
-    return;
+  try {
+    await fetchGatewayJson(
+      buildGatewayImageUrl(imageId),
+      {
+        method,
+        headers: buildGatewayIdentityHeaders(user),
+        body: body === undefined ? undefined : JSON.stringify(body),
+      },
+      {
+        timeoutMs: 5000,
+        errorPrefix: "Gateway image mutation",
+      },
+    );
+  } catch (error) {
+    throw buildGatewayImageError(
+      error?.status || 502,
+      error?.message || "Gateway image mutation failed",
+    );
   }
-
-  const text = await response.text();
-  const payload = parseGatewayBody(text);
-  throw buildGatewayImageError(
-    response.status,
-    payload?.detail || payload?.error || text || `Gateway image mutation failed (${response.status})`,
-  );
 }
 
 export async function setImageVisibilityOrThrow({

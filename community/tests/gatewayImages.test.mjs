@@ -42,20 +42,16 @@ test("setImageVisibilityOrThrow sends canonical gateway PATCH request", async ()
     restoreEnv();
   }
 
-  assert.deepEqual(fetchCalls, [
-    {
-      url: "http://gateway.test/image/img_123",
-      init: {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Internal-Token": "secret",
-        },
-        body: JSON.stringify({ is_public: false }),
-        cache: "no-store",
-      },
-    },
-  ]);
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0].url, "http://gateway.test/image/img_123");
+  assert.equal(fetchCalls[0].init.method, "PATCH");
+  assert.equal(fetchCalls[0].init.body, JSON.stringify({ is_public: false }));
+  assert.equal(fetchCalls[0].init.cache, "no-store");
+  assert.ok(fetchCalls[0].init.signal);
+  assert.deepEqual(fetchCalls[0].init.headers, {
+    "Content-Type": "application/json",
+    "X-Internal-Token": "secret",
+  });
 });
 
 test("deleteImageOrThrow surfaces gateway failures instead of swallowing them", async () => {
@@ -79,6 +75,39 @@ test("deleteImageOrThrow surfaces gateway failures instead of swallowing them", 
         }),
       }),
       /Media service unreachable/,
+    );
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv();
+  }
+});
+
+test("setImageVisibilityOrThrow maps gateway timeouts to bounded errors", async () => {
+  process.env.GATEWAY_URI = "http://gateway.test";
+
+  const originalFetch = global.fetch;
+  global.fetch = async () => {
+    const error = new Error("aborted");
+    error.name = "AbortError";
+    throw error;
+  };
+
+  try {
+    await assert.rejects(
+      setImageVisibilityOrThrow({
+        imageId: "img_123",
+        isPublic: true,
+        user: { user_id: "u_1" },
+        buildGatewayIdentityHeaders: () => ({
+          "Content-Type": "application/json",
+          "X-Internal-Token": "secret",
+        }),
+      }),
+      (error) => {
+        assert.equal(error.status, 504);
+        assert.match(error.message, /timed out/i);
+        return true;
+      },
     );
   } finally {
     global.fetch = originalFetch;

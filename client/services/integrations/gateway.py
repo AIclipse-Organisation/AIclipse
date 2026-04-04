@@ -4,6 +4,8 @@ from typing import Any
 
 import requests
 
+_gateway_session: requests.Session | None = None
+
 
 def build_gateway_url(*, base_url: str, path: str) -> str:
     return base_url.rstrip("/") + path
@@ -16,6 +18,20 @@ def build_gateway_headers(*, token: str | None = None, json_body: bool = False) 
     if json_body:
         headers["Content-Type"] = "application/json"
     return headers
+
+
+def get_gateway_session() -> requests.Session:
+    global _gateway_session
+    if _gateway_session is None:
+        _gateway_session = requests.Session()
+    return _gateway_session
+
+
+def reset_gateway_session() -> None:
+    global _gateway_session
+    if _gateway_session is not None:
+        _gateway_session.close()
+        _gateway_session = None
 
 
 def request_gateway_response(
@@ -34,53 +50,17 @@ def request_gateway_response(
         url = build_gateway_url(base_url=base_url, path=path)
         headers = build_gateway_headers(token=token, json_body=json_body is not None)
         normalized_method = method.upper()
-        if normalized_method == "GET" and json_body is None and form_data is None and files is None:
-            request_kwargs = {
-                "headers": headers,
-                "timeout": timeout_seconds,
-            }
-            if params is not None:
-                request_kwargs["params"] = params
-            resp = requests.get(url, **request_kwargs)
-        elif normalized_method == "POST" and form_data is None and files is None:
-            request_kwargs = {
-                "headers": headers,
-                "timeout": timeout_seconds,
-            }
-            if params is not None:
-                request_kwargs["params"] = params
-            if json_body is not None:
-                request_kwargs["json"] = json_body
-            resp = requests.post(url, **request_kwargs)
-        elif normalized_method == "PATCH" and form_data is None and files is None:
-            request_kwargs = {
-                "headers": headers,
-                "timeout": timeout_seconds,
-            }
-            if params is not None:
-                request_kwargs["params"] = params
-            if json_body is not None:
-                request_kwargs["json"] = json_body
-            resp = requests.patch(url, **request_kwargs)
-        elif normalized_method == "DELETE" and form_data is None and files is None:
-            request_kwargs = {
-                "headers": headers,
-                "timeout": timeout_seconds,
-            }
-            if params is not None:
-                request_kwargs["params"] = params
-            resp = requests.delete(url, **request_kwargs)
-        else:
-            resp = requests.request(
-                method=normalized_method,
-                url=url,
-                headers=headers,
-                params=params,
-                json=json_body,
-                data=form_data,
-                files=files,
-                timeout=timeout_seconds,
-            )
+        session = get_gateway_session()
+        resp = session.request(
+            method=normalized_method,
+            url=url,
+            headers=headers,
+            params=params,
+            json=json_body,
+            data=form_data,
+            files=files,
+            timeout=timeout_seconds,
+        )
     except requests.RequestException:
         return None, 502
 

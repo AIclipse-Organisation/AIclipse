@@ -165,10 +165,25 @@ async def test_community_comments_get_proxies_with_internal_token(client, patch_
 
 
 @pytest.mark.asyncio
-async def test_community_posts_click_proxies_with_internal_token(client, patch_upstreams):
+async def test_community_posts_click_proxies_with_forwarded_identity(
+    client,
+    patch_upstreams,
+    auth_keypair,
+):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_click",
+        email="u_click@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
     def click_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers.get("authorization") is None
         assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_click"
+        assert req.headers.get("x-user-email") == "u_click@example.com"
+        assert req.headers.get("x-user-is-admin") == "false"
         assert req.read() == b'{"post_id":"post_123"}'
         return httpx.Response(status_code=200, json={"ok": True})
 
@@ -179,7 +194,11 @@ async def test_community_posts_click_proxies_with_internal_token(client, patch_u
         handler=click_handler,
     )
 
-    response = await client.post("/community/posts/click", json={"post_id": "post_123"})
+    response = await client.post(
+        "/community/posts/click",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"post_id": "post_123"},
+    )
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}

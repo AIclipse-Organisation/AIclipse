@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveRenderableItemsWithPublicImages } from "../app/lib/publicImages.js";
+import {
+  fetchPublicImagesByIds,
+  resolveRenderableItemsWithPublicImages,
+} from "../app/lib/publicImages.js";
 
 test("resolveRenderableItemsWithPublicImages preserves ranked order and reports missing image payloads", () => {
   const items = [
@@ -64,4 +67,31 @@ test("resolveRenderableItemsWithPublicImages merges all resolved items in order"
     ],
     missingImageIds: [],
   });
+});
+
+test("fetchPublicImagesByIds maps gateway timeouts to bounded lookup errors", async () => {
+  process.env.GATEWAY_URI = "http://gateway.test";
+  process.env.INTERNAL_AUTH_TOKEN = "secret";
+
+  const originalFetch = global.fetch;
+  global.fetch = async () => {
+    const error = new Error("aborted");
+    error.name = "AbortError";
+    throw error;
+  };
+
+  try {
+    await assert.rejects(
+      fetchPublicImagesByIds(["img_1"]),
+      (error) => {
+        assert.equal(error.status, 504);
+        assert.match(error.message, /timed out/i);
+        return true;
+      },
+    );
+  } finally {
+    global.fetch = originalFetch;
+    delete process.env.GATEWAY_URI;
+    delete process.env.INTERNAL_AUTH_TOKEN;
+  }
 });

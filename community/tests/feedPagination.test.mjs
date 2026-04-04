@@ -6,10 +6,12 @@ import { buildFeedCandidateWindow, mergeFeedItems } from "../app/lib/feedPaginat
 test("buildFeedCandidateWindow uses a cumulative ranked window instead of overlapping page skips", () => {
   const pageOne = buildFeedCandidateWindow(1, 12);
   const pageTwo = buildFeedCandidateWindow(2, 12);
+  const pageNine = buildFeedCandidateWindow(9, 12);
 
   assert.equal(pageOne.pageOffset, 0);
   assert.equal(pageTwo.pageOffset, 12);
   assert.ok(pageTwo.candidateLimit > pageOne.candidateLimit);
+  assert.ok(pageNine.candidateLimit > 96);
   assert.equal(pageOne.fetchLimit, pageOne.candidateLimit + 1);
   assert.equal(pageTwo.fetchLimit, pageTwo.candidateLimit + 1);
 });

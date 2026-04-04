@@ -110,6 +110,10 @@ def build_community_blueprint(*, deps: RouteDeps):
 
     @bp.post("/community/posts/click")
     def community_click():
+        token = get_access_token(request)
+        if not token:
+            return json_missing_auth(community_shape=True)
+
         click_data, body_error = parse_json_body_or_400(invalid_detail="Invalid JSON", error_field="error")
         if body_error:
             return body_error
@@ -118,7 +122,7 @@ def build_community_blueprint(*, deps: RouteDeps):
             method="POST",
             base_url=deps.gateway_uri,
             path="/community/posts/click",
-            token="",
+            token=token,
             json_body=click_data,
             invalid_json_detail="Invalid JSON from gateway on /community/posts/click",
         )

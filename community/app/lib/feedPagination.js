@@ -1,5 +1,4 @@
 const FEED_OVERSCAN_MULTIPLIER = 4;
-const FEED_MAX_CANDIDATES = 96;
 
 function safePositiveInt(value, fallback) {
   const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -14,9 +13,9 @@ export function buildFeedCandidateWindow(page, limit) {
   const safeLimit = safePositiveInt(limit, 1);
   const pageOffset = (safePage - 1) * safeLimit;
   const requiredItems = pageOffset + safeLimit;
-  const candidateLimit = Math.min(
-    Math.max(requiredItems * FEED_OVERSCAN_MULTIPLIER, requiredItems + 12),
-    FEED_MAX_CANDIDATES,
+  const candidateLimit = Math.max(
+    requiredItems * FEED_OVERSCAN_MULTIPLIER,
+    requiredItems + 12,
   );
 
   return {

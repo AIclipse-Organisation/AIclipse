@@ -1178,6 +1178,54 @@ def test_viewscan_create_comment_redirects_when_auth_middleware_revalidation_fai
     assert "access_token=" in clear_cookie_header
     assert "Expires=Thu, 01 Jan 1970" in clear_cookie_header
     assert "Secure" in clear_cookie_header
+
+
+def test_community_click_requires_auth_and_forwards_bearer_token(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_click", "email": "user@example.com", "is_admin": False}, 200)
+    )
+
+    post_calls = []
+
+    def fake_post(url, headers=None, params=None, json=None, data=None, files=None, timeout=None):
+        post_calls.append((url, headers, params, json, timeout))
+        assert data is None
+        assert files is None
+        return ResponseStub(200, {"ok": True, "counted": True})
+
+    monkeypatch.setattr(main_client_module.requests, "post", fake_post)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "user-token")
+
+    resp = client.post("/community/posts/click", json={"post_id": "post_123"})
+
+    assert resp.status_code == 200
+    assert resp.get_json() == {"ok": True, "counted": True}
+    assert post_calls == [
+        (
+            "http://gateway.test/community/posts/click",
+            {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Authorization": "Bearer user-token",
+            },
+            None,
+            {"post_id": "post_123"},
+            10,
+        )
+    ]
+
+
+def test_community_click_returns_401_without_auth(main_client_module, monkeypatch):
+    backend_post = Mock(side_effect=AssertionError("gateway must not be called without auth"))
+    monkeypatch.setattr(main_client_module.requests, "post", backend_post)
+
+    client = main_client_module.app.test_client()
+    resp = client.post("/community/posts/click", json={"post_id": "post_123"})
+
+    assert resp.status_code == 401
+    assert resp.get_json() == {"error": "Unauthorized", "detail": "Missing auth token"}
     backend_post.assert_not_called()
 
     with client.session_transaction() as sess:

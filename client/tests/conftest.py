@@ -82,4 +82,34 @@ def main_client_module(monkeypatch):
 
     module.app.config.update(TESTING=True)
     module.app.secret_key = "test-secret"
+
+    from services.integrations import gateway as gateway_integration
+
+    class _GatewayTestSession:
+        def request(self, method, url, headers=None, params=None, json=None, data=None, files=None, timeout=None):
+            method_name = str(method or "").lower()
+            request_kwargs = {"headers": headers, "timeout": timeout}
+            if params is not None:
+                request_kwargs["params"] = params
+            if json is not None:
+                request_kwargs["json"] = json
+            if data is not None:
+                request_kwargs["data"] = data
+            if files is not None:
+                request_kwargs["files"] = files
+            if files is not None or data is not None:
+                return module.requests.request(method=method, url=url, **request_kwargs)
+            if method_name in {"get", "post", "patch", "delete"}:
+                request_fn = getattr(module.requests, method_name)
+                return request_fn(url, **request_kwargs)
+            return module.requests.request(method=method, url=url, **request_kwargs)
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(
+        gateway_integration,
+        "get_gateway_session",
+        lambda: _GatewayTestSession(),
+    )
     return module
