@@ -78,6 +78,8 @@ def register_auth_middleware(app: Flask, gateway: GatewayClient) -> None:
         if fetch_site and fetch_site not in ("same-origin", "none"):
             return jsonify({"detail": "Cross-site request blocked"}), 403
 
+        return None
+
     @app.before_request
     def _enforce_auth():
         if request.method == "OPTIONS":

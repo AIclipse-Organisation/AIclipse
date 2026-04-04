@@ -24,11 +24,6 @@ from routes.community import build_community_blueprint
 from routes.community_moderation import build_community_moderation_blueprint
 from routes.library_viewscan import build_library_viewscan_blueprint
 
-import routes.detection as route_detection
-import routes.library as route_library
-import routes.community as route_community
-import routes.community_moderation as route_community_moderation
-
 
 BASE_DIR = Path(__file__).resolve().parent
 app = Flask(

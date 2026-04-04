@@ -11,7 +11,6 @@
     createScrambledNumber,
     formatDate,
     getBootstrappedImageId,
-    getCurrentScan,
     getCurrentActions,
     getPostId,
     isPrivateScan,
