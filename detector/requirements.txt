@@ -4,7 +4,7 @@ pymongo==4.16.0
 redis==7.4.0
 requests==2.33.0
 transformers==5.4.0
-Pillow==12.1.1
+Pillow==12.2.0
 httpx==0.28.1
 numpy==2.3.5
 pydantic==2.12.5
