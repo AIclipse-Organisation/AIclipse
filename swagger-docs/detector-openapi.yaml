@@ -40,16 +40,6 @@ components:
         model_version:
           type: string
 
-    LegacyDetectionResult:
-      type: object
-      required: [is_ai, score]
-      properties:
-        is_ai:
-          type: boolean
-        score:
-          type: number
-          format: float
-
 paths:
   /healthz:
     get:
@@ -116,12 +106,6 @@ paths:
           schema:
             type: string
           description: Correlation ID for logs and tracing. Must be provided.
-        - in: header
-          name: X-User-Id
-          required: false
-          schema:
-            type: string
-          description: User ID for audit logging.
       requestBody:
         required: true
         content:
@@ -159,38 +143,3 @@ paths:
                     type: string
                     example: timeout
 
-  /v1.0.0/checks:
-    post:
-      summary: Run image detection (v1.0.0) - legacy stub
-      deprecated: true
-      tags: [v1.0.0]
-      description: >
-        Legacy endpoint. Returns hardcoded values (is_ai=true, score=0.87).
-        Do not use for production detection.
-      parameters:
-        - in: header
-          name: X-Request-Id
-          required: false
-          schema:
-            type: string
-        - in: header
-          name: X-User-Id
-          required: false
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/octet-stream:
-            schema:
-              type: string
-              format: binary
-      responses:
-        "200":
-          description: Legacy detection result (hardcoded stub)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LegacyDetectionResult"
-        "400":
-          description: Empty body

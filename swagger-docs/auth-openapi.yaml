@@ -540,6 +540,70 @@ components:
         revoked:
           type: boolean
 
+    UserInfoResponse:
+      type: object
+      required: [user_id, plan]
+      properties:
+        user_id:
+          type: string
+        plan:
+          type: integer
+        stripe_customer_id:
+          type: string
+          nullable: true
+
+    UpdatePlanRequest:
+      type: object
+      required: [plan]
+      properties:
+        plan:
+          type: integer
+        stripe_customer_id:
+          type: string
+          nullable: true
+
+    UpdatePlanResponse:
+      type: object
+      required: [updated, previous_plan]
+      properties:
+        updated:
+          type: boolean
+        previous_plan:
+          type: integer
+
+    IncrementStatsRequest:
+      type: object
+      required: [inc]
+      properties:
+        inc:
+          type: object
+          additionalProperties:
+            type: integer
+          description: >
+            Map of stat field to integer delta. Allowed keys:
+            total_guesses, total_correct, admin_guesses_total, admin_guesses_correct,
+            admin_fake_correct, admin_fake_total, admin_real_correct, admin_real_total,
+            community_score. Any other key is rejected with 400.
+
+    RecordActivityRequest:
+      type: object
+      properties:
+        points:
+          type: integer
+          default: 0
+          description: Community score delta. Only applied when > 0.
+
+    RecordActivityResponse:
+      type: object
+      required: [updated, current_streak, longest_streak]
+      properties:
+        updated:
+          type: boolean
+        current_streak:
+          type: integer
+        longest_streak:
+          type: integer
+
 paths:
   /healthz:
     get:
@@ -846,8 +910,12 @@ paths:
 
   /admin/users/accuracy:
     post:
-      summary: Batch user accuracy lookup
-      description: Returns voting accuracy stats for the given user IDs.
+      summary: Batch user accuracy lookup (internal)
+      description: >
+        Returns voting accuracy stats for the given user IDs.
+        Called by the community service when computing voter trust scores.
+      security:
+        - internalTokenAuth: []
       requestBody:
         required: true
         content:
@@ -863,6 +931,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/UserAccuracy"
+        "403":
+          description: Missing or invalid X-Internal-Token
 
   /admin/user/{user_id}:
     get:
@@ -1124,6 +1194,133 @@ paths:
                 $ref: "#/components/schemas/ApiKeyRevokeResponse"
         "401":
           description: Unauthorized
+
+  /internal/user/{user_id}:
+    get:
+      summary: Read user plan info (internal)
+      description: Used by billing to read the user's plan and Stripe customer id.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User plan info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfoResponse"
+        "403":
+          description: Missing or invalid X-Internal-Token
+        "404":
+          description: User not found
+
+  /internal/user/{user_id}/plan:
+    post:
+      summary: Update user plan (internal)
+      description: >
+        Used by billing to set the user's plan (and optionally stripe_customer_id)
+        after Stripe webhook events. Returns the previous plan value.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlanRequest"
+      responses:
+        "200":
+          description: Plan updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatePlanResponse"
+        "403":
+          description: Missing or invalid X-Internal-Token
+        "404":
+          description: User not found
+
+  /internal/user/{user_id}/stats:
+    post:
+      summary: Increment user stats (internal)
+      description: >
+        Used by community voting to bump user stat counters atomically.
+        Only keys in the allow-list are accepted; unknown keys return 400.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncrementStatsRequest"
+      responses:
+        "200":
+          description: Stats incremented
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: boolean
+                    example: true
+        "400":
+          description: Empty inc map or disallowed field keys
+        "403":
+          description: Missing or invalid X-Internal-Token
+        "404":
+          description: User not found
+
+  /internal/user/{user_id}/activity:
+    post:
+      summary: Record user activity (internal)
+      description: >
+        Used by community gamification to update daily streak counters and
+        optionally add community_score points. Streak resets if more than one
+        day has elapsed since last activity.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordActivityRequest"
+      responses:
+        "200":
+          description: Activity recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordActivityResponse"
+        "403":
+          description: Missing or invalid X-Internal-Token
+        "404":
+          description: User not found
 
   /internal/api-key/exchange:
     post:

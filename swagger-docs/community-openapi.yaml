@@ -1,22 +1,63 @@
 openapi: 3.0.3
 info:
-  title: Community Service (Internal API)
+  title: Community Service
   version: "1.0.0"
   description: >
-    Internal API consumed by Gateway via proxy.
-    All /community/internal/* routes require X-Internal-Token header
-    and user context forwarded in X-User-* headers.
-    Browser-facing routes at /community/* use cookie-based auth.
+    Next.js App Router service with basePath "/community". Exposes three
+    path layers, each with its own auth model:
+
+    1. Public BFF (/community/*): browser-facing routes. Auth is resolved
+       from the access_token cookie, which the service exchanges with
+       Gateway /auth/me to obtain user identity.
+
+    2. Internal (/community/internal/*): service-to-service routes called
+       by Gateway's community proxy. Require X-Internal-Token header plus
+       X-User-Id (and optional X-User-Name, X-User-Is-Admin) headers with
+       forwarded user identity.
+
+    3. Admin BFF (/community/adminBFF/*): admin-only browser routes. Auth
+       is resolved from the access_token cookie; handlers proxy to
+       Gateway /admin/* and /auth/admin/* using the admin's bearer JWT.
+
+    Public BFF and Internal routes share the same handlers and behavior;
+    they differ only in how the caller's identity is established.
 servers:
   - url: http://community-srv:3000
 
 components:
   securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: Shared access token cookie issued by Auth service. Resolved via Gateway /auth/me.
     internalAuth:
       type: apiKey
       in: header
       name: X-Internal-Token
-      description: Internal service-to-service token.
+      description: Internal service-to-service token. Paired with X-User-* identity headers.
+
+  parameters:
+    XUserIdHeader:
+      in: header
+      name: X-User-Id
+      required: true
+      schema:
+        type: string
+      description: Forwarded user id from Gateway.
+    XUserNameHeader:
+      in: header
+      name: X-User-Name
+      required: false
+      schema:
+        type: string
+    XUserIsAdminHeader:
+      in: header
+      name: X-User-Is-Admin
+      required: false
+      schema:
+        type: string
+        enum: ["true", "false"]
 
   schemas:
     Post:
@@ -105,6 +146,10 @@ components:
 
     Notification:
       type: object
+      description: >
+        Collapsed notification. Each document represents a unique
+        (recipient, actor, post, type, [vote_value|moderation_action])
+        tuple; repeated events increment event_count instead of inserting.
       properties:
         notification_id:
           type: string
@@ -114,19 +159,22 @@ components:
           type: string
         actor_user_name:
           type: string
+          description: Resolved from auth.users at read time; falls back to "Someone".
         post_id:
           type: string
         type:
           type: string
-          enum: [vote, comment, moderation, receive_vote, receive_comment]
+          enum: [vote, comment, moderation]
         vote_value:
           type: string
-          enum: [real, ai]
+          enum: [up, down]
           nullable: true
+          description: Present when type=vote.
         moderation_action:
           type: string
           enum: [removed, deleted]
           nullable: true
+          description: Present when type=moderation.
         moderation_reason:
           type: string
           nullable: true
@@ -141,10 +189,10 @@ components:
         created_at:
           type: string
           format: date-time
-        read_at:
+          description: In list responses, overridden to last_event_at (most recent event).
+        last_event_at:
           type: string
           format: date-time
-          nullable: true
 
     CreatePostRequest:
       type: object
@@ -168,6 +216,14 @@ components:
         is_admin_post:
           type: boolean
           default: false
+
+    UpdatePostRequest:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+          maxLength: 1000
 
     VoteRequest:
       type: object
@@ -257,6 +313,7 @@ components:
 
     MarkReadRequest:
       type: object
+      description: Provide exactly one of mark_all, post_id, or notification_ids.
       properties:
         mark_all:
           type: boolean
@@ -267,6 +324,64 @@ components:
           items:
             type: string
 
+    MarkReadResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        modified_count:
+          type: integer
+
+    PostListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+        hasMore:
+          type: boolean
+
+    CommentListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+
+    NotificationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        unread_count:
+          type: integer
+
+    UnreadCountResponse:
+      type: object
+      properties:
+        unread_count:
+          type: integer
+
+    ModerationStatusResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              image_id:
+                type: string
+              moderation_status:
+                type: string
+                enum: [removed, cleared]
+              moderation_reason:
+                type: string
+
 paths:
   /community/healthz:
     get:
@@ -276,23 +391,21 @@ paths:
         "200":
           description: OK (plain text "OK")
 
-  # ───────────────── Internal Posts ─────────────────
-  /community/internal/posts:
+  # ─────────────────────────────────────────────────────────────────
+  # PUBLIC BFF (cookieAuth) — browser-facing same-origin routes
+  # ─────────────────────────────────────────────────────────────────
+  /community/posts:
     get:
-      summary: List posts (internal)
-      tags: [Posts]
+      summary: List posts
+      tags: [Posts (public)]
       security:
-        - internalAuth: []
+        - cookieAuth: []
+        - {}
+      description: >
+        Auth is optional; an unauthenticated caller gets posts without
+        user_vote. Returns paginated posts with ranking score and Redis
+        vote deltas merged in.
       parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: X-User-Is-Admin
-          schema:
-            type: string
         - in: query
           name: page
           schema:
@@ -317,37 +430,16 @@ paths:
             type: string
       responses:
         "200":
-          description: Paginated posts with ranking scores and vote deltas from Redis
+          description: Paginated posts
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Post"
-                  hasMore:
-                    type: boolean
+                $ref: "#/components/schemas/PostListResponse"
     post:
-      summary: Create post (internal)
-      tags: [Posts]
+      summary: Create post
+      tags: [Posts (public)]
       security:
-        - internalAuth: []
-      parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: X-User-Name
-          schema:
-            type: string
-        - in: header
-          name: X-User-Is-Admin
-          schema:
-            type: string
+        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -356,7 +448,7 @@ paths:
               $ref: "#/components/schemas/CreatePostRequest"
       responses:
         "201":
-          description: Post created. Image visibility synced to public via Gateway.
+          description: Post created; image visibility synced via Gateway.
           content:
             application/json:
               schema:
@@ -368,16 +460,11 @@ paths:
         "502":
           description: Failed to sync image visibility
     patch:
-      summary: Update post (internal)
-      tags: [Posts]
+      summary: Update post description
+      tags: [Posts (public)]
       security:
-        - internalAuth: []
+        - cookieAuth: []
       parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
         - in: query
           name: post_id
           required: true
@@ -388,12 +475,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [description]
-              properties:
-                description:
-                  type: string
-                  maxLength: 1000
+              $ref: "#/components/schemas/UpdatePostRequest"
       responses:
         "200":
           description: Post updated
@@ -402,23 +484,14 @@ paths:
         "404":
           description: Post not found
     delete:
-      summary: Delete post (internal)
-      tags: [Posts]
+      summary: Delete post
+      tags: [Posts (public)]
       description: >
-        Soft-deletes post. Admin can delete any post. Deletes associated
-        comments, votes, and image. Sends moderation notification if admin.
+        Soft-delete. Admin can delete any post. Cascades to comments,
+        votes, image. Sends moderation notification when admin-initiated.
       security:
-        - internalAuth: []
+        - cookieAuth: []
       parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: X-User-Is-Admin
-          schema:
-            type: string
         - in: query
           name: post_id
           required: true
@@ -432,23 +505,16 @@ paths:
         "404":
           description: Post not found
 
-  # ───────────────── Internal Votes ─────────────────
-  /community/internal/posts/vote:
+  /community/posts/vote:
     post:
-      summary: Vote on post (internal)
-      tags: [Votes]
+      summary: Vote on post
+      tags: [Votes (public)]
       description: >
-        One vote per user per post (immutable). Updates user accuracy stats
-        for admin posts with ground_truth. Queues vote delta to Redis
+        One vote per user per post (immutable). Updates accuracy stats for
+        admin posts with ground_truth. Queues vote delta to Redis
         (5s debounce, 60s max wait).
       security:
-        - internalAuth: []
-      parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
+        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -469,20 +535,13 @@ paths:
         "404":
           description: Post not found
 
-  # ───────────────── Internal Clicks ─────────────────
-  /community/internal/posts/click:
+  /community/posts/click:
     post:
-      summary: Track post click (internal)
-      tags: [Clicks]
-      description: 60-second cooldown per user per post. Queues click delta to Redis.
+      summary: Track post click
+      tags: [Clicks (public)]
+      description: 60s cooldown per (user, post). Queues click delta to Redis.
       security:
-        - internalAuth: []
-      parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
+        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -491,7 +550,7 @@ paths:
               $ref: "#/components/schemas/ClickRequest"
       responses:
         "200":
-          description: Click tracked
+          description: Click recorded (or cooldown hit)
           content:
             application/json:
               schema:
@@ -501,13 +560,13 @@ paths:
         "404":
           description: Post not found
 
-  # ───────────────── Internal Comments ─────────────────
-  /community/internal/posts/comments:
+  /community/posts/comments:
     get:
-      summary: List comments (internal)
-      tags: [Comments]
+      summary: List comments for post
+      tags: [Comments (public)]
       security:
-        - internalAuth: []
+        - cookieAuth: []
+        - {}
       parameters:
         - in: query
           name: post_id
@@ -520,31 +579,16 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Comment"
+                $ref: "#/components/schemas/CommentListResponse"
     post:
-      summary: Create comment (internal)
-      tags: [Comments]
+      summary: Create comment
+      tags: [Comments (public)]
       description: >
-        Text is normalized (CRLF to LF, collapsed spaces/newlines, trimmed).
-        Creates notification for post author. Queues comment delta to Redis
-        (30s debounce, 60s max wait).
+        Text is normalized (CRLF→LF, collapsed whitespace, trimmed).
+        Creates notification for post author. Queues comment delta to
+        Redis (30s debounce, 60s max wait).
       security:
-        - internalAuth: []
-      parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: X-User-Name
-          schema:
-            type: string
+        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -564,20 +608,15 @@ paths:
                       comment_count:
                         type: integer
         "400":
-          description: Invalid post_id, empty/too long comment
+          description: Invalid post_id, empty or too-long comment
         "404":
           description: Post not found
     delete:
-      summary: Delete comment (internal)
-      tags: [Comments]
+      summary: Delete comment
+      tags: [Comments (public)]
       security:
-        - internalAuth: []
+        - cookieAuth: []
       parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
         - in: query
           name: comment_id
           required: true
@@ -591,12 +630,353 @@ paths:
         "404":
           description: Comment not found
 
-  # ───────────────── Internal Reports & Moderation ─────────────────
+  /community/posts/report:
+    get:
+      summary: List reported posts (admin)
+      tags: [Moderation (public)]
+      description: Admin only. Returns reported posts sorted by report_count desc.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Reported posts with report_history
+        "403":
+          description: Not admin
+    post:
+      summary: Report post
+      tags: [Moderation (public)]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "200":
+          description: Post reported
+        "404":
+          description: Post not found
+    patch:
+      summary: Moderate reported post (admin)
+      tags: [Moderation (public)]
+      description: >
+        Admin action on a reported post. "remove" hides it and syncs
+        image visibility; "dismiss" clears moderation status.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "200":
+          description: Moderation action applied
+        "403":
+          description: Not admin
+
+  /community/notifications:
+    get:
+      summary: List notifications
+      tags: [Notifications (public)]
+      description: Up to 50 collapsed notifications sorted by last_event_at desc.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: unread_only
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Notifications with unread_count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+
+  /community/notifications/unread-count:
+    get:
+      summary: Get unread notification count
+      tags: [Notifications (public)]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnreadCountResponse"
+
+  /community/notifications/read:
+    post:
+      summary: Mark notifications as read
+      tags: [Notifications (public)]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkReadRequest"
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkReadResponse"
+        "400":
+          description: No marking criteria provided
+
+  # ─────────────────────────────────────────────────────────────────
+  # INTERNAL (internalAuth + X-User-*) — called by Gateway proxy
+  # ─────────────────────────────────────────────────────────────────
+  /community/internal/posts:
+    get:
+      summary: List posts (internal)
+      tags: [Posts (internal)]
+      security:
+        - internalAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XUserIdHeader"
+        - $ref: "#/components/parameters/XUserIsAdminHeader"
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: user_id
+          schema:
+            type: string
+        - in: query
+          name: image_id
+          schema:
+            type: string
+        - in: query
+          name: post_id
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostListResponse"
+    post:
+      summary: Create post (internal)
+      tags: [Posts (internal)]
+      security:
+        - internalAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XUserIdHeader"
+        - $ref: "#/components/parameters/XUserNameHeader"
+        - $ref: "#/components/parameters/XUserIsAdminHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "201":
+          description: Post created; image visibility synced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+        "502":
+          description: Failed to sync image visibility
+    patch:
+      summary: Update post (internal)
+      tags: [Posts (internal)]
+      security:
+        - internalAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XUserIdHeader"
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePostRequest"
+      responses:
+        "200":
+          description: Post updated
+        "403":
+          description: Not post owner
+        "404":
+          description: Post not found
+    delete:
+      summary: Delete post (internal)
+      tags: [Posts (internal)]
+      security:
+        - internalAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XUserIdHeader"
+        - $ref: "#/components/parameters/XUserIsAdminHeader"
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Post deleted
+        "403":
+          description: Not owner and not admin
+        "404":
+          description: Post not found
+
+  /community/internal/posts/vote:
+    post:
+      summary: Vote on post (internal)
+      tags: [Votes (internal)]
+      security:
+        - internalAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XUserIdHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteRequest"
+      responses:
+        "200":
+          description: Vote recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoteResponse"
+        "400":
+          description: Invalid input
+        "403":
+          description: Already voted on this post
+        "404":
+          description: Post not found
+
+  /community/internal/posts/click:
+    post:
+      summary: Track post click (internal)
+      tags: [Clicks (internal)]
+      security:
+        - internalAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XUserIdHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClickRequest"
+      responses:
+        "200":
+          description: Click recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClickResponse"
+        "400":
+          description: Missing post_id
+        "404":
+          description: Post not found
+
+  /community/internal/posts/comments:
+    get:
+      summary: List comments (internal)
+      tags: [Comments (internal)]
+      security:
+        - internalAuth: []
+      parameters:
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Up to 100 comments, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentListResponse"
+    post:
+      summary: Create comment (internal)
+      tags: [Comments (internal)]
+      security:
+        - internalAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XUserIdHeader"
+        - $ref: "#/components/parameters/XUserNameHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Comment"
+                  - type: object
+                    properties:
+                      comment_count:
+                        type: integer
+        "400":
+          description: Invalid input
+        "404":
+          description: Post not found
+    delete:
+      summary: Delete comment (internal)
+      tags: [Comments (internal)]
+      security:
+        - internalAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XUserIdHeader"
+        - in: query
+          name: comment_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comment deleted
+        "403":
+          description: Not comment author
+        "404":
+          description: Comment not found
+
   /community/internal/posts/report:
     get:
       summary: List reported posts (admin, internal)
-      tags: [Moderation]
-      description: Returns reported posts sorted by report_count desc. Admin only.
+      tags: [Moderation (internal)]
       security:
         - internalAuth: []
       parameters:
@@ -613,15 +993,11 @@ paths:
           description: Not admin
     post:
       summary: Report post (internal)
-      tags: [Moderation]
+      tags: [Moderation (internal)]
       security:
         - internalAuth: []
       parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/XUserIdHeader"
       requestBody:
         required: true
         content:
@@ -635,18 +1011,11 @@ paths:
           description: Post not found
     patch:
       summary: Moderate reported post (admin, internal)
-      tags: [Moderation]
-      description: >
-        Admin action on reported post. "remove" hides post and syncs image
-        visibility. "dismiss" clears moderation status.
+      tags: [Moderation (internal)]
       security:
         - internalAuth: []
       parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/XUserIdHeader"
         - in: header
           name: X-User-Is-Admin
           required: true
@@ -666,7 +1035,10 @@ paths:
   /community/internal/posts/moderation-status:
     post:
       summary: Check image moderation status (internal)
-      tags: [Moderation]
+      tags: [Moderation (internal)]
+      description: >
+        Batch lookup of moderation status for a list of image_ids.
+        Internal-only — not exposed as a public BFF route.
       security:
         - internalAuth: []
       requestBody:
@@ -681,35 +1053,16 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        image_id:
-                          type: string
-                        moderation_status:
-                          type: string
-                          enum: [removed, cleared]
-                        moderation_reason:
-                          type: string
+                $ref: "#/components/schemas/ModerationStatusResponse"
 
-  # ───────────────── Internal Notifications ─────────────────
   /community/internal/notifications:
     get:
-      summary: Get notifications (internal)
-      tags: [Notifications]
-      description: Returns up to 50 notifications, collapsed by type/actor/post, sorted by last_event_at desc.
+      summary: List notifications (internal)
+      tags: [Notifications (internal)]
       security:
         - internalAuth: []
       parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/XUserIdHeader"
         - in: query
           name: unread_only
           schema:
@@ -721,51 +1074,32 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Notification"
-                  unread_count:
-                    type: integer
+                $ref: "#/components/schemas/NotificationListResponse"
 
   /community/internal/notifications/unread-count:
     get:
-      summary: Get unread notification count (internal)
-      tags: [Notifications]
+      summary: Unread count (internal)
+      tags: [Notifications (internal)]
       security:
         - internalAuth: []
       parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/XUserIdHeader"
       responses:
         "200":
           description: Unread count
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  unread_count:
-                    type: integer
+                $ref: "#/components/schemas/UnreadCountResponse"
 
   /community/internal/notifications/read:
     post:
-      summary: Mark notifications as read (internal)
-      tags: [Notifications]
-      description: Provide one of mark_all, post_id, or notification_ids.
+      summary: Mark notifications read (internal)
+      tags: [Notifications (internal)]
       security:
         - internalAuth: []
       parameters:
-        - in: header
-          name: X-User-Id
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/XUserIdHeader"
       requestBody:
         required: true
         content:
@@ -778,11 +1112,284 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  modified_count:
-                    type: integer
+                $ref: "#/components/schemas/MarkReadResponse"
         "400":
           description: No marking criteria provided
+
+  # ─────────────────────────────────────────────────────────────────
+  # ADMIN BFF (cookieAuth, admin JWT) — proxies to Gateway
+  # ─────────────────────────────────────────────────────────────────
+  /community/adminBFF/access-requests:
+    get:
+      summary: List access requests (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /auth/admin/access-requests.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: string
+        - in: query
+          name: page_size
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated access requests
+        "401":
+          description: Not admin or missing admin token
+
+  /community/adminBFF/access-requests/{userId}/approve:
+    post:
+      summary: Approve access request (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /auth/admin/access-requests/{userId}/approve.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approved
+        "400":
+          description: Missing userId
+        "401":
+          description: Not admin
+
+  /community/adminBFF/access-requests/{userId}/reject:
+    delete:
+      summary: Reject access request (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /auth/admin/access-requests/{userId}/reject (DELETE).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rejected
+        "400":
+          description: Missing userId
+        "401":
+          description: Not admin
+
+  /community/adminBFF/user-deletion-logs:
+    get:
+      summary: List user deletion logs (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /auth/admin/user-deletion-logs.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: string
+            default: "1"
+        - in: query
+          name: page_size
+          schema:
+            type: string
+            default: "20"
+      responses:
+        "200":
+          description: Paginated deletion logs
+
+  /community/adminBFF/users:
+    get:
+      summary: List users (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /auth/admin/users.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: is_admin
+          schema:
+            type: string
+        - in: query
+          name: access_status
+          schema:
+            type: string
+        - in: query
+          name: sort
+          schema:
+            type: string
+        - in: query
+          name: order
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: string
+        - in: query
+          name: page_size
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated users
+    post:
+      summary: Create user (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /auth/admin/users.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: User created
+
+  /community/adminBFF/users/{userId}:
+    patch:
+      summary: Update user (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /auth/admin/user/{userId} (PATCH).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: User updated
+    delete:
+      summary: Delete user (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /auth/admin/user/{userId} (DELETE).
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: User deleted
+
+  /community/adminBFF/models:
+    get:
+      summary: List models (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /admin/models.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Model list
+    post:
+      summary: Upload model (admin)
+      tags: [Admin BFF]
+      description: >
+        Streams multipart upload to Gateway /admin/models/upload via
+        native HTTP. Body size limit 750 MB.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Model uploaded
+        "400":
+          description: Invalid Content-Type
+        "401":
+          description: Not admin
+        "502":
+          description: Gateway proxy error
+
+  /community/adminBFF/models/current:
+    get:
+      summary: Get current model (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /admin/models/current.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current model
+        "404":
+          description: No active model
+
+  /community/adminBFF/models/train:
+    post:
+      summary: Trigger model training (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /admin/models/train.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Training triggered
+
+  /community/adminBFF/models/training-images:
+    get:
+      summary: List training images (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /admin/models/training-images.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Training image list
+
+  /community/adminBFF/models/{version}:
+    delete:
+      summary: Delete model version (admin)
+      tags: [Admin BFF]
+      description: Proxies to Gateway /admin/models/{version}.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: version
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Model deleted

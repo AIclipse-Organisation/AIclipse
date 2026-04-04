@@ -42,30 +42,25 @@ components:
           type: boolean
           description: "true = AI vote, false = Real vote"
 
-    ConfidenceResult:
+    EvaluateResponse:
       type: object
+      description: Shaped response from the workflow's ConfidenceResult.
       properties:
-        IsReadyForTraining:
+        Label:
+          type: string
+          enum: [ai, real]
+          description: Training label chosen by the Bayesian workflow.
+        IsReady:
           type: boolean
-        PosteriorMean:
-          type: number
-          format: double
-        Alpha:
-          type: number
-          format: double
-          description: AI evidence (Bayesian).
-        Beta:
-          type: number
-          format: double
-          description: Real evidence (Bayesian).
-        Probability:
+          description: True when evidence is sufficient to add to training set.
+        CurrentProbability:
           type: number
           format: double
           minimum: 0
           maximum: 1
-        TrainingLabel:
+        Action:
           type: string
-          enum: [ai, real]
+          enum: ["Added to Training Set", "Waiting for more votes"]
 
     UploadModelRequest:
       type: object
@@ -287,7 +282,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ConfidenceResult"
+                $ref: "#/components/schemas/EvaluateResponse"
         "400":
           description: Evaluation failed
 
@@ -414,15 +409,3 @@ paths:
         "404":
           description: Model version not found
 
-  /api/models/images:
-    get:
-      summary: Get images linked to a model version
-      tags: [Models]
-      parameters:
-        - in: query
-          name: version
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Images associated with model version

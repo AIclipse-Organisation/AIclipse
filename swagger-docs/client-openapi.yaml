@@ -1,0 +1,1103 @@
+openapi: 3.0.3
+info:
+  title: Client Service (BFF)
+  version: "1.0.0"
+  description: >
+    Flask-based Backend-for-Frontend serving the main product UI.
+
+    Two response styles are served from this origin:
+
+    1. HTML page routes — server-rendered Jinja templates.
+    2. JSON BFF routes — thin authenticated proxies to Gateway. The
+       client resolves the access_token cookie (set by Auth after login)
+       and forwards requests to Gateway with Authorization: Bearer.
+
+    Session policy: on 401 from Gateway, the client clears the server
+    session and the access_token cookie on the response. /logout clears
+    both unconditionally.
+
+    Authentication scheme: all authenticated routes read the access_token
+    cookie. "cookieAuth" below refers to this single cookie; a few pages
+    tolerate no cookie (public landing, /login).
+servers:
+  - url: http://client-srv:3000
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: Shared access token cookie issued by Auth service.
+
+  schemas:
+    ErrorDetail:
+      type: object
+      properties:
+        detail:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          description: User profile from Gateway /auth/me.
+
+    SignupRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        user_name:
+          type: string
+
+    DescriptionBody:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+          maxLength: 1000
+
+    PublishViewscanBody:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+          maxLength: 1000
+        verdict:
+          type: string
+        label:
+          type: string
+        confidence:
+          type: number
+
+    CommentBody:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          maxLength: 1000
+
+    CreatePostBody:
+      type: object
+      required: [image_id, description]
+      properties:
+        image_id:
+          type: string
+        description:
+          type: string
+          maxLength: 1000
+        result:
+          type: string
+          enum: [real, ai]
+          nullable: true
+        ground_truth:
+          type: string
+          enum: [real, ai]
+          nullable: true
+
+    VoteBody:
+      type: object
+      required: [post_id, vote]
+      properties:
+        post_id:
+          type: string
+        vote:
+          type: string
+          enum: [up, down]
+
+    ClickBody:
+      type: object
+      required: [post_id]
+      properties:
+        post_id:
+          type: string
+
+    ReportBody:
+      type: object
+      required: [post_id]
+      properties:
+        post_id:
+          type: string
+        reason:
+          type: string
+        details:
+          type: string
+
+    ModerationStatusBody:
+      type: object
+      required: [image_ids]
+      properties:
+        image_ids:
+          type: array
+          items:
+            type: string
+
+    CreateCommentBody:
+      type: object
+      required: [post_id, text]
+      properties:
+        post_id:
+          type: string
+        text:
+          type: string
+          maxLength: 1000
+
+    CheckoutBody:
+      type: object
+      required: [plan_id]
+      properties:
+        plan_id:
+          type: integer
+          enum: [1, 2]
+
+    CancelSubscriptionBody:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+
+    MarkReadBody:
+      type: object
+      properties:
+        mark_all:
+          type: boolean
+        post_id:
+          type: string
+        notification_ids:
+          type: array
+          items:
+            type: string
+
+    ImagePatchBody:
+      type: object
+      properties:
+        is_public:
+          type: boolean
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid access_token cookie.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorDetail"
+    HtmlPage:
+      description: Server-rendered HTML page.
+      content:
+        text/html:
+          schema:
+            type: string
+
+paths:
+  # ─────────────── Public pages & health ───────────────
+  /healthz:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        "200":
+          description: Plain text "OK"
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /:
+    get:
+      summary: Landing page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /login:
+    get:
+      summary: Login page
+      tags: [Pages]
+      description: >
+        Renders login page. If a valid access_token cookie is present,
+        redirects to /upload. On 401 from Gateway, clears cookie and
+        renders login.
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+        "302":
+          description: Redirect to /upload when already authenticated
+
+  # ─────────────── Auth session ───────────────
+  /auth/signup:
+    post:
+      summary: Register new user
+      tags: [Auth]
+      description: Proxies to Gateway /auth/signup. Returns 403 if signup disabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "200":
+          description: User created
+        "400":
+          description: Invalid input
+        "403":
+          description: Public registration is currently disabled
+        "409":
+          description: Email already registered
+
+  /auth/login:
+    post:
+      summary: Authenticate user
+      tags: [Auth]
+      description: >
+        Exchanges credentials with Gateway /auth/login. On success, sets
+        the access_token cookie on the response and stores user in
+        server session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated; cookie set
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: access_token cookie (HttpOnly)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Invalid input
+        "401":
+          description: Invalid credentials
+
+  /logout:
+    post:
+      summary: Log out
+      tags: [Auth]
+      description: Clears server session and access_token cookie.
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  # ─────────────── Profile (self-service) ───────────────
+  /auth/me:
+    get:
+      summary: Get authenticated user
+      tags: [Profile]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user profile
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      summary: Update authenticated user
+      tags: [Profile]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Updated
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      summary: Delete authenticated user
+      tags: [Profile]
+      description: On success, clears session and access_token cookie.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Deleted; session and cookie cleared
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile:
+    get:
+      summary: Profile page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /admin:
+    get:
+      summary: Admin entry
+      tags: [Pages]
+      description: >
+        Admin-only redirect to /community/admin. Non-admin users get 403.
+        Unauthenticated callers are redirected to /.
+      security:
+        - cookieAuth: []
+      responses:
+        "302":
+          description: Redirect to /community/admin (admin) or / (unauth)
+        "403":
+          description: Forbidden — admin access required
+
+  # ─────────────── API keys ───────────────
+  /auth/api-key:
+    get:
+      summary: Get current API key info
+      tags: [API Keys]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: API key metadata
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Rotate API key
+      tags: [API Keys]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: New key issued
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      summary: Revoke API key
+      tags: [API Keys]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Key revoked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─────────────── Detection ───────────────
+  /upload:
+    get:
+      summary: Upload page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /results:
+    get:
+      summary: Detection results page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /checks:
+    post:
+      summary: Run AI detection check
+      tags: [Detection]
+      description: Proxies multipart to Gateway /checks. Returns verdict, label, confidence, detection_token.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Detection result
+        "400":
+          description: Missing file
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          description: Quota exceeded
+
+  /upload/image:
+    post:
+      summary: Upload scanned image
+      tags: [Detection]
+      description: >
+        Uploads an image to Gateway /upload/image. Requires a
+        detection_token from a prior /checks call.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, detection_token]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                detection_token:
+                  type: string
+                is_public:
+                  type: boolean
+      responses:
+        "200":
+          description: Image stored
+        "400":
+          description: Missing file or detection_token
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /results/save:
+    post:
+      summary: Save scan result with optional publish
+      tags: [Detection]
+      description: >
+        Atomic save+publish flow. If is_public=true, description is
+        required and the viewer user_id is resolved. Clears session on 401.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, detection_token]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                detection_token:
+                  type: string
+                is_public:
+                  type: boolean
+                description:
+                  type: string
+                  maxLength: 1000
+      responses:
+        "200":
+          description: Saved (and published if requested)
+        "400":
+          description: Missing detection_token or invalid description
+        "401":
+          description: Unauthorized (session cleared)
+
+  # ─────────────── Library (images) ───────────────
+  /scans:
+    get:
+      summary: Scans page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /images:
+    get:
+      summary: List my images
+      tags: [Library]
+      description: Proxies to Gateway /images (returns current user's images).
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Image list
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /image/{image_id}:
+    get:
+      summary: Get image metadata
+      tags: [Library]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Image metadata with presigned URL
+        "400":
+          description: Invalid image_id
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+    patch:
+      summary: Update image (is_public)
+      tags: [Library]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImagePatchBody"
+      responses:
+        "200":
+          description: Updated
+        "400":
+          description: Invalid input
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not owner
+        "404":
+          description: Image not found
+    delete:
+      summary: Delete image
+      tags: [Library]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not owner
+        "404":
+          description: Image not found
+
+  # ─────────────── View Scan (single-image detail flow) ───────────────
+  /viewscan:
+    get:
+      summary: Viewscan entry redirect
+      tags: [Pages]
+      responses:
+        "302":
+          description: Redirect to /scans
+
+  /viewscan/{image_id}:
+    get:
+      summary: Viewscan page for image
+      tags: [Pages]
+      description: >
+        Server-side renders the viewscan page with initial page model
+        hydrated from Gateway. Non-200 downstream shows error state.
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+        "400":
+          description: Invalid image_id
+    delete:
+      summary: Delete viewscan image
+      tags: [View Scan]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+        "400":
+          description: Invalid image_id
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /viewscan/{image_id}/description:
+    patch:
+      summary: Update viewscan description
+      tags: [View Scan]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DescriptionBody"
+      responses:
+        "200":
+          description: Description updated
+        "400":
+          description: Invalid image_id, empty or too-long description
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /viewscan/{image_id}/publish:
+    post:
+      summary: Publish viewscan image
+      tags: [View Scan]
+      description: Publishes image with description, verdict/label/confidence.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishViewscanBody"
+      responses:
+        "200":
+          description: Published
+        "400":
+          description: Invalid input
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /viewscan/{image_id}/make-private:
+    post:
+      summary: Make viewscan image private
+      tags: [View Scan]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Made private
+        "400":
+          description: Invalid image_id
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /viewscan/{image_id}/comments:
+    get:
+      summary: List comments for viewscan image
+      tags: [View Scan]
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comments list
+        "400":
+          description: Invalid image_id
+    post:
+      summary: Create comment on viewscan image
+      tags: [View Scan]
+      description: On 401 from Gateway, session is cleared.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentBody"
+      responses:
+        "200":
+          description: Comment created
+        "400":
+          description: Empty or too-long comment
+        "401":
+          description: Unauthorized (session cleared)
+
+  /viewscan/{image_id}/comments/{comment_id}:
+    delete:
+      summary: Delete comment
+      tags: [View Scan]
+      description: On 401 from Gateway, session is cleared.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: comment_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+        "400":
+          description: Invalid comment_id
+        "401":
+          description: Unauthorized (session cleared)
+
+  # ─────────────── Community ───────────────
+  /community/posts:
+    get:
+      summary: List community posts
+      tags: [Community]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Paginated posts
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Create community post
+      tags: [Community]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostBody"
+      responses:
+        "201":
+          description: Post created
+        "400":
+          description: Invalid input
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /community/posts/vote:
+    post:
+      summary: Vote on community post
+      tags: [Community]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteBody"
+      responses:
+        "200":
+          description: Vote recorded
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Already voted
+
+  /community/posts/comments:
+    get:
+      summary: List comments for community post
+      tags: [Community]
+      parameters:
+        - in: query
+          name: post_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comments list
+        "400":
+          description: Missing post_id
+    post:
+      summary: Create comment on community post
+      tags: [Community]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentBody"
+      responses:
+        "201":
+          description: Comment created
+        "400":
+          description: Invalid input
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /community/posts/click:
+    post:
+      summary: Track community post click
+      tags: [Community]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClickBody"
+      responses:
+        "200":
+          description: Click recorded
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /community/posts/report:
+    post:
+      summary: Report community post
+      tags: [Community]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportBody"
+      responses:
+        "200":
+          description: Reported
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /community/posts/moderation-status:
+    post:
+      summary: Check image moderation status
+      tags: [Community]
+      description: Batch moderation status lookup for image_ids.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationStatusBody"
+      responses:
+        "200":
+          description: Moderation status per image
+        "400":
+          description: Invalid input
+
+  # ─────────────── Notifications ───────────────
+  /notification:
+    get:
+      summary: Notifications page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /community/notifications:
+    get:
+      summary: List notifications
+      tags: [Notifications]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Notifications with unread_count
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /community/notifications/unread-count:
+    get:
+      summary: Unread notification count
+      tags: [Notifications]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Unread count
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /community/notifications/read:
+    post:
+      summary: Mark notifications read
+      tags: [Notifications]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkReadBody"
+      responses:
+        "200":
+          description: Marked read
+        "400":
+          description: No criteria provided
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─────────────── Plan & billing ───────────────
+  /plan:
+    get:
+      summary: Plan page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /usage/check:
+    post:
+      summary: Check usage quota
+      tags: [Plan]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Quota status
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /billing/create-checkout-session:
+    post:
+      summary: Start Stripe checkout
+      tags: [Plan]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutBody"
+      responses:
+        "200":
+          description: Checkout URL
+        "400":
+          description: Invalid plan_id
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          description: Missing user info for billing
+
+  /billing/subscription/status:
+    get:
+      summary: Get subscription status
+      tags: [Plan]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Subscription status
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          description: Missing user info for billing
+
+  /billing/subscription/cancel-at-period-end:
+    post:
+      summary: Schedule cancellation at period end
+      tags: [Plan]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelSubscriptionBody"
+      responses:
+        "200":
+          description: Cancellation scheduled
+        "400":
+          description: Cancellation reason is required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          description: Missing user info for billing
+
+  # ─────────────── Static support pages ───────────────
+  /dev:
+    get:
+      summary: Developer info page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /docs:
+    get:
+      summary: Documentation page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /contact:
+    get:
+      summary: Contact page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"
+
+  /tutorials:
+    get:
+      summary: Tutorials page
+      tags: [Pages]
+      responses:
+        "200":
+          $ref: "#/components/responses/HtmlPage"

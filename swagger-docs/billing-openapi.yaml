@@ -186,11 +186,19 @@ paths:
     post:
       summary: Stripe webhook handler
       description: >
-        Handles Stripe webhook events. Verifies stripe-signature header.
-        Processed events: checkout.session.completed (creates subscription),
-        customer.subscription.updated (updates billing status),
-        customer.subscription.deleted (cancels subscription, downgrades to free).
-        Duplicate events are ignored via stripe_event_id deduplication.
+        Handles Stripe webhook events. Verifies stripe-signature header first;
+        the raw bytes must not be parsed before verification.
+
+        Processed events:
+        checkout.session.completed (activates subscription, upgrades user plan),
+        customer.subscription.updated (syncs billing status and period end),
+        customer.subscription.deleted (downgrades to free plan).
+
+        Retry-safe: each step (plan audit, auth plan update, billing audit)
+        is keyed by stripe_event_id via unique-sparse indexes, so a repeated
+        delivery from Stripe fails with DuplicateKeyError on already-recorded
+        rows and simply continues past them. No "duplicate_event" short-circuit
+        is emitted in the response.
       parameters:
         - in: header
           name: stripe-signature
@@ -213,15 +221,14 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [status]
                 properties:
                   status:
                     type: string
                     enum: [success, ignored, "db unavailable"]
                   reason:
                     type: string
-                    description: Present when status=ignored (e.g. duplicate_event, missing_user_id).
-                  event_id:
-                    type: string
+                    description: Present when status=ignored (currently only "missing_user_id").
         "400":
           description: Invalid payload or invalid signature
         "500":

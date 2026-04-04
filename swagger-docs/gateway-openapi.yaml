@@ -969,7 +969,31 @@ paths:
       tags: [Billing]
       description: >
         Proxied as raw bytes to preserve Stripe signature verification.
-        Also accessible at /api/billing/webhook.
+        Exact same behavior is also exposed at /api/billing/webhook.
+      parameters:
+        - in: header
+          name: stripe-signature
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Webhook processed
+        "400":
+          description: Invalid payload or signature
+
+  /api/billing/webhook:
+    post:
+      summary: Stripe webhook (alias)
+      tags: [Billing]
+      description: Identical to /billing/webhook. Both paths are registered on the same handler.
       parameters:
         - in: header
           name: stripe-signature
@@ -994,9 +1018,13 @@ paths:
     get:
       summary: List community posts
       tags: [Community]
-      description: Proxy to Community Service. Auth optional for read.
+      description: >
+        Proxy to Community Service. Auth is optional; if a Bearer token is
+        provided, the caller's user context is forwarded (used to resolve
+        user_vote on each post).
       security:
         - bearerAuth: []
+        - {}
       parameters:
         - in: query
           name: page
@@ -1200,12 +1228,10 @@ paths:
     get:
       summary: List comments
       tags: [Community]
-      security:
-        - bearerAuth: []
+      description: Public endpoint. No authentication required.
       parameters:
         - in: query
           name: post_id
-          required: true
           schema:
             type: string
         - in: query
@@ -1415,25 +1441,6 @@ paths:
       responses:
         "200":
           description: List of training images
-        "401":
-          description: Unauthorized
-        "403":
-          description: Admin privileges required
-
-  /admin/models/images:
-    get:
-      summary: Get images for a model version (admin)
-      tags: [Models]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: version
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Images associated with model version
         "401":
           description: Unauthorized
         "403":

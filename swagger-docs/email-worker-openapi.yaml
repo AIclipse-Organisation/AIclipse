@@ -4,8 +4,16 @@ info:
   version: "1.0.0"
   description: >
     Email dispatch worker with Dead Letter Queue (DLQ) management.
-    Listens to Redis streams for email send requests.
-    HTTP endpoints are internal-only.
+
+    Primary surface is Redis Streams (not HTTP): the worker is a consumer
+    on the "auth-events" stream (consumer group "email-workers") and
+    sends email via Gmail OAuth2. Send failures after MAX_RETRIES=3 are
+    copied to the "auth-events-dlq" stream. Deduplication uses a
+    per-event Redis key with TTL=86400s; an in-flight send lock
+    (TTL=300s) prevents concurrent delivery of the same event.
+
+    HTTP endpoints are internal-only and protected by X-Internal-Token.
+    They exist for DLQ inspection and manual replay.
 servers:
   - url: http://email-worker-srv:3000
 
@@ -42,7 +50,7 @@ components:
           description: Number of DLQ items to replay.
         delete_after_replay:
           type: boolean
-          default: false
+          default: true
           description: If true, remove items from DLQ after successful replay.
 
     ReplayResponse:
@@ -54,9 +62,25 @@ components:
         deleted:
           type: integer
           description: Number of items removed from DLQ.
-        errors:
+        target_stream:
+          type: string
+          description: Stream name items were replayed to (auth-events).
+        delete_after_replay:
+          type: boolean
+
+    DlqListResponse:
+      type: object
+      properties:
+        stream:
+          type: string
+          description: DLQ stream name (auth-events-dlq).
+        count:
           type: integer
-          description: Number of replay failures.
+          description: Number of items returned.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DlqItem"
 
 paths:
   /healthz:
@@ -95,14 +119,15 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/DlqItem"
+                $ref: "#/components/schemas/DlqListResponse"
+        "400":
+          description: count out of range (must be 1-200)
         "401":
           description: Missing or invalid X-Internal-Token
+        "500":
+          description: INTERNAL_AUTH_TOKEN is not configured
+        "503":
+          description: Redis unavailable
 
   /internal/dlq/replay:
     post:
@@ -127,3 +152,7 @@ paths:
                 $ref: "#/components/schemas/ReplayResponse"
         "401":
           description: Missing or invalid X-Internal-Token
+        "500":
+          description: INTERNAL_AUTH_TOKEN is not configured
+        "503":
+          description: Redis unavailable
