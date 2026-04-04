@@ -49,7 +49,7 @@ jobs:
 
       - name: Cache Git LFS objects
         if: ${{ inputs.lfs_weights_enabled }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .git/lfs/objects
           key: lfs-${{ runner.os }}-${{ hashFiles(inputs.lfs_weights_path) }}
