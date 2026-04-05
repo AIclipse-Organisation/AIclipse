@@ -49,7 +49,7 @@ def state(monkeypatch, billing_module):
     # at httpx internals.
     auth_read = Mock(
         name="_read_user_plan",
-        return_value={"user_id": "user_1", "plan": 0, "stripe_customer_id": "cus_123"},
+        return_value={"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 0, "stripe_customer_id": "cus_123"},
     )
     auth_update = Mock(
         name="_update_user_plan",

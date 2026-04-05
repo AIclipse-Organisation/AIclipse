@@ -74,7 +74,7 @@ def test_billing_checkout_clears_session_and_cookie_when_revalidation_fails(main
 
 def test_checks_returns_502_when_gateway_answers_with_non_json(main_client_module, monkeypatch):
     proxy_call = Mock(return_value=({"detail": "Invalid JSON from gateway on /checks"}, 502))
-    monkeypatch.setattr(main_client_module.route_detection, "proxy_gateway_multipart_request", proxy_call)
+    monkeypatch.setattr("routes.detection.proxy_gateway_multipart_request", proxy_call)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "check-token")
@@ -124,7 +124,7 @@ def test_billing_subscription_status_uses_session_user_and_proxies(main_client_m
 
 def test_get_image_proxies_through_gateway_media_service(main_client_module, monkeypatch):
     proxy_call = Mock(return_value=({"item": {"image_id": "img_123"}}, 200))
-    monkeypatch.setattr(main_client_module.route_library, "proxy_gateway_json_request", proxy_call)
+    monkeypatch.setattr("routes.library.proxy_gateway_json_request", proxy_call)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "img-token")
@@ -1277,7 +1277,7 @@ def test_versioned_static_assets_are_cacheable_and_immutable(main_client_module)
 
 def test_images_api_is_sent_with_no_store_cache_policy(main_client_module, monkeypatch):
     list_images = Mock(return_value=({"items": [{"image_id": "img_123"}]}, 200))
-    monkeypatch.setattr(main_client_module.route_library, "list_images_page", list_images)
+    monkeypatch.setattr("routes.library.list_images_page", list_images)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "img-token")

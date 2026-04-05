@@ -29,14 +29,14 @@ def test_config_returns_publishable_key(client, state):
 
 
 def test_subscription_status_returns_default_when_no_billing_doc(client, state):
-    state["auth_read"].return_value = {"user_id": "user_1", "plan": 1, "stripe_customer_id": "cus_123"}
+    state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 1, "stripe_customer_id": "cus_123"}
     state["billing_coll"].find_one.return_value = None
 
-    response = client.get("/subscription/status", params={"user_id": "user_1"})
+    response = client.get("/subscription/status", params={"user_id": "u_11111111-1111-1111-1111-111111111111"})
 
     assert response.status_code == 200
     assert response.json() == {
-        "user_id": "user_1",
+        "user_id": "u_11111111-1111-1111-1111-111111111111",
         "plan": 1,
         "status": "none",
         "cancel_at_period_end": False,
@@ -46,7 +46,7 @@ def test_subscription_status_returns_default_when_no_billing_doc(client, state):
 
 def test_subscription_status_returns_active_with_period_end(client, state):
     period_end = datetime(2026, 5, 24, 10, 0, tzinfo=timezone.utc)
-    state["auth_read"].return_value = {"user_id": "user_1", "plan": 1, "stripe_customer_id": "cus_123"}
+    state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 1, "stripe_customer_id": "cus_123"}
     state["billing_coll"].find_one.return_value = {
         "status": "active",
         "cancel_at_period_end": False,
@@ -56,11 +56,11 @@ def test_subscription_status_returns_active_with_period_end(client, state):
         "cancellation_reason": None,
     }
 
-    response = client.get("/subscription/status", params={"user_id": "user_1"})
+    response = client.get("/subscription/status", params={"user_id": "u_11111111-1111-1111-1111-111111111111"})
 
     assert response.status_code == 200
     assert response.json() == {
-        "user_id": "user_1",
+        "user_id": "u_11111111-1111-1111-1111-111111111111",
         "plan": 1,
         "status": "active",
         "cancel_at_period_end": False,
@@ -69,7 +69,7 @@ def test_subscription_status_returns_active_with_period_end(client, state):
 
 
 def test_create_checkout_session_success(client, state):
-    payload = {"user_id": "user_1", "plan_id": 1, "email": "alice@example.com"}
+    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 1, "email": "alice@example.com"}
 
     response = client.post("/create-checkout-session", json=payload)
 
@@ -82,7 +82,7 @@ def test_create_checkout_session_success(client, state):
 
 
 def test_create_checkout_session_invalid_plan(client, state):
-    payload = {"user_id": "user_1", "plan_id": 99, "email": "alice@example.com"}
+    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 99, "email": "alice@example.com"}
 
     response = client.post("/create-checkout-session", json=payload)
 
@@ -93,7 +93,7 @@ def test_create_checkout_session_invalid_plan(client, state):
 def test_create_checkout_session_reuses_existing_customer(client, state):
     state["plan_coll"].find_one.return_value = {"stripe_customer_id": "cus_existing"}
 
-    payload = {"user_id": "user_1", "plan_id": 2, "email": "alice@example.com"}
+    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 2, "email": "alice@example.com"}
     response = client.post("/create-checkout-session", json=payload)
 
     assert response.status_code == 200
@@ -104,7 +104,7 @@ def test_create_checkout_session_reuses_existing_customer(client, state):
 def test_create_checkout_session_stripe_not_configured(client, state, monkeypatch, billing_module):
     monkeypatch.setattr(billing_module, "STRIPE_SECRET_KEY", None, raising=False)
 
-    payload = {"user_id": "user_1", "plan_id": 1, "email": "alice@example.com"}
+    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 1, "email": "alice@example.com"}
     response = client.post("/create-checkout-session", json=payload)
 
     assert response.status_code == 503
@@ -114,7 +114,7 @@ def test_create_checkout_session_stripe_not_configured(client, state, monkeypatc
 def test_create_checkout_session_db_unavailable(client, state, monkeypatch, billing_module):
     monkeypatch.setattr(billing_module, "plan_coll", None, raising=False)
 
-    payload = {"user_id": "user_1", "plan_id": 1, "email": "alice@example.com"}
+    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 1, "email": "alice@example.com"}
     response = client.post("/create-checkout-session", json=payload)
 
     assert response.status_code == 503
@@ -122,9 +122,9 @@ def test_create_checkout_session_db_unavailable(client, state, monkeypatch, bill
 
 
 def test_cancel_subscription_schedules_period_end_and_records_reason(client, state):
-    state["auth_read"].return_value = {"user_id": "user_1", "plan": 2}
+    state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 2}
     state["billing_coll"].find_one.return_value = {
-        "user_id": "user_1",
+        "user_id": "u_11111111-1111-1111-1111-111111111111",
         "plan": 2,
         "status": "active",
         "stripe_subscription_id": "sub_123",
@@ -136,7 +136,7 @@ def test_cancel_subscription_schedules_period_end_and_records_reason(client, sta
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "user_1", "reason": "Too expensive"},
+        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
     )
 
     assert response.status_code == 200
@@ -152,7 +152,7 @@ def test_cancel_subscription_schedules_period_end_and_records_reason(client, sta
 def test_cancel_subscription_requires_reason(client, state):
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "user_1", "reason": "   "},
+        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "   "},
     )
 
     assert response.status_code == 400
@@ -160,11 +160,11 @@ def test_cancel_subscription_requires_reason(client, state):
 
 
 def test_cancel_subscription_requires_paid_plan(client, state):
-    state["auth_read"].return_value = {"user_id": "user_1", "plan": 0}
+    state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 0}
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "user_1", "reason": "Too expensive"},
+        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
     )
 
     assert response.status_code == 400
@@ -172,12 +172,12 @@ def test_cancel_subscription_requires_paid_plan(client, state):
 
 
 def test_cancel_subscription_returns_404_when_no_active_subscription_record(client, state):
-    state["auth_read"].return_value = {"user_id": "user_1", "plan": 2}
+    state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 2}
     state["billing_coll"].find_one.return_value = None
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "user_1", "reason": "Too expensive"},
+        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
     )
 
     assert response.status_code == 404
@@ -185,9 +185,9 @@ def test_cancel_subscription_returns_404_when_no_active_subscription_record(clie
 
 
 def test_cancel_subscription_returns_404_when_subscription_id_missing(client, state):
-    state["auth_read"].return_value = {"user_id": "user_1", "plan": 2}
+    state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 2}
     state["billing_coll"].find_one.return_value = {
-        "user_id": "user_1",
+        "user_id": "u_11111111-1111-1111-1111-111111111111",
         "plan": 2,
         "status": "active",
         "stripe_customer_id": "cus_123",
@@ -196,7 +196,7 @@ def test_cancel_subscription_returns_404_when_subscription_id_missing(client, st
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "user_1", "reason": "Too expensive"},
+        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
     )
 
     assert response.status_code == 404
@@ -205,9 +205,9 @@ def test_cancel_subscription_returns_404_when_subscription_id_missing(client, st
 
 def test_cancel_subscription_uses_existing_period_end_when_stripe_period_missing(client, state):
     existing_period_end = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
-    state["auth_read"].return_value = {"user_id": "user_1", "plan": 2}
+    state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 2}
     state["billing_coll"].find_one.return_value = {
-        "user_id": "user_1",
+        "user_id": "u_11111111-1111-1111-1111-111111111111",
         "plan": 2,
         "status": "active",
         "stripe_subscription_id": "sub_123",
@@ -220,7 +220,7 @@ def test_cancel_subscription_uses_existing_period_end_when_stripe_period_missing
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "user_1", "reason": "Other"},
+        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Other"},
     )
 
     assert response.status_code == 200
@@ -229,9 +229,9 @@ def test_cancel_subscription_uses_existing_period_end_when_stripe_period_missing
 
 def test_cancel_subscription_is_idempotent_when_already_scheduled(client, state):
     existing_period_end = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
-    state["auth_read"].return_value = {"user_id": "user_1", "plan": 2}
+    state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 2}
     state["billing_coll"].find_one.return_value = {
-        "user_id": "user_1",
+        "user_id": "u_11111111-1111-1111-1111-111111111111",
         "plan": 2,
         "status": "cancel_scheduled",
         "cancel_at_period_end": True,
@@ -242,7 +242,7 @@ def test_cancel_subscription_is_idempotent_when_already_scheduled(client, state)
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "user_1", "reason": "Too expensive"},
+        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
     )
 
     assert response.status_code == 200
@@ -289,7 +289,7 @@ def test_webhook_checkout_completed_success(client, state):
                 "id": "cs_123",
                 "customer": "cus_123",
                 "metadata": {
-                    "user_id": "user_1",
+                    "user_id": "u_11111111-1111-1111-1111-111111111111",
                     "plan_id": "2",
                     "amount_paid": "19.99",
                     "stripe_customer_id": "cus_123",
@@ -326,13 +326,13 @@ def test_webhook_checkout_completed_missing_user_id_ignored(client, state):
     response = _post_webhook(client, event)
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ignored", "reason": "missing_user_id"}
+    assert response.json() == {"status": "ignored", "reason": "invalid_user_id"}
     state["auth_update"].assert_not_called()
 
 
 def test_webhook_subscription_deleted_cancels_plan(client, state):
     state["billing_coll"].find_one.return_value = {
-        "user_id": "user_1",
+        "user_id": "u_11111111-1111-1111-1111-111111111111",
         "plan": 2,
         "status": "cancel_scheduled",
         "stripe_subscription_id": "sub_123",
@@ -400,8 +400,8 @@ def test_webhook_subscription_updated_reactivates_subscription(client, state):
 
 def test_webhook_subscription_deleted_falls_back_to_plan_record(client, state):
     state["billing_coll"].find_one.return_value = None
-    state["plan_coll"].find_one.return_value = {"user_id": "user_2"}
-    state["auth_read"].return_value = {"user_id": "user_2", "plan": 1}
+    state["plan_coll"].find_one.return_value = {"user_id": "u_22222222-2222-2222-2222-222222222222"}
+    state["auth_read"].return_value = {"user_id": "u_22222222-2222-2222-2222-222222222222", "plan": 1}
 
     event = {
         "id": "evt_sub_deleted_2",
@@ -441,7 +441,7 @@ def test_webhook_checkout_duplicate_event_skipped_via_unique_index(client, state
                 "id": "cs_123",
                 "customer": "cus_123",
                 "metadata": {
-                    "user_id": "user_1",
+                    "user_id": "u_11111111-1111-1111-1111-111111111111",
                     "plan_id": "2",
                     "amount_paid": "19.99",
                     "stripe_customer_id": "cus_123",
@@ -474,7 +474,7 @@ def test_webhook_checkout_billing_duplicate_skipped(client, state):
                 "id": "cs_123",
                 "customer": "cus_123",
                 "metadata": {
-                    "user_id": "user_1",
+                    "user_id": "u_11111111-1111-1111-1111-111111111111",
                     "plan_id": "2",
                     "amount_paid": "19.99",
                     "stripe_customer_id": "cus_123",
@@ -493,7 +493,7 @@ def test_webhook_checkout_billing_duplicate_skipped(client, state):
 def test_webhook_checkout_audit_captures_original_plan_before_auth_update(client, state):
     """Original plan must be read before auth is mutated — otherwise a retry
     after auth update would record original_plan == new_plan."""
-    state["auth_read"].return_value = {"user_id": "user_1", "plan": 0, "stripe_customer_id": "cus_123"}
+    state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 0, "stripe_customer_id": "cus_123"}
 
     event = {
         "id": "evt_order_1",
@@ -503,7 +503,7 @@ def test_webhook_checkout_audit_captures_original_plan_before_auth_update(client
                 "id": "cs_123",
                 "customer": "cus_123",
                 "metadata": {
-                    "user_id": "user_1",
+                    "user_id": "u_11111111-1111-1111-1111-111111111111",
                     "plan_id": "2",
                     "amount_paid": "19.99",
                     "stripe_customer_id": "cus_123",
@@ -535,7 +535,7 @@ def test_webhook_checkout_auth_failure_bubbles_so_stripe_retries(client, state):
                 "id": "cs_123",
                 "customer": "cus_123",
                 "metadata": {
-                    "user_id": "user_1",
+                    "user_id": "u_11111111-1111-1111-1111-111111111111",
                     "plan_id": "2",
                     "amount_paid": "19.99",
                     "stripe_customer_id": "cus_123",
@@ -557,7 +557,7 @@ def test_webhook_subscription_deleted_includes_event_id_for_idempotency(client, 
     """subscription.deleted's billing insert must carry stripe_event_id so
     the unique index protects against duplicate inserts on retry."""
     state["billing_coll"].find_one.return_value = {
-        "user_id": "user_1",
+        "user_id": "u_11111111-1111-1111-1111-111111111111",
         "plan": 2,
         "status": "cancel_scheduled",
         "stripe_subscription_id": "sub_123",
@@ -581,7 +581,7 @@ def test_webhook_subscription_deleted_duplicate_plan_insert_skipped(client, stat
     """Retry of subscription.deleted: plan_coll insert raises DuplicateKeyError
     but downstream cancellation still completes."""
     state["billing_coll"].find_one.return_value = {
-        "user_id": "user_1",
+        "user_id": "u_11111111-1111-1111-1111-111111111111",
         "plan": 2,
         "status": "cancel_scheduled",
         "stripe_subscription_id": "sub_123",
