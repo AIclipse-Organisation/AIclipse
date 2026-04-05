@@ -174,6 +174,7 @@ class RequestLogSanitizer:
     @classmethod
     def _clean_text(cls, value, max_len: int = 128) -> str:
         text = "" if value is None else str(value)
+        text = text.replace("\r", " ").replace("\n", " ")
         text = cls._CONTROL_CHARS.sub(" ", text).strip()
         if len(text) > max_len:
             return f"{text[:max_len]}..."
