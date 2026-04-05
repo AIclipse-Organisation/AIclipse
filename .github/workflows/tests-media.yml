@@ -9,13 +9,54 @@ on:
       - 'infra/k8s-dev/dev-secrets.yaml'
       - 'infra/kustomization.yaml'
       - 'skaffold.yaml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'media/**'
+      - 'infra/k8s/media-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
 
 concurrency:
   group: tests-media-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
+  unit:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: media
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: media/requirements.txt
+
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        run: |
+          set -euo pipefail
+          python -m pytest tests -q
+
   media:
+    name: k3d-smoke
+    needs: unit
     uses: ./.github/workflows/k3d-smoke.yml
     with:
       svc_name: media

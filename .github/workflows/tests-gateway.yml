@@ -9,10 +9,21 @@ on:
       - 'infra/k8s-dev/dev-secrets.yaml'
       - 'infra/kustomization.yaml'
       - 'skaffold.yaml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'gateway/**'
+      - 'infra/k8s/gateway-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
 
 concurrency:
   group: tests-gateway-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   unit:

@@ -9,10 +9,21 @@ on:
       - 'infra/k8s-dev/dev-secrets.yaml'
       - 'infra/kustomization.yaml'
       - 'skaffold.yaml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'community/**'
+      - 'infra/k8s/community-depl.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
 
 concurrency:
   group: tests-community-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   unit:
@@ -25,25 +36,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # - name: Setup Python
-      #   uses: actions/setup-python@v5
-      #   with:
-      #     python-version: "3.11"
-      #     cache: "pip"
-      #     cache-dependency-path: |
-      #       community/requirements.txt
-      #       community/requirements-dev.txt
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: community/package-lock.json
 
-      # - name: Install deps
-      #   run: |
-      #     set -euo pipefail
-      #     python -m pip install -U pip
-      #     pip install -r requirements-dev.txt
+      - name: Install deps
+        run: npm ci
 
-      # - name: Run pytest
-      #   run: |
-      #     set -euo pipefail
-      #     python -m pytest tests -q
+      - name: Run node --test
+        run: npm test
 
   community:
     name: k3d-smoke

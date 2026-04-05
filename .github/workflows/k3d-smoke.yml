@@ -33,6 +33,9 @@ on:
       lfs_weights_enabled: { type: boolean, required: false, default: false }
       lfs_weights_path:    { type: string, required: false, default: "" }
 
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest

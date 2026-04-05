@@ -11,10 +11,23 @@ on:
       - 'infra/k8s-dev/dev-secrets.yaml'
       - 'infra/kustomization.yaml'
       - 'skaffold.yaml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'model-cycle/**'
+      - 'infra/k8s/model-cycle-depl.yaml'
+      - 'infra/k8s/model-cycle-pvc.yaml'
+      - 'infra/k8s-dev/model-cycle-secrets.yaml'
+      - 'infra/k8s-dev/dev-secrets.yaml'
+      - 'infra/kustomization.yaml'
+      - 'skaffold.yaml'
 
 concurrency:
   group: tests-model-cycle-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   unit:
@@ -27,25 +40,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.11"
-  #         cache: "pip"
-  #         cache-dependency-path: |
-  #           model-cycle/requirements.txt
-  #           model-cycle/requirements-dev.txt
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
 
-  #     - name: Install deps
-  #       run: |
-  #         set -euo pipefail
-  #         python -m pip install -U pip
-  #         pip install -r requirements-dev.txt
+      - name: Restore
+        run: dotnet restore Tests/Tests.csproj
 
-  #     - name: Run pytest
-  #       run: |
-  #         set -euo pipefail
-  #         python -m pytest tests -q
+      - name: Run xUnit tests
+        run: dotnet test Tests/Tests.csproj --no-restore --verbosity minimal
 
   model-cycle:
     name: k3d-smoke
