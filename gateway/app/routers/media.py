@@ -16,7 +16,7 @@ router = APIRouter()
 
 def _media_admin_headers(user: UserContext) -> dict[str, str]:
     return {
-        "X-Is-Admin": "true" if user.is_admin else "false",
+        "X-User-Is-Admin": "true" if user.is_admin else "false",
     }
 
 

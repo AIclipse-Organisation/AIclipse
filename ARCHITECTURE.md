@@ -140,7 +140,7 @@ feature. Before merging, re-read the relevant section.
 | `client` → `gateway` | all backend data (detection, library, billing, community, auth) |
 | `community` → `gateway` | `/auth/me` lookup, adminBFF proxies, media visibility sync |
 | `gateway` → `auth` | validate JWT, API-key lookup, internal user endpoints |
-| `gateway` → `media` | image ops with `X-User-*`, `X-Is-Admin` |
+| `gateway` → `media` | image ops with `X-User-*` |
 | `gateway` → `detector` | `/v1.0.1/checks` |
 | `gateway` → `billing` | checkout, status, cancel |
 | `gateway` → `community` | `/community/internal/*` (X-Internal-Token + X-User-*) |

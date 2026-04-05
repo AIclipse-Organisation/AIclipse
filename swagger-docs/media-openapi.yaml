@@ -231,7 +231,7 @@ paths:
             type: boolean
           description: New public visibility value.
         - in: header
-          name: X-Is-Admin
+          name: X-User-Is-Admin
           required: false
           schema:
             type: boolean
@@ -268,7 +268,7 @@ paths:
           schema:
             type: string
         - in: header
-          name: X-Is-Admin
+          name: X-User-Is-Admin
           required: false
           schema:
             type: boolean

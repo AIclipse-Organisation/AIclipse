@@ -403,7 +403,7 @@ def update_image(
     image_id: str,
     user_id: str | None = Query(None),
     is_public: bool | None = Query(None),
-    x_is_admin: bool = Header(False, alias="X-Is-Admin"),
+    x_user_is_admin: bool = Header(False, alias="X-User-Is-Admin"),
 ):
     """
     Update an image's is_public field.
@@ -418,7 +418,7 @@ def update_image(
     if not doc:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    if not can_manage_image(doc, user_id, x_is_admin):
+    if not can_manage_image(doc, user_id, x_user_is_admin):
         raise HTTPException(status_code=403, detail="Forbidden: You can only update your own images")
 
     # Build update document
@@ -447,7 +447,7 @@ def update_image(
         "Successfully updated image %s (user: %s, admin: %s)",
         sanitize_for_log(str(image_id)),
         sanitize_for_log(user_id),
-        sanitize_for_log(str(x_is_admin)),
+        sanitize_for_log(str(x_user_is_admin)),
     )
     return attach_required_url(updated_doc)
 
@@ -456,7 +456,7 @@ def update_image(
 def delete_image(
     image_id: str,
     user_id: str | None = Query(None),
-    x_is_admin: bool = Header(False, alias="X-Is-Admin"),
+    x_user_is_admin: bool = Header(False, alias="X-User-Is-Admin"),
 ):
     """
     Delete an image from both MinIO storage and MongoDB.
@@ -471,7 +471,7 @@ def delete_image(
     if not doc:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    if not can_manage_image(doc, user_id, x_is_admin):
+    if not can_manage_image(doc, user_id, x_user_is_admin):
         raise HTTPException(status_code=403, detail="Forbidden: You can only delete your own images")
 
     # Delete from MinIO/S3 storage
@@ -496,7 +496,7 @@ def delete_image(
         "Successfully deleted image %s (user: %s, admin: %s)",
         sanitize_for_log(str(image_id)),
         sanitize_for_log(user_id),
-        sanitize_for_log(str(x_is_admin)),
+        sanitize_for_log(str(x_user_is_admin)),
     )
     return {"message": "Image deleted successfully", "image_id": image_id}
 

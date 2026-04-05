@@ -75,7 +75,7 @@ async def test_patch_image_accepts_internal_forwarded_user(client, patch_upstrea
     def media_patch_handler(req: httpx.Request) -> httpx.Response:
         assert req.url.params.get("user_id") == "u_comm"
         assert req.url.params.get("is_public") == "true"
-        assert req.headers.get("x-is-admin") == "true"
+        assert req.headers.get("x-user-is-admin") == "true"
         return httpx.Response(status_code=200, json={"ok": True})
 
     patch_upstreams.add(host="media", method="PATCH", path="/image/img_internal", handler=media_patch_handler)
