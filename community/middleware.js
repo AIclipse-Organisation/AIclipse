@@ -10,12 +10,23 @@ function isPublicPath(pathname) {
   );
 }
 
+function safeTokenCompare(a, b) {
+  if (!a || !b) return false;
+  const enc = new TextEncoder();
+  const bufA = enc.encode(a);
+  const bufB = enc.encode(b);
+  if (bufA.length !== bufB.length) return false;
+  let diff = 0;
+  for (let i = 0; i < bufA.length; i++) diff |= bufA[i] ^ bufB[i];
+  return diff === 0;
+}
+
 function isTrustedInternalRequest(request) {
   const expectedToken = String(process.env.INTERNAL_AUTH_TOKEN || "").trim();
   if (!expectedToken) return false;
 
   const providedToken = String(request.headers.get("x-internal-token") || "").trim();
-  return providedToken !== "" && providedToken === expectedToken;
+  return providedToken !== "" && safeTokenCompare(providedToken, expectedToken);
 }
 
 function redirectToLogin(request, reason = "auth_failed") {
