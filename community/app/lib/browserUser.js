@@ -28,6 +28,8 @@ async function fetchGatewayUser(accessToken) {
   }
 
   let response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
   try {
     response = await fetch(`${gateway}/auth/me`, {
       headers: {
@@ -35,9 +37,12 @@ async function fetchGatewayUser(accessToken) {
         Authorization: `Bearer ${accessToken}`,
       },
       cache: "no-store",
+      signal: controller.signal,
     });
   } catch {
     throw new Error("Gateway auth/me unreachable");
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!response.ok) {

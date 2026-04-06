@@ -92,7 +92,13 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
       const adminUserId = currentUser.user_id;
 
       try {
-        const { post_id, action, note } = await req.json();
+        const { post_id: rawPostId, action, note } = await req.json();
+
+        const validation = validatePostId(rawPostId);
+        if (!validation.valid) {
+          return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
+        const post_id = validation.value;
 
         const db = await getDb();
         const postsCol = db.collection(POSTS_COLLECTION);

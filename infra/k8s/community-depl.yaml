@@ -11,6 +11,10 @@ spec:
       containers:
         - name: community
           image: aiclipse/community
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: MONGO_URI
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }

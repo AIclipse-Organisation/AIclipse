@@ -16,6 +16,10 @@ spec:
         - name: worker
           image: aiclipse/community
           command: ["node", "commentFlushWorker.js"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: MONGO_URI
               valueFrom:

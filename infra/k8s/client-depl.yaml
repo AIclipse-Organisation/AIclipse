@@ -13,6 +13,10 @@ spec:
       containers:
         - name: client
           image: aiclipse/client
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: GATEWAY_URI
               value: "http://gateway-srv:8080"
