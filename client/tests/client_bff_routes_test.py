@@ -927,16 +927,22 @@ def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client
     main_client_module.gateway.fetch_me = Mock(
         return_value=({"user_id": "u_1", "email": "u@example.com", "is_admin": False}, 200)
     )
-    calls = []
+    get_calls = []
+    patch_calls = []
+    post_calls = []
 
     def fake_get(url, headers=None, params=None, timeout=None):
+        get_calls.append({"url": url, "headers": headers, "params": params, "timeout": timeout})
+        if url == "http://gateway.test/image/img_123":
+            assert headers["Authorization"] == "Bearer user-token"
+            return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": False}})
         if url == "http://gateway.test/community/posts":
             assert params == {"image_id": "img_123"}
             return ResponseStub(200, {"items": []})
         raise AssertionError(f"Unexpected GET {url}")
 
     def fake_post(url, headers=None, data=None, files=None, json=None, timeout=None):
-        calls.append({"url": url, "headers": headers, "json": json, "timeout": timeout})
+        post_calls.append({"url": url, "headers": headers, "json": json, "timeout": timeout})
         if url == "http://gateway.test/community/posts":
             assert headers["Authorization"] == "Bearer user-token"
             assert json["image_id"] == "img_123"
@@ -946,6 +952,7 @@ def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client
         raise AssertionError(f"Unexpected POST {url}")
 
     def fake_patch(url, headers=None, params=None, json=None, timeout=None):
+        patch_calls.append({"url": url, "headers": headers, "params": params, "json": json, "timeout": timeout})
         if url == "http://gateway.test/image/img_123":
             assert headers["Authorization"] == "Bearer user-token"
             assert json == {"is_public": True}
@@ -970,7 +977,12 @@ def test_viewscan_publish_uses_server_owned_post_and_visibility_flow(main_client
     assert resp.status_code == 200
     assert resp.get_json()["post_id"] == "post_new"
     assert resp.get_json()["is_public"] is True
-    assert len(calls) == 1
+    assert [call["url"] for call in get_calls] == [
+        "http://gateway.test/image/img_123",
+        "http://gateway.test/community/posts",
+    ]
+    assert [call["url"] for call in patch_calls] == ["http://gateway.test/image/img_123"]
+    assert len(post_calls) == 1
 
 
 def test_viewscan_publish_fails_closed_when_post_lookup_errors(main_client_module, monkeypatch):
@@ -978,13 +990,18 @@ def test_viewscan_publish_fails_closed_when_post_lookup_errors(main_client_modul
         return_value=({"user_id": "u_1", "email": "u@example.com", "is_admin": False}, 200)
     )
     create_post = Mock(side_effect=AssertionError("publish must not create a duplicate post"))
+    patch_image = Mock(side_effect=AssertionError("visibility must not change when image is already public"))
 
     def fake_get(url, headers=None, params=None, timeout=None):
-        assert url == "http://gateway.test/community/posts"
-        return ResponseStub(502, {"detail": "Gateway unreachable"})
+        if url == "http://gateway.test/image/img_123":
+            return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": True}})
+        if url == "http://gateway.test/community/posts":
+            return ResponseStub(502, {"detail": "Gateway unreachable"})
+        raise AssertionError(f"Unexpected GET {url}")
 
     monkeypatch.setattr(main_client_module.requests, "get", fake_get)
     monkeypatch.setattr(main_client_module.requests, "post", create_post)
+    monkeypatch.setattr(main_client_module.requests, "patch", patch_image)
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "user-token")
@@ -998,6 +1015,112 @@ def test_viewscan_publish_fails_closed_when_post_lookup_errors(main_client_modul
 
     assert resp.status_code == 502
     assert resp.get_json() == {"detail": "Gateway unreachable"}
+    create_post.assert_not_called()
+    patch_image.assert_not_called()
+
+
+def test_viewscan_publish_recovers_existing_post_after_private_round_trip(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "u@example.com", "is_admin": False}, 200)
+    )
+    get_calls = []
+    patch_calls = []
+    create_post = Mock(side_effect=AssertionError("publish must not create a duplicate post"))
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        get_calls.append({"url": url, "headers": headers, "timeout": timeout})
+        if url == "http://gateway.test/image/img_123":
+            assert headers["Authorization"] == "Bearer user-token"
+            return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": False}})
+        if url == "http://gateway.test/community/posts":
+            assert params == {"image_id": "img_123"}
+            return ResponseStub(200, {"items": [{"post_id": "post_9", "image_id": "img_123"}]})
+        raise AssertionError(f"Unexpected GET {url}")
+
+    def fake_patch(url, headers=None, params=None, json=None, timeout=None):
+        patch_calls.append({"url": url, "headers": headers, "params": params, "json": json, "timeout": timeout})
+        if url == "http://gateway.test/image/img_123":
+            assert headers["Authorization"] == "Bearer user-token"
+            assert json == {"is_public": True}
+            assert params is None
+            return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": True}})
+        if url == "http://gateway.test/community/posts":
+            assert headers["Authorization"] == "Bearer user-token"
+            assert params == {"post_id": "post_9"}
+            assert json == {"description": "Republished text"}
+            return ResponseStub(200, {"message": "Post updated successfully"})
+        raise AssertionError(f"Unexpected PATCH {url}")
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "patch", fake_patch)
+    monkeypatch.setattr(main_client_module.requests, "post", create_post)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "user-token")
+    with client.session_transaction() as sess:
+        sess["current_user"] = {"user_id": "u_1", "email": "u@example.com", "is_admin": False}
+
+    resp = client.post(
+        "/viewscan/img_123/publish",
+        json={"description": "Republished text", "verdict": "fake", "label": "fake", "confidence": 0.91},
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json() == {"image_id": "img_123", "post_id": "post_9", "is_public": True}
+    assert [call["url"] for call in get_calls] == [
+        "http://gateway.test/image/img_123",
+        "http://gateway.test/community/posts",
+    ]
+    assert [call["url"] for call in patch_calls] == [
+        "http://gateway.test/image/img_123",
+        "http://gateway.test/community/posts",
+    ]
+    create_post.assert_not_called()
+
+
+def test_viewscan_publish_rolls_visibility_back_when_post_lookup_fails_after_restore(main_client_module, monkeypatch):
+    main_client_module.gateway.fetch_me = Mock(
+        return_value=({"user_id": "u_1", "email": "u@example.com", "is_admin": False}, 200)
+    )
+    patch_calls = []
+    create_post = Mock(side_effect=AssertionError("publish must not create a duplicate post"))
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if url == "http://gateway.test/image/img_123":
+            return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": False}})
+        if url == "http://gateway.test/community/posts":
+            assert params == {"image_id": "img_123"}
+            return ResponseStub(502, {"detail": "Gateway unreachable"})
+        raise AssertionError(f"Unexpected GET {url}")
+
+    def fake_patch(url, headers=None, params=None, json=None, timeout=None):
+        patch_calls.append({"url": url, "json": json, "headers": headers, "params": params, "timeout": timeout})
+        assert url == "http://gateway.test/image/img_123"
+        assert headers["Authorization"] == "Bearer user-token"
+        assert params is None
+        if json == {"is_public": True}:
+            return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": True}})
+        if json == {"is_public": False}:
+            return ResponseStub(200, {"item": {"image_id": "img_123", "is_public": False}})
+        raise AssertionError(f"Unexpected PATCH body {json}")
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+    monkeypatch.setattr(main_client_module.requests, "patch", fake_patch)
+    monkeypatch.setattr(main_client_module.requests, "post", create_post)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "user-token")
+    with client.session_transaction() as sess:
+        sess["current_user"] = {"user_id": "u_1", "email": "u@example.com", "is_admin": False}
+
+    resp = client.post(
+        "/viewscan/img_123/publish",
+        json={"description": "Republished text", "verdict": "fake", "label": "fake", "confidence": 0.91},
+    )
+
+    assert resp.status_code == 502
+    assert resp.get_json() == {"detail": "Gateway unreachable"}
+    assert [call["json"] for call in patch_calls] == [{"is_public": True}, {"is_public": False}]
     create_post.assert_not_called()
 
 

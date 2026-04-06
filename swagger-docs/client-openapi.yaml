@@ -687,7 +687,13 @@ paths:
     post:
       summary: Publish viewscan image
       tags: [View Scan]
-      description: Publishes image with description, verdict/label/confidence.
+      description: >
+        Publishes the scan with description, verdict/label/confidence.
+        If a community post already exists for the image, the endpoint
+        reuses that post instead of creating a duplicate. Republishing a
+        previously private scan restores image visibility before resolving
+        or updating the community post. If the publish step fails after
+        restoring visibility, the client rolls the image back to private.
       security:
         - cookieAuth: []
       parameters:
