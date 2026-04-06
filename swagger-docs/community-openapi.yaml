@@ -742,10 +742,13 @@ paths:
     get:
       summary: List posts (internal)
       tags: [Posts (internal)]
+      description: >
+        Internal feed lookup. Requires X-Internal-Token. Forwarded user
+        identity is optional on GET; when X-User-Id is present the
+        response may include viewer-specific fields such as user_vote.
       security:
         - internalAuth: []
       parameters:
-        - $ref: "#/components/parameters/XUserIdHeader"
         - $ref: "#/components/parameters/XUserIsAdminHeader"
         - in: query
           name: page

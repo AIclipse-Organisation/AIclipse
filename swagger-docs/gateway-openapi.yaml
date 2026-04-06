@@ -1232,10 +1232,7 @@ paths:
       parameters:
         - in: query
           name: post_id
-          schema:
-            type: string
-        - in: query
-          name: comment_id
+          required: true
           schema:
             type: string
       responses:

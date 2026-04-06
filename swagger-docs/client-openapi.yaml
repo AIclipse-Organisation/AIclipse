@@ -258,8 +258,8 @@ paths:
             schema:
               $ref: "#/components/schemas/SignupRequest"
       responses:
-        "200":
-          description: User created
+        "202":
+          description: Signup request accepted (pending admin approval)
         "400":
           description: Invalid input
         "403":
@@ -449,7 +449,7 @@ paths:
           description: Missing file
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "429":
+        "403":
           description: Quota exceeded
 
   /upload/image:
@@ -477,7 +477,7 @@ paths:
                 is_public:
                   type: boolean
       responses:
-        "200":
+        "201":
           description: Image stored
         "400":
           description: Missing file or detection_token
@@ -802,13 +802,16 @@ paths:
     get:
       summary: List community posts
       tags: [Community]
+      description: >
+        Lists community posts. Authentication is optional; when an
+        access_token cookie is present, the request includes it and the
+        response may contain viewer-specific fields such as user_vote.
       security:
         - cookieAuth: []
+        - {}
       responses:
         "200":
           description: Paginated posts
-        "401":
-          $ref: "#/components/responses/Unauthorized"
     post:
       summary: Create community post
       tags: [Community]
@@ -923,8 +926,6 @@ paths:
       summary: Check image moderation status
       tags: [Community]
       description: Batch moderation status lookup for image_ids.
-      security:
-        - cookieAuth: []
       requestBody:
         required: true
         content:
