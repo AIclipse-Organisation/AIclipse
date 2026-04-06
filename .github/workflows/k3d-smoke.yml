@@ -227,24 +227,26 @@ jobs:
           kubectl rollout status -n "$NAMESPACE" statefulset/s3 --timeout=${{ inputs.rollout_timeout }}
 
       - name: Deploy service
-        # Patch image tag in the deployment manifest to the CI-built tag.
+        # Patch image tag in the deployment manifest to the CI-built tag and
+        # force local image usage in the same rollout. A follow-up patch would
+        # mutate the pod template again and trigger a second rollout.
         shell: bash
         run: |
           set -euo pipefail
           IMG="${{ inputs.image_name }}:${IMAGE_TAG}"
           DEP="${{ inputs.deployment_yaml }}"
           TMP="/tmp/depl.yaml"
-          sed "s|image: ${{ inputs.image_name }}|image: ${IMG}|g" "$DEP" > "$TMP"
+          awk -v repo="${{ inputs.image_name }}" -v img="${IMG}" '
+            index($0, "image: " repo) {
+              sub("image: " repo, "image: " img)
+              print
+              match($0, /^[[:space:]]*/)
+              print substr($0, RSTART, RLENGTH) "imagePullPolicy: Never"
+              next
+            }
+            { print }
+          ' "$DEP" > "$TMP"
           kubectl apply -n "$NAMESPACE" -f "$TMP"
-
-      - name: Force local image usage
-        # Guarantee kubelet never pulls from a registry. Fail fast if image is missing.
-        shell: bash
-        run: |
-          set -euo pipefail
-          kubectl -n "$NAMESPACE" patch deployment/${{ inputs.deployment_name }} \
-            --type=strategic \
-            -p '{"spec":{"template":{"spec":{"containers":[{"name":"'"${{ inputs.container_name }}"'","imagePullPolicy":"Never"}]}}}}'
 
       - name: Wait extra PVC (post-deploy, optional)
         if: ${{ inputs.extra_pvc_name != '' }}
