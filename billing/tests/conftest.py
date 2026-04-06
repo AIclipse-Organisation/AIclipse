@@ -1,7 +1,7 @@
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -46,12 +46,13 @@ def state(monkeypatch, billing_module):
 
     # Auth internal API: mock at the helper layer so tests can configure the
     # user plan billing reads and assert the update call args without poking
-    # at httpx internals.
-    auth_read = Mock(
+    # at httpx internals.  Both helpers are now async coroutines, so we use
+    # AsyncMock so that ``await _read_user_plan(...)`` resolves correctly.
+    auth_read = AsyncMock(
         name="_read_user_plan",
         return_value={"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 0, "stripe_customer_id": "cus_123"},
     )
-    auth_update = Mock(
+    auth_update = AsyncMock(
         name="_update_user_plan",
         return_value={"updated": True, "previous_plan": 0},
     )

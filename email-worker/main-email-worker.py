@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import base64
+import hmac
 import threading
 import time
 from datetime import datetime, timezone
@@ -95,7 +96,7 @@ def _require_internal_token(x_internal_token: str | None) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="INTERNAL_AUTH_TOKEN is not configured",
         )
-    if x_internal_token != INTERNAL_AUTH_TOKEN:
+    if not hmac.compare_digest(x_internal_token or "", INTERNAL_AUTH_TOKEN):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
 

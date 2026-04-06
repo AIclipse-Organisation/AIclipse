@@ -2,11 +2,13 @@ public class DetectorClientService : IDetectorClientService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<DetectorClientService> _logger;
+    private readonly string _internalAuthToken;
 
     public DetectorClientService(HttpClient httpClient, ILogger<DetectorClientService> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _internalAuthToken = Environment.GetEnvironmentVariable("INTERNAL_AUTH_TOKEN") ?? "";
     }
 
     public async Task<bool> NotifyModelUpdateAsync(string version, string minioPath)
@@ -21,7 +23,13 @@ public class DetectorClientService : IDetectorClientService
 
             _logger.LogInformation("Notifying Detector to hot-swap to version {Version} at {Path}", version, minioPath);
 
-            var response = await _httpClient.PostAsJsonAsync("/internal/reload-model", payload);
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/internal/reload-model")
+            {
+                Content = JsonContent.Create(payload)
+            };
+            request.Headers.Add("X-Internal-Token", _internalAuthToken);
+
+            var response = await _httpClient.SendAsync(request);
 
             if (response.IsSuccessStatusCode)
             {

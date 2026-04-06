@@ -53,13 +53,15 @@ async def gateway_upload_image(
 
     if s.media_uri:
         url = s.media_uri.rstrip("/") + "/upload/image"
-        headers = {"X-Request-Id": str(uuid.uuid4())}
+        headers = {
+            "X-Request-Id": str(uuid.uuid4()),
+            "X-User-Id": user.user_id,
+        }
 
         safe_name = file.filename or f"upload{ext}"
 
         files = {
             "file": (safe_name, data, normalized_ct),
-            "user_id": (None, user.user_id),
             "verdict": (None, str(verdict)),
             "label": (None, str(label)),
             "confidence": (None, str(confidence)),

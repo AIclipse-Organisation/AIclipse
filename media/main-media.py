@@ -277,13 +277,20 @@ class ImageLookupIn(BaseModel):
 @app.post("/upload/image", status_code=201, response_model=ImageOut)
 async def upload_image(
     file: UploadFile = File(...),
-    user_id: str = Form(...),
     verdict: str = Form(...),
     label: str = Form(...),
     confidence: float = Form(...),
     is_public: bool = Form(...),
     model_version: str = Form(...),
+    x_user_id: str = Header(..., alias="X-User-Id"),
 ):
+    # user_id is forwarded by the gateway from the authenticated JWT; treating
+    # it as a header rather than a form field keeps it out of the user-controlled
+    # body and makes the gateway→media trust contract explicit.
+    user_id = x_user_id.strip()
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Missing user identity")
+
     normalized_model_version = str(model_version or "").strip()
     if not normalized_model_version:
         raise HTTPException(status_code=400, detail="Missing model_version")

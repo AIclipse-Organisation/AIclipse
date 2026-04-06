@@ -75,19 +75,26 @@ paths:
         Stores an image in MinIO and creates a metadata record.
         If MongoDB insert fails after S3 upload, the S3 object is rolled back.
         Allowed content types: image/jpeg, image/png. Max size: 20 MB.
+        The caller's user identity is forwarded by the gateway as the
+        X-User-Id header; callers must not supply it in the form body.
+      parameters:
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+          description: User id forwarded by the gateway from the authenticated JWT.
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required: [file, user_id, verdict, label, confidence, model_version, is_public]
+              required: [file, verdict, label, confidence, model_version, is_public]
               properties:
                 file:
                   type: string
                   format: binary
-                user_id:
-                  type: string
                 verdict:
                   type: string
                 label:
@@ -112,6 +119,8 @@ paths:
           description: File exceeds 20 MB limit
         "415":
           description: Unsupported content type (not JPEG/PNG)
+        "422":
+          description: Missing X-User-Id header
         "500":
           description: Failed to store image in S3
         "503":

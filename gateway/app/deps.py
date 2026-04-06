@@ -1,3 +1,4 @@
+import hmac
 from typing import Optional, Tuple
 
 import httpx
@@ -147,7 +148,7 @@ async def get_internal_user(
     x_user_is_admin: Optional[str] = Header(None, alias="X-User-Is-Admin"),
 ) -> UserContext:
     expected_token = _require_internal_token(request)
-    if x_internal_token != expected_token:
+    if not hmac.compare_digest(x_internal_token or "", expected_token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid internal auth token",
@@ -173,7 +174,7 @@ async def require_internal_request(
     x_internal_token: Optional[str] = Header(None, alias="X-Internal-Token"),
 ) -> bool:
     expected_token = _require_internal_token(request)
-    if x_internal_token != expected_token:
+    if not hmac.compare_digest(x_internal_token or "", expected_token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid internal auth token",

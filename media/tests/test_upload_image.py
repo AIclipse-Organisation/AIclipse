@@ -45,13 +45,13 @@ def test_upload_image_success(client, monkeypatch):
         "/upload/image",
         files={"file": ("test.png", fake_image, "image/png")},
         data={
-            "user_id": "test_user",
             "verdict": "ok",
             "label": "real",
             "confidence": "0.85",
             "model_version": "v-test",
             "is_public": "true",
         },
+        headers={"X-User-Id": "test_user"},
     )
 
     assert response.status_code == 201, response.text
@@ -86,13 +86,13 @@ def test_upload_image_rolls_back_when_metadata_store_unavailable(client, monkeyp
         "/upload/image",
         files={"file": ("test.png", fake_image, "image/png")},
         data={
-            "user_id": "test_user",
             "verdict": "ok",
             "label": "real",
             "confidence": "0.85",
             "model_version": "v-test",
             "is_public": "true",
         },
+        headers={"X-User-Id": "test_user"},
     )
 
     assert response.status_code == 503, response.text
@@ -118,12 +118,12 @@ def test_upload_image_requires_model_version(client):
         "/upload/image",
         files={"file": ("test.png", fake_image, "image/png")},
         data={
-            "user_id": "test_user",
             "verdict": "ok",
             "label": "real",
             "confidence": "0.85",
             "is_public": "true",
         },
+        headers={"X-User-Id": "test_user"},
     )
 
     assert response.status_code == 422

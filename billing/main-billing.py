@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -12,7 +13,21 @@ from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # AsyncClient must live in the event loop that owns it; owning it here
+    # keeps request-path code off the sync httpx path that used to block the
+    # loop on every auth call.
+    async with httpx.AsyncClient(timeout=5.0) as auth_http:
+        global _auth_http
+        _auth_http = auth_http
+        yield
+        _auth_http = None
+
+
+_auth_http: httpx.AsyncClient | None = None
+app = FastAPI(lifespan=lifespan)
 
 # -------------------------
 # ENV
@@ -51,7 +66,6 @@ billing_coll = None
 # -------------------------
 # AUTH INTERNAL API
 # -------------------------
-_auth_http = httpx.Client(timeout=5.0)
 
 # user_id is minted by auth as f"u_{uuid4()}". Validating at the URL
 # interpolation boundary stops path traversal (e.g. "../admin") from routing
@@ -69,19 +83,19 @@ def _auth_headers() -> dict:
     return {"X-Internal-Token": INTERNAL_AUTH_TOKEN} if INTERNAL_AUTH_TOKEN else {}
 
 
-def _read_user_plan(user_id: str) -> dict:
+async def _read_user_plan(user_id: str) -> dict:
     """Return {"user_id", "plan", "stripe_customer_id"} or {} if not found."""
     if not AUTH_URI or not INTERNAL_AUTH_TOKEN:
         raise HTTPException(status_code=503, detail="Auth service not configured")
     _require_valid_user_id(user_id)
-    resp = _auth_http.get(f"{AUTH_URI}/internal/user/{user_id}", headers=_auth_headers())
+    resp = await _auth_http.get(f"{AUTH_URI}/internal/user/{user_id}", headers=_auth_headers())
     if resp.status_code == 404:
         return {}
     resp.raise_for_status()
     return resp.json()
 
 
-def _update_user_plan(user_id: str, plan: int, stripe_customer_id: str | None = None) -> dict:
+async def _update_user_plan(user_id: str, plan: int, stripe_customer_id: str | None = None) -> dict:
     """Update user plan via auth. Returns {"updated": bool, "previous_plan": int}."""
     if not AUTH_URI or not INTERNAL_AUTH_TOKEN:
         raise HTTPException(status_code=503, detail="Auth service not configured")
@@ -89,7 +103,7 @@ def _update_user_plan(user_id: str, plan: int, stripe_customer_id: str | None = 
     body: dict = {"plan": plan}
     if stripe_customer_id is not None:
         body["stripe_customer_id"] = stripe_customer_id
-    resp = _auth_http.post(
+    resp = await _auth_http.post(
         f"{AUTH_URI}/internal/user/{user_id}/plan", json=body, headers=_auth_headers(),
     )
     resp.raise_for_status()
@@ -237,7 +251,7 @@ def get_config():
 
 
 @app.get("/subscription/status")
-def get_subscription_status(user_id: str):
+async def get_subscription_status(user_id: str):
     if billing_coll is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
@@ -245,7 +259,7 @@ def get_subscription_status(user_id: str):
     if not safe_user_id:
         raise HTTPException(status_code=400, detail="Invalid user_id")
 
-    user_info = _read_user_plan(safe_user_id)
+    user_info = await _read_user_plan(safe_user_id)
     current_plan = int(user_info.get("plan", 0) or 0)
 
     latest_bill = billing_coll.find_one(
@@ -383,7 +397,7 @@ async def cancel_subscription_at_period_end(request: CancelSubscriptionRequest):
     if not cancellation_reason:
         raise HTTPException(status_code=400, detail="Cancellation reason is required")
 
-    current_user = _read_user_plan(safe_user_id)
+    current_user = await _read_user_plan(safe_user_id)
     current_plan = int(current_user.get("plan", 0) or 0)
     if current_plan <= 0:
         raise HTTPException(status_code=400, detail="No active paid subscription")
@@ -566,7 +580,7 @@ async def stripe_webhook(request: Request):
 
         # Capture original plan before auth update so the audit row reflects
         # the true transition, even if a later step fails and Stripe retries.
-        original_plan = int(_read_user_plan(user_id).get("plan", 0) or 0)
+        original_plan = int((await _read_user_plan(user_id)).get("plan", 0) or 0)
 
         # Step 1 (audit first): recording intent before mutating auth means a
         # retry sees DuplicateKeyError here and skips straight to the remaining
@@ -590,7 +604,7 @@ async def stripe_webhook(request: Request):
             logger.info("plan audit already exists for event_id=%s (retry)", event_id)
 
         # Step 2: auth update is idempotent (set plan = N).
-        _update_user_plan(user_id, new_plan, stripe_customer_id)
+        await _update_user_plan(user_id, new_plan, stripe_customer_id)
         logger.info("user plan updated: user_id=%s original_plan=%s new_plan=%s", user_id, original_plan, new_plan)
 
         # Step 3: billing audit.
@@ -689,7 +703,7 @@ async def stripe_webhook(request: Request):
 
         if user_id and last_billing is None:
             # user_id came from plan_coll; fetch current plan via auth.
-            user_info = _read_user_plan(user_id)
+            user_info = await _read_user_plan(user_id)
             current_plan = int(user_info.get("plan", 0))
 
         if user_id:
@@ -714,7 +728,7 @@ async def stripe_webhook(request: Request):
             except DuplicateKeyError:
                 logger.info("plan audit already exists for event_id=%s (retry)", event_id)
 
-            _update_user_plan(user_id, 0)
+            await _update_user_plan(user_id, 0)
 
             billing_coll.update_many(
                 {
