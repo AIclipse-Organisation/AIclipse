@@ -49,6 +49,8 @@ jobs:
       K3S_IMAGE: ${{ inputs.k3s_image }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          lfs: ${{ inputs.lfs_weights_enabled }}
 
       - name: Initialize smoke gate
         shell: bash
@@ -81,12 +83,14 @@ jobs:
           fi
 
           git lfs install --local
-          git lfs pull --include="$FILE" --exclude="*"
-          PULL_EXIT=$?
+          git lfs fetch --include="$FILE" --exclude="*"
+          FETCH_EXIT=$?
+          git lfs checkout "$FILE"
+          CHECKOUT_EXIT=$?
           git lfs status || true
-          if [[ $PULL_EXIT -ne 0 ]]; then
+          if [[ $FETCH_EXIT -ne 0 || $CHECKOUT_EXIT -ne 0 ]]; then
             echo "SMOKE_ENABLED=false" >> "$GITHUB_ENV"
-            echo "SMOKE_SKIP_REASON=lfs-pull-failed" >> "$GITHUB_ENV"
+            echo "SMOKE_SKIP_REASON=lfs-materialize-failed" >> "$GITHUB_ENV"
             exit 0
           fi
 
