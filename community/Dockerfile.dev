@@ -6,6 +6,10 @@ RUN npm ci
 
 COPY . .
 
+# Next dev writes runtime artifacts under /app/.next, so the working tree must
+# be writable before switching away from root.
+RUN mkdir -p .next && chown -R 1000:1000 /app
+
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 
