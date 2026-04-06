@@ -18,6 +18,6 @@ EXPOSE 3000
 
 ENV APP_ENV=dev
 
-USER node
+USER 1000
 
 CMD ["npm", "run", "dev"]

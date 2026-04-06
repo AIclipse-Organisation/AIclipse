@@ -5,21 +5,13 @@ on:
   pull_request:
     paths:
       - 'model-cycle/**'
-      - 'infra/k8s/model-cycle-depl.yaml'
-      - 'infra/k8s/model-cycle-pvc.yaml'
-      - 'infra/k8s-dev/model-cycle-secrets.yaml'
-      - 'infra/k8s-dev/dev-secrets.yaml'
-      - 'infra/kustomization.yaml'
+      - 'infra/**'
       - 'skaffold.yaml'
   push:
     branches: [dev, main]
     paths:
       - 'model-cycle/**'
-      - 'infra/k8s/model-cycle-depl.yaml'
-      - 'infra/k8s/model-cycle-pvc.yaml'
-      - 'infra/k8s-dev/model-cycle-secrets.yaml'
-      - 'infra/k8s-dev/dev-secrets.yaml'
-      - 'infra/kustomization.yaml'
+      - 'infra/**'
       - 'skaffold.yaml'
 
 concurrency:

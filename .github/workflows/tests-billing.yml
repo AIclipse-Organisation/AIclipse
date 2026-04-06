@@ -5,17 +5,13 @@ on:
   pull_request:
     paths:
       - 'billing/**'
-      - 'infra/k8s/billing-depl.yaml'
-      - 'infra/k8s-dev/dev-secrets.yaml'
-      - 'infra/kustomization.yaml'
+      - 'infra/**'
       - 'skaffold.yaml'
   push:
     branches: [dev, main]
     paths:
       - 'billing/**'
-      - 'infra/k8s/billing-depl.yaml'
-      - 'infra/k8s-dev/dev-secrets.yaml'
-      - 'infra/kustomization.yaml'
+      - 'infra/**'
       - 'skaffold.yaml'
 
 concurrency:

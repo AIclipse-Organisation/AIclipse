@@ -14,6 +14,6 @@ EXPOSE 3000
 
 ENV APP_ENV=prod
 
-USER node
+USER 1000
 
 CMD ["npx", "next", "start", "-H", "0.0.0.0", "-p", "3000"]

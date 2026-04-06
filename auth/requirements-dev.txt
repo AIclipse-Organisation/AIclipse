@@ -1,3 +1,4 @@
 -r requirements.txt
 pytest
 pytest-asyncio
+httpx==0.28.1

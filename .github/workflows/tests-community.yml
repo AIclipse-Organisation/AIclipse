@@ -5,17 +5,13 @@ on:
   pull_request:
     paths:
       - 'community/**'
-      - 'infra/k8s/community-depl.yaml'
-      - 'infra/k8s-dev/dev-secrets.yaml'
-      - 'infra/kustomization.yaml'
+      - 'infra/**'
       - 'skaffold.yaml'
   push:
     branches: [dev, main]
     paths:
       - 'community/**'
-      - 'infra/k8s/community-depl.yaml'
-      - 'infra/k8s-dev/dev-secrets.yaml'
-      - 'infra/kustomization.yaml'
+      - 'infra/**'
       - 'skaffold.yaml'
 
 concurrency:

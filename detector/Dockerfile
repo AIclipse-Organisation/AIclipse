@@ -21,6 +21,6 @@ COPY main-detector.py .
 
 RUN useradd --system --uid 1000 --no-create-home appuser && \
     chown -R appuser /app/models
-USER appuser
+USER 1000
 
 CMD ["uvicorn", "main-detector:app", "--host", "0.0.0.0", "--port", "3000"]
