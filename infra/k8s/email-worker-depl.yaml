@@ -15,6 +15,7 @@ spec:
           image: aiclipse/email-worker
           imagePullPolicy: IfNotPresent
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]

@@ -12,6 +12,7 @@ spec:
         - name: community
           image: aiclipse/community
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]

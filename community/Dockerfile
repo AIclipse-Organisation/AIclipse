@@ -7,10 +7,13 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build && npm prune --omit=dev
+RUN npm run build && npm prune --omit=dev && \
+    chown -R node:node .next
 
 EXPOSE 3000
 
 ENV APP_ENV=prod
+
+USER node
 
 CMD ["npx", "next", "start", "-H", "0.0.0.0", "-p", "3000"]

@@ -12,6 +12,7 @@ spec:
         - name: gateway
           image: aiclipse/gateway
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]

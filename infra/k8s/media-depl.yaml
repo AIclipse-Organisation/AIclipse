@@ -12,6 +12,7 @@ spec:
         - name: media
           image: aiclipse/media
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]

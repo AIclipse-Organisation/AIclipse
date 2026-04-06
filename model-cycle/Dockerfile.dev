@@ -34,4 +34,6 @@ EXPOSE 3000
 # gives .net permission to read/write in temp training jobs folders
 RUN mkdir -p training_jobs && chmod 777 training_jobs
 
+USER app
+
 ENTRYPOINT ["dotnet", "ModelCycle.dll"]

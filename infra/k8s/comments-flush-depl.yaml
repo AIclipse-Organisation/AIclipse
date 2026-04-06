@@ -17,6 +17,7 @@ spec:
           image: aiclipse/community
           command: ["node", "commentFlushWorker.js"]
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]

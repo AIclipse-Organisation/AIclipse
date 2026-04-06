@@ -28,6 +28,7 @@ spec:
         - name: model-cycle
           image: aiclipse/model-cycle
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
