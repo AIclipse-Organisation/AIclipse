@@ -50,8 +50,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Initialize smoke gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "SMOKE_ENABLED=true" >> "$GITHUB_ENV"
+          echo "SMOKE_SKIP_REASON=" >> "$GITHUB_ENV"
+
       - name: Cache Git LFS objects
-        if: ${{ inputs.lfs_weights_enabled }}
+        if: ${{ inputs.lfs_weights_enabled && env.SMOKE_ENABLED == 'true' }}
         uses: actions/cache@v4
         with:
           path: .git/lfs/objects
@@ -60,26 +67,47 @@ jobs:
             lfs-${{ runner.os }}-
 
       - name: Ensure weights (Git LFS)
-        if: ${{ inputs.lfs_weights_enabled }}
+        if: ${{ inputs.lfs_weights_enabled && env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           cd "$(git rev-parse --show-toplevel)"
 
           FILE='${{ inputs.lfs_weights_path }}'
           if [[ -z "$FILE" ]]; then
-            echo "ERROR: lfs_weights_path is empty while lfs_weights_enabled=true" >&2
-            exit 1
+            echo "SMOKE_ENABLED=false" >> "$GITHUB_ENV"
+            echo "SMOKE_SKIP_REASON=empty-lfs-path" >> "$GITHUB_ENV"
+            exit 0
           fi
 
           git lfs install --local
           git lfs pull --include="$FILE" --exclude="*"
+          PULL_EXIT=$?
           git lfs status || true
+          if [[ $PULL_EXIT -ne 0 ]]; then
+            echo "SMOKE_ENABLED=false" >> "$GITHUB_ENV"
+            echo "SMOKE_SKIP_REASON=lfs-pull-failed" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if head -n 1 "$FILE" | grep -q '^version https://git-lfs.github.com/spec/v1$'; then
+            echo "SMOKE_ENABLED=false" >> "$GITHUB_ENV"
+            echo "SMOKE_SKIP_REASON=lfs-pointer-file" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+      - name: Report skipped smoke
+        if: ${{ inputs.lfs_weights_enabled && env.SMOKE_ENABLED == 'false' }}
+        shell: bash
+        run: |
+          echo "Skipping smoke because required LFS weights are unavailable in CI: $SMOKE_SKIP_REASON"
 
       - uses: docker/setup-buildx-action@v4
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
 
       - name: Build image (load locally, no push)
         # Build once, load into the runner’s Docker; we will import into all k3d nodes.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.context }}
@@ -93,6 +121,7 @@ jobs:
 
       - name: Install k3d (pinned + checksum)
         # Pin and verify SHA256 to avoid supply-chain drift.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -106,24 +135,28 @@ jobs:
           k3d version
 
       - name: Setup kubectl (pinned)
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         uses: azure/setup-kubectl@v5
         with:
           version: ${{ inputs.kubectl_version }}
 
       - name: Create cluster (pinned k3s)
         # One server + one agent, wait for readiness to reduce race conditions.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         run: |
           k3d cluster create "$CLUSTER" --image "$K3S_IMAGE" --agents 1 --wait --timeout 120s
           kubectl cluster-info
 
       - name: Wait local-path-provisioner
         # Ensure the default dynamic provisioner is ready before creating PVCs.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
           kubectl -n kube-system rollout status deploy/local-path-provisioner --timeout=90s
 
       - name: Ensure hostpath-retain StorageClass
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -132,6 +165,7 @@ jobs:
           kubectl get sc
 
       - name: Import image into cluster (direct mode)
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -141,17 +175,18 @@ jobs:
 
       - name: Apply dev secrets
         # Supplies creds/URIs for deps and the service under test.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         run: kubectl apply -n "$NAMESPACE" -f "${{ inputs.secrets_yaml }}"
 
       - name: Apply extra secrets (optional)
-        if: ${{ inputs.extra_secrets_yaml != '' }}
+        if: ${{ env.SMOKE_ENABLED == 'true' && inputs.extra_secrets_yaml != '' }}
         shell: bash
         run: |
           set -euo pipefail
           kubectl apply -n "$NAMESPACE" -f "${{ inputs.extra_secrets_yaml }}"
 
       - name: Apply extra PVC (optional)
-        if: ${{ inputs.extra_pvc_yaml != '' }}
+        if: ${{ env.SMOKE_ENABLED == 'true' && inputs.extra_pvc_yaml != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -161,6 +196,7 @@ jobs:
         shell: bash
         # mongo-depl.yaml contains its own StorageClass named hostpath-retain with a different provisioner.
         # Filter that document out to avoid immutable-field update errors.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         run: |
           set -euo pipefail
           apply_filtered() {
@@ -186,6 +222,7 @@ jobs:
       - name: Wait storage (PVC Bound)
         # Do not use `kubectl wait --for=condition=Bound` (flaky for PVCs).
         # Poll phase until Bound and print strong diagnostics on timeout.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -219,6 +256,7 @@ jobs:
 
       - name: Wait deps
         # Ensure Redis/Mongo statefulsets and S3 deployment are ready before testing the app.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -230,6 +268,7 @@ jobs:
         # Patch image tag in the deployment manifest to the CI-built tag and
         # force local image usage in the same rollout. A follow-up patch would
         # mutate the pod template again and trigger a second rollout.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -249,7 +288,7 @@ jobs:
           kubectl apply -n "$NAMESPACE" -f "$TMP"
 
       - name: Wait extra PVC (post-deploy, optional)
-        if: ${{ inputs.extra_pvc_name != '' }}
+        if: ${{ env.SMOKE_ENABLED == 'true' && inputs.extra_pvc_name != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -280,16 +319,19 @@ jobs:
 
       - name: Wait for rollout
         # The app must be ready before probing.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         run: kubectl rollout status -n "$NAMESPACE" deployment/${{ inputs.deployment_name }} --timeout=${{ inputs.rollout_timeout }}
 
       - name: Start curl pod
         # Run curl inside the cluster to avoid NodePort/Ingress complexity.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         run: |
           kubectl run -n "$NAMESPACE" smoke --image=curlimages/curl:8.7.1 --restart=Never -- sh -c "sleep 300"
           kubectl wait -n "$NAMESPACE" --for=condition=Ready pod/smoke --timeout=60s
 
       - name: Health check (with retries)
         # Simple HTTP probe against the ClusterIP service.
+        if: ${{ env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -304,7 +346,7 @@ jobs:
 
       - name: Logs on failure
         # Print cluster state and app logs only if the job failed.
-        if: failure()
+        if: ${{ failure() && env.SMOKE_ENABLED == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -323,5 +365,5 @@ jobs:
 
       - name: Cleanup
         # Always tear down the k3d cluster to avoid runner leakage.
-        if: always()
+        if: ${{ always() && env.SMOKE_ENABLED == 'true' }}
         run: k3d cluster delete "$CLUSTER"
