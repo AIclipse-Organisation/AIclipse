@@ -1,5 +1,8 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { getDb } from "./lib/mongo/mongo.js";
-import { getRedis } from "./lib/redis/redis.js";
+import { disposeRedis, getRedis } from "./lib/redis/redis.js";
 
 const POSTS_COLLECTION = "community.posts";
 
@@ -19,10 +22,10 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function ensureConsumerGroup(redis) {
+export async function ensureConsumerGroup(redis, { logger = console } = {}) {
   try {
     await redis.xgroup("CREATE", STREAM, GROUP, "0", "MKSTREAM");
-    console.log(`[userDeleteWorker] consumer group '${GROUP}' created`);
+    logger.log(`[userDeleteWorker] consumer group '${GROUP}' created`);
   } catch (err) {
     if (err.message && err.message.includes("BUSYGROUP")) {
       // Group already exists — expected on restart
@@ -32,7 +35,7 @@ async function ensureConsumerGroup(redis) {
   }
 }
 
-async function processMessages(redis, posts, messages) {
+export async function processMessages(redis, posts, messages, { logger = console } = {}) {
   for (const [msgId, rawFields] of messages) {
     // ioredis returns fields as a flat array: ['key', 'val', 'key2', 'val2', ...]
     const fields = {};
@@ -53,13 +56,13 @@ async function processMessages(redis, posts, messages) {
       const payload = JSON.parse(dataRaw || "{}");
       deletedUserId = payload.deleted_user_id || null;
     } catch {
-      console.error("[userDeleteWorker] failed to parse event data for msg", msgId);
+      logger.error("[userDeleteWorker] failed to parse event data for msg", msgId);
       await redis.xack(STREAM, GROUP, msgId);
       continue;
     }
 
     if (!deletedUserId) {
-      console.warn("[userDeleteWorker] missing deleted_user_id in msg", msgId);
+      logger.warn("[userDeleteWorker] missing deleted_user_id in msg", msgId);
       await redis.xack(STREAM, GROUP, msgId);
       continue;
     }
@@ -76,13 +79,13 @@ async function processMessages(redis, posts, messages) {
         },
       );
 
-      console.log(
+      logger.log(
         `[userDeleteWorker] tombstoned ${result.modifiedCount} post(s) for user ${deletedUserId}`,
       );
 
       await redis.xack(STREAM, GROUP, msgId);
     } catch (err) {
-      console.error(
+      logger.error(
         `[userDeleteWorker] failed to tombstone posts for user ${deletedUserId}:`,
         err?.message || err,
       );
@@ -91,16 +94,40 @@ async function processMessages(redis, posts, messages) {
   }
 }
 
-async function main() {
-  const redis = getRedis();
-  const db = await getDb();
-  const posts = db.collection(POSTS_COLLECTION);
+export async function runUserDeleteWorker({
+  redisFactory = getRedis,
+  dbFactory = getDb,
+  sleepFn = sleep,
+  logger = console,
+  stopWhen = () => false,
+} = {}) {
+  let redis = null;
+  let posts = null;
+  let consumerGroupReady = false;
+  let started = false;
 
-  await ensureConsumerGroup(redis);
-  console.log("[userDeleteWorker] started");
-
-  while (true) {
+  while (!stopWhen()) {
     try {
+      if (!redis) {
+        redis = redisFactory();
+        consumerGroupReady = false;
+      }
+
+      if (!posts) {
+        const db = await dbFactory();
+        posts = db.collection(POSTS_COLLECTION);
+      }
+
+      if (!consumerGroupReady) {
+        await ensureConsumerGroup(redis, { logger });
+        consumerGroupReady = true;
+      }
+
+      if (!started) {
+        logger.log("[userDeleteWorker] started");
+        started = true;
+      }
+
       const response = await redis.xreadgroup(
         "GROUP", GROUP, CONSUMER,
         "BLOCK", BLOCK_MS,
@@ -114,16 +141,25 @@ async function main() {
       }
 
       for (const [, messages] of response) {
-        await processMessages(redis, posts, messages);
+        await processMessages(redis, posts, messages, { logger });
       }
     } catch (err) {
-      console.error("[userDeleteWorker] error:", err?.message || err);
-      await sleep(2000);
+      logger.error("[userDeleteWorker] error:", err?.message || err);
+      disposeRedis(redis);
+      redis = null;
+      posts = null;
+      consumerGroupReady = false;
+      await sleepFn(2000);
     }
   }
 }
 
-main().catch((err) => {
-  console.error("[userDeleteWorker] fatal:", err);
-  process.exit(1);
-});
+const ENTRY_FILE = fileURLToPath(import.meta.url);
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === ENTRY_FILE;
+
+if (isDirectRun) {
+  runUserDeleteWorker().catch((err) => {
+    console.error("[userDeleteWorker] fatal:", err);
+    process.exit(1);
+  });
+}

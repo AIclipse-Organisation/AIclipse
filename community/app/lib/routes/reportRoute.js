@@ -1,0 +1,250 @@
+import { NextResponse } from "next/server";
+import { getDb } from "@/lib/mongo/mongo.js";
+import { validatePostId } from "@/app/posts/validation.js";
+import { recordCollapsedNotification } from "@/lib/notifications/notifications.js";
+import { fetchPublicImagesByIds, resolveRenderableItemsWithPublicImages } from "@/app/lib/publicImages";
+import { setImageVisibilityOrThrow } from "@/app/lib/gatewayImages";
+import { updatePostStateWithImageSyncOrRollback } from "@/app/lib/postStateSync";
+
+const POSTS_COLLECTION = "community.posts";
+
+function unauthorized(error) {
+  return NextResponse.json(
+    { error: "Unauthorized", detail: String(error) },
+    { status: 401 },
+  );
+}
+
+export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHeaders }) {
+  return {
+    async POST(req) {
+      let currentUser;
+      try {
+        currentUser = await requireUser(req);
+      } catch (authErr) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const reporterId = currentUser.user_id;
+
+      try {
+        const body = await req.json().catch(() => null);
+        const { post_id, reason = "General Flag", details = "" } = body || {};
+
+        if (!post_id) {
+          return NextResponse.json({ error: "Missing post_id" }, { status: 400 });
+        }
+
+        const validation = validatePostId(post_id);
+        if (!validation.valid) {
+          return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
+
+        const db = await getDb();
+        const postsCol = db.collection(POSTS_COLLECTION);
+        const result = await postsCol.findOneAndUpdate(
+          { post_id: validation.value },
+          {
+            $set: { is_reported: true, last_reported_at: new Date() },
+            $addToSet: { reporter_ids: reporterId },
+            $push: {
+              report_history: {
+                reporter_id: reporterId,
+                reason,
+                details,
+                created_at: new Date(),
+              },
+            },
+            $inc: { report_count: 1 },
+          },
+          {
+            returnDocument: "after",
+            projection: { _id: 0, post_id: 1, report_count: 1 },
+          },
+        );
+
+        const updatedDoc = result?.value !== undefined ? result.value : result;
+        if (!updatedDoc) {
+          return NextResponse.json({ error: "Post not found in database" }, { status: 404 });
+        }
+
+        return NextResponse.json(
+          { message: "Post reported successfully", report_count: updatedDoc.report_count },
+          { status: 200 },
+        );
+      } catch (err) {
+        return NextResponse.json(
+          { error: "Failed to report", detail: String(err) },
+          { status: 500 },
+        );
+      }
+    },
+
+    async PATCH(req) {
+      let currentUser;
+      try {
+        currentUser = await requireUser(req);
+      } catch (authErr) {
+        return unauthorized(authErr);
+      }
+      if (!currentUser.is_admin) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      const adminUserId = currentUser.user_id;
+
+      try {
+        const { post_id: rawPostId, action, note } = await req.json();
+
+        const validation = validatePostId(rawPostId);
+        if (!validation.valid) {
+          return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
+        const post_id = validation.value;
+
+        const db = await getDb();
+        const postsCol = db.collection(POSTS_COLLECTION);
+        const post = await postsCol.findOne({ post_id });
+        if (!post) {
+          return NextResponse.json({ error: "Post not found" }, { status: 404 });
+        }
+
+        const logEntry = {
+          admin_id: adminUserId,
+          action,
+          note: note || "No note provided",
+          timestamp: new Date(),
+        };
+
+        const nextModerationState = {
+          is_reported: false,
+          last_moderated_at: new Date(),
+        };
+
+        if (action === "remove") {
+          nextModerationState.moderation_status = "removed";
+          nextModerationState.is_removed = true;
+
+          await updatePostStateWithImageSyncOrRollback({
+            postsCol,
+            previousPost: post,
+            nextState: nextModerationState,
+            rollbackFields: [
+              "is_reported",
+              "last_moderated_at",
+              "moderation_status",
+              "is_removed",
+            ],
+            syncImage: () =>
+              setImageVisibilityOrThrow({
+                imageId: post.image_id,
+                isPublic: false,
+                user: currentUser,
+                buildGatewayIdentityHeaders,
+              }),
+          });
+
+          if (post.user_id && post.user_id !== adminUserId) {
+            try {
+              await recordCollapsedNotification(db, {
+                recipient_user_id: post.user_id,
+                actor_user_id: adminUserId,
+                post_id: post.post_id,
+                type: "moderation",
+                moderation_action: "removed",
+                moderation_reason: note || "Content policy violation",
+                image_id: post.image_id || null,
+              });
+            } catch (notifyErr) {
+              console.error("Failed to create moderation notification:", notifyErr);
+            }
+          }
+        } else if (action === "dismiss") {
+          await postsCol.updateOne(
+            { post_id },
+            {
+              $set: {
+                ...nextModerationState,
+                moderation_status: "cleared",
+                is_removed: false,
+              },
+              $push: { moderation_log: logEntry },
+            },
+          );
+          return NextResponse.json({ message: `Post ${action}ed.` });
+        }
+
+        try {
+          await postsCol.updateOne(
+            { post_id },
+            { $push: { moderation_log: logEntry } },
+          );
+        } catch (logErr) {
+          console.error("Failed to append moderation log:", logErr);
+        }
+
+        return NextResponse.json({ message: `Post ${action}ed.` });
+      } catch (err) {
+        return NextResponse.json(
+          { error: "Action failed", detail: String(err) },
+          { status: 500 },
+        );
+      }
+    },
+
+    async GET(req) {
+      let currentUser;
+      try {
+        currentUser = await requireUser(req);
+      } catch (authErr) {
+        return unauthorized(authErr);
+      }
+      if (!currentUser.is_admin) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      try {
+        const db = await getDb();
+        const postsCol = db.collection(POSTS_COLLECTION);
+
+        const reportedPosts = await postsCol
+          .find({
+            is_reported: true,
+            is_removed: { $ne: true },
+            is_deleted: { $ne: true },
+          })
+          .sort({ report_count: -1, last_reported_at: -1 })
+          .toArray();
+
+        if (reportedPosts.length === 0) {
+          return NextResponse.json({ items: [] }, { status: 200 });
+        }
+
+        const images = await fetchPublicImagesByIds(
+          reportedPosts.map((post) => post.image_id),
+        );
+        const { items, missingImageIds } = resolveRenderableItemsWithPublicImages(
+          reportedPosts,
+          images,
+        );
+        if (missingImageIds.length > 0) {
+          console.error(
+            "Reported posts skipped unresolved public images:",
+            missingImageIds.filter(Boolean),
+          );
+        }
+        if (reportedPosts.length > 0 && items.length === 0) {
+          return NextResponse.json(
+            { error: "Failed to fetch reporting queue", detail: "Reporting queue contains unresolved image references" },
+            { status: 502 },
+          );
+        }
+
+        return NextResponse.json({ items }, { status: 200 });
+      } catch (err) {
+        return NextResponse.json(
+          { error: "Failed to fetch reporting queue", detail: err?.message || String(err) },
+          { status: err?.status || 500 },
+        );
+      }
+    },
+  };
+}

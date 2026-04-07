@@ -6,12 +6,12 @@
 /**
  * Vote on a post
  */
-export async function voteOnPost(postId, userId, direction) {
+export async function voteOnPost(postId, direction) {
   const res = await fetch(`/community/posts/vote`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     credentials: "include",
-    body: JSON.stringify({ post_id: postId, user_id: userId, vote: direction }),
+    body: JSON.stringify({ post_id: postId, vote: direction }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -107,15 +107,13 @@ export async function deletePostAPI(postId) {
 /**
  * Submit a comment
  */
-export async function submitCommentAPI(postId, userId, userName, text) {
+export async function submitCommentAPI(postId, text) {
   const res = await fetch(`/community/posts/comments`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
       post_id: postId,
-      user_id: userId,
-      user_name: userName,
       text,
     }),
   });

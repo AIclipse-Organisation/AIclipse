@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-module.exports = {
+const nextConfig = {
   basePath: "/community",
   output: "standalone",
   logging: {
@@ -10,7 +10,7 @@ module.exports = {
 
   experimental: {
     serverActions: {
-      bodySizeLimit: '1gb',
+      bodySizeLimit: '5mb',
     },
   },
 
@@ -24,3 +24,5 @@ module.exports = {
     return config;
   },
 };
+
+export default nextConfig;

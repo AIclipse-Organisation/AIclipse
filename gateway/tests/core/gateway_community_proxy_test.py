@@ -1,0 +1,242 @@
+import httpx
+import pytest
+
+try:
+    from tests.conftest import make_auth_token
+except (ModuleNotFoundError, ImportError):
+    from gateway.tests.conftest import make_auth_token
+
+
+@pytest.mark.asyncio
+async def test_community_posts_get_proxies_without_auth(client, patch_upstreams):
+    def community_posts_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.url.params.get("image_id") == "img_123"
+        return httpx.Response(status_code=200, json={"items": [{"post_id": "post_1"}]})
+
+    patch_upstreams.add(
+        host="community",
+        method="GET",
+        path="/community/internal/posts",
+        handler=community_posts_handler,
+    )
+
+    response = await client.get("/community/posts", params={"image_id": "img_123"})
+    assert response.status_code == 200
+    assert response.json()["items"][0]["post_id"] == "post_1"
+
+
+@pytest.mark.asyncio
+async def test_community_posts_create_proxies_authenticated_user(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_posts",
+        email="u_posts@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    def community_create_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("x-internal-token")
+        assert req.headers.get("x-user-id") == "u_posts"
+        assert req.headers.get("x-user-email") == "u_posts@example.com"
+        assert req.headers.get("x-user-is-admin") == "false"
+        return httpx.Response(status_code=201, json={"post_id": "post_new"})
+
+    patch_upstreams.add(
+        host="community",
+        method="POST",
+        path="/community/internal/posts",
+        handler=community_create_handler,
+    )
+
+    response = await client.post(
+        "/community/posts",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"image_id": "img_123", "description": "hello"},
+    )
+    assert response.status_code == 201
+    assert response.json()["post_id"] == "post_new"
+
+
+@pytest.mark.asyncio
+async def test_community_posts_patch_proxies_authenticated_user(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_posts",
+        email="u_posts@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    def community_patch_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_posts"
+        assert req.headers.get("x-user-email") == "u_posts@example.com"
+        assert req.headers.get("x-user-is-admin") == "false"
+        assert req.url.params.get("post_id") == "post_123"
+        assert req.read() == b'{"description":"Updated"}'
+        return httpx.Response(status_code=200, json={"message": "Post updated successfully"})
+
+    patch_upstreams.add(
+        host="community",
+        method="PATCH",
+        path="/community/internal/posts",
+        handler=community_patch_handler,
+    )
+
+    response = await client.patch(
+        "/community/posts",
+        params={"post_id": "post_123"},
+        headers={"Authorization": f"Bearer {token}"},
+        json={"description": "Updated"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Post updated successfully"
+
+
+@pytest.mark.asyncio
+async def test_community_moderation_status_proxies_json_response(client, patch_upstreams):
+    def moderation_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("accept") == "application/json"
+        assert req.headers.get("content-type", "").startswith("application/json")
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.read() == b'{"image_ids":["img_123"]}'
+        return httpx.Response(
+            status_code=200,
+            json={
+                "items": [
+                    {
+                        "image_id": "img_123",
+                        "moderation_status": "removed",
+                        "moderation_reason": "Content removed by moderation team",
+                    }
+                ]
+            },
+        )
+
+    patch_upstreams.add(
+        host="community",
+        method="POST",
+        path="/community/internal/posts/moderation-status",
+        handler=moderation_handler,
+    )
+
+    response = await client.post(
+        "/community/posts/moderation-status",
+        json={"image_ids": ["img_123"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [
+            {
+                "image_id": "img_123",
+                "moderation_status": "removed",
+                "moderation_reason": "Content removed by moderation team",
+            }
+        ]
+    }
+
+
+@pytest.mark.asyncio
+async def test_community_comments_get_proxies_with_internal_token(client, patch_upstreams):
+    def comments_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.url.params.get("post_id") == "post_123"
+        return httpx.Response(status_code=200, json={"items": [{"comment_id": "c_1"}]})
+
+    patch_upstreams.add(
+        host="community",
+        method="GET",
+        path="/community/internal/posts/comments",
+        handler=comments_handler,
+    )
+
+    response = await client.get("/community/posts/comments", params={"post_id": "post_123"})
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [{"comment_id": "c_1"}]}
+
+
+@pytest.mark.asyncio
+async def test_community_posts_click_proxies_with_forwarded_identity(
+    client,
+    patch_upstreams,
+    auth_keypair,
+):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_click",
+        email="u_click@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    def click_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_click"
+        assert req.headers.get("x-user-email") == "u_click@example.com"
+        assert req.headers.get("x-user-is-admin") == "false"
+        assert req.read() == b'{"post_id":"post_123"}'
+        return httpx.Response(status_code=200, json={"ok": True})
+
+    patch_upstreams.add(
+        host="community",
+        method="POST",
+        path="/community/internal/posts/click",
+        handler=click_handler,
+    )
+
+    response = await client.post(
+        "/community/posts/click",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"post_id": "post_123"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_community_notifications_unread_count_proxies_with_forwarded_identity(
+    client,
+    patch_upstreams,
+    auth_keypair,
+):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_notify",
+        email="u_notify@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    def unread_count_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("authorization") is None
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_notify"
+        assert req.headers.get("x-user-email") == "u_notify@example.com"
+        assert req.headers.get("x-user-is-admin") == "false"
+        return httpx.Response(status_code=200, json={"unread_count": 3})
+
+    patch_upstreams.add(
+        host="community",
+        method="GET",
+        path="/community/internal/notifications/unread-count",
+        handler=unread_count_handler,
+    )
+
+    response = await client.get(
+        "/community/notifications/unread-count",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"unread_count": 3}

@@ -26,6 +26,7 @@ async def create_detection_token(
     verdict: str,
     label: str,
     confidence: float,
+    model_version: str,
 ) -> str:
     s = request.app.state.settings
     secret = require_setting("DETECTION_TOKEN_SECRET", s.detection_token_secret)
@@ -38,6 +39,7 @@ async def create_detection_token(
         "verdict": verdict,
         "label": label,
         "confidence": confidence,
+        "model_version": model_version,
         "iat": now,
         "exp": now + 600,
     }

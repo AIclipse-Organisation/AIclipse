@@ -1,0 +1,71 @@
+name: tests-email-worker
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'email-worker/**'
+      - 'infra/**'
+      - 'skaffold.yaml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'email-worker/**'
+      - 'infra/**'
+      - 'skaffold.yaml'
+
+concurrency:
+  group: tests-email-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: email-worker
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            email-worker/requirements.txt
+            email-worker/requirements-dev.txt
+
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: |
+          set -euo pipefail
+          python -m pytest tests -q
+
+  email-worker:
+    name: k3d-smoke
+    needs: unit
+    uses: ./.github/workflows/k3d-smoke.yml
+    with:
+      svc_name: email-worker
+      context: ./email-worker
+      dockerfile: email-worker/Dockerfile
+      image_name: aiclipse/email-worker
+      deployment_yaml: infra/k8s/email-worker-depl.yaml
+      deployment_name: email-worker-depl
+      container_name: email-worker
+      service_name: email-worker-srv
+      service_port: 3000
+      health_path: /healthz
+      secrets_yaml: infra/k8s-dev/dev-secrets.yaml
+      readiness_selector: app=email-worker

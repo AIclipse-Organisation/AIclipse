@@ -12,6 +12,11 @@ spec:
         - name: worker
           image: aiclipse/community
           command: ["node", "userDeleteWorker.js"]
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: MONGO_URI
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }

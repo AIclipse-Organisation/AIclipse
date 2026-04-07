@@ -1,15 +1,33 @@
+import json
 import logging
 import os
 import re
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import httpx
 import stripe
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # AsyncClient must live in the event loop that owns it; owning it here
+    # keeps request-path code off the sync httpx path that used to block the
+    # loop on every auth call.
+    async with httpx.AsyncClient(timeout=5.0) as auth_http:
+        global _auth_http
+        _auth_http = auth_http
+        yield
+        _auth_http = None
+
+
+_auth_http: httpx.AsyncClient | None = None
+app = FastAPI(lifespan=lifespan)
 
 # -------------------------
 # ENV
@@ -21,6 +39,9 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 CLIENT_URL = os.getenv("CLIENT_URL")
+
+AUTH_URI = os.getenv("AUTH_URI")
+INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN")
 
 # Stripe setup
 if STRIPE_SECRET_KEY:
@@ -38,32 +59,55 @@ logger.info("MONGO_URI set=%s", bool(MONGO_URI))
 logger.info("MONGO_DB=%s", MONGO_DB)
 
 
-# Collections
-users_coll = None
+# Collections (billing's own data — user data is read/written via auth internal API)
 plan_coll = None
 billing_coll = None
 
+# -------------------------
+# AUTH INTERNAL API
+# -------------------------
 
-def _resolve_users_collection(db):
-    auth_users = db["auth.users"]
-    legacy_users = db["users"]
+# user_id is minted by auth as f"u_{uuid4()}". Validating at the URL
+# interpolation boundary stops path traversal (e.g. "../admin") from routing
+# the internal call to an unintended auth endpoint.
+_USER_ID_RE = re.compile(r"^u_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
-    try:
-        if auth_users.estimated_document_count() > 0:
-            logger.info("Using users collection: auth.users")
-            return auth_users
-    except Exception as e:
-        logger.warning("Could not inspect auth.users: %s", e)
 
-    try:
-        if legacy_users.estimated_document_count() > 0:
-            logger.info("Using users collection: users")
-            return legacy_users
-    except Exception as e:
-        logger.warning("Could not inspect users: %s", e)
+def _require_valid_user_id(user_id: str) -> str:
+    if not isinstance(user_id, str) or not _USER_ID_RE.match(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+    return user_id
 
-    logger.info("Using users collection default: auth.users")
-    return auth_users
+
+def _auth_headers() -> dict:
+    return {"X-Internal-Token": INTERNAL_AUTH_TOKEN} if INTERNAL_AUTH_TOKEN else {}
+
+
+async def _read_user_plan(user_id: str) -> dict:
+    """Return {"user_id", "plan", "stripe_customer_id"} or {} if not found."""
+    if not AUTH_URI or not INTERNAL_AUTH_TOKEN:
+        raise HTTPException(status_code=503, detail="Auth service not configured")
+    _require_valid_user_id(user_id)
+    resp = await _auth_http.get(f"{AUTH_URI}/internal/user/{user_id}", headers=_auth_headers())
+    if resp.status_code == 404:
+        return {}
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def _update_user_plan(user_id: str, plan: int, stripe_customer_id: str | None = None) -> dict:
+    """Update user plan via auth. Returns {"updated": bool, "previous_plan": int}."""
+    if not AUTH_URI or not INTERNAL_AUTH_TOKEN:
+        raise HTTPException(status_code=503, detail="Auth service not configured")
+    _require_valid_user_id(user_id)
+    body: dict = {"plan": plan}
+    if stripe_customer_id is not None:
+        body["stripe_customer_id"] = stripe_customer_id
+    resp = await _auth_http.post(
+        f"{AUTH_URI}/internal/user/{user_id}/plan", json=body, headers=_auth_headers(),
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 # -------------------------
 # HELPERS
@@ -107,15 +151,20 @@ try:
     client.admin.command("ping")
     db = client[MONGO_DB]
 
-    users_coll = _resolve_users_collection(db)
     plan_coll = db.plan
     billing_coll = db.billing
+
+    # Unique-sparse indexes give us atomic, retry-safe webhook handling:
+    # Stripe retries deliver the same event_id; a second insert fails with
+    # DuplicateKeyError, which each step catches to preserve forward progress
+    # without needing transactions or pre-checks.
+    plan_coll.create_index("stripe_event_id", unique=True, sparse=True)
+    billing_coll.create_index("stripe_event_id", unique=True, sparse=True)
 
     logger.info("Mongo connected OK. DB=%s", MONGO_DB)
 
 except Exception as e:
     logger.exception("Mongo connection failed: %s", e)
-    users_coll = None
     plan_coll = None
     billing_coll = None
 
@@ -139,6 +188,7 @@ class RequestLogSanitizer:
     @classmethod
     def _clean_text(cls, value, max_len: int = 128) -> str:
         text = "" if value is None else str(value)
+        text = text.replace("\r", " ").replace("\n", " ")
         text = cls._CONTROL_CHARS.sub(" ", text).strip()
         if len(text) > max_len:
             return f"{text[:max_len]}..."
@@ -201,16 +251,16 @@ def get_config():
 
 
 @app.get("/subscription/status")
-def get_subscription_status(user_id: str):
-    if users_coll is None or billing_coll is None:
+async def get_subscription_status(user_id: str):
+    if billing_coll is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
     safe_user_id = RequestLogSanitizer.user_id(user_id)
     if not safe_user_id:
         raise HTTPException(status_code=400, detail="Invalid user_id")
 
-    user_doc = users_coll.find_one({"user_id": safe_user_id}) or {}
-    current_plan = int(user_doc.get("plan", 0) or 0)
+    user_info = await _read_user_plan(safe_user_id)
+    current_plan = int(user_info.get("plan", 0) or 0)
 
     latest_bill = billing_coll.find_one(
         {
@@ -251,7 +301,7 @@ async def create_checkout_session(request: CheckoutRequest):
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Stripe not configured")
 
-    if users_coll is None or plan_coll is None:
+    if plan_coll is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
     plan_prices = {
@@ -336,7 +386,7 @@ async def cancel_subscription_at_period_end(request: CancelSubscriptionRequest):
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Stripe not configured")
 
-    if users_coll is None or plan_coll is None or billing_coll is None:
+    if plan_coll is None or billing_coll is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
     safe_user_id = RequestLogSanitizer.user_id(request.user_id)
@@ -347,7 +397,7 @@ async def cancel_subscription_at_period_end(request: CancelSubscriptionRequest):
     if not cancellation_reason:
         raise HTTPException(status_code=400, detail="Cancellation reason is required")
 
-    current_user = users_coll.find_one({"user_id": safe_user_id}) or {}
+    current_user = await _read_user_plan(safe_user_id)
     current_plan = int(current_user.get("plan", 0) or 0)
     if current_plan <= 0:
         raise HTTPException(status_code=400, detail="No active paid subscription")
@@ -466,7 +516,10 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=500, detail="Webhook secret not configured")
 
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        # Verify signature; we re-parse the payload ourselves so downstream code
+        # works with a plain dict rather than stripe>=14 StripeObject
+        # (which no longer subclasses dict).
+        stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
     except ValueError:
         logger.exception("Webhook invalid payload (not JSON?)")
         raise HTTPException(status_code=400, detail="Invalid payload")
@@ -474,22 +527,19 @@ async def stripe_webhook(request: Request):
         logger.exception("Webhook signature verification failed")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
+    event = json.loads(payload)
+
+    # Stripe-controlled strings are stripped of control chars before any log
+    # or DB use so that a crafted webhook can't forge log lines (invariant
+    # #13 in ARCHITECTURE.md). Values still pass signature verification above.
     event_type = event.get("type")
-    event_id = event.get("id")
+    event_id = RequestLogSanitizer._clean_text(event.get("id"), max_len=64)
 
     logger.info("Webhook verified: id=%s type=%s", event_id, event_type)
 
-    if users_coll is None or plan_coll is None or billing_coll is None:
+    if plan_coll is None or billing_coll is None:
         logger.error("DB not available; cannot persist billing updates.")
         return {"status": "db unavailable"}
-
-    # Stripe can retry delivery for the same event id; ignore already processed
-    # mutating events to avoid duplicate audit/billing rows.
-    if event_id and event_type in {"checkout.session.completed", "customer.subscription.deleted"}:
-        existing = plan_coll.find_one({"stripe_event_id": event_id})
-        if isinstance(existing, dict) and existing.get("stripe_event_id") == event_id:
-            logger.info("Duplicate webhook event ignored: id=%s type=%s", event_id, event_type)
-            return {"status": "ignored", "reason": "duplicate_event", "event_id": event_id}
 
     # --- checkout completed ---
     if event_type == "checkout.session.completed":
@@ -504,70 +554,80 @@ async def stripe_webhook(request: Request):
         amount_paid = meta.get("amount_paid")
         stripe_customer_id = meta.get("stripe_customer_id") or session.get("customer")
 
+        try:
+            new_plan = int(plan_id_raw)
+        except Exception:
+            new_plan = 0
+
+        if not user_id or not _USER_ID_RE.match(user_id):
+            # Returning 200 here avoids Stripe retrying a permanently-bad event.
+            safe_session_id = RequestLogSanitizer._clean_text(session_id, max_len=64)
+            logger.warning("missing/invalid user_id in metadata; ignoring session=%s", safe_session_id)
+            return {"status": "ignored", "reason": "invalid_user_id"}
+        # user_id has matched _USER_ID_RE (UUID format), so this is a no-op —
+        # but it makes the sanitization explicit at the log boundary.
+        user_id = RequestLogSanitizer._clean_text(user_id, max_len=64)
+
         logger.info(
             "checkout.session.completed: session=%s user_id=%s plan_id=%s amount_paid=%s customer_id=%s",
             session_id,
             user_id, plan_id_raw, amount_paid, stripe_customer_id
         )
 
-        try:
-            new_plan = int(plan_id_raw)
-        except Exception:
-            new_plan = 0
-
-        if not user_id:
-            logger.warning("missing user_id in metadata; ignoring session=%s", session_id)
-            return {"status": "ignored", "reason": "missing_user_id"}
-
-        # Read current plan for audit
-        user_doc = users_coll.find_one({"user_id": user_id}) or {}
-        original_plan = int(user_doc.get("plan", 0))
-        logger.info("user lookup: user_id=%s found=%s original_plan=%s", user_id, bool(user_doc), original_plan)
-
         now = _now_utc()
         period_start = now
         period_end = _month_end_from(period_start)
 
-        upd = users_coll.update_one(
-            {"user_id": user_id},
-            {"$set": {"plan": new_plan, "stripe_customer_id": stripe_customer_id}},
-        )
-        logger.info("users.update_one matched=%s modified=%s", upd.matched_count, upd.modified_count)
+        # Capture original plan before auth update so the audit row reflects
+        # the true transition, even if a later step fails and Stripe retries.
+        original_plan = int((await _read_user_plan(user_id)).get("plan", 0) or 0)
 
-        plan_ins = plan_coll.insert_one(
-            {
-                "user_id": user_id,
-                "timestamp": now,
-                "original_plan": original_plan,
-                "new_plan": new_plan,
-                "success": True,
-                "stripe_customer_id": stripe_customer_id,
-                "stripe_session_id": session_id,
-                "stripe_event_id": event_id,
-                "stripe_subscription_id": stripe_subscription_id,
-                "action": "subscribe",
-            }
-        )
-        logger.info("plan.insert_one id=%s", str(plan_ins.inserted_id))
+        # Step 1 (audit first): recording intent before mutating auth means a
+        # retry sees DuplicateKeyError here and skips straight to the remaining
+        # steps — original_plan stays accurate across retries.
+        try:
+            plan_coll.insert_one(
+                {
+                    "user_id": user_id,
+                    "timestamp": now,
+                    "original_plan": original_plan,
+                    "new_plan": new_plan,
+                    "success": True,
+                    "stripe_customer_id": stripe_customer_id,
+                    "stripe_session_id": session_id,
+                    "stripe_event_id": event_id,
+                    "stripe_subscription_id": stripe_subscription_id,
+                    "action": "subscribe",
+                }
+            )
+        except DuplicateKeyError:
+            logger.info("plan audit already exists for event_id=%s (retry)", event_id)
 
-        bill_ins = billing_coll.insert_one(
-            {
-                "user_id": user_id,
-                "plan": new_plan,
-                "status": "active",
-                "billing_period_start": period_start,
-                "billing_period_end": period_end,
-                "amount_paid": amount_paid,
-                "stripe_session_id": session_id,
-                "stripe_event_id": event_id,
-                "stripe_subscription_id": stripe_subscription_id,
-                "stripe_customer_id": stripe_customer_id,
-                "cancel_at_period_end": False,
-                "cancellation_reason": None,
-                "timestamp": now,
-            }
-        )
-        logger.info("billing.insert_one id=%s", str(bill_ins.inserted_id))
+        # Step 2: auth update is idempotent (set plan = N).
+        await _update_user_plan(user_id, new_plan, stripe_customer_id)
+        logger.info("user plan updated: user_id=%s original_plan=%s new_plan=%s", user_id, original_plan, new_plan)
+
+        # Step 3: billing audit.
+        try:
+            billing_coll.insert_one(
+                {
+                    "user_id": user_id,
+                    "plan": new_plan,
+                    "status": "active",
+                    "billing_period_start": period_start,
+                    "billing_period_end": period_end,
+                    "amount_paid": amount_paid,
+                    "stripe_session_id": session_id,
+                    "stripe_event_id": event_id,
+                    "stripe_subscription_id": stripe_subscription_id,
+                    "stripe_customer_id": stripe_customer_id,
+                    "cancel_at_period_end": False,
+                    "cancellation_reason": None,
+                    "timestamp": now,
+                }
+            )
+        except DuplicateKeyError:
+            logger.info("billing audit already exists for event_id=%s (retry)", event_id)
 
         logger.info("UPGRADE COMPLETE user=%s %s->%s", user_id, original_plan, new_plan)
 
@@ -626,21 +686,49 @@ async def stripe_webhook(request: Request):
                 sort=[("timestamp", -1)],
             )
 
+        user_id = None
+        current_plan = 0
         if last_billing and last_billing.get("user_id"):
             user_id = last_billing["user_id"]
             current_plan = int(last_billing.get("plan", 0) or 0)
         elif last_plan and last_plan.get("user_id"):
             user_id = last_plan["user_id"]
-            current_user = users_coll.find_one({"user_id": user_id}) or {}
-            current_plan = int(current_user.get("plan", 0))
-        else:
+
+        if user_id and not _USER_ID_RE.match(user_id):
+            logger.warning("skipping deleted-subscription webhook: invalid user_id in stored record")
             user_id = None
-            current_plan = 0
+        elif user_id:
+            # Idempotent for valid IDs; makes log-time sanitization explicit.
+            user_id = RequestLogSanitizer._clean_text(user_id, max_len=64)
+
+        if user_id and last_billing is None:
+            # user_id came from plan_coll; fetch current plan via auth.
+            user_info = await _read_user_plan(user_id)
+            current_plan = int(user_info.get("plan", 0))
 
         if user_id:
             now = _now_utc()
 
-            users_coll.update_one({"user_id": user_id}, {"$set": {"plan": 0}})
+            # Audit first (see checkout.session.completed for rationale).
+            try:
+                plan_coll.insert_one(
+                    {
+                        "user_id": user_id,
+                        "timestamp": now,
+                        "original_plan": current_plan,
+                        "new_plan": 0,
+                        "success": True,
+                        "stripe_customer_id": customer_id,
+                        "stripe_subscription_id": subscription_id,
+                        "stripe_event_id": event_id,
+                        "action": "subscription_deleted",
+                        "cancellation_reason": cancellation_reason,
+                    }
+                )
+            except DuplicateKeyError:
+                logger.info("plan audit already exists for event_id=%s (retry)", event_id)
+
+            await _update_user_plan(user_id, 0)
 
             billing_coll.update_many(
                 {
@@ -663,33 +751,22 @@ async def stripe_webhook(request: Request):
                 },
             )
 
-            plan_coll.insert_one(
-                {
+            try:
+                billing_coll.insert_one({
                     "user_id": user_id,
-                    "timestamp": now,
-                    "original_plan": current_plan,
-                    "new_plan": 0,
-                    "success": True,
+                    "plan": current_plan,
+                    "status": "canceled",
+                    "billing_period_start": None,
+                    "billing_period_end": period_end,
+                    "amount_paid": None,
                     "stripe_customer_id": customer_id,
                     "stripe_subscription_id": subscription_id,
                     "stripe_event_id": event_id,
-                    "action": "subscription_deleted",
                     "cancellation_reason": cancellation_reason,
-                }
-            )
-
-            billing_coll.insert_one({
-                "user_id": user_id,
-                "plan": current_plan,
-                "status": "canceled",
-                "billing_period_start": None,
-                "billing_period_end": period_end,
-                "amount_paid": None,
-                "stripe_customer_id": customer_id,
-                "stripe_subscription_id": subscription_id,
-                "cancellation_reason": cancellation_reason,
-                "timestamp": now,
-            })
+                    "timestamp": now,
+                })
+            except DuplicateKeyError:
+                logger.info("billing audit already exists for event_id=%s (retry)", event_id)
 
             logger.info("Subscription cancelled after delete webhook")
         else:

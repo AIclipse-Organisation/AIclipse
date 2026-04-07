@@ -52,7 +52,6 @@ def test_login_success_strips_bearer_prefix_sets_session_and_secure_cookie(auth_
     with client.session_transaction() as sess:
         assert sess["current_user"]["user_id"] == 17
         assert sess["is_admin"] is True
-        assert isinstance(sess["auth_checked_at"], int)
 
 
 def test_login_rejects_gateway_payload_without_token_or_user(auth_app_factory):
@@ -95,8 +94,9 @@ def test_auth_me_clears_session_and_cookie_on_unauthorized(auth_app_factory):
         assert dict(sess) == {}
 
 
-def test_admin_route_denies_non_admin_user_without_gateway_refetch(auth_app_factory):
+def test_admin_route_denies_non_admin_user_after_gateway_revalidation(auth_app_factory):
     gateway = Mock()
+    gateway.fetch_me.return_value = ({"user_id": 1, "is_admin": False}, 200)
     app, _ = auth_app_factory(gateway=gateway)
     client = app.test_client()
     client.set_cookie("access_token", "valid-token")
@@ -108,4 +108,4 @@ def test_admin_route_denies_non_admin_user_without_gateway_refetch(auth_app_fact
 
     assert resp.status_code == 403
     assert resp.get_data(as_text=True) == "Forbidden: Admin access required"
-    gateway.fetch_me.assert_not_called()
+    gateway.fetch_me.assert_called_once_with("valid-token")

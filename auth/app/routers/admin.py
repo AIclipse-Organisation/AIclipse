@@ -13,8 +13,9 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
-from app.deps.authz import get_current_admin
+from app.deps.authz import get_current_admin, require_internal_token
 from app.routers.public import (
     UserPublic,
     build_user_public,
@@ -22,6 +23,7 @@ from app.routers.public import (
     UserAccuracy,
     UserAccuracyRequest,
     _now_utc,
+    normalize_email_or_400,
     validate_date_of_birth,
 )
 from app.services.passwords import PasswordService, PasswordValidationError
@@ -246,6 +248,7 @@ async def admin_create_user(
         "usage_reset_date": None,
         "stripe_customer_id": None,
         "do_not_show_disclaimer_again": False,
+        "do_not_show_quick_start_again": False,
     }
 
     await users.insert_one(user_doc)
@@ -256,8 +259,7 @@ async def admin_create_user(
     )
 
 
-# Called from model-cycle so removed the admin requirement.
-@router.post("/users/accuracy", response_model=List[UserAccuracy])
+@router.post("/users/accuracy", response_model=List[UserAccuracy], dependencies=[Depends(require_internal_token)])
 async def admin_get_users_accuracy(
     request: Request,
     body: UserAccuracyRequest
@@ -315,7 +317,7 @@ async def admin_update_user(
     if "user_name" in raw and raw["user_name"] is not None:
         update_doc["user_name"] = raw["user_name"].strip()
     if "email" in raw and raw["email"] is not None:
-        update_doc["email"] = raw["email"].strip().lower()
+        update_doc["email"] = normalize_email_or_400(raw["email"], required=True)
     if "password" in raw and raw["password"]:
         update_doc["password"] = await pwd.hash_password(raw["password"])
     if "date_of_birth" in raw and raw["date_of_birth"] is not None:
@@ -329,11 +331,14 @@ async def admin_update_user(
             raise HTTPException(status_code=404, detail="User not found")
         return build_user_public(doc)
 
-    result = await users.find_one_and_update(
-        {"user_id": user_id},
-        {"$set": update_doc},
-        return_document=ReturnDocument.AFTER,
-    )
+    try:
+        result = await users.find_one_and_update(
+            {"user_id": user_id},
+            {"$set": update_doc},
+            return_document=ReturnDocument.AFTER,
+        )
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Email already registered")
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
 

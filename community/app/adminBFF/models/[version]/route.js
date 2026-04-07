@@ -1,27 +1,11 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { proxyAdminJson } from "@/app/lib/adminGateway";
 
 export const runtime = "nodejs";
-const GATEWAY_URL = process.env.GATEWAY_URI;
 
 export async function DELETE(req, { params }) {
-  try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("access_token")?.value;
-    const { version } = await params;
-
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const res = await fetch(`${GATEWAY_URL}/admin/models/${version}`, {
-      method: "DELETE",
-      headers: { "Authorization": `Bearer ${token}` },
-    });
-
-    if (!res.ok) throw new Error(`Gateway Error: ${res.status}`);
-
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
+  const { version } = await params;
+  return proxyAdminJson({
+    path: `/admin/models/${encodeURIComponent(version)}`,
+    method: "DELETE",
+  });
 }

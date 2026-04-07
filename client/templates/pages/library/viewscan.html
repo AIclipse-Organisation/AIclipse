@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>AIclipse</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="{{ asset_url('images/aiclipse_moon.png') }}" />
+
+  <link rel="stylesheet" href="{{ asset_url('css/core/styles.css') }}" />
+  <link rel="stylesheet" href="{{ asset_url('css/core/community-ui.css') }}" />
+  <link rel="stylesheet" href="{{ asset_url('css/pages/library/viewscan/page.css') }}" />
+  <link rel="stylesheet" href="{{ asset_url('css/core/loader.css') }}" />
+</head>
+
+<body class="app">
+  <div id="app-container" class="app-container">
+    <div id="viewscan-bootstrap" data-image-id="{{ initial_image_id or '' }}" hidden></div>
+    <script id="viewscan-page-model" type="application/json">{{ initial_viewscan_page_model|default(None)|tojson }}</script>
+    {% set page_title = 'View Scan' %}
+    {% set show_back = True %}
+    {% include 'partials/navigation/topbar.html' %}
+
+    <main class="screen">
+      <section class="page-header page-header--with-description" aria-label="Page title">
+        <div class="page-header-main">
+          <h1 id="viewscan-title" class="page-title">View Scan</h1>
+
+          <div id="description-header-section" class="page-header-description" hidden>
+            <div class="vs-desc-row">
+              <p id="description-text" class="page-header-description-text"></p>
+              <button type="button" id="btn-edit-description" class="vs-edit-desc-btn" hidden
+                aria-label="Edit description">
+                <img src="{{ asset_url('images/edit_icon.svg') }}" alt="" />
+              </button>
+            </div>
+          </div>
+          <div id="private-description-placeholder" class="private-placeholder private-placeholder--description" hidden>
+            You will need to publish post to add a description.
+          </div>
+          <span id="vs-upload-date" class="vs-upload-date" hidden></span>
+        </div>
+
+      </section>
+
+      <!-- <div id="viewscan-status" class="status-message"></div> -->
+
+      <section id="viewscan-card" class="viewscan-card" hidden>
+        <!-- Back button ABOVE the image (not overlay) -->
+        <!-- <a href="/scans" class="back-to-scans-btn">Back to Scans</a> -->
+
+        <div class="viewscan-image-wrap">
+          <img id="viewscan-image" class="viewscan-image" alt="Selected scan image" />
+        </div>
+
+        <!-- Verdict cards just below the image -->
+        <div id="verdict-block" class="comm_bars is-hidden verdict-block" hidden aria-label="Scan result">
+          <!-- AICLIPSE (gold) -->
+          <section id="aiclipse-card" class="comm_barBlock" hidden>
+            <div class="comm_barTrackWrap">
+              <div class="comm_barIconCol">
+                <img src="{{ asset_url('images/aiclipse_moon.png') }}" alt="" class="comm_resultIcon" />
+              </div>
+              <span class="comm_zoneLabel comm_zoneLabel--safe comm_zoneLabel--at-20">Real</span>
+              <span class="comm_zoneLabel comm_zoneLabel--neutral comm_zoneLabel--at-50">Suspicious</span>
+              <span class="comm_zoneLabel comm_zoneLabel--risk comm_zoneLabel--at-80">Fake</span>
+
+              <div class="comm_progressPanel" aria-hidden="true" title="AI probability">
+                <div class="comm_progressBar">
+                  <div id="aiclipse-fill" class="comm_progressFill" data-p="0"></div>
+                  <div class="comm_barMarker comm_barMarker--at-38"></div>
+                  <div class="comm_barMarker comm_barMarker--at-62"></div>
+                  <span class="comm_barPercent" id="aiclipse-percent">0%</span>
+                </div>
+              </div>
+              <div class="comm_voteSummary comm_voteSummary--row">
+                <span>AIclipse's Estimate</span>
+                <span>Probability of Fakeness</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- COMMUNITY (purple) -->
+          <section id="community-card" class="comm_barBlock comm_communityBar" hidden>
+            <p id="community-private-note" class="vs-communityPrivateNote" hidden>Publish to Allow Voting</p>
+            <div class="comm_communityVote">
+              <div class="comm_communityIconCol">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="comm_communityIconSvg">
+                  <path
+                    d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+                </svg>
+              </div>
+              <div class="comm_voteBars">
+                <div class="comm_voteRow">
+                  <div class="comm_voteRowHead">
+                    <span class="comm_voteLabel comm_voteLabel--real">Real</span>
+                    <span class="comm_voteCount" id="community-real-count">0 votes</span>
+                  </div>
+                  <div class="comm_voteTrack">
+                    <div class="comm_voteFill comm_voteFill--real" id="community-real-fill"></div>
+                    <span class="comm_votePct" id="community-real-pct">0%</span>
+                  </div>
+                </div>
+
+                <div class="comm_voteRow">
+                  <div class="comm_voteRowHead">
+                    <span class="comm_voteLabel comm_voteLabel--fake">Fake</span>
+                    <span class="comm_voteCount" id="community-fake-count">0 votes</span>
+                  </div>
+                  <div class="comm_voteTrack">
+                    <div class="comm_voteFill comm_voteFill--fake" id="community-fake-fill"></div>
+                    <span class="comm_votePct" id="community-fake-pct">0%</span>
+                  </div>
+                </div>
+
+                <p class="comm_voteSummary" id="community-summary" hidden>
+                  Community Votes · <span id="community-total">0</span> Total · Verdict —
+                  <span id="community-verdict" class="comm_voteSummary--split">Split</span>
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {% include 'partials/library/viewscan/action_buttons.html' %}
+
+      </section>
+    </main>
+
+    {% include 'partials/library/viewscan/modals.html' %}
+    {% include 'partials/library/viewscan/comments_sheet.html' %}
+
+  </div>
+  {% include 'partials/navigation/navbar.html' %}
+
+  <script src="{{ asset_url('js/core/http.js') }}"></script>
+  <script src="{{ asset_url('js/pages/library/api.js') }}"></script>
+  <script src="{{ asset_url('js/core/navigation.js') }}"></script>
+  <script src="{{ asset_url('js/core/app.js') }}"></script>
+  <script src="{{ asset_url('js/pages/library/viewscan/model.js') }}"></script>
+  <script src="{{ asset_url('js/pages/library/viewscan/comments.js') }}"></script>
+  <script src="{{ asset_url('js/pages/library/viewscan/actions.js') }}"></script>
+  <script src="{{ asset_url('js/pages/library/viewscan/index.js') }}"></script>
+  <script src="{{ asset_url('js/core/page-loader.js') }}"></script>
+</body>
+
+</html>

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AIclipse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="{{ asset_url('images/aiclipse_moon.png') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/core/styles.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/pages/notifications/notification.css') }}" />
+  </head>
+
+  <body class="app">
+    <div class="app-container">
+      {% set page_title = 'Notifications' %}
+      {% include 'partials/navigation/topbar.html' %}
+
+      <main class="screen">
+        <section class="notification-list" id="notification-list" aria-live="polite"></section>
+        <p class="notification-status" id="notification-status"></p>
+      </main>
+
+    </div>
+    {% include 'partials/navigation/navbar.html' %}
+    <script src="{{ asset_url('js/core/page-loader.js') }}"></script>
+    <script src="{{ asset_url('js/core/navigation.js') }}"></script>
+    <script src="{{ asset_url('js/core/app.js') }}"></script>
+    <script src="{{ asset_url('js/pages/notifications/notification.js') }}"></script>
+  </body>
+</html>

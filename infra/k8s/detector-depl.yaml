@@ -18,9 +18,16 @@ spec:
       containers:
         - name: detector
           image: aiclipse/detector
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - { containerPort: 3000, name: http }
           env:
+            - name: INTERNAL_AUTH_TOKEN
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
             - name: MONGO_URI
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
             - name: MONGO_DB

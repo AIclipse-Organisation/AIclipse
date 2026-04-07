@@ -1,0 +1,177 @@
+.aiclipse-tutorial-shade {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.68);
+  z-index: 4200;
+  display: none;
+}
+
+.aiclipse-tutorial-shade.is-open {
+  display: block;
+}
+
+.aiclipse-tutorial-hitbox {
+  position: fixed;
+  z-index: 4202;
+  display: none;
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  appearance: none;
+}
+
+.aiclipse-tutorial-hitbox.is-open {
+  display: block;
+}
+
+.aiclipse-tutorial-hitbox.is-clickable {
+  cursor: pointer;
+}
+
+.aiclipse-tutorial-card {
+  position: fixed;
+  width: min(92vw, 430px);
+  max-height: min(68vh, 520px);
+  overflow: auto;
+  background: #222222;
+  border: 1px solid #343434;
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.92);
+  z-index: 4203;
+  display: none;
+}
+
+.aiclipse-tutorial-card.is-open {
+  display: block;
+}
+
+.aiclipse-tutorial-head {
+  padding: 14px 16px 6px;
+}
+
+.aiclipse-tutorial-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.aiclipse-tutorial-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #CFB87C;
+}
+
+.aiclipse-tutorial-tracker {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(207, 184, 124, 0.85);
+}
+
+.aiclipse-tutorial-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.aiclipse-tutorial-body {
+  padding: 0 16px 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.aiclipse-tutorial-body p {
+  margin: 0;
+}
+
+.aiclipse-tutorial-body p + p {
+  margin-top: 8px;
+}
+
+.aiclipse-tutorial-body strong {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.aiclipse-tutorial-inline-ui {
+  color: #CFB87C;
+  font-weight: 800;
+}
+
+.aiclipse-tutorial-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.aiclipse-tutorial-note p {
+  margin: 0;
+}
+
+.aiclipse-tutorial-note p + p {
+  margin-top: 4px;
+}
+
+.aiclipse-tutorial-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.aiclipse-tutorial-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 96px;
+}
+
+.aiclipse-tutorial-btn--neutral {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.aiclipse-tutorial-btn--neutral:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.aiclipse-tutorial-btn--primary {
+  margin-left: auto;
+  border-color: #CFB87C;
+  color: #CFB87C;
+}
+
+.aiclipse-tutorial-btn--primary:hover {
+  background: #CFB87C;
+  color: #111111;
+}
+
+.aiclipse-tutorial-target {
+  position: relative !important;
+  z-index: 4201 !important;
+  background-color: rgba(207, 184, 124, 0.08) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.aiclipse-tutorial-elevated {
+  z-index: 4201 !important;
+}

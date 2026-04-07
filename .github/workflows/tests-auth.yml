@@ -5,14 +5,21 @@ on:
   pull_request:
     paths:
       - 'auth/**'
-      - 'infra/k8s/auth-depl.yaml'
-      - 'infra/k8s-dev/dev-secrets.yaml'
-      - 'infra/kustomization.yaml'
+      - 'infra/**'
+      - 'skaffold.yaml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'auth/**'
+      - 'infra/**'
       - 'skaffold.yaml'
 
 concurrency:
   group: tests-auth-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   unit:

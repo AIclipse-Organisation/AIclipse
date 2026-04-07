@@ -1,85 +1,49 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { Readable } from "stream";
 import http from "node:http";
+import {
+  buildAdminError,
+  getAdminAccessToken,
+  parseGatewayBody,
+  proxyAdminJson,
+  sanitizeLogMessage,
+} from "@/app/lib/adminGateway";
 
 export const runtime = "nodejs";
-
-const GATEWAY_URL = process.env.GATEWAY_URI
-
-// Helper to clean token
-function cleanToken(val) {
-  if (!val) return null;
-  return val.replace("Bearer ", "").replace(/"/g, "").trim();
-}
-
-// Helper to sanitize values before logging to prevent log injection
-function sanitizeLogMessage(val) {
-  if (val === null || val === undefined) return "";
-  return String(val).replace(/[\r\n]/g, "");
-}
+const GATEWAY_URL = process.env.GATEWAY_URI;
 
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '750mb',
+      sizeLimit: "750mb",
     },
   },
 };
 
 export async function GET(req) {
-  try {
-    const cookieStore = await cookies();
-    const token = cleanToken(cookieStore.get("access_token")?.value);
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const res = await fetch(`${GATEWAY_URL}/admin/models`, {
-      headers: { 
-        "Authorization": `Bearer ${token}` 
-      },
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      return NextResponse.json(
-        { error: `Gateway Error: ${res.status}`, detail: errText }, 
-        { status: res.status }
-      );
-    }
-
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch (err) {
-    console.error("🔥 [AdminAPI GET] Exception:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
+  return proxyAdminJson({
+    path: "/admin/models",
+  });
 }
 
 export async function POST(req) {
   try {
-    const cookieStore = await cookies();
-    const token = cleanToken(cookieStore.get("access_token")?.value);
+    const token = await getAdminAccessToken();
 
     if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return buildAdminError(401, "Unauthorized");
     }
 
     const contentType = req.headers.get("content-type");
     const contentLength = req.headers.get("content-length");
 
     if (!contentType?.includes("multipart/form-data")) {
-      return NextResponse.json({ error: "Invalid Content-Type" }, { status: 400 });
+      return buildAdminError(400, "Invalid Content-Type");
     }
 
-    console.log(`[AdminAPI] Piping ${contentLength || '?'} bytes via native HTTP...`);
+    console.log(`[AdminAPI] Piping ${contentLength || "?"} bytes via native HTTP...`);
 
-    // 1. Setup the Native Node Request
     const targetUrl = new URL(`${GATEWAY_URL}/admin/models/upload`);
-    
     const options = {
       hostname: targetUrl.hostname,
       port: targetUrl.port,
@@ -87,44 +51,46 @@ export async function POST(req) {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
-        "Content-Type": contentType, // Keep boundary exactly as is
-        // We explicitly forward Content-Length so Python knows exactly when to stop
+        "Content-Type": contentType,
         ...(contentLength && { "Content-Length": contentLength }),
       },
     };
 
-    // 2. Create the Promise wrapper for the Node stream
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const proxyReq = http.request(options, (proxyRes) => {
         let responseBody = "";
 
-        // Collect the JSON response from Gateway
         proxyRes.on("data", (chunk) => {
           responseBody += chunk;
         });
 
         proxyRes.on("end", () => {
-          // Pass the Gateway's status and body back to the Client
-          try {
-             // Try parsing JSON if possible, else return text
-             const json = JSON.parse(responseBody);
-             resolve(NextResponse.json(json, { status: proxyRes.statusCode }));
-          } catch (e) {
-             console.error(`[AdminAPI] JSON Parse Error. Raw: ${responseBody.substring(0, 100)}`);
-             resolve(NextResponse.json(
-                { error: "Gateway response invalid", details: responseBody }, 
-                { status: proxyRes.statusCode || 500 }
-             ));
+          const parsed = parseGatewayBody(responseBody);
+          if (proxyRes.statusCode && proxyRes.statusCode >= 400) {
+            resolve(
+              buildAdminError(
+                proxyRes.statusCode,
+                "Gateway Error",
+                parsed || responseBody,
+              ),
+            );
+            return;
           }
+
+          if (typeof parsed === "string") {
+            resolve(NextResponse.json({ message: parsed }, { status: proxyRes.statusCode || 200 }));
+            return;
+          }
+
+          resolve(NextResponse.json(parsed, { status: proxyRes.statusCode || 200 }));
         });
       });
 
       proxyReq.on("error", (err) => {
         console.error("🔥 [AdminAPI] Proxy Request Error:", sanitizeLogMessage(err && err.message));
-        resolve(NextResponse.json({ error: "Proxy Error", details: err.message }, { status: 502 }));
+        resolve(buildAdminError(502, "Proxy Error", err.message));
       });
 
-      // 3. Pipe the incoming Next.js Web Stream into the Node Request
       if (req.body) {
         const nodeStream = Readable.fromWeb(req.body);
         nodeStream.pipe(proxyReq);
@@ -135,6 +101,6 @@ export async function POST(req) {
 
   } catch (err) {
     console.error("🔥 [AdminAPI POST] Exception:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return buildAdminError(500, "Internal Error", err.message);
   }
 }

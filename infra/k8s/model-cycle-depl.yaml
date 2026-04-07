@@ -27,6 +27,11 @@ spec:
       containers:
         - name: model-cycle
           image: aiclipse/model-cycle
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 3000
@@ -34,6 +39,8 @@ spec:
             - name: model-data
               mountPath: /app/data
           env:
+            - name: INTERNAL_AUTH_TOKEN
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
             - name: MONGO_URI
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
             - name: MONGO_DB

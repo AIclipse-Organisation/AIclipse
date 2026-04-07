@@ -10,27 +10,32 @@ function isPublicPath(pathname) {
   );
 }
 
-async function isTokenValid(token) {
-  const gateway = process.env.GATEWAY_URI;
-  if (!gateway) return false;
-
-  try {
-    const res = await fetch(`${gateway}/auth/me`, {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      cache: "no-store",
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+function safeTokenCompare(a, b) {
+  if (!a || !b) return false;
+  const enc = new TextEncoder();
+  const bufA = enc.encode(a);
+  const bufB = enc.encode(b);
+  if (bufA.length !== bufB.length) return false;
+  let diff = 0;
+  for (let i = 0; i < bufA.length; i++) diff |= bufA[i] ^ bufB[i];
+  return diff === 0;
 }
 
-function redirectToLogin(request) {
+function isTrustedInternalRequest(request) {
+  const expectedToken = String(process.env.INTERNAL_AUTH_TOKEN || "").trim();
+  if (!expectedToken) return false;
+
+  const providedToken = String(request.headers.get("x-internal-token") || "").trim();
+  return providedToken !== "" && safeTokenCompare(providedToken, expectedToken);
+}
+
+function redirectToLogin(request, reason = "auth_failed") {
   const loginUrl = getLoginUrlFromHeaders(request.headers, request.nextUrl.origin);
   const secure = isHttpsFromHeaders(request.headers);
+
+  console.warn(
+    `[community] auth redirect (${reason}) for ${request.method} ${request.nextUrl.pathname}`,
+  );
 
   const res = NextResponse.redirect(loginUrl, 302);
   res.headers.set("Cache-Control", "no-store, max-age=0, must-revalidate");
@@ -51,13 +56,10 @@ export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
   if (isPublicPath(pathname)) return NextResponse.next();
+  if (isTrustedInternalRequest(request)) return NextResponse.next();
 
   const token = request.cookies.get("access_token")?.value;
-  if (!token) return redirectToLogin(request);
-
-  const ok = await isTokenValid(token);
-  if (!ok) return redirectToLogin(request);
-
+  if (!token) return redirectToLogin(request, "missing_access_token");
   return NextResponse.next();
 }
 

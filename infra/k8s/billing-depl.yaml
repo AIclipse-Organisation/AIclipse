@@ -11,6 +11,11 @@ spec:
       containers:
         - name: billing
           image: aiclipse/billing
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: MONGO_URI
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
@@ -24,6 +29,10 @@ spec:
               valueFrom: { secretKeyRef: { name: stripe-sec, key: STRIPE_WEBHOOK_SECRET } }
             - name: CLIENT_URL
               valueFrom: { configMapKeyRef: { name: app-configmap, key: CLIENT_URL } }
+            - name: AUTH_URI
+              value: "http://auth-srv:3000"
+            - name: INTERNAL_AUTH_TOKEN
+              valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
           ports: [{ name: http, containerPort: 3000 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 3000, scheme: HTTP }

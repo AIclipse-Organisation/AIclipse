@@ -181,6 +181,7 @@ async def _run_asgi_lifespan(app, timeout_s: float = 10.0):
 def gateway_mod():
     os.environ.setdefault("AUTH_URI", "http://auth")
     os.environ.setdefault("BILLING_URI", "http://billing-srv")
+    os.environ.setdefault("COMMUNITY_URI", "http://community")
     os.environ.setdefault("DETECTOR_URI", "http://detector")
     os.environ.setdefault("MEDIA_URI", "http://media")
     os.environ.setdefault("DETECTION_TOKEN_SECRET", "test-detection-secret")
@@ -230,6 +231,25 @@ def patch_upstreams(gateway_mod, upstream_router, auth_keypair, monkeypatch) -> 
         return httpx.Response(status_code=200, json={"keys": [auth_keypair.jwk]})
 
     upstream_router.add(host="auth", method="GET", path="/.well-known/jwks.json", handler=_jwks_handler)
+
+    def _usage_check_handler(_req: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=200,
+            json={
+                "allowed": True,
+                "plan": 0,
+                "unlimited": False,
+                "monthly_usage": 0,
+                "limit": 10,
+                "remaining": 10,
+            },
+        )
+
+    def _usage_increment_handler(_req: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=200, json={"incremented": True, "monthly_usage": 1})
+
+    upstream_router.add(host="auth", method="POST", path="/usage/check", handler=_usage_check_handler)
+    upstream_router.add(host="auth", method="POST", path="/usage/increment", handler=_usage_increment_handler)
 
     return upstream_router
 

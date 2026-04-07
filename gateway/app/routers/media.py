@@ -3,12 +3,12 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Path, Query, Request, UploadFile, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from app.core.image_safety import sniff_and_validate_image
 from app.core.media_url import build_media_image_url
 from app.core.tokens import validate_detection_token
-from app.deps import get_current_user
+from app.deps import get_current_user, get_current_user_or_internal, require_internal_request
 from app.models import UpdateImageRequest, UserContext
 
 router = APIRouter()
@@ -16,7 +16,7 @@ router = APIRouter()
 
 def _media_admin_headers(user: UserContext) -> dict[str, str]:
     return {
-        "X-Is-Admin": "true" if user.is_admin else "false",
+        "X-User-Is-Admin": "true" if user.is_admin else "false",
     }
 
 
@@ -43,8 +43,9 @@ async def gateway_upload_image(
     verdict = payload.get("verdict")
     label = payload.get("label")
     confidence = payload.get("confidence")
+    model_version = payload.get("model_version")
 
-    if verdict is None or label is None or confidence is None:
+    if verdict is None or label is None or confidence is None or model_version is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="detection_token missing detection fields",
@@ -52,16 +53,19 @@ async def gateway_upload_image(
 
     if s.media_uri:
         url = s.media_uri.rstrip("/") + "/upload/image"
-        headers = {"X-Request-Id": str(uuid.uuid4())}
+        headers = {
+            "X-Request-Id": str(uuid.uuid4()),
+            "X-User-Id": user.user_id,
+        }
 
         safe_name = file.filename or f"upload{ext}"
 
         files = {
             "file": (safe_name, data, normalized_ct),
-            "user_id": (None, user.user_id),
             "verdict": (None, str(verdict)),
             "label": (None, str(label)),
             "confidence": (None, str(confidence)),
+            "model_version": (None, str(model_version)),
             "is_public": (None, "true" if is_public else "false"),
         }
 
@@ -69,7 +73,10 @@ async def gateway_upload_image(
         try:
             resp = await client.post(url, files=files, headers=headers, timeout=20.0)
         except httpx.RequestError:
-            pass
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Media service unreachable",
+            )
         else:
             if resp.status_code == 201:
                 return Response(
@@ -77,30 +84,15 @@ async def gateway_upload_image(
                     status_code=resp.status_code,
                     media_type=resp.headers.get("content-type", "application/json"),
                 )
-            if resp.status_code >= 500:
-                pass
+            raise HTTPException(
+                status_code=resp.status_code,
+                detail=f"Media service error: {resp.status_code}",
+            )
 
-    image_id = str(uuid.uuid4())
-    image_payload = {
-        "image_id": image_id,
-        "user_id": user.user_id,
-        "verdict": verdict,
-        "label": label,
-        "confidence": confidence,
-        "is_public": bool(is_public),
-        "uploaded_at": "1970-01-01T00:00:00Z",
-        "is_reported": False,
-        "url": f"https://example.invalid/images/{image_id}",
-    }
-
-    response_body = {
-        "verdict": verdict,
-        "label": label,
-        "confidence": confidence,
-        "image": image_payload,
-    }
-
-    return JSONResponse(status_code=status.HTTP_201_CREATED, content=response_body)
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Media service unavailable",
+    )
 
 
 @router.get("/images")
@@ -111,27 +103,57 @@ async def gateway_get_my_images(
 ):
     s = request.app.state.settings
 
-    if s.media_uri:
-        params = {"user_id": user.user_id}
-        if is_public is not None:
-            params["is_public"] = "true" if is_public else "false"
+    if not s.media_uri:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unavailable")
 
-        url = s.media_uri.rstrip("/") + "/images"
-        client: httpx.AsyncClient = request.app.state.http
+    params = {"user_id": user.user_id}
+    if is_public is not None:
+        params["is_public"] = "true" if is_public else "false"
 
-        try:
-            resp = await client.get(url, params=params, timeout=10.0)
-        except httpx.RequestError:
-            pass
-        else:
-            if resp.status_code == 200:
-                return Response(
-                    content=resp.content,
-                    status_code=resp.status_code,
-                    media_type=resp.headers.get("content-type", "application/json"),
-                )
+    url = s.media_uri.rstrip("/") + "/images"
+    client: httpx.AsyncClient = request.app.state.http
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"items": []})
+    try:
+        resp = await client.get(url, params=params, timeout=10.0)
+    except httpx.RequestError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
+
+    if resp.status_code == 200:
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+
+    raise HTTPException(status_code=resp.status_code, detail=f"Media service error: {resp.status_code}")
+
+
+@router.post("/internal/images/lookup")
+async def gateway_lookup_public_images(
+    request: Request,
+    body: dict = Body(...),
+    _internal_ok: bool = Depends(require_internal_request),
+):
+    s = request.app.state.settings
+
+    if not s.media_uri:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unavailable")
+
+    url = s.media_uri.rstrip("/") + "/images/lookup"
+    client: httpx.AsyncClient = request.app.state.http
+    try:
+        resp = await client.post(url, json=body, timeout=10.0)
+    except httpx.RequestError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
+
+    if resp.status_code == 200:
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+
+    raise HTTPException(status_code=resp.status_code, detail=f"Media service error: {resp.status_code}")
 
 
 @router.get("/image/{image_id}")
@@ -143,7 +165,7 @@ async def gateway_get_image(
     s = request.app.state.settings
 
     if not s.media_uri:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unavailable")
 
     url = build_media_image_url(request, image_id)
     params = {"user_id": user.user_id}
@@ -152,7 +174,7 @@ async def gateway_get_image(
     try:
         resp = await client.get(url, params=params, timeout=10.0)
     except httpx.RequestError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
 
     if resp.status_code == 200:
         return Response(
@@ -171,12 +193,12 @@ async def gateway_update_image(
     request: Request,
     image_id: str = Path(...),
     body: UpdateImageRequest = Body(...),
-    user: UserContext = Depends(get_current_user),
+    user: UserContext = Depends(get_current_user_or_internal),
 ):
     s = request.app.state.settings
 
     if not s.media_uri:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unavailable")
 
     url = build_media_image_url(request, image_id)
     params = {"user_id": user.user_id}
@@ -212,35 +234,11 @@ async def gateway_update_image(
     raise HTTPException(status_code=resp.status_code, detail=f"Media service error: {resp.status_code}")
 
 
-@router.get("/community/images")
-async def gateway_get_community_images(request: Request):
-    s = request.app.state.settings
-
-    if s.media_uri:
-        url = s.media_uri.rstrip("/") + "/images"
-        params = {"is_public": "true"}
-
-        client: httpx.AsyncClient = request.app.state.http
-        try:
-            resp = await client.get(url, params=params, timeout=10.0)
-        except httpx.RequestError:
-            pass
-        else:
-            if resp.status_code == 200:
-                return Response(
-                    content=resp.content,
-                    status_code=resp.status_code,
-                    media_type=resp.headers.get("content-type", "application/json"),
-                )
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"items": []})
-
-
 @router.delete("/image/{image_id}")
 async def gateway_delete_image(
     request: Request,
     image_id: str = Path(...),
-    user: UserContext = Depends(get_current_user),
+    user: UserContext = Depends(get_current_user_or_internal),
 ):
     s = request.app.state.settings
 
@@ -258,7 +256,7 @@ async def gateway_delete_image(
     try:
         resp = await client.delete(url, params=params, headers=headers, timeout=10.0)
     except httpx.RequestError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
 
     if resp.status_code == 200:
         return Response(

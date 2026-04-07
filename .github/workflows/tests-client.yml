@@ -5,17 +5,79 @@ on:
   pull_request:
     paths:
       - 'client/**'
-      - 'infra/k8s/client-depl.yaml'
-      - 'infra/k8s-dev/dev-secrets.yaml'
-      - 'infra/kustomization.yaml'
+      - 'infra/**'
+      - 'skaffold.yaml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'client/**'
+      - 'infra/**'
       - 'skaffold.yaml'
 
 concurrency:
   group: tests-client-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
+  unit-python:
+    name: unit-tests-python
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            client/requirements.txt
+            client/requirements-dev.txt
+
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: |
+          set -euo pipefail
+          python -m pytest tests -q
+
+  unit-js:
+    name: unit-tests-js
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run jest
+        run: npm test
+
   client:
+    name: k3d-smoke
+    needs: [unit-python, unit-js]
     uses: ./.github/workflows/k3d-smoke.yml
     with:
       svc_name: client

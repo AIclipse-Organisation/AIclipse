@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "jest --runInBand"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0"
+  }
+}

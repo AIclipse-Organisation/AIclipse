@@ -1,3 +1,15 @@
+# Security-only mode.
+#
+# `open-pull-requests-limit: 0` disables version-update PRs (no weekly bumps).
+# Security-update PRs (CVE-triggered) are created regardless of this limit
+# — see https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference#open-pull-requests-limit
+#
+# CVE coverage on PRs is also enforced by:
+#   - .github/workflows/pip-audit.yml       (Python, OSV-backed)
+#   - .github/workflows/npm-audit.yml       (Node, --audit-level=high)
+#   - .github/workflows/dotnet-audit.yml    (.NET, --vulnerable --include-transitive)
+#   - .github/workflows/dependency-review.yml (SCA gate, fail-on-severity: high)
+
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -5,48 +17,56 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pip"
     directory: "/auth"
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pip"
     directory: "/billing"
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pip"
     directory: "/client"
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pip"
     directory: "/detector"
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pip"
     directory: "/gateway"
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pip"
     directory: "/media"
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pip"
     directory: "/email-worker"
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0
 
   # Next.js
   - package-ecosystem: "npm"
@@ -54,6 +74,7 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0
 
   # C#
   - package-ecosystem: "nuget"
@@ -61,3 +82,4 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "dev"
+    open-pull-requests-limit: 0

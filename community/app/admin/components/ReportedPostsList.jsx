@@ -14,13 +14,8 @@ export default function ReportedPostsList() {
   const fetchReports = async () => {
     try {
       setLoading(true);
-      const [reportsData, imagesData] = await Promise.all([
-        adminService.getReportedPosts(),
-        fetch("/community/images", { credentials: "include" }).then(res => res.json())
-      ]);
-      const imageById = new Map((imagesData.items || []).map(img => [img.image_id, img]));
-      const merged = (reportsData.items || []).map(post => ({ ...post, url: imageById.get(post.image_id)?.url }));
-      setReports(merged);
+      const reportsData = await adminService.getReportedPosts();
+      setReports(Array.isArray(reportsData.items) ? reportsData.items : []);
     } finally { setLoading(false); }
   };
 

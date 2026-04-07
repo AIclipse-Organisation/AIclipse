@@ -3,3 +3,4 @@ uvicorn[standard]==0.42.0
 pymongo==4.16.0
 stripe==15.0.0
 pydantic==2.12.5
+httpx==0.28.1

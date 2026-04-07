@@ -11,6 +11,11 @@ spec:
       containers:
         - name: media
           image: aiclipse/media
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
           - name: MODEL_CYCLE_URL
             value: "http://model-cycle-srv:3000"

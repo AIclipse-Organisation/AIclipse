@@ -3,7 +3,7 @@ const path = require("path");
 
 
 describe("scans CSS contract", () => {
-  const cssPath = path.join(__dirname, "../static/css/scans.css");
+  const cssPath = path.join(__dirname, "../static/css/pages/library/scans.css");
   const css = fs.readFileSync(cssPath, "utf8");
 
   // Core layout and hover behavior should always be present.

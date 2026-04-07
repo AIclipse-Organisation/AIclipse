@@ -15,7 +15,14 @@ class JwksService:
         self.cache: Dict[str, Any] = {}
         self.lock = asyncio.Lock()
 
-    async def refresh(self, app, *, force: bool = False, kid: str | None = None) -> None:
+    async def refresh(
+        self,
+        app,
+        *,
+        force: bool = False,
+        kid: str | None = None,
+        quiet: bool = False,
+    ) -> None:
         s = app.state.settings
         auth_uri = require_setting("AUTH_URI", s.auth_uri)
 
@@ -29,7 +36,8 @@ class JwksService:
                 resp = await client.get(url, timeout=5.0)
                 resp.raise_for_status()
             except httpx.HTTPError as exc:
-                logging.error("Failed to refresh JWKS: %s", exc)
+                if not quiet:
+                    logging.error("Failed to refresh JWKS: %s", exc)
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail="Unable to fetch JWKS from auth service",
@@ -38,7 +46,8 @@ class JwksService:
             try:
                 data = resp.json()
             except ValueError:
-                logging.error("JWKS response is not valid JSON")
+                if not quiet:
+                    logging.error("JWKS response is not valid JSON")
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail="Auth JWKS is invalid JSON",
@@ -53,7 +62,8 @@ class JwksService:
                     try:
                         public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk_obj))
                     except Exception as exc:
-                        logging.error("Failed to parse JWK for kid=%s: %s", jwk_kid, exc)
+                        if not quiet:
+                            logging.error("Failed to parse JWK for kid=%s: %s", jwk_kid, exc)
                         continue
                     keys[jwk_kid] = public_key
                 return keys
@@ -61,7 +71,8 @@ class JwksService:
             parsed = await app.state.cpu.run(_parse_keys, data)
 
             if not parsed:
-                logging.error("Received empty JWKS")
+                if not quiet:
+                    logging.error("Received empty JWKS")
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail="Auth JWKS has no keys",

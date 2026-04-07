@@ -1,0 +1,411 @@
+openapi: 3.0.3
+info:
+  title: Model Cycle Service
+  version: "1.0.0"
+  description: >
+    Model lifecycle management: image confidence evaluation, training jobs,
+    model deployment, and version history. Built with C# ASP.NET Core.
+servers:
+  - url: http://model-cycle-srv:3000
+
+components:
+  schemas:
+    EvaluateImageRequest:
+      type: object
+      required: [MediaImageId]
+      properties:
+        PostId:
+          type: string
+        MediaImageId:
+          type: string
+        S3Key:
+          type: string
+          nullable: true
+        Label:
+          type: string
+          default: Unknown
+        ModelConfidence:
+          type: number
+          format: double
+        Votes:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserVoteDto"
+
+    UserVoteDto:
+      type: object
+      required: [UserId]
+      properties:
+        UserId:
+          type: string
+        IsAiVote:
+          type: boolean
+          description: "true = AI vote, false = Real vote"
+
+    EvaluateResponse:
+      type: object
+      description: Shaped response from the workflow's ConfidenceResult.
+      properties:
+        Label:
+          type: string
+          enum: [ai, real]
+          description: Training label chosen by the Bayesian workflow.
+        IsReady:
+          type: boolean
+          description: True when evidence is sufficient to add to training set.
+        CurrentProbability:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        Action:
+          type: string
+          enum: ["Added to Training Set", "Waiting for more votes"]
+
+    UploadModelRequest:
+      type: object
+      required: [File, Version]
+      properties:
+        File:
+          type: string
+          format: binary
+          description: Model weights file (max 750 MB).
+        Version:
+          type: string
+          description: Semantic version (e.g. v1.0.0).
+        NewImagesCount:
+          type: integer
+        ReplayBufferCount:
+          type: integer
+        ValidationAccuracy:
+          type: number
+          format: double
+        ValidationPrecision:
+          type: number
+          format: double
+        ValidationRecall:
+          type: number
+          format: double
+        ValidationF1Score:
+          type: number
+          format: double
+        GoldenTestAccuracy:
+          type: number
+          format: double
+        GoldenTestPrecision:
+          type: number
+          format: double
+        GoldenTestRecall:
+          type: number
+          format: double
+        GoldenTestF1Score:
+          type: number
+          format: double
+        GoldenFakeToRealMisclassifications:
+          type: integer
+        GoldenRealToFakeMisclassifications:
+          type: integer
+        NewTrainingImageIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        ReplayImageIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        GoldenTestImageIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    ModelWeights:
+      type: object
+      properties:
+        Id:
+          type: string
+          format: uuid
+        Version:
+          type: string
+        MinioObjectPath:
+          type: string
+        CreatedAt:
+          type: string
+          format: date-time
+        NewImagesCount:
+          type: integer
+        ReplayBufferCount:
+          type: integer
+        ValidationAccuracy:
+          type: number
+          format: double
+        ValidationPrecision:
+          type: number
+          format: double
+        ValidationRecall:
+          type: number
+          format: double
+        ValidationF1Score:
+          type: number
+          format: double
+        GoldenTestAccuracy:
+          type: number
+          format: double
+        GoldenTestPrecision:
+          type: number
+          format: double
+        GoldenTestRecall:
+          type: number
+          format: double
+        GoldenTestF1Score:
+          type: number
+          format: double
+        GoldenFakeToRealMisclassifications:
+          type: integer
+        GoldenRealToFakeMisclassifications:
+          type: integer
+        IsDeployed:
+          type: boolean
+        RejectionReason:
+          type: string
+          nullable: true
+
+    CurrentModel:
+      type: object
+      properties:
+        Version:
+          type: string
+        Accuracy:
+          type: number
+          format: double
+        Precision:
+          type: number
+          format: double
+        Recall:
+          type: number
+          format: double
+        DeployedAt:
+          type: string
+          format: date-time
+
+    TrainingImage:
+      type: object
+      properties:
+        Id:
+          type: string
+          format: uuid
+        MediaImageId:
+          type: string
+        S3Key:
+          type: string
+        Label:
+          type: string
+        Status:
+          type: string
+          enum: [Pending, Ready, UsedInTraining]
+        UploadedAt:
+          type: string
+          format: date-time
+        UserAiVotes:
+          type: integer
+        UserRealVotes:
+          type: integer
+        ModelConfidenceScore:
+          type: number
+          format: double
+        ModelVersion:
+          type: string
+          nullable: true
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /:
+    get:
+      summary: Service info
+      tags: [Health]
+      responses:
+        "200":
+          description: Service identification
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: model-cycle
+                  message:
+                    type: string
+                  env:
+                    type: object
+                    properties:
+                      hostname:
+                        type: string
+                      pod:
+                        type: string
+
+  /api/imageconfidence/evaluate:
+    post:
+      summary: Evaluate image confidence
+      tags: [Image Confidence]
+      description: >
+        Evaluates an image based on model confidence and user votes using
+        Bayesian inference (Beta distribution). Determines if the image is
+        ready for training. User vote weights are based on historical accuracy
+        fetched from Auth Service.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluateImageRequest"
+      responses:
+        "200":
+          description: Confidence evaluation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluateResponse"
+        "400":
+          description: Evaluation failed
+
+  /api/models/train:
+    post:
+      summary: Trigger training cycle
+      tags: [Models]
+      description: >
+        Queues a training job. Only one pending training is held at a time.
+        Training collects balanced Ready images, adds replay buffer,
+        runs Python training script, evaluates metrics, and deploys if improved.
+      responses:
+        "202":
+          description: Training signal queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Message:
+                    type: string
+
+  /images:
+    get:
+      summary: List training images
+      tags: [Training Images]
+      description: All training images with metadata, ordered by UploadedAt descending.
+      responses:
+        "200":
+          description: Training images
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrainingImage"
+
+  /api/models/current:
+    get:
+      summary: Get currently deployed model
+      tags: [Models]
+      responses:
+        "200":
+          description: Current model info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentModel"
+        "404":
+          description: No deployed model found
+
+  /api/models/upload:
+    post:
+      summary: Upload and deploy a model
+      tags: [Models]
+      description: >
+        Upload model weights with training metadata and image lineage.
+        Uploads to MinIO, stores metadata in SQLite, deactivates previous
+        models, and notifies Detector Service for hot-swap.
+        Max upload: 750 MB.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadModelRequest"
+      responses:
+        "200":
+          description: Model uploaded and deployed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Message:
+                    type: string
+                  Id:
+                    type: string
+                    format: uuid
+                  Version:
+                    type: string
+                  ImagesLinked:
+                    type: integer
+        "400":
+          description: No file provided
+
+  /api/models:
+    get:
+      summary: List all model versions
+      tags: [Models]
+      description: Returns all model versions ordered by CreatedAt descending.
+      responses:
+        "200":
+          description: Model version history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModelWeights"
+
+  /api/models/{version}:
+    delete:
+      summary: Delete a model version
+      tags: [Models]
+      description: Deletes model metadata from SQLite and attempts to delete from MinIO.
+      parameters:
+        - in: path
+          name: version
+          required: true
+          schema:
+            type: string
+          description: "Semantic version (e.g. v1.0.0). Auto-prepends 'v' if missing."
+      responses:
+        "200":
+          description: Model deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Message:
+                    type: string
+        "404":
+          description: Model version not found
+
