@@ -24,6 +24,7 @@ export default async function RootLayout({ children }) {
       <head>
         <title>AIclipse</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+        <link rel="icon" type="image/png" href="/community/favicon.png" />
       </head>
       <body>
         <ShellWrapper user={user}>{children}</ShellWrapper>

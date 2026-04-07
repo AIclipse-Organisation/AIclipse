@@ -3,7 +3,7 @@ import os
 import requests
 from pathlib import Path
 
-from flask import Flask, request, session
+from flask import Flask, request, session, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.serving import WSGIRequestHandler
 
@@ -139,6 +139,11 @@ def apply_security_and_cache_headers(resp):
         resp.headers["Pragma"] = "no-cache"
 
     return resp
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/png")
 
 
 class Quiet(WSGIRequestHandler):
