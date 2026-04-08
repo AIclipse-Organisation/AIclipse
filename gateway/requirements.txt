@@ -2,6 +2,6 @@ fastapi==0.129.2
 uvicorn[standard]==0.41.0
 httpx==0.28.1
 PyJWT==2.12.0
-cryptography==46.0.6
+cryptography==46.0.7
 python-multipart==0.0.22
 pillow==12.1.1
