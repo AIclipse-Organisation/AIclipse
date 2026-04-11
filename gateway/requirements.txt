@@ -3,5 +3,5 @@ uvicorn[standard]==0.42.0
 httpx==0.28.1
 PyJWT==2.12.1
 cryptography==46.0.6
-python-multipart==0.0.22
+python-multipart==0.0.26
 pillow==12.1.1
