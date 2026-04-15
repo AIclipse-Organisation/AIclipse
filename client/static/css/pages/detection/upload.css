@@ -1281,9 +1281,9 @@ textarea {
 
 .btn-crop-reset.inside-frame {
   box-sizing: border-box;
-  display: flex;          /* Added for icon alignment */
-  align-items: center;    /* Added for icon alignment */
-  gap: 5px;               /* Added for icon alignment */
+  display: flex;          
+  align-items: center;    
+  gap: 5px;               
   font-size: 12px;
   font-weight: 700;
   color: #CFB87C;
@@ -1299,5 +1299,5 @@ textarea {
 }
 
 .btn-crop-reset.inside-frame svg {
-  margin-top: -1px;       /* Tiny optical adjustment to center the arrow with the text */
+  margin-top: -1px;       
 }

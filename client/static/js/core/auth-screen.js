@@ -250,3 +250,29 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  const toggleButtons = document.querySelectorAll('.password-toggle');
+
+  toggleButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      // Find the input and icons associated with this specific button
+      const wrapper = this.closest('.password-input-wrapper');
+      const input = wrapper.querySelector('input');
+      const eyeIcon = this.querySelector('.eye-icon');
+      const eyeOffIcon = this.querySelector('.eye-off-icon');
+
+      // Toggle the password visibility
+      if (input.type === 'password') {
+        input.type = 'text';
+        eyeIcon.style.display = 'none';
+        eyeOffIcon.style.display = 'block';
+      } else {
+        input.type = 'password';
+        eyeIcon.style.display = 'block';
+        eyeOffIcon.style.display = 'none';
+      }
+    });
+  });
+});

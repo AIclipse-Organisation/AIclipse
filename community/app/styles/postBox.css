@@ -668,23 +668,18 @@
 }
 
 .comm_vote_prompt {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 10;
-
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: #fff;
-
-  /* background: rgba(0, 0, 0, 0.7); */
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(4px);
-  pointer-events: none;
-  white-space: nowrap;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    font-weight: 500;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    white-space: nowrap;
 }
 
 .comm_bars {

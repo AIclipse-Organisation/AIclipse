@@ -592,3 +592,42 @@ input:-webkit-autofill:active {
     font-size: 18px;
   }
 }
+
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 15px; /* Adjust to match your existing input margins */
+}
+
+/* Ensure the text doesn't type underneath the eye icon */
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 44px; 
+  box-sizing: border-box;
+  margin-bottom: 0; /* Reset bottom margin since wrapper handles it */
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5); /* Muted gray/white */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 160ms ease;
+}
+
+.password-toggle:hover {
+  color: #CFB87C; /* Your gold brand color */
+}
+
+.password-toggle svg {
+  width: 20px;
+  height: 20px;
+}
