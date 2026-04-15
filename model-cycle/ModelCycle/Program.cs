@@ -117,11 +117,11 @@ catch (Exception ex)
 builder.WebHost.UseUrls("http://0.0.0.0:3000");
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.Limits.MaxRequestBodySize = 524288000;
+    options.Limits.MaxRequestBodySize = 786432000;
 });
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 524288000;
+    options.MultipartBodyLengthLimit = 786432000;
 });
 builder.Services.AddCors(options =>
 {

@@ -27,7 +27,7 @@ export default function PostCreator() {
       setIsPublishing(true);
       setStatus({ type: "info", text: "Analyzing image..." });
       const scanData = await adminService.scanImage(selectedFile);
-      const uploadData = await adminService.saveImage(selectedFile, scanData.detection_token);
+      const uploadData = await adminService.saveImage(scanData.normalizedFile, scanData.detection_token);
       const payload = uploadData.body || uploadData;
 
       await adminService.createOfficialPost({

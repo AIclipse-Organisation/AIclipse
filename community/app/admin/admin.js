@@ -1,3 +1,32 @@
+async function normalizeImageToJpeg(file) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const img = await new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = dataUrl;
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+
+  const blob = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.92)
+  );
+
+  const baseName = file.name.replace(/\.\w+$/, "");
+  return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
+}
+
 async function fetchLocal(endpoint, options = {}) {
   const headers = {
     ...options.headers,
@@ -94,15 +123,17 @@ export const adminService = {
     }),
 
   scanImage: async (file) => {
+    const normalizedFile = await normalizeImageToJpeg(file);
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", normalizedFile);
     const res = await fetch("/checks", {
       method: "POST",
       body: formData,
       credentials: "include"
     });
     if (!res.ok) throw new Error("AI Scan failed");
-    return res.json();
+    const data = await res.json();
+    return { ...data, normalizedFile };
   },
 
   saveImage: async (file, token) => {

@@ -17,7 +17,7 @@ jobs:
     name: CodeQL Python
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: github/codeql-action/init@v4
         with:
           languages: python
@@ -28,7 +28,7 @@ jobs:
     name: CodeQL JavaScript
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: github/codeql-action/init@v4
         with:
           languages: javascript
@@ -44,7 +44,7 @@ jobs:
         working-directory: model-cycle
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: github/codeql-action/init@v4
         with:
@@ -52,7 +52,7 @@ jobs:
           queries: security-and-quality
           build-mode: manual
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "8.0.x"
 

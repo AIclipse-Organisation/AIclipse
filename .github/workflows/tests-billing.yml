@@ -5,17 +5,56 @@ on:
   pull_request:
     paths:
       - 'billing/**'
-      - 'infra/k8s/billing-depl.yaml'
-      - 'infra/k8s-dev/dev-secrets.yaml'
-      - 'infra/kustomization.yaml'
+      - 'infra/**'
+      - 'skaffold.yaml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'billing/**'
+      - 'infra/**'
       - 'skaffold.yaml'
 
 concurrency:
   group: tests-billing-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
+  unit:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: billing
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            billing/requirements.txt
+            billing/requirements-dev.txt
+
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: |
+          set -euo pipefail
+          python -m pytest tests -q
+
   billing:
+    name: k3d-smoke
+    needs: unit
     uses: ./.github/workflows/k3d-smoke.yml
     with:
       svc_name: billing

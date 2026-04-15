@@ -1,0 +1,594 @@
+/* =========================
+   GLOBAL RESET / SAFETY
+========================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #000;
+  color: #fff;
+}
+
+/* =========================
+   APP CONTAINER
+========================= */
+
+body.app .app-container {
+  position: relative;
+  margin: 0 auto;
+  max-width: 480px;
+  min-height: 100svh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at top center, rgba(201, 186, 131, 0.08), transparent 34%),
+    linear-gradient(180deg, #242424 0%, #202020 100%);
+}
+
+/* Background layers */
+body.app .app-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.65;
+  z-index: 0;
+}
+
+body.app .app-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* =========================
+   SCREEN + LAYOUT
+========================= */
+
+body.app .screen {
+  position: relative;
+  z-index: 1;
+  min-height: 100svh;
+  display: flex;
+}
+
+.auth-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 18px;
+  padding: 20px 20px 32px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+
+.auth-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.auth-back:hover {
+  color: #fff;
+}
+
+.auth-back:focus-visible {
+  outline: 2px solid #C9BA83;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.auth-back-arrow {
+  font-size: 28px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+/* =========================
+   BRAND
+========================= */
+
+.brand-hero {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
+.brand-image {
+  width: 220px;
+  max-width: 68vw;
+}
+
+/* =========================
+   AUTH WRAPPER
+========================= */
+
+.auth-card {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================
+   HEAD COPY
+========================= */
+
+.auth-copy {
+  margin: 10px 0 28px;
+}
+
+.auth-title {
+  margin: 0;
+  font-size: 35px;
+  line-height: 0.98;
+  color: #C9BA83;
+  font-weight: 700;
+}
+
+/* =========================
+   TOGGLE
+========================= */
+
+.auth-switch {
+  margin: 18px 0 2px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.auth-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 4px;
+  color: #C9BA83;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.auth-link:hover {
+  opacity: 0.92;
+}
+
+.auth-link:focus-visible {
+  outline: 2px solid #C9BA83;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* =========================
+   PANELS
+========================= */
+
+.auth-panels {
+  width: 100%;
+  display: block;
+}
+
+.auth-panel {
+  width: 100%;
+  display: block;
+  position: static !important;
+}
+
+.auth-panel[data-panel="signup"] {
+  display: none;
+}
+
+.auth-panels[data-mode="signup"] .auth-panel[data-panel="signup"] {
+  display: block;
+}
+
+.auth-panels[data-mode="signup"] .auth-panel[data-panel="login"] {
+  display: none;
+}
+
+.auth-panels[data-mode="login"] .auth-panel[data-panel="login"] {
+  display: block;
+}
+
+/* =========================
+   INPUTS
+========================= */
+
+/* =========================
+   INPUTS
+========================= */
+
+label {
+  display: block;
+  font-size: 15px;
+  margin: 0 0 6px;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 500;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-height: 56px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  font-size: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.96);
+  outline: none;
+  box-sizing: border-box;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(201, 186, 131, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(201, 186, 131, 0.10);
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 48px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.72) 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(50% - 2px),
+    calc(100% - 14px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+select:required:invalid {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+select option {
+  background: #1c1c1c;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: #fff;
+  -webkit-box-shadow: 0 0 0 1000px #2a2a2a inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* =========================
+   PASSWORD POLICY
+========================= */
+
+.password-policy {
+  margin-top: -6px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.password-policy-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.80);
+}
+
+.password-policy-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.policy-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.policy-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  font-weight: 800;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.policy-item.is-neutral .policy-icon {
+  color: rgba(255, 255, 255, 0.60);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.policy-item.is-ok .policy-icon {
+  color: rgb(61, 220, 132);
+  border-color: rgba(61, 220, 132, 0.65);
+}
+
+.policy-item.is-bad .policy-icon {
+  color: rgb(255, 90, 90);
+  border-color: rgba(255, 90, 90, 0.65);
+}
+
+.policy-item.is-ok {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.policy-item.is-bad {
+  color: rgba(255, 255, 255, 0.90);
+}
+
+/* =========================
+   BUTTONS
+========================= */
+
+#btn-login,
+#btn-signup {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 18px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #C9BA83;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+#btn-login,
+#btn-signup {
+  --btn-outline-color: #C9BA83;
+  --btn-hover-color: #C9BA83;
+  border: 1px solid var(--btn-outline-color);
+}
+
+/* hover only when button is enabled */
+#btn-login:hover,
+#btn-signup:hover:not(:disabled) {
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+/* press effect only when enabled */
+#btn-login:active,
+#btn-signup:active:not(:disabled) {
+  transform: translateY(1px);
+  background: var(--btn-hover-color);
+  color: #111;
+}
+
+#btn-signup:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(35%);
+}
+
+/* disabled stays unchanged */
+#btn-signup:disabled:hover,
+#btn-signup:disabled:active {
+  background: transparent;
+  color: #C9BA83;
+  transform: none;
+}
+
+/* =========================
+   T&C
+========================= */
+
+.terms-row {
+  margin-top: 2px;
+  margin-bottom: 14px;
+}
+
+.terms-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+}
+
+.terms-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  margin: 1px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  accent-color: #C9BA83;
+}
+
+.terms-label a {
+  color: #C9BA83;
+  text-decoration: underline;
+}
+
+/* =========================
+   ACCESSIBILITY
+========================= */
+
+.legacy-heading {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+}
+
+/* =========================
+   STATUS
+========================= */
+
+#login-status,
+#signup-status {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+#login-status .status-success {
+  color: #7ee787;
+}
+
+#login-status .status-error {
+  color: #ff8d8d;
+}
+
+#login-status .status-info {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+#signup-status .status-success {
+  color: #7ee787;
+}
+
+#signup-status .status-error {
+  color: #ff8d8d;
+}
+
+#signup-status .status-info {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+
+/* =======================
+   Spinner
+========================== */
+
+.spinner {
+  border: 4px solid rgba(255, 255, 255, 0.18);
+  border-top: 4px solid #C9BA83;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+#login-spinner-container {
+  text-align: center;
+  padding: 28px 0 16px;
+}
+
+.auth-details-extra[hidden] {
+  display: none !important;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 380px) {
+  .auth-shell {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .brand-image {
+    width: 190px;
+  }
+
+  .auth-title {
+    font-size: 40px;
+  }
+
+  #btn-login,
+  #btn-signup {
+    font-size: 18px;
+  }
+}

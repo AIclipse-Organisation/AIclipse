@@ -8,7 +8,8 @@ class UserContext(BaseModel):
     email: Optional[str] = None
     is_admin: bool = False
     plan: Optional[int] = None
-    token: str
+    user_name: Optional[str] = None
+    token: str = ""
 
 
 class UpdateImageRequest(BaseModel):

@@ -30,9 +30,12 @@ ENV ASPNETCORE_URLS=http://+:3000
 EXPOSE 3000
 
 # Stricter permissions
-RUN mkdir -p training_jobs && chmod 755 training_jobs
+RUN useradd --system --uid 1000 --create-home --shell /usr/sbin/nologin appuser && \
+    mkdir -p training_jobs && \
+    chown 1000:1000 training_jobs && \
+    chmod 755 training_jobs
 
-# runs as non root user for security
-USER app
+# Numeric UID keeps Kubernetes runAsNonRoot verification simple.
+USER 1000
 
 ENTRYPOINT ["dotnet", "ModelCycle.dll"]

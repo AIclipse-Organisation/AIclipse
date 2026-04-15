@@ -9,6 +9,16 @@ class UserRepo:
         await self.users.create_index([("email", 1)], name="uniq_email", unique=True)
         await self.users.create_index([("user_id", 1)], name="uniq_user_id", unique=True)
 
+    async def ensure_default_user_fields(self):
+        await self.users.update_many(
+            {"do_not_show_disclaimer_again": {"$exists": False}},
+            {"$set": {"do_not_show_disclaimer_again": False}},
+        )
+        await self.users.update_many(
+            {"do_not_show_quick_start_again": {"$exists": False}},
+            {"$set": {"do_not_show_quick_start_again": False}},
+        )
+
 
 class ApiKeyRepo:
     def __init__(self, db: AsyncIOMotorDatabase):

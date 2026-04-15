@@ -27,7 +27,7 @@ def load_v1_model(override_path: str = None):
         # Fallback for old .pt or .bin files
         # We set weights_only=False here only because the specific Pickler 
         # in your environment is throwing 'Unsupported operand 144'
-        state_dict = torch.load(path, map_location=DEVICE, weights_only=False)
+        state_dict = torch.load(path, map_location=DEVICE, weights_only=True)
         
         # Unpack if nested in 'model_state'
         actual_weights = state_dict.get("model_state", state_dict)

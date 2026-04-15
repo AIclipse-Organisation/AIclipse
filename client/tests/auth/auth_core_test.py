@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from flask import make_response, request
 
-from auth.core import is_api_request, is_request_secure, json_error, set_access_cookie, clear_access_cookie
+from auth.cookies import clear_access_cookie, is_request_secure, set_access_cookie
+from auth.request_policy import is_api_request, json_error
 
 
 def test_is_request_secure_prefers_forwarded_proto_over_scheme(flask_app):

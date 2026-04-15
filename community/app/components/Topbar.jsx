@@ -242,7 +242,7 @@ export default function Topbar({ isAdmin, showBack }) {
             onClick={() => {
               closeMenu();
               setTimeout(() => {
-                window.AIclipseTutorial?.openCenter?.();
+                window.location.href = "/tutorials";
               }, 0);
             }}
           >

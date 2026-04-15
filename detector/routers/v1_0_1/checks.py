@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 
 from detector_modules.service.detector_service import predict_from_bytes
+from detector_modules.core.loader import get_model_version
 from routers.swagger.detector_params import checksv101_params
 
 router = APIRouter()
@@ -52,7 +53,12 @@ async def detector_checks_v1_0_1(request: Request):
         except TimeoutError:
             raise HTTPException(status_code=504, detail="timeout")
 
-        result = {"verdict": verdict, "label": label, "confidence": confidence}
+        result = {
+            "verdict": verdict,
+            "label": label,
+            "confidence": confidence,
+            "model_version": get_model_version(),
+        }
 
         print(
             f"[Detector v1.0.1] Results: verdict={result['verdict']} "

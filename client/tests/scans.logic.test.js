@@ -1,13 +1,9 @@
 const {
+  buildViewscanUrl,
   getVisibility,
-  clamp01,
-  cleanLabelText,
-  computeRealPct,
-} = require("../static/js/scans.js");
+} = require("../static/js/pages/library/scans.js");
 
-// These tests validate the core scan-page helper logic.
 describe("client scans JavaScript logic", () => {
-  // We show private/public badges based on this value so we need to test a safe default matters.
   test("getVisibility returns public/private and defaults to private", () => {
     expect(getVisibility({ is_public: true })).toBe("public");
     expect(getVisibility({ is_public: false })).toBe("private");
@@ -15,78 +11,22 @@ describe("client scans JavaScript logic", () => {
     expect(getVisibility(null)).toBe("private");
   });
 
-  // Confidence values should always stay in the valid probability range.
-  test("clamp01 keeps values in 0..1", () => {
-    expect(clamp01(0.4)).toBe(0.4);
-    expect(clamp01(-1)).toBe(0);
-    expect(clamp01(2)).toBe(1);
-    expect(clamp01("bad")).toBe(0);
+  test("buildViewscanUrl uses image id as the canonical routing key", () => {
+    expect(
+      buildViewscanUrl({ image_id: "img_123" }, "http://aiclipse.local")
+    ).toBe("http://aiclipse.local/viewscan/img_123");
   });
 
-  // Labels sometimes arrive with a leading percentage (e.g., "87% AI").
-  // This helper removes that prefix so UI text is cleaner.
-  test("cleanLabelText strips leading percent prefix", () => {
-    expect(cleanLabelText("87.74% AI Generated")).toBe("AI Generated");
-    expect(cleanLabelText("  12%   REAL")).toBe("REAL");
-    expect(cleanLabelText("Unknown")).toBe("Unknown");
+  test("buildViewscanUrl preserves mark_post_id only when a post exists", () => {
+    expect(
+      buildViewscanUrl(
+        { image_id: "img_123", post_id: "post_9" },
+        "http://aiclipse.local"
+      )
+    ).toBe("http://aiclipse.local/viewscan/img_123?from=scans&mark_post_id=post_9");
   });
 
-  // Null/empty input should not throw and should produce empty text.
-  test("cleanLabelText handles empty-like values safely", () => {
-    expect(cleanLabelText("")).toBe("");
-    expect(cleanLabelText(null)).toBe("");
-    expect(cleanLabelText(undefined)).toBe("");
-  });
-
-  // For AI-like verdicts, "real %" is the inverse of model confidence.
-  test("computeRealPct computes real percentage for AI-like verdicts", () => {
-    const out = computeRealPct({ label: "AI Generated", confidence: 0.8 });
-    expect(out.label).toBe("AI Generated");
-    expect(out.realPct).toBe("20.00");
-  });
-
-  // For a Real verdict, real % follows the confidence directly.
-  test("computeRealPct computes real percentage for real verdicts", () => {
-    const out = computeRealPct({ label: "Real", confidence: 0.91 });
-    expect(out.label).toBe("Real");
-    expect(out.realPct).toBe("91.00");
-  });
-
-  // Some responses send score instead of confidence.
-  // This checks the fallback path still computes correct output.
-  test("computeRealPct falls back to score when confidence is missing", () => {
-    const out = computeRealPct({ result: "Deepfake", score: 0.33 });
-    expect(out.label).toBe("Deepfake");
-    expect(out.realPct).toBe("67.00");
-  });
-
-  // Unknown labels are treated as AI-like by current product logic.
-  test("computeRealPct treats unknown verdict as inverse confidence", () => {
-    const out = computeRealPct({ label: "Maybe", confidence: 0.4 });
-    expect(out.label).toBe("Maybe");
-    expect(out.realPct).toBe("60.00");
-  });
-
-  // Inputs outside [0,1] are clamped before computing percentages.
-  test("computeRealPct clamps out-of-range confidence values", () => {
-    const tooHigh = computeRealPct({ label: "Real", confidence: 2 });
-    const tooLow = computeRealPct({ label: "AI", confidence: -1 });
-
-    expect(tooHigh.realPct).toBe("100.00");
-    expect(tooLow.realPct).toBe("100.00");
-  });
-
-  // Leading percent text should be removed before label classification.
-  test("computeRealPct classifies using cleaned label text", () => {
-    const out = computeRealPct({ label: "75% REAL", confidence: 0.25 });
-    expect(out.label).toBe("REAL");
-    expect(out.realPct).toBe("25.00");
-  });
-
-  // With no label/result and no confidence/score, function should stay stable.
-  test("computeRealPct defaults to Unknown and safe numeric output", () => {
-    const out = computeRealPct({});
-    expect(out.label).toBe("Unknown");
-    expect(out.realPct).toBe("100.00");
+  test("buildViewscanUrl returns null for missing image id", () => {
+    expect(buildViewscanUrl({}, "http://aiclipse.local")).toBeNull();
   });
 });

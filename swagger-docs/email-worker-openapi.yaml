@@ -1,0 +1,158 @@
+openapi: 3.0.3
+info:
+  title: Email Worker Service
+  version: "1.0.0"
+  description: >
+    Email dispatch worker with Dead Letter Queue (DLQ) management.
+
+    Primary surface is Redis Streams (not HTTP): the worker is a consumer
+    on the "auth-events" stream (consumer group "email-workers") and
+    sends email via Gmail OAuth2. Send failures after MAX_RETRIES=3 are
+    copied to the "auth-events-dlq" stream. Deduplication uses a
+    per-event Redis key with TTL=86400s; an in-flight send lock
+    (TTL=300s) prevents concurrent delivery of the same event.
+
+    HTTP endpoints are internal-only and protected by X-Internal-Token.
+    They exist for DLQ inspection and manual replay.
+servers:
+  - url: http://email-worker-srv:3000
+
+components:
+  securitySchemes:
+    internalTokenAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+      description: Internal service-to-service token.
+
+  schemas:
+    DlqItem:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Redis stream message ID.
+        type:
+          type: string
+          description: Email type that failed.
+        data:
+          type: object
+          description: Original email payload.
+
+    ReplayRequest:
+      type: object
+      properties:
+        count:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 10
+          description: Number of DLQ items to replay.
+        delete_after_replay:
+          type: boolean
+          default: true
+          description: If true, remove items from DLQ after successful replay.
+
+    ReplayResponse:
+      type: object
+      properties:
+        replayed:
+          type: integer
+          description: Number of items replayed to the main stream.
+        deleted:
+          type: integer
+          description: Number of items removed from DLQ.
+        target_stream:
+          type: string
+          description: Stream name items were replayed to (auth-events).
+        delete_after_replay:
+          type: boolean
+
+    DlqListResponse:
+      type: object
+      properties:
+        stream:
+          type: string
+          description: DLQ stream name (auth-events-dlq).
+        count:
+          type: integer
+          description: Number of items returned.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DlqItem"
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /internal/dlq:
+    get:
+      summary: List failed email sends (DLQ)
+      description: Returns items from the Dead Letter Queue for inspection.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: query
+          name: count
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+          description: Number of items to return.
+      responses:
+        "200":
+          description: DLQ items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DlqListResponse"
+        "400":
+          description: count out of range (must be 1-200)
+        "401":
+          description: Missing or invalid X-Internal-Token
+        "500":
+          description: INTERNAL_AUTH_TOKEN is not configured
+        "503":
+          description: Redis unavailable
+
+  /internal/dlq/replay:
+    post:
+      summary: Replay DLQ items to main stream
+      description: >
+        Re-publishes failed email sends back to the main processing stream.
+        Optionally removes them from the DLQ after replay.
+      security:
+        - internalTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplayRequest"
+      responses:
+        "200":
+          description: Replay statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplayResponse"
+        "401":
+          description: Missing or invalid X-Internal-Token
+        "500":
+          description: INTERNAL_AUTH_TOKEN is not configured
+        "503":
+          description: Redis unavailable

@@ -36,16 +36,17 @@ public class MediaServiceTests
     public async Task GetImageMetadataAsync_ReturnsObject_WhenResponseIs200()
     {
         // Arrange
-        var fakeResponse = new MediaImageResponse 
-        { 
-            ImageId = "img_123", 
+        var fakeResponse = new MediaImageResponse
+        {
+            ImageId = "img_123",
             Url = "http://s3/img.jpg",
             UserId = "user_test_123",
             S3Key = "images/img_123.jpg",
             Verdict = "pending",
             Label = "unknown",
             Confidence = 1,
-            IsPublic = true
+            IsPublic = true,
+            ModelVersion = "v1.0.0"
         };
         var json = JsonSerializer.Serialize(fakeResponse);
 

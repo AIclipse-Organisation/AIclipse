@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AIclipse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="{{ asset_url('images/aiclipse_moon.png') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/core/styles.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/pages/support/tutorials.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/core/loader.css') }}" />
+  </head>
+
+  <body class="app" data-page-id="tutorials">
+    <div class="app-container">
+      {% set page_title = 'Tutorials' %}
+      {% include 'partials/navigation/topbar.html' %}
+
+      <main class="screen tutorials-screen">
+        <section class="tutorials-header">
+          <p class="tutorials-kicker">Learn the product</p>
+          <h1 class="tutorials-title">Tutorials</h1>
+          <p class="tutorials-subtitle">
+            Start a tutorial here.
+          </p>
+        </section>
+
+        <section id="tutorials-active"></section>
+        <section id="tutorials-list" class="tutorials-list"></section>
+      </main>
+
+    </div>
+    {% include 'partials/navigation/navbar.html' %}
+
+    <script src="{{ asset_url('js/core/page-loader.js') }}"></script>
+    <script src="{{ asset_url('js/core/navigation.js') }}"></script>
+    <script src="{{ asset_url('js/core/app.js') }}"></script>
+    <script src="{{ asset_url('js/tutorials/loader.js') }}" defer></script>
+    <script src="{{ asset_url('js/pages/support/tutorials.js') }}"></script>
+  </body>
+</html>

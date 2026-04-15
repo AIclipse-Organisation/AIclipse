@@ -1,25 +1,27 @@
 {
   "name": "community",
   "private": true,
+  "type": "module",
   "scripts": {
-   "dev": "next dev --turbo -H 0.0.0.0 -p 3000",
+    "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 3000"
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@heroui/react": "^2.8.8",
-    "framer-motion": "^12.33.0",
-    "ioredis": "^5.9.2",
+    "framer-motion": "^12.38.0",
+    "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.21.0",
-    "next": "^15.5.14",
+    "mongodb": "^7.1.1",
+    "next": "^15.5.15",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "autoprefixer": "^10.4.24",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18"
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.2"
   }
 }

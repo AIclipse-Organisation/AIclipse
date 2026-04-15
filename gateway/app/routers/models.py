@@ -29,7 +29,8 @@ async def gateway_trigger_training(
     try:
         resp = await client.post(url, timeout=10.0)
     except httpx.RequestError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=f"Model Cycle unreachable: {exc}")
+        logging.error("Model Cycle connection failed: %s", exc)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
 
     return Response(
         content=resp.content,
@@ -123,17 +124,17 @@ async def gateway_upload_model(
         resp.raise_for_status()
 
     except httpx.HTTPStatusError as exc:
-        logging.error(f"Downstream Error: {exc.response.text}")
+        logging.error("Downstream error: %s", exc.response.text)
         return Response(
             content=exc.response.content,
             status_code=exc.response.status_code,
             media_type="application/json"
         )
     except Exception as exc:
-        logging.error(f"🔥 Gateway Proxy Failure: {str(exc)}")
+        logging.error("Gateway proxy failure: %s", exc)
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, 
-            detail=f"Downstream pipe failed: {str(exc)}"
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Downstream pipe failed"
         )
 
     return Response(
@@ -181,22 +182,3 @@ async def gateway_delete_model(
 
     return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
 
-# ---------------------------------------------------------
-# 7. GET MODEL IMAGES
-# ---------------------------------------------------------
-@router.get("/models/images")
-async def gateway_get_model_images(
-    request: Request,
-    version: str,
-    user: UserContext = Depends(get_current_admin),
-):
-    base_url = get_cycle_url(request)
-    url = f"{base_url}/api/models/images"
-    
-    client: httpx.AsyncClient = request.app.state.http
-    try:
-        resp = await client.get(url, timeout=10.0)
-    except httpx.RequestError:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
-
-    return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")

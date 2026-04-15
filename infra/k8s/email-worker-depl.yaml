@@ -14,6 +14,11 @@ spec:
         - name: email-worker
           image: aiclipse/email-worker
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: REDIS_URI
               valueFrom: { secretKeyRef: { name: redis-sec, key: REDIS_URI } }

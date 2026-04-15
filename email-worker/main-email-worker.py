@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import base64
+import hmac
 import threading
 import time
 from datetime import datetime, timezone
@@ -61,6 +62,7 @@ INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN")
 r: redis.Redis | None = None
 _gmail_access_token: str | None = None
 _gmail_access_token_expiry_s: float = 0.0
+_startup_retry_logged_at_s: float = 0.0
 
 
 def _require_redis() -> redis.Redis:
@@ -94,7 +96,7 @@ def _require_internal_token(x_internal_token: str | None) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="INTERNAL_AUTH_TOKEN is not configured",
         )
-    if x_internal_token != INTERNAL_AUTH_TOKEN:
+    if not hmac.compare_digest(x_internal_token or "", INTERNAL_AUTH_TOKEN):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
 
@@ -106,6 +108,15 @@ def _connect_redis() -> redis.Redis:
         socket_connect_timeout=REDIS_CONNECT_TIMEOUT_S,
         socket_timeout=REDIS_SOCKET_TIMEOUT_S,
     )
+
+
+def _log_startup_retry(err: Exception) -> None:
+    global _startup_retry_logged_at_s
+
+    now = time.time()
+    if _startup_retry_logged_at_s == 0.0 or now - _startup_retry_logged_at_s >= 10.0:
+        logger.warning("startup_retry err=%s", err)
+        _startup_retry_logged_at_s = now
 
 
 def _ensure_group() -> None:
@@ -397,7 +408,7 @@ def startup() -> None:
             break
         except Exception as err:
             # Keep retrying so service recovers when Redis comes up later.
-            logger.warning("startup_retry err=%s", err)
+            _log_startup_retry(err)
             time.sleep(1)
 
     # Suppress repeated /healthz probe noise — only log it once.

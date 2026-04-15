@@ -1,65 +1,111 @@
 openapi: 3.0.3
 info:
-  title: Aiclipse Detector Service API
-  version: "1.0.0"
-
+  title: Detector Service
+  version: "1.0.1"
 servers:
   - url: http://detector-srv:3000
 
+components:
+  schemas:
+    ModelUpdateRequest:
+      type: object
+      required: [version, minio_path]
+      properties:
+        version:
+          type: string
+          description: Version identifier for the new model.
+        minio_path:
+          type: string
+          description: S3/MinIO object key to download model weights from.
+
+    DetectionResultV1:
+      type: object
+      required: [verdict, label, confidence, model_version]
+      properties:
+        verdict:
+          type: string
+          enum: [REAL, FAKE]
+        label:
+          type: string
+          enum: [real, fake, suspicious]
+          description: >
+            Confidence-banded label: <15% or >85% = real/fake,
+            15-40% or 60-85% = real/fake, 40-60% = suspicious.
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Sigmoid-smoothed confidence score.
+        model_version:
+          type: string
+
 paths:
-  /v1.0.0/checks:
-    post:
-      summary: Run image detection (v1.0.0)
-      tags: [v1.0.0]
-      description: >
-        Legacy - Accept an image file as multipart/form-data and return AI/Deepfake detection result.
-        Intended to be called by Gateway.
-      parameters:
-        - in: header
-          name: X-Request-Id
-          required: true
-          schema:
-            type: string
-          description: Correlation ID for logs and tracing. Gateway always sends it.
-      requestBody:
-        required: true
-        content:
-          application/octet-stream:
-            schema:
-              type: string
-              format: binary
+  /healthz:
+    get:
+      summary: Health check
       responses:
         "200":
-          description: Legacy detection result
+          description: OK
           content:
             application/json:
               schema:
                 type: object
-                required: [is_ai, score]
                 properties:
-                  is_ai:
-                    type: boolean
-                  score:
-                    type: number
-        "400":
-          description: Invalid request
+                  status:
+                    type: string
+                    example: ok
+
+  /internal/reload-model:
+    post:
+      summary: Hot-reload model weights (internal)
+      description: >
+        Downloads new model weights from MinIO and performs an in-memory hot-swap.
+        Old model versions are cleaned up from disk after swap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelUpdateRequest"
+      responses:
+        "200":
+          description: Model reloaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  version:
+                    type: string
         "500":
-          description: Internal Model error
+          description: Reload failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
 
   /v1.0.1/checks:
     post:
       summary: Run image detection (v1.0.1)
       tags: [v1.0.1]
       description: >
-        Accept raw image bytes as application/octet-stream and return enhanced AI/Deepfake detection output.
-        This version adds classification label and confidence score.
+        Accept raw image bytes and return AI/deepfake detection result.
+        Uses ViT model with confidence smoothing and label banding.
+        Subject to concurrency limits (max inflight and max concurrent inference).
       parameters:
         - in: header
           name: X-Request-Id
           required: true
           schema:
             type: string
-          description: Correlation ID for logs and tracing. Gateway always sends it.
+          description: Correlation ID for logs and tracing. Must be provided.
       requestBody:
         required: true
         content:
@@ -73,17 +119,27 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [verdict, label, confidence]
-                properties:
-                  verdict:
-                    type: string
-                  label:
-                    type: string
-                  confidence:
-                    type: number
-                    format: float
+                $ref: "#/components/schemas/DetectionResultV1"
         "400":
-          description: Invalid request
-        "500":
-          description: Internal Model error
+          description: Missing X-Request-Id header or empty body
+        "503":
+          description: Service at capacity (all inference slots busy)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: busy
+        "504":
+          description: Inference timeout exceeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: timeout
+

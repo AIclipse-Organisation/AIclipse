@@ -1,17 +1,11 @@
-import { getDb } from "./lib/mongo/mongo.js";
-import { getRedis } from "./lib/redis/redis.js";
+import { runFlushWorker } from "./lib/workers/flushWorker.js";
 
-const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 const POSTS_COLLECTION = "community.posts";
 
 const FLUSH_ZSET = "votes:flush_at";
 const MODEL_STREAM_KEY = "events:model_cycle";
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-async function flushOnce({ redis, posts }) {
+async function flushOnce({ redis, collection: posts }) {
   const nowSec = Math.floor(Date.now() / 1000);
 
   const duePostIds = await redis.zrangebyscore(
@@ -74,25 +68,11 @@ async function flushOnce({ redis, posts }) {
   return duePostIds.length;
 }
 
-async function main() {
-  const redis = getRedis();
-  const db = await getDb();
-  const posts = db.collection(POSTS_COLLECTION);
-
-  console.log("[voteFlushWorker] started");
-
-  while (true) {
-    try {
-      const n = await flushOnce({ redis, posts });
-      await sleep(n ? 250 : 1000);
-    } catch (e) {
-      console.error("[voteFlushWorker] error:", e?.message || e);
-      await sleep(1000);
-    }
-  }
-}
-
-main().catch((e) => {
+runFlushWorker({
+  name: "voteFlushWorker",
+  collectionName: POSTS_COLLECTION,
+  flushOnce,
+}).catch((e) => {
   console.error("[voteFlushWorker] fatal:", e);
   process.exit(1);
 });

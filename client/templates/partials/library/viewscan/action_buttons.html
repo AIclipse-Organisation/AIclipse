@@ -1,0 +1,33 @@
+<div class="comm_voteButtonRow">
+  <button type="button" id="btn-delete-scan"
+    class="comm_voteMainBtn vs-actionBtn vs-deleteBtn btn-primary-outline" hidden>
+    <svg class="comm_icon vs-svgIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M9 6V4h6v2" />
+    </svg>
+    <span class="comm_actionText">Delete</span>
+  </button>
+  <button type="button" id="btn-make-public" class="comm_voteMainBtn vs-actionBtn btn-primary-outline" hidden>
+    <span class="comm_actionText">Publish</span>
+  </button>
+  <button type="button" id="btn-delete-post" class="comm_voteMainBtn vs-actionBtn btn-primary-outline" hidden>
+    <span class="comm_actionText">Make Private</span>
+  </button>
+  <button type="button" id="btn-comments" class="comm_commentIconBtn vs-commentsBtn" hidden>
+    <img class="comm_icon" src="{{ asset_url('images/comment.png') }}" alt="" />
+    <span id="btn-comments-count" class="comm_actionCount">0</span>
+  </button>
+</div>
+
+<div id="scan-quick-meta" hidden aria-hidden="true">
+  <span id="scan-quick-visibility"></span>
+  <span id="scan-quick-uploaded"></span>
+</div>
+
+<div id="private-votes-placeholder" class="private-placeholder private-placeholder--votes" hidden>
+  Publish post to view community stats
+</div>

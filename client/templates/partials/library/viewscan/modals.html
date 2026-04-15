@@ -1,0 +1,87 @@
+<div id="delete-modal" class="modal-overlay" hidden>
+  <div class="modal">
+    <h3 class="modal-title">Make Private?</h3>
+    <p class="modal-text">
+      This will remove the post from the community. Your scan data will
+      be kept private.
+    </p>
+
+    <div class="modal-actions">
+      <button type="button" id="modal-cancel" class="secondary">
+        Cancel
+      </button>
+      <button type="button" id="modal-confirm" class="danger">
+        Make Private
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="delete-scan-modal" class="modal-overlay" hidden>
+  <div class="modal">
+    <h3 class="modal-title">Delete Scan</h3>
+    <p class="modal-text">
+      Are you sure you want to delete this scan? This action cannot be
+      undone.
+    </p>
+
+    <div class="modal-actions">
+      <button type="button" id="scan-modal-cancel" class="secondary">
+        Cancel
+      </button>
+      <button type="button" id="scan-modal-confirm" class="danger">
+        Delete
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="delete-comment-modal" class="modal-overlay" hidden>
+  <div class="modal">
+    <h3 class="modal-title">Delete Comment</h3>
+    <p class="modal-text">
+      Are you sure you want to delete this comment? This action cannot be undone.
+    </p>
+    <div class="modal-actions">
+      <button type="button" id="comment-modal-cancel" class="secondary">
+        Cancel
+      </button>
+      <button type="button" id="comment-modal-confirm" class="danger">
+        Delete
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="make-public-modal" class="modal-overlay" hidden>
+  <div class="modal">
+    <h3 class="modal-title">Publish to Community</h3>
+    <p class="modal-text">Add a description for your post (required, max 1000 characters):</p>
+    <textarea id="make-public-description" class="edit-desc-modal-textarea" maxlength="1000" rows="5"
+      placeholder="Describe your image..."></textarea>
+    <div class="edit-desc-modal-count">
+      <span id="make-public-count">0</span>/1000
+    </div>
+    <div id="make-public-status" class="make-public-status"></div>
+    <div class="modal-actions">
+      <button type="button" id="make-public-cancel" class="secondary">Cancel</button>
+      <button type="button" id="make-public-publish" class="primary-gold">Publish</button>
+    </div>
+  </div>
+</div>
+
+<div id="edit-desc-modal" class="modal-overlay" hidden>
+  <div class="modal">
+    <h3 class="modal-title">Edit Description</h3>
+    <textarea id="edit-description-input" class="edit-desc-modal-textarea" maxlength="1000" rows="5"
+      placeholder="Update your description..."></textarea>
+    <div class="edit-desc-modal-count">
+      <span id="edit-description-count">0</span>/1000
+    </div>
+    <div id="edit-description-status" class="edit-desc-status"></div>
+    <div class="modal-actions">
+      <button type="button" id="edit-description-cancel" class="secondary">Cancel</button>
+      <button type="button" id="edit-description-save" class="primary-gold">Save</button>
+    </div>
+  </div>
+</div>

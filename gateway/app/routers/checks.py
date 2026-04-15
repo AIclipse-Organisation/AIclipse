@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 import httpx
@@ -24,6 +25,88 @@ def _detail_from_detector(resp: httpx.Response) -> str:
     return resp.text or ""
 
 
+def _requires_usage_enforcement(user: UserContext) -> bool:
+    return int(user.plan or 0) == 0
+
+
+async def _require_scan_quota(
+    *,
+    request: Request,
+    client: httpx.AsyncClient,
+    auth_uri: str,
+    user: UserContext,
+) -> None:
+    if not _requires_usage_enforcement(user):
+        return
+
+    try:
+        usage_check_resp = await client.post(
+            auth_uri.rstrip("/") + "/usage/check",
+            headers={"Authorization": f"Bearer {user.token}"},
+            timeout=10.0,
+        )
+    except httpx.RequestError as exc:
+        logging.warning("Usage service unavailable during quota check: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Usage service unavailable",
+        )
+
+    if usage_check_resp.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Usage service unavailable",
+        )
+
+    try:
+        usage_data = usage_check_resp.json()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Usage service returned invalid JSON",
+        )
+
+    if not usage_data.get("allowed", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "usage_limit_exceeded",
+                "message": "You've reached your free tier limit of 10 scans per month. Upgrade to premium for unlimited scans.",
+                "monthly_usage": usage_data.get("monthly_usage", 0),
+                "limit": usage_data.get("limit", 10),
+            },
+        )
+
+
+async def _record_scan_usage(
+    *,
+    client: httpx.AsyncClient,
+    auth_uri: str,
+    user: UserContext,
+) -> None:
+    if not _requires_usage_enforcement(user):
+        return
+
+    try:
+        increment_resp = await client.post(
+            auth_uri.rstrip("/") + "/usage/increment",
+            headers={"Authorization": f"Bearer {user.token}"},
+            timeout=10.0,
+        )
+    except httpx.RequestError as exc:
+        logging.warning("Usage service unavailable during usage increment: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Usage service unavailable",
+        )
+
+    if increment_resp.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Usage service unavailable",
+        )
+
+
 async def _checks_impl(request: Request, file: UploadFile, user: UserContext) -> JSONResponse:
     s = request.app.state.settings
     detector_uri = require_setting("DETECTOR_URI", s.detector_uri)
@@ -31,30 +114,12 @@ async def _checks_impl(request: Request, file: UploadFile, user: UserContext) ->
 
     client: httpx.AsyncClient = request.app.state.http
 
-    # Best-effort usage check (fail open unless explicit free-tier block)
-    try:
-        usage_check_resp = await client.post(
-            auth_uri.rstrip("/") + "/usage/check",
-            headers={"Authorization": f"Bearer {user.token}"},
-            timeout=10.0,
-        )
-        if usage_check_resp.status_code == 200:
-            usage_data = usage_check_resp.json()
-            if not usage_data.get("allowed", False):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail={
-                        "error": "usage_limit_exceeded",
-                        "message": "You've reached your free tier limit of 10 scans per month. Upgrade to premium for unlimited scans.",
-                        "monthly_usage": usage_data.get("monthly_usage", 0),
-                        "limit": usage_data.get("limit", 10),
-                    },
-                )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        # Do not fail scans if usage service has transient issues.
-        request.app.logger.warning("Usage check failed: %s", exc)
+    await _require_scan_quota(
+        request=request,
+        client=client,
+        auth_uri=auth_uri,
+        user=user,
+    )
 
     data = await file.read()
     await sniff_and_validate_image(request, data)
@@ -72,7 +137,8 @@ async def _checks_impl(request: Request, file: UploadFile, user: UserContext) ->
     except httpx.TimeoutException:
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="timeout")
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Detector unreachable: {exc}")
+        logging.warning("Detector unavailable during scan request: %s", exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Detector unavailable")
 
     if resp.status_code in (503, 504):
         # Forward busy/timeout as-is to client (client shows generic message)
@@ -92,8 +158,9 @@ async def _checks_impl(request: Request, file: UploadFile, user: UserContext) ->
     verdict = detector_payload.get("verdict")
     label = detector_payload.get("label")
     confidence = detector_payload.get("confidence")
+    model_version = detector_payload.get("model_version")
 
-    if verdict is None or label is None or confidence is None:
+    if verdict is None or label is None or confidence is None or model_version is None:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Detector response missing required fields")
 
     detection_token = await create_detection_token(
@@ -103,24 +170,22 @@ async def _checks_impl(request: Request, file: UploadFile, user: UserContext) ->
         verdict=str(verdict),
         label=str(label),
         confidence=float(confidence),
+        model_version=str(model_version),
     )
 
     response_body = {
         "verdict": verdict,
         "label": label,
         "confidence": confidence,
+        "model_version": model_version,
         "detection_token": detection_token,
     }
 
-    # Best-effort usage increment (do not fail successful scans)
-    try:
-        await client.post(
-            auth_uri.rstrip("/") + "/usage/increment",
-            headers={"Authorization": f"Bearer {user.token}"},
-            timeout=10.0,
-        )
-    except Exception as exc:
-        request.app.logger.warning("Usage increment failed: %s", exc)
+    await _record_scan_usage(
+        client=client,
+        auth_uri=auth_uri,
+        user=user,
+    )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=response_body)
 

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Media Service
-  version: "0.0.1"
+  version: "1.0.0"
 servers:
   - url: http://media-srv:3000
 
@@ -9,35 +9,28 @@ components:
   schemas:
     ImageRecord:
       type: object
-      description: Image document stored in the images collection.
-      required:
-        - image_id
-        - user_id
-        - s3_key
-        - verdict
-        - label
-        - confidence
-        - is_public
-        - uploaded_at
-        - is_reported
+      required: [image_id, user_id, s3_key, verdict, label, confidence, is_public, uploaded_at, is_reported]
       properties:
         image_id:
           type: string
+          example: "img_a1b2c3d4"
         user_id:
           type: string
         s3_key:
           type: string
-          description: Key of the object stored in MinIO (S3-compatible).
+          description: Object key in MinIO (format image_id.ext).
         verdict:
           type: string
-          description: High-level verdict from detector (e.g. "ai", "human").
         label:
           type: string
-          description: Human-readable label for the verdict.
         confidence:
           type: number
           format: float
-          description: Confidence in range [0, 1].
+          minimum: 0
+          maximum: 1
+        model_version:
+          type: string
+          nullable: true
         is_public:
           type: boolean
         uploaded_at:
@@ -48,56 +41,71 @@ components:
         url:
           type: string
           format: uri
-          description: Resolved URL built from s3_key (for convenience).
+          description: Presigned S3 URL. Public images get 1h TTL, private get 5min TTL.
+
+    ImageLookupRequest:
+      type: object
+      required: [image_ids]
+      properties:
+        image_ids:
+          type: array
+          items:
+            type: string
 
 paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
   /upload/image:
     post:
       summary: Store image and metadata
       description: >
-        Store an image in MinIO and create a metadata record in the images collection.
-        Intended to be called by Gateway after detection result has been obtained.
+        Stores an image in MinIO and creates a metadata record.
+        If MongoDB insert fails after S3 upload, the S3 object is rolled back.
+        Allowed content types: image/jpeg, image/png. Max size: 20 MB.
+        The caller's user identity is forwarded by the gateway as the
+        X-User-Id header; callers must not supply it in the form body.
       parameters:
         - in: header
-          name: X-Request-Id
+          name: X-User-Id
           required: true
           schema:
             type: string
-          description: Correlation ID for logs and tracing.
+          description: User id forwarded by the gateway from the authenticated JWT.
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required:
-                - file
-                - user_id
-                - verdict
-                - label
-                - confidence
-                - is_public
+              required: [file, verdict, label, confidence, model_version, is_public]
               properties:
                 file:
                   type: string
                   format: binary
-                  description: Image file (JPEG/PNG) to store.
-                user_id:
-                  type: string
-                  description: Owner user ID (from Gateway after JWT validation).
                 verdict:
                   type: string
-                  description: Detection verdict from Detector service.
                 label:
                   type: string
-                  description: Detection label from Detector service.
                 confidence:
                   type: number
                   format: float
-                  description: Raw model confidence in range [0, 1].
+                model_version:
+                  type: string
                 is_public:
                   type: boolean
-                  description: Whether the image should be public (community) or private (history).
       responses:
         "201":
           description: Image stored and metadata created
@@ -106,33 +114,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/ImageRecord"
         "400":
-          description: Invalid image or missing required fields
+          description: Missing model_version or invalid input
+        "413":
+          description: File exceeds 20 MB limit
+        "415":
+          description: Unsupported content type (not JPEG/PNG)
+        "422":
+          description: Missing X-User-Id header
         "500":
-          description: Internal error when storing image or writing to DB
+          description: Failed to store image in S3
+        "503":
+          description: MongoDB unavailable
 
   /images:
     get:
-      summary: List images for a user or public images
+      summary: List images
       description: >
-        Return images filtered either by user_id (for history) or by is_public=true (for community).
-        There is no endpoint that returns all private images globally.
+        Returns up to 200 images sorted by uploaded_at descending.
+        Each image includes a presigned S3 URL.
       parameters:
         - in: query
           name: user_id
           schema:
             type: string
-          required: false
-          description: Owner user ID. When provided, filters images by this user.
+          description: Filter by owner user ID.
         - in: query
           name: is_public
           schema:
             type: boolean
-          required: false
-          description: >
-            If true and user_id is omitted, return only public images (community).
-            If true with user_id, return only public images for that user.
-            If false with user_id, return only private images for that user.
-            If omitted with user_id, return all images for that user.
+          description: Filter by public visibility.
       responses:
         "200":
           description: List of images
@@ -140,39 +150,155 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [items]
                 properties:
                   items:
                     type: array
                     items:
                       $ref: "#/components/schemas/ImageRecord"
+        "503":
+          description: MongoDB unavailable
+
+  /images/lookup:
+    post:
+      summary: Batch lookup public images
+      description: >
+        Returns public images matching the given IDs, preserving request order.
+        Non-existent or non-public IDs are silently skipped.
+        Duplicate IDs are deduplicated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageLookupRequest"
+      responses:
+        "200":
+          description: Matching public images
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ImageRecord"
+        "503":
+          description: MongoDB unavailable
 
   /image/{image_id}:
     get:
-      summary: Get single image metadata
+      summary: Get single image
       description: >
-        Return metadata for a single image.
-        Media service enforces that either:
-        - the image belongs to the provided user_id (when given), or
-        - the image is public (is_public=true).
+        Returns image metadata if the caller owns it (user_id matches)
+        or if the image is public. Otherwise returns 404.
       parameters:
         - in: path
           name: image_id
           required: true
           schema:
             type: string
-          description: Image ID.
         - in: query
           name: user_id
           required: false
           schema:
             type: string
-          description: ID of the user requesting the image (for private access checks).
+          description: Owner ID for private access check.
       responses:
         "200":
-          description: Image metadata
+          description: Image metadata with presigned URL
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImageRecord"
         "404":
-          description: Image not found or not accessible for this user
+          description: Not found or not accessible
+        "503":
+          description: MongoDB unavailable
+
+    patch:
+      summary: Update image metadata
+      description: Currently only is_public can be updated. Requires owner or admin.
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: user_id
+          required: false
+          schema:
+            type: string
+          description: Owner ID for permission check.
+        - in: query
+          name: is_public
+          required: false
+          schema:
+            type: boolean
+          description: New public visibility value.
+        - in: header
+          name: X-User-Is-Admin
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Admin override flag (set by Gateway).
+      responses:
+        "200":
+          description: Updated image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageRecord"
+        "400":
+          description: No valid fields to update
+        "403":
+          description: Not owner and not admin
+        "404":
+          description: Image not found
+        "503":
+          description: MongoDB unavailable
+
+    delete:
+      summary: Delete image
+      description: Deletes from S3 first, then removes MongoDB record. Requires owner or admin.
+      parameters:
+        - in: path
+          name: image_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: user_id
+          required: false
+          schema:
+            type: string
+        - in: header
+          name: X-User-Is-Admin
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Image deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  image_id:
+                    type: string
+        "403":
+          description: Not owner and not admin
+        "404":
+          description: Image not found
+        "500":
+          description: Failed to delete from S3
+        "503":
+          description: MongoDB unavailable

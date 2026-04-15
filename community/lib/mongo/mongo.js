@@ -1,4 +1,5 @@
 import { MongoClient } from "mongodb";
+import { ensureCommunityIndexes } from "./indexes.js";
 
 const MONGO_DB = process.env.MONGO_DB || "aiclipse";
 
@@ -10,6 +11,14 @@ const options = {
 
 let client;
 let clientPromise;
+
+function resetClientState() {
+  clientPromise = null;
+  client = null;
+  if (process.env.APP_ENV === "dev") {
+    delete global._mongoClientPromise;
+  }
+}
 
 export async function getDb() {
   const MONGO_URI = process.env.MONGO_URI;
@@ -30,8 +39,15 @@ export async function getDb() {
     }
   }
 
-  const connectedClient = await clientPromise;
-  return connectedClient.db(MONGO_DB);
+  try {
+    const connectedClient = await clientPromise;
+    const db = connectedClient.db(MONGO_DB);
+    await ensureCommunityIndexes(db);
+    return db;
+  } catch (error) {
+    resetClientState();
+    throw error;
+  }
 }
 
 export default clientPromise;

@@ -11,8 +11,8 @@ export function getExternalOriginFromHeaders(h, fallbackOrigin = "") {
 
 export function getLoginUrlFromHeaders(h, fallbackOrigin = "") {
   const origin = getExternalOriginFromHeaders(h, fallbackOrigin);
-  if (!origin) return "/";
-  return new URL("/", origin).toString();
+  if (!origin) return "/login";
+  return new URL("/login", origin).toString();
 }
 
 export function isHttpsFromHeaders(h) {

@@ -11,6 +11,11 @@ spec:
       containers:
         - name: gateway
           image: aiclipse/gateway
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: JWT_KEY
               valueFrom: { secretKeyRef: { name: jwt-sec, key: JWT_KEY } }
@@ -24,9 +29,11 @@ spec:
               value: "http://media-srv:3000"
             - name: BILLING_URI
               value: "http://billing-srv:3000"
+            - name: COMMUNITY_URI
+              value: "http://community-srv:3000"
             - name: DETECTOR_URI
               value: "http://detector-srv:3000"
-            - name: MOEDEL_CYCLE_URI
+            - name: MODEL_CYCLE_URI
               value: "http://model-cycle-srv:3000"
           ports: [{ name: http, containerPort: 8080 }]
           readinessProbe:

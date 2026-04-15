@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Auth Service
-  version: "0.0.2"
+  version: "1.0.0"
 servers:
   - url: http://auth-srv:3000
 
@@ -19,13 +19,37 @@ components:
       description: Internal service-to-service token for protected internal endpoints.
 
   schemas:
+    HowDidYouFindUs:
+      type: string
+      enum:
+        - social_media
+        - browsing
+        - friend_or_colleague
+        - news_article
+        - youtube
+        - linkedin
+        - other
+
+    ReasonCode:
+      type: string
+      enum:
+        - test_purpose
+        - user_request
+        - spam_abuse
+        - security
+        - other
+
+    AccessStatus:
+      type: string
+      enum: [approved, pending, rejected]
+
     UserPublic:
       type: object
       required: [user_id, user_name, email, is_admin, plan, created_at]
       properties:
         user_id:
           type: string
-          description: Application-level user identifier.
+          example: "u_abc123"
         user_name:
           type: string
         email:
@@ -39,55 +63,138 @@ components:
           format: int32
           minimum: 0
           default: 0
+          description: "0 = free tier, 1 = Plus, 2 = Premium"
+        access_status:
+          $ref: "#/components/schemas/AccessStatus"
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        reviewed_by_user_id:
+          type: string
+          nullable: true
         created_at:
           type: string
           format: date-time
         date_of_birth:
           type: string
-          pattern: '^\\d{2}-\\d{2}-\\d{4}$'
-          description: Date of birth in DD-MM-YYYY format.
+          pattern: '^\d{2}-\d{2}-\d{4}$'
           nullable: true
         total_guesses:
           type: integer
-          format: int32
           minimum: 0
-          nullable: true
         total_correct:
           type: integer
-          format: int32
           minimum: 0
-          nullable: true
         acc_guessing_ai:
           type: integer
-          format: int32
           minimum: 0
-          nullable: true
         acc_guessing_real:
           type: integer
-          format: int32
           minimum: 0
+        admin_guesses_total:
+          type: integer
+          minimum: 0
+        admin_guesses_correct:
+          type: integer
+          minimum: 0
+        admin_fake_correct:
+          type: integer
+          minimum: 0
+        admin_fake_total:
+          type: integer
+          minimum: 0
+        admin_real_correct:
+          type: integer
+          minimum: 0
+        admin_real_total:
+          type: integer
+          minimum: 0
+        monthly_usage_count:
+          type: integer
+          minimum: 0
+        usage_reset_date:
+          type: string
+          format: date-time
           nullable: true
+        stripe_customer_id:
+          type: string
+          nullable: true
+        do_not_show_disclaimer_again:
+          type: boolean
+        do_not_show_quick_start_again:
+          type: boolean
+        community_score:
+          type: integer
+        current_streak:
+          type: integer
+        longest_streak:
+          type: integer
+        last_activity_date:
+          type: string
+          format: date-time
+          nullable: true
+        how_did_you_find_us:
+          type: string
+          nullable: true
+        how_did_you_find_us_detail:
+          type: string
+          nullable: true
+
+    PublicUserProfile:
+      type: object
+      required: [user_id, user_name, community_score, current_streak, created_at]
+      properties:
+        user_id:
+          type: string
+        user_name:
+          type: string
+        community_score:
+          type: integer
+        current_streak:
+          type: integer
+        admin_guesses_correct:
+          type: integer
+        admin_guesses_total:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
 
     SignupRequest:
       type: object
-      required: [user_name, email, date_of_birth, password]
+      required: [user_name, email, date_of_birth, password, how_did_you_find_us]
       properties:
         user_name:
           type: string
           minLength: 1
-          description: Display name of the user.
         email:
           type: string
           format: email
-          description: Unique email address.
         date_of_birth:
           type: string
-          pattern: '^\\d{2}-\\d{2}-\\d{4}$'
-          description: Date of birth in DD-MM-YYYY format.
+          pattern: '^\d{2}-\d{2}-\d{4}$'
+          description: DD-MM-YYYY format. Must be 18-150 years old.
         password:
           type: string
           format: password
-          description: Plain-text password to be hashed on the server.
+          description: "Min 8 chars, max 72 UTF-8 bytes. Requires: 1 uppercase, 1 lowercase, 1 digit, 1 symbol (!@#$%^&*?), no spaces."
+        how_did_you_find_us:
+          $ref: "#/components/schemas/HowDidYouFindUs"
+        how_did_you_find_us_detail:
+          type: string
+          maxLength: 500
+          description: Required when how_did_you_find_us is "other".
+
+    SignupPendingResponse:
+      type: object
+      required: [pending, message]
+      properties:
+        pending:
+          type: boolean
+          example: true
+        message:
+          type: string
 
     LoginRequest:
       type: object
@@ -106,7 +213,7 @@ components:
       properties:
         token:
           type: string
-          description: JWT access token.
+          description: JWT access token (RS256, 1-hour expiry).
         user:
           $ref: "#/components/schemas/UserPublic"
 
@@ -115,29 +222,21 @@ components:
       properties:
         user_name:
           type: string
+          nullable: true
         email:
           type: string
           format: email
+          nullable: true
         password:
           type: string
           format: password
-
-    AdminUpdateUserRequest:
-      type: object
-      properties:
-        user_name:
-          type: string
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          format: password
-        date_of_birth:
-          type: string
-          pattern: '^\\d{2}-\\d{2}-\\d{4}$'
-        is_admin:
+          nullable: true
+        do_not_show_disclaimer_again:
           type: boolean
+          nullable: true
+        do_not_show_quick_start_again:
+          type: boolean
+          nullable: true
 
     DeleteMeResponse:
       type: object
@@ -150,12 +249,81 @@ components:
         message:
           type: string
 
+    AdminCreateUserRequest:
+      type: object
+      required: [user_name, email, date_of_birth]
+      properties:
+        user_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          description: Optional. If omitted a random 16-char password is generated.
+          minLength: 8
+        is_admin:
+          type: boolean
+          default: false
+        date_of_birth:
+          type: string
+          pattern: '^\d{2}-\d{2}-\d{4}$'
+
+    AdminCreateUserResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserPublic"
+        temporary_password:
+          type: string
+          nullable: true
+          description: Present only when the password was auto-generated.
+
+    AdminUpdateUserRequest:
+      type: object
+      properties:
+        user_name:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        password:
+          type: string
+          format: password
+          nullable: true
+          minLength: 8
+        date_of_birth:
+          type: string
+          pattern: '^\d{2}-\d{2}-\d{4}$'
+          nullable: true
+        is_admin:
+          type: boolean
+          nullable: true
+
+    AdminDeleteUserRequest:
+      type: object
+      required: [reason_code]
+      properties:
+        reason_code:
+          $ref: "#/components/schemas/ReasonCode"
+        reason_detail:
+          type: string
+          maxLength: 500
+
     AdminDeleteUserResponse:
       type: object
-      required: [deleted, user]
+      required: [deleted, log_id, user]
       properties:
         deleted:
           type: boolean
+        log_id:
+          type: string
+          example: "del_abc123"
         user:
           type: object
           required: [user_id, email]
@@ -166,12 +334,159 @@ components:
               type: string
               format: email
 
+    AdminListResponse:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserPublic"
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+
+    UserAccuracyRequest:
+      type: object
+      required: [user_ids]
+      properties:
+        user_ids:
+          type: array
+          items:
+            type: string
+
+    UserAccuracy:
+      type: object
+      required: [user_id, admin_fake_correct, admin_fake_total, admin_real_correct, admin_real_total]
+      properties:
+        user_id:
+          type: string
+        admin_fake_correct:
+          type: integer
+        admin_fake_total:
+          type: integer
+        admin_real_correct:
+          type: integer
+        admin_real_total:
+          type: integer
+
+    UsageCheckResponse:
+      type: object
+      required: [allowed, plan, unlimited, monthly_usage, limit, usage_reset_date]
+      properties:
+        allowed:
+          type: boolean
+        plan:
+          type: integer
+        unlimited:
+          type: boolean
+        monthly_usage:
+          type: integer
+        limit:
+          type: integer
+          example: 10
+        remaining:
+          type: integer
+          nullable: true
+        usage_reset_date:
+          type: string
+          format: date-time
+
+    UsageIncrementResponse:
+      type: object
+      required: [incremented, plan, unlimited, monthly_usage]
+      properties:
+        incremented:
+          type: boolean
+        plan:
+          type: integer
+        unlimited:
+          type: boolean
+        monthly_usage:
+          type: integer
+
+    UserDeletionLog:
+      type: object
+      properties:
+        log_id:
+          type: string
+        deleted_user_id:
+          type: string
+        deleted_user_email:
+          type: string
+          nullable: true
+        deleted_user_name:
+          type: string
+          nullable: true
+        deleted_by_user_id:
+          type: string
+        deleted_by_email:
+          type: string
+          nullable: true
+        reason_code:
+          $ref: "#/components/schemas/ReasonCode"
+        reason_detail:
+          type: string
+          nullable: true
+        deleted_at:
+          type: string
+          format: date-time
+        user_snapshot:
+          type: object
+          description: Full user document at deletion time (password excluded).
+
+    AccessRequestRejectResponse:
+      type: object
+      required: [rejected, user_id, email]
+      properties:
+        rejected:
+          type: boolean
+        user_id:
+          type: string
+        email:
+          type: string
+          format: email
+
+    PasswordPolicyError:
+      type: object
+      properties:
+        code:
+          type: string
+          example: weak_password
+        message:
+          type: string
+        checks:
+          type: object
+          properties:
+            min_length:
+              type: boolean
+            max_length:
+              type: boolean
+            no_spaces:
+              type: boolean
+            has_lowercase:
+              type: boolean
+            has_uppercase:
+              type: boolean
+            has_number:
+              type: boolean
+            has_symbol:
+              type: boolean
+        failed:
+          type: array
+          items:
+            type: string
+
     ApiKeyPublic:
       type: object
       required: [key_id, created_at, last4]
       properties:
         key_id:
           type: string
+          example: "ak_abc123"
         created_at:
           type: string
           format: date-time
@@ -181,7 +496,6 @@ components:
           nullable: true
         last4:
           type: string
-          description: Last 4 characters of the secret portion.
 
     ApiKeyGetResponse:
       type: object
@@ -197,7 +511,7 @@ components:
       properties:
         api_key:
           type: string
-          description: Full API key in format "{key_id}.{secret}". Returned only on rotation/creation.
+          description: "Full API key: {key_id}.{secret}. Returned only on creation."
         key:
           $ref: "#/components/schemas/ApiKeyPublic"
 
@@ -207,7 +521,6 @@ components:
       properties:
         api_key:
           type: string
-          description: Full API key in format "{key_id}.{secret}".
 
     ApiKeyExchangeResponse:
       type: object
@@ -215,11 +528,10 @@ components:
       properties:
         token:
           type: string
-          description: Short-lived JWT issued for API-key access.
+          description: Short-lived JWT (5 min, RS256) with token_type=api_key.
         exp:
           type: integer
           format: int64
-          description: Expiry as UNIX timestamp (seconds).
 
     ApiKeyRevokeResponse:
       type: object
@@ -227,7 +539,70 @@ components:
       properties:
         revoked:
           type: boolean
-          description: True if a key existed and was deleted.
+
+    UserInfoResponse:
+      type: object
+      required: [user_id, plan]
+      properties:
+        user_id:
+          type: string
+        plan:
+          type: integer
+        stripe_customer_id:
+          type: string
+          nullable: true
+
+    UpdatePlanRequest:
+      type: object
+      required: [plan]
+      properties:
+        plan:
+          type: integer
+        stripe_customer_id:
+          type: string
+          nullable: true
+
+    UpdatePlanResponse:
+      type: object
+      required: [updated, previous_plan]
+      properties:
+        updated:
+          type: boolean
+        previous_plan:
+          type: integer
+
+    IncrementStatsRequest:
+      type: object
+      required: [inc]
+      properties:
+        inc:
+          type: object
+          additionalProperties:
+            type: integer
+          description: >
+            Map of stat field to integer delta. Allowed keys:
+            total_guesses, total_correct, admin_guesses_total, admin_guesses_correct,
+            admin_fake_correct, admin_fake_total, admin_real_correct, admin_real_total,
+            community_score. Any other key is rejected with 400.
+
+    RecordActivityRequest:
+      type: object
+      properties:
+        points:
+          type: integer
+          default: 0
+          description: Community score delta. Only applied when > 0.
+
+    RecordActivityResponse:
+      type: object
+      required: [updated, current_streak, longest_streak]
+      properties:
+        updated:
+          type: boolean
+        current_streak:
+          type: integer
+        longest_streak:
+          type: integer
 
 paths:
   /healthz:
@@ -236,11 +611,52 @@ paths:
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /.well-known/jwks.json:
+    get:
+      summary: JSON Web Key Set
+      description: Public keys for verifying JWT signatures (RS256, kid=phase1-key).
+      responses:
+        "200":
+          description: JWKS document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kty:
+                          type: string
+                        kid:
+                          type: string
+                        use:
+                          type: string
+                        alg:
+                          type: string
+                        n:
+                          type: string
+                        e:
+                          type: string
 
   /signup:
     post:
-      summary: Create user
-      description: Create a new user account.
+      summary: Register new user
+      description: >
+        Creates a pending account. An admin must approve it before the user can log in.
+        Email is normalized to lowercase. DOB must be 18-150 years old.
       requestBody:
         required: true
         content:
@@ -248,21 +664,30 @@ paths:
             schema:
               $ref: "#/components/schemas/SignupRequest"
       responses:
-        "201":
-          description: User created
+        "202":
+          description: Signup request accepted (pending admin approval)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserPublic"
+                $ref: "#/components/schemas/SignupPendingResponse"
         "400":
-          description: Invalid payload
+          description: >
+            Invalid payload, weak password, invalid DOB format, or underage.
+            Password errors include detailed checks object.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    $ref: "#/components/schemas/PasswordPolicyError"
         "409":
           description: Email already registered
 
   /login:
     post:
       summary: Issue JWT
-      description: Validate credentials and issue a JWT access token.
+      description: Validate credentials and issue a JWT access token (RS256, 1-hour expiry).
       requestBody:
         required: true
         content:
@@ -278,43 +703,12 @@ paths:
                 $ref: "#/components/schemas/LoginResponse"
         "401":
           description: Invalid credentials
-
-  /.well-known/jwks.json:
-    get:
-      summary: JSON Web Key Set (JWKS)
-      description: Return public keys used to verify JWT signatures issued by Auth Service.
-      responses:
-        "200":
-          description: JWKS document
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [keys]
-                properties:
-                  keys:
-                    type: array
-                    items:
-                      type: object
-                      description: JSON Web Key
-                      properties:
-                        kty:
-                          type: string
-                        kid:
-                          type: string
-                        use:
-                          type: string
-                        alg:
-                          type: string
-                        n:
-                          type: string
-                        e:
-                          type: string
+        "403":
+          description: Account pending admin approval
 
   /me:
     get:
       summary: Get current user profile
-      description: Return the profile of the authenticated user.
       security:
         - bearerAuth: []
       responses:
@@ -326,10 +720,11 @@ paths:
                 $ref: "#/components/schemas/UserPublic"
         "401":
           description: Unauthorized
+        "404":
+          description: User not found
 
     patch:
       summary: Update current user profile
-      description: Update profile fields for the authenticated user (name, email, password).
       security:
         - bearerAuth: []
       requestBody:
@@ -346,13 +741,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserPublic"
         "400":
-          description: Invalid payload
+          description: Invalid payload or weak password
         "401":
           description: Unauthorized
+        "404":
+          description: User not found
+        "409":
+          description: Email already registered
 
     delete:
       summary: Delete current user account
-      description: Permanently delete the authenticated user's account.
+      description: Permanently deletes the account. Publishes auth.user.deleted.self event to Redis.
       security:
         - bearerAuth: []
       responses:
@@ -364,41 +763,180 @@ paths:
                 $ref: "#/components/schemas/DeleteMeResponse"
         "401":
           description: Unauthorized
+        "404":
+          description: User not found
+
+  /public/user/{user_id}:
+    get:
+      summary: Get public user profile
+      description: Returns limited public profile data. No authentication required.
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Public user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUserProfile"
+        "404":
+          description: User not found
+
+  /usage/check:
+    post:
+      summary: Check usage quota
+      description: >
+        Check whether the user can perform another scan.
+        Resets monthly counter if the reset date has passed.
+        Free tier limit is 10 scans/month; paid plans are unlimited.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usage quota status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageCheckResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+
+  /usage/increment:
+    post:
+      summary: Record a usage event
+      description: Increments the monthly usage counter by 1. Resets counter if reset date has passed.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usage incremented
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageIncrementResponse"
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
 
   /admin/users:
     get:
-      summary: List users
-      description: Admin-only endpoint to list users, optionally filtered by user_name.
+      summary: List users (admin)
       security:
         - bearerAuth: []
       parameters:
         - in: query
-          name: user_name
+          name: search
           schema:
             type: string
-          required: false
-          description: Optional case-insensitive partial match on user_name.
+          description: Search by name (regex) or email local part (case-insensitive).
+        - in: query
+          name: is_admin
+          schema:
+            type: boolean
+        - in: query
+          name: access_status
+          schema:
+            $ref: "#/components/schemas/AccessStatus"
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [created_at, user_name, email]
+            default: created_at
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 25
       responses:
         "200":
-          description: List of users
+          description: Paginated list of users
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/UserPublic"
+                $ref: "#/components/schemas/AdminListResponse"
         "401":
           description: Unauthorized
         "403":
           description: Admin privileges required
 
+    post:
+      summary: Create user (admin)
+      description: Creates a pre-approved user. Auto-generates password if omitted.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminCreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminCreateUserResponse"
+        "400":
+          description: Weak password
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "409":
+          description: Email already registered
+
+  /admin/users/accuracy:
+    post:
+      summary: Batch user accuracy lookup (internal)
+      description: >
+        Returns voting accuracy stats for the given user IDs.
+        Called by the community service when computing voter trust scores.
+      security:
+        - internalTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserAccuracyRequest"
+      responses:
+        "200":
+          description: User accuracy data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserAccuracy"
+        "403":
+          description: Missing or invalid X-Internal-Token
+
   /admin/user/{user_id}:
     get:
       summary: Get user by ID (admin)
-      description: Admin-only endpoint to get a user's details by user_id.
       security:
         - bearerAuth: []
       parameters:
@@ -423,7 +961,6 @@ paths:
 
     patch:
       summary: Update user (admin)
-      description: Admin-only endpoint to update a user's info (name, email, password, date_of_birth, is_admin).
       security:
         - bearerAuth: []
       parameters:
@@ -453,10 +990,12 @@ paths:
           description: Admin privileges required
         "404":
           description: User not found
+        "409":
+          description: Email already registered
 
     delete:
       summary: Delete user (admin)
-      description: Admin-only endpoint to delete a user by user_id.
+      description: Deletes user and creates a deletion audit log (30-day TTL). Publishes auth.user.deleted.admin event.
       security:
         - bearerAuth: []
       parameters:
@@ -465,6 +1004,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminDeleteUserRequest"
       responses:
         "200":
           description: User deleted
@@ -479,15 +1024,135 @@ paths:
         "404":
           description: User not found
 
+  /admin/user-deletion-logs:
+    get:
+      summary: List deletion audit logs (admin)
+      description: Returns deletion logs sorted by deleted_at descending. Logs have 30-day TTL.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: Deletion logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserDeletionLog"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+
+  /admin/access-requests:
+    get:
+      summary: List pending access requests (admin)
+      description: Returns users with access_status=pending, sorted by created_at descending.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 25
+      responses:
+        "200":
+          description: Pending access requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminListResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+
+  /admin/access-requests/{user_id}/approve:
+    post:
+      summary: Approve access request (admin)
+      description: Sets access_status=approved and publishes auth.access_request.approved event.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPublic"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "404":
+          description: No pending access request for this user
+
+  /admin/access-requests/{user_id}/reject:
+    delete:
+      summary: Reject access request (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessRequestRejectResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "404":
+          description: No pending access request for this user
+
   /me/api-key:
     get:
-      summary: Get current user's API key metadata
-      description: Return API key metadata for the authenticated user (no secret is ever returned here).
+      summary: Get API key metadata
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: API key metadata (or null if none)
+          description: API key metadata (or key=null if none exists)
           content:
             application/json:
               schema:
@@ -496,10 +1161,10 @@ paths:
           description: Unauthorized
 
     post:
-      summary: Rotate current user's API key
+      summary: Create or rotate API key
       description: >
-        Create/replace the user's API key and return the full key once.
-        The full key is only returned on this endpoint response.
+        Generates a new API key, replacing any existing one (one key per user).
+        The full secret is returned only in this response.
       security:
         - bearerAuth: []
       responses:
@@ -511,17 +1176,18 @@ paths:
                 $ref: "#/components/schemas/ApiKeyCreateResponse"
         "401":
           description: Unauthorized
+        "404":
+          description: User not found
         "409":
-          description: API key rotation conflict; retry
+          description: Rotation conflict; retry
 
     delete:
-      summary: Revoke current user's API key
-      description: Delete the user's API key (if it exists).
+      summary: Revoke API key
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Revocation status
+          description: Revocation result
           content:
             application/json:
               schema:
@@ -529,12 +1195,139 @@ paths:
         "401":
           description: Unauthorized
 
+  /internal/user/{user_id}:
+    get:
+      summary: Read user plan info (internal)
+      description: Used by billing to read the user's plan and Stripe customer id.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User plan info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfoResponse"
+        "403":
+          description: Missing or invalid X-Internal-Token
+        "404":
+          description: User not found
+
+  /internal/user/{user_id}/plan:
+    post:
+      summary: Update user plan (internal)
+      description: >
+        Used by billing to set the user's plan (and optionally stripe_customer_id)
+        after Stripe webhook events. Returns the previous plan value.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlanRequest"
+      responses:
+        "200":
+          description: Plan updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatePlanResponse"
+        "403":
+          description: Missing or invalid X-Internal-Token
+        "404":
+          description: User not found
+
+  /internal/user/{user_id}/stats:
+    post:
+      summary: Increment user stats (internal)
+      description: >
+        Used by community voting to bump user stat counters atomically.
+        Only keys in the allow-list are accepted; unknown keys return 400.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncrementStatsRequest"
+      responses:
+        "200":
+          description: Stats incremented
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: boolean
+                    example: true
+        "400":
+          description: Empty inc map or disallowed field keys
+        "403":
+          description: Missing or invalid X-Internal-Token
+        "404":
+          description: User not found
+
+  /internal/user/{user_id}/activity:
+    post:
+      summary: Record user activity (internal)
+      description: >
+        Used by community gamification to update daily streak counters and
+        optionally add community_score points. Streak resets if more than one
+        day has elapsed since last activity.
+      security:
+        - internalTokenAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordActivityRequest"
+      responses:
+        "200":
+          description: Activity recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordActivityResponse"
+        "403":
+          description: Missing or invalid X-Internal-Token
+        "404":
+          description: User not found
+
   /internal/api-key/exchange:
     post:
       summary: Exchange API key for short-lived JWT (internal)
       description: >
-        Internal endpoint used by Gateway to exchange an API key for a short-lived JWT.
-        Requires X-Internal-Token header.
+        Used by Gateway to convert an API key into a short-lived JWT (5 min, RS256).
+        The JWT includes token_type=api_key and api_key_id claims.
       security:
         - internalTokenAuth: []
       requestBody:
@@ -553,6 +1346,4 @@ paths:
         "401":
           description: Invalid API key
         "403":
-          description: Forbidden
-        "500":
-          description: Server error
+          description: Missing or invalid X-Internal-Token
