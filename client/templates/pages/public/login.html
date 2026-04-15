@@ -4,8 +4,15 @@
     <meta charset="utf-8" />
     <title>AIclipse</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/png" href="{{ asset_url('images/aiclipse_moon.png') }}" />
-    <link rel="stylesheet" href="{{ asset_url('css/pages/public/login.css') }}" />
+    <link
+      rel="icon"
+      type="image/png"
+      href="{{ asset_url('images/aiclipse_moon.png') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ asset_url('css/pages/public/login.css') }}"
+    />
   </head>
 
   <body class="app">
@@ -43,7 +50,11 @@
                 />
 
                 <label for="signup-email">Email</label>
-                <input id="signup-email" type="email" placeholder="Please enter your email" />
+                <input
+                  id="signup-email"
+                  type="email"
+                  placeholder="Please enter your email"
+                />
 
                 <label for="signup-date-of-birth">Date of Birth</label>
                 <input
@@ -60,7 +71,9 @@
                   <option value="" selected>Select one</option>
                   <option value="social_media">Social media</option>
                   <option value="browsing">Browsing</option>
-                  <option value="friend_or_colleague">Friend or colleague</option>
+                  <option value="friend_or_colleague">
+                    Friend or colleague
+                  </option>
                   <option value="news_article">News article</option>
                   <option value="youtube">YouTube</option>
                   <option value="linkedin">LinkedIn</option>
@@ -81,25 +94,50 @@
                   hidden
                 ></textarea>
 
-               <label for="signup-password">Password</label>
-<div class="password-input-wrapper">
-  <input
-    id="signup-password"
-    type="password"
-    placeholder="Please enter your password"
-    autocomplete="new-password"
-  />
-  <button type="button" class="password-toggle" aria-label="Toggle password visibility">
-    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-      <circle cx="12" cy="12" r="3"></circle>
-    </svg>
-    <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-      <line x1="1" y1="1" x2="23" y2="23"></line>
-    </svg>
-  </button>
-</div>
+                <label for="signup-password">Password</label>
+                <div class="password-input-wrapper">
+                  <input
+                    id="signup-password"
+                    type="password"
+                    placeholder="Please enter your password"
+                    autocomplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    aria-label="Toggle password visibility"
+                  >
+                    <svg
+                      class="eye-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                      ></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    <svg
+                      class="eye-off-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      style="display: none"
+                    >
+                      <path
+                        d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
+                      ></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                  </button>
+                </div>
 
                 <div
                   id="signup-password-policy"
@@ -122,13 +160,23 @@
                       <span class="policy-icon" aria-hidden="true">•</span>
                       <span class="policy-text">No spaces</span>
                     </li>
-                    <li class="policy-item is-neutral" data-rule="has_lowercase">
+                    <li
+                      class="policy-item is-neutral"
+                      data-rule="has_lowercase"
+                    >
                       <span class="policy-icon" aria-hidden="true">•</span>
-                      <span class="policy-text">At least one lowercase letter (a-z)</span>
+                      <span class="policy-text"
+                        >At least one lowercase letter (a-z)</span
+                      >
                     </li>
-                    <li class="policy-item is-neutral" data-rule="has_uppercase">
+                    <li
+                      class="policy-item is-neutral"
+                      data-rule="has_uppercase"
+                    >
                       <span class="policy-icon" aria-hidden="true">•</span>
-                      <span class="policy-text">At least one uppercase letter (A-Z)</span>
+                      <span class="policy-text"
+                        >At least one uppercase letter (A-Z)</span
+                      >
                     </li>
                     <li class="policy-item is-neutral" data-rule="has_number">
                       <span class="policy-icon" aria-hidden="true">•</span>
@@ -136,7 +184,9 @@
                     </li>
                     <li class="policy-item is-neutral" data-rule="has_symbol">
                       <span class="policy-icon" aria-hidden="true">•</span>
-                      <span class="policy-text">At least one symbol (!@#$)</span>
+                      <span class="policy-text"
+                        >At least one symbol (!@#$)</span
+                      >
                     </li>
                   </ul>
                 </div>
@@ -151,18 +201,22 @@
                         target="_blank"
                         rel="noopener"
                       >
-                        AIclipse Terms &amp; Conditions
-                      </a>.
+                        AIclipse Terms &amp; Conditions </a
+                      >.
                     </span>
                   </label>
                 </div>
 
-                <button id="btn-signup" type="button" disabled>Request Access</button>
+                <button id="btn-signup" type="button" disabled>
+                  Request Access
+                </button>
                 <div id="signup-status"></div>
 
                 <p class="auth-switch">
                   Already have an account?
-                  <button type="button" class="auth-link" data-mode="login">Login</button>
+                  <button type="button" class="auth-link" data-mode="login">
+                    Login
+                  </button>
                 </p>
               </div>
               {% endif %}
@@ -176,27 +230,55 @@
                   </div>
 
                   <label for="login-email">Email</label>
-                  <input id="login-email" type="email" placeholder="Please enter your email" />
+                  <input
+                    id="login-email"
+                    type="email"
+                    placeholder="Please enter your email"
+                  />
 
-                 <label for="login-password">Password</label>
-<div class="password-input-wrapper">
-  <input
-    id="login-password"
-    type="password"
-    placeholder="Please enter your password"
-  />
-  <button type="button" class="password-toggle" aria-label="Toggle password visibility">
-    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-      <circle cx="12" cy="12" r="3"></circle>
-    </svg>
-    <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-      <line x1="1" y1="1" x2="23" y2="23"></line>
-    </svg>
-  </button>
-</div>
-
+                  <label for="login-password">Password</label>
+                  <div class="password-input-wrapper">
+                    <input
+                      id="login-password"
+                      type="password"
+                      placeholder="Please enter your password"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      aria-label="Toggle password visibility"
+                    >
+                      <svg
+                        class="eye-icon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path
+                          d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                        ></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                      <svg
+                        class="eye-off-icon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        style="display: none"
+                      >
+                        <path
+                          d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
+                        ></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    </button>
+                  </div>
 
                   <button id="btn-login" type="button">Log in</button>
                   <div id="login-status"></div>
@@ -204,7 +286,9 @@
                   {% if show_signup %}
                   <p class="auth-switch">
                     Don't have an account?
-                    <button type="button" class="auth-link" data-mode="signup">Sign Up</button>
+                    <button type="button" class="auth-link" data-mode="signup">
+                      Sign Up
+                    </button>
                   </p>
                   {% endif %}
                 </div>
@@ -216,7 +300,6 @@
               </div>
             </div>
           </section>
-
         </div>
       </main>
     </div>
