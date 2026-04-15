@@ -313,8 +313,8 @@ textarea {
 }
 
 .btn-crop-reset.inside-frame:hover {
-  background: #CFB87C;
-  color: #111;
+  background: rgba(207, 184, 124, 0.15);
+  color: #fff;
 }
 
 .btn-clear-image {
@@ -1230,4 +1230,74 @@ textarea {
 
 .upload-placeholder[hidden] {
   display: none !important;
+}
+
+
+/* =========================
+   Crop Controls Overlay
+   ========================= */
+
+.crop-controls-overlay {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  background: rgba(15, 15, 15, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 6px 6px 6px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.crop-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.crop-hint svg {
+  opacity: 0.6;
+}
+
+.crop-divider {
+  width: 1px;
+  height: 12px;
+  background: rgb(34 34 34 / 55%);
+  margin: 0 2px; 
+}
+
+.btn-crop-reset.inside-frame {
+  box-sizing: border-box;
+  display: flex;          /* Added for icon alignment */
+  align-items: center;    /* Added for icon alignment */
+  gap: 5px;               /* Added for icon alignment */
+  font-size: 12px;
+  font-weight: 700;
+  color: #CFB87C;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.btn-crop-reset.inside-frame:hover {
+  background: rgba(207, 184, 124, 0.15);
+  color: #fff;
+}
+
+.btn-crop-reset.inside-frame svg {
+  margin-top: -1px;       /* Tiny optical adjustment to center the arrow with the text */
 }

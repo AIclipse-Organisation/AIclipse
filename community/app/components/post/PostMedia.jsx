@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function PostMedia({
@@ -8,13 +9,21 @@ export default function PostMedia({
   isUserCorrect,
   groundTruth,
 }) {
+  // 1. Add a state to track when the image is fully loaded
+  const [isLoaded, setIsLoaded] = useState(false);
+
   return (
     <div className="comm_postImageWrap">
-      <img
+      {/* 2. Change to motion.img and use onLoad */}
+      <motion.img
         className="comm_postImage"
         src={url}
         alt={label || "Community image"}
         onClick={onClick}
+        onLoad={() => setIsLoaded(true)}
+        animate={{ opacity: isLoaded ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+        style={{ color: "transparent" }}
       />
 
       {/* Full overlay */}

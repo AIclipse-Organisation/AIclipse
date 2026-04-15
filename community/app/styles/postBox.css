@@ -265,6 +265,7 @@
   width: min(100vw, 480px);
   left: 50%;
   transform: translateX(-50%);
+  background: #222222; /* prevents white flash while image is opacity:0 */
 }
 
 .comm_postImage {
@@ -272,13 +273,16 @@
   -o-object-fit: cover;
   object-fit: cover;
   cursor: pointer;
-  background: rgba(255, 255, 255, .05);
+
+  opacity: 0; /* start hidden at CSS level — prevents FOUC before Framer Motion hydrates */
+  background: transparent;
+  color: transparent;
+
   width: 100%;
   height: auto;
   display: block;
   margin-bottom: 12px;
 }
-
 /* =========================
    ACTION ROW (like/dislike/comment)
    ========================= */
