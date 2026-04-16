@@ -1022,6 +1022,9 @@ paths:
     post:
       summary: Start Stripe checkout
       tags: [Plan]
+      description: >
+        Authenticated BFF route. The client forwards the access_token-derived
+        Bearer token to Gateway, and Gateway resolves the user identity for Billing.
       security:
         - cookieAuth: []
       requestBody:
@@ -1038,12 +1041,14 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "502":
-          description: Missing user info for billing
+          description: Gateway or Billing unavailable
 
   /billing/subscription/status:
     get:
       summary: Get subscription status
       tags: [Plan]
+      description: >
+        Authenticated BFF route. Gateway resolves the caller identity for Billing.
       security:
         - cookieAuth: []
       responses:
@@ -1052,12 +1057,14 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "502":
-          description: Missing user info for billing
+          description: Gateway or Billing unavailable
 
   /billing/subscription/cancel-at-period-end:
     post:
       summary: Schedule cancellation at period end
       tags: [Plan]
+      description: >
+        Authenticated BFF route. Gateway resolves the caller identity for Billing.
       security:
         - cookieAuth: []
       requestBody:
@@ -1074,7 +1081,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "502":
-          description: Missing user info for billing
+          description: Gateway or Billing unavailable
 
   # ─────────────── Static support pages ───────────────
   /dev:

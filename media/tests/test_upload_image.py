@@ -244,3 +244,14 @@ def test_get_images_collection_throttles_repeated_mongo_outage_logs(monkeypatch)
     assert main_media.get_images_collection() is None
     assert main_media.get_images_collection() is None
     assert warning_messages == ["mongo connection unavailable: mongo down"]
+
+
+def test_update_image_rejects_invalid_admin_header(client):
+    response = client.patch(
+        "/image/img_123",
+        params={"user_id": "u_1", "is_public": "true"},
+        headers={"X-User-Is-Admin": "yes"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["header", "X-User-Is-Admin"]

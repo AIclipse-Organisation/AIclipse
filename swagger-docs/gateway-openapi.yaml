@@ -860,6 +860,10 @@ paths:
     post:
       summary: Create checkout session
       tags: [Billing]
+      description: >
+        Authenticated billing route. Gateway resolves the caller from the
+        Bearer JWT and forwards trusted identity to Billing via
+        X-Internal-Token + X-User-* headers.
       security:
         - bearerAuth: []
       requestBody:
@@ -868,52 +872,22 @@ paths:
           application/json:
             schema:
               type: object
-              required: [user_id, plan_id, email]
+              required: [plan_id]
               properties:
-                user_id:
-                  type: string
                 plan_id:
                   type: integer
                   enum: [1, 2]
-                email:
-                  type: string
-                  format: email
       responses:
         "200":
           description: Checkout session created
         "400":
           description: Invalid input
+        "401":
+          description: Unauthorized
         "503":
           description: Billing service unavailable
 
-  /api/billing/create-checkout-session:
-    post:
-      summary: Create checkout session (API path)
-      tags: [Billing]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [user_id, plan_id, email]
-              properties:
-                user_id:
-                  type: string
-                plan_id:
-                  type: integer
-                email:
-                  type: string
-                  format: email
-      responses:
-        "200":
-          description: Checkout session created
-        "400":
-          description: Invalid input
-
-  /api/billing/config:
+  /billing/config:
     get:
       summary: Get billing config
       tags: [Billing]
@@ -921,26 +895,30 @@ paths:
         "200":
           description: Stripe publishable key
 
-  /api/billing/subscription/status:
+  /billing/subscription/status:
     get:
       summary: Get subscription status
       tags: [Billing]
-      parameters:
-        - in: query
-          name: user_id
-          required: true
-          schema:
-            type: string
+      description: >
+        Authenticated billing route. Gateway resolves the caller from the
+        Bearer JWT and forwards trusted identity to Billing via
+        X-Internal-Token + X-User-* headers.
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Subscription status
-        "400":
-          description: Invalid user_id
+        "401":
+          description: Unauthorized
 
-  /api/billing/subscription/cancel-at-period-end:
+  /billing/subscription/cancel-at-period-end:
     post:
       summary: Cancel subscription at period end
       tags: [Billing]
+      description: >
+        Authenticated billing route. Gateway resolves the caller from the
+        Bearer JWT and forwards trusted identity to Billing via
+        X-Internal-Token + X-User-* headers.
       security:
         - bearerAuth: []
       requestBody:
@@ -949,10 +927,8 @@ paths:
           application/json:
             schema:
               type: object
-              required: [user_id, reason]
+              required: [reason]
               properties:
-                user_id:
-                  type: string
                 reason:
                   type: string
       responses:
@@ -960,6 +936,8 @@ paths:
           description: Cancellation scheduled
         "400":
           description: Invalid input or no active subscription
+        "401":
+          description: Unauthorized
         "404":
           description: No subscription found
 
@@ -969,31 +947,8 @@ paths:
       tags: [Billing]
       description: >
         Proxied as raw bytes to preserve Stripe signature verification.
-        Exact same behavior is also exposed at /api/billing/webhook.
-      parameters:
-        - in: header
-          name: stripe-signature
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/octet-stream:
-            schema:
-              type: string
-              format: binary
-      responses:
-        "200":
-          description: Webhook processed
-        "400":
-          description: Invalid payload or signature
-
-  /api/billing/webhook:
-    post:
-      summary: Stripe webhook (alias)
-      tags: [Billing]
-      description: Identical to /billing/webhook. Both paths are registered on the same handler.
+        Public ingress may prepend /api before rewrite, but the canonical
+        Gateway service route is /billing/webhook.
       parameters:
         - in: header
           name: stripe-signature

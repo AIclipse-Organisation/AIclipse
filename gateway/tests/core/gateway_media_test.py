@@ -95,6 +95,23 @@ async def test_patch_image_accepts_internal_forwarded_user(client, patch_upstrea
 
 
 @pytest.mark.asyncio
+async def test_patch_image_rejects_invalid_internal_admin_header(client):
+    r = await client.patch(
+        "/image/img_internal",
+        headers={
+            "X-Internal-Token": "test-internal-token",
+            "X-User-Id": "u_comm",
+            "X-User-Is-Admin": "yes",
+            "X-User-Email": "u_comm@example.com",
+        },
+        json={"is_public": True},
+    )
+
+    assert r.status_code == 422
+    assert r.json()["detail"][0]["loc"] == ["header", "X-User-Is-Admin"]
+
+
+@pytest.mark.asyncio
 async def test_internal_images_lookup_requires_internal_token_and_proxies_media(client, patch_upstreams):
     def media_lookup_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers.get("x-internal-token") is None

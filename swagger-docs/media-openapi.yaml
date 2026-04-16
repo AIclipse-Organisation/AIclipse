@@ -243,9 +243,10 @@ paths:
           name: X-User-Is-Admin
           required: false
           schema:
-            type: boolean
-            default: false
-          description: Admin override flag (set by Gateway).
+            type: string
+            enum: ["true", "false"]
+            default: "false"
+          description: Strict admin override flag forwarded by Gateway.
       responses:
         "200":
           description: Updated image
@@ -280,8 +281,10 @@ paths:
           name: X-User-Is-Admin
           required: false
           schema:
-            type: boolean
-            default: false
+            type: string
+            enum: ["true", "false"]
+            default: "false"
+          description: Strict admin override flag forwarded by Gateway.
       responses:
         "200":
           description: Image deleted

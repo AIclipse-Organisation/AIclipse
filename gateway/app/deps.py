@@ -1,5 +1,5 @@
 import hmac
-from typing import Optional, Tuple
+from typing import Literal, Optional, Tuple
 
 import httpx
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -31,8 +31,12 @@ def _require_internal_token(request: Request) -> str:
     return require_setting("INTERNAL_AUTH_TOKEN", s.internal_auth_token)
 
 
-def _parse_bool_header(value: Optional[str]) -> bool:
-    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+def _normalize_optional_header(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    return normalized or None
 
 
 async def _exchange_api_key_for_jwt(request: Request, api_key: str) -> Tuple[str, int]:
@@ -145,7 +149,7 @@ async def get_internal_user(
     x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
     x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
     x_user_name: Optional[str] = Header(None, alias="X-User-Name"),
-    x_user_is_admin: Optional[str] = Header(None, alias="X-User-Is-Admin"),
+    x_user_is_admin: Optional[Literal["true", "false"]] = Header(None, alias="X-User-Is-Admin"),
 ) -> UserContext:
     expected_token = _require_internal_token(request)
     if not hmac.compare_digest(x_internal_token or "", expected_token):
@@ -154,7 +158,7 @@ async def get_internal_user(
             detail="Invalid internal auth token",
         )
 
-    user_id = str(x_user_id or "").strip()
+    user_id = _normalize_optional_header(x_user_id)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -163,9 +167,9 @@ async def get_internal_user(
 
     return UserContext(
         user_id=user_id,
-        email=(str(x_user_email).strip() or None) if x_user_email is not None else None,
-        user_name=(str(x_user_name).strip() or None) if x_user_name is not None else None,
-        is_admin=_parse_bool_header(x_user_is_admin),
+        email=_normalize_optional_header(x_user_email),
+        user_name=_normalize_optional_header(x_user_name),
+        is_admin=x_user_is_admin == "true",
     )
 
 
@@ -189,7 +193,7 @@ async def get_current_user_or_internal(
     x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
     x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
     x_user_name: Optional[str] = Header(None, alias="X-User-Name"),
-    x_user_is_admin: Optional[str] = Header(None, alias="X-User-Is-Admin"),
+    x_user_is_admin: Optional[Literal["true", "false"]] = Header(None, alias="X-User-Is-Admin"),
 ) -> UserContext:
     if authorization:
         return await get_current_user(request, authorization=authorization)

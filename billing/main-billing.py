@@ -2,14 +2,15 @@ import json
 import logging
 import os
 import re
+import hmac
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 import stripe
-from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
@@ -169,17 +170,47 @@ except Exception as e:
     billing_coll = None
 
 # -------------------------
-# MODELS
+# FORWARDED USER
 # -------------------------
-class CheckoutRequest(BaseModel):
+@dataclass(frozen=True)
+class ForwardedUserContext:
     user_id: str
-    plan_id: int
-    email: str
+    email: str | None = None
+    user_name: str | None = None
+    is_admin: bool = False
 
 
-class CancelSubscriptionRequest(BaseModel):
-    user_id: str
-    reason: str
+def _normalize_optional_header(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    return normalized or None
+
+
+def _require_forwarded_user(
+    x_internal_token: str | None = Header(None, alias="X-Internal-Token"),
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
+    x_user_email: str | None = Header(None, alias="X-User-Email"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    x_user_is_admin: Literal["true", "false"] | None = Header(None, alias="X-User-Is-Admin"),
+) -> ForwardedUserContext:
+    if not INTERNAL_AUTH_TOKEN:
+        raise HTTPException(status_code=503, detail="Internal auth not configured")
+
+    if not hmac.compare_digest(x_internal_token or "", INTERNAL_AUTH_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid internal auth token")
+
+    user_id = _normalize_optional_header(x_user_id)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Missing forwarded user id")
+
+    return ForwardedUserContext(
+        user_id=_require_valid_user_id(user_id),
+        email=_normalize_optional_header(x_user_email),
+        user_name=_normalize_optional_header(x_user_name),
+        is_admin=x_user_is_admin == "true",
+    )
 
 
 class RequestLogSanitizer:
@@ -251,13 +282,11 @@ def get_config():
 
 
 @app.get("/subscription/status")
-async def get_subscription_status(user_id: str):
+async def get_subscription_status(user: ForwardedUserContext = Depends(_require_forwarded_user)):
     if billing_coll is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    safe_user_id = RequestLogSanitizer.user_id(user_id)
-    if not safe_user_id:
-        raise HTTPException(status_code=400, detail="Invalid user_id")
+    safe_user_id = user.user_id
 
     user_info = await _read_user_plan(safe_user_id)
     current_plan = int(user_info.get("plan", 0) or 0)
@@ -291,11 +320,17 @@ async def get_subscription_status(user_id: str):
 # CHECKOUT
 # -------------------------
 @app.post("/create-checkout-session")
-async def create_checkout_session(request: CheckoutRequest):
+async def create_checkout_session(
+    plan_id: int = Body(..., embed=True),
+    user: ForwardedUserContext = Depends(_require_forwarded_user),
+):
+    if not user.email:
+        raise HTTPException(status_code=400, detail="Missing forwarded user email")
+
     safe_user_id, safe_plan_id, safe_email = RequestLogSanitizer.sanitize_checkout_input(
-        request.user_id,
-        request.plan_id,
-        request.email,
+        user.user_id,
+        plan_id,
+        user.email,
     )
 
     if not STRIPE_SECRET_KEY:
@@ -382,18 +417,19 @@ async def create_checkout_session(request: CheckoutRequest):
 
 
 @app.post("/subscription/cancel-at-period-end")
-async def cancel_subscription_at_period_end(request: CancelSubscriptionRequest):
+async def cancel_subscription_at_period_end(
+    reason: str = Body(..., embed=True),
+    user: ForwardedUserContext = Depends(_require_forwarded_user),
+):
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Stripe not configured")
 
     if plan_coll is None or billing_coll is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    safe_user_id = RequestLogSanitizer.user_id(request.user_id)
-    cancellation_reason = RequestLogSanitizer._clean_text(request.reason, max_len=120)
+    safe_user_id = user.user_id
+    cancellation_reason = RequestLogSanitizer._clean_text(reason, max_len=120)
 
-    if not safe_user_id:
-        raise HTTPException(status_code=400, detail="Invalid user_id")
     if not cancellation_reason:
         raise HTTPException(status_code=400, detail="Cancellation reason is required")
 
