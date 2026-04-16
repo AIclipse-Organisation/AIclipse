@@ -62,17 +62,59 @@ components:
           type: string
           enum: ["Added to Training Set", "Waiting for more votes"]
 
-    UploadModelRequest:
+    CreateModelUploadSessionRequest:
       type: object
-      required: [File, Version]
+      required: [Version, FileName, FileSize]
       properties:
-        File:
-          type: string
-          format: binary
-          description: Model weights file (max 750 MB).
         Version:
           type: string
-          description: Semantic version (e.g. v1.0.0).
+          description: Semantic version (e.g. v1.0.0). Auto-prefixes "v" if omitted.
+        FileName:
+          type: string
+          description: "Original model filename. Supported extensions: .pt, .bin, .safetensors."
+        FileSize:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 786432000
+          description: Exact file size in bytes (max 750 MB).
+        ContentType:
+          type: string
+          description: Browser-provided MIME type. Defaults to application/octet-stream.
+
+    CreateModelUploadSessionResponse:
+      type: object
+      required: [UploadId, UploadUrl, UploadMethod, UploadHeaders, ExpiresAt]
+      properties:
+        UploadId:
+          type: string
+          description: Opaque signed upload session token used when finalizing the model.
+        UploadUrl:
+          type: string
+          format: uri
+          description: Presigned object-storage URL for the direct PUT upload.
+        UploadMethod:
+          type: string
+          example: PUT
+        UploadHeaders:
+          type: object
+          additionalProperties:
+            type: string
+          description: Headers the browser must send to the presigned upload URL.
+        ExpiresAt:
+          type: string
+          format: date-time
+          description: Upload session expiry timestamp in UTC.
+
+    FinalizeModelUploadRequest:
+      type: object
+      required: [UploadId, Version]
+      properties:
+        UploadId:
+          type: string
+        Version:
+          type: string
+          description: Semantic version (e.g. v1.0.0). Auto-prefixes "v" if omitted.
         NewImagesCount:
           type: integer
         ReplayBufferCount:
@@ -334,21 +376,48 @@ paths:
         "404":
           description: No deployed model found
 
-  /api/models/upload:
+  /api/models/uploads:
     post:
-      summary: Upload and deploy a model
+      summary: Create a direct-upload session for a model
       tags: [Models]
       description: >
-        Upload model weights with training metadata and image lineage.
-        Uploads to MinIO, stores metadata in SQLite, deactivates previous
-        models, and notifies Detector Service for hot-swap.
-        Max upload: 750 MB.
+        Returns a presigned object-storage PUT URL for browser-direct upload.
+        The control plane stays on the authenticated admin path, but the
+        model bytes bypass application servers. The service may also reap
+        expired abandoned staging objects older than the upload-session TTL.
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
-              $ref: "#/components/schemas/UploadModelRequest"
+              $ref: "#/components/schemas/CreateModelUploadSessionRequest"
+      responses:
+        "200":
+          description: Upload session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateModelUploadSessionResponse"
+        "400":
+          description: Invalid version, file size, or file extension
+        "409":
+          description: Model version already exists
+
+  /api/models/uploads/finalize:
+    post:
+      summary: Finalize a direct-uploaded model and deploy it
+      tags: [Models]
+      description: >
+        Validates the uploaded object against the signed upload session,
+        promotes the staged upload to the canonical release key
+        `models/{version}.{ext}`, stores model lineage in SQLite,
+        deactivates prior deployments, and notifies Detector Service for hot-swap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizeModelUploadRequest"
       responses:
         "200":
           description: Model uploaded and deployed
@@ -367,7 +436,9 @@ paths:
                   ImagesLinked:
                     type: integer
         "400":
-          description: No file provided
+          description: Invalid or expired upload session
+        "409":
+          description: Upload missing, size mismatch, or version conflict
 
   /api/models:
     get:
@@ -408,4 +479,3 @@ paths:
                     type: string
         "404":
           description: Model version not found
-

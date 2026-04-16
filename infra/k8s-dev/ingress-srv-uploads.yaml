@@ -11,13 +11,13 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: aiclipse.local
+    - host: storage.aiclipse.local
       http:
         paths:
-          - path: /community/adminBFF/models/?(.*)
+          - path: /model-cycle-storage/models/uploads/?(.*)
             pathType: ImplementationSpecific
             backend:
               service:
-                name: community-srv
+                name: s3-srv
                 port:
-                  number: 3000
+                  number: 9000

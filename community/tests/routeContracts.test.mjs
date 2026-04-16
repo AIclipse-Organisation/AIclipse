@@ -127,3 +127,17 @@ test("community tutorial entry routes to the shared tutorials page", () => {
   assert.match(topbar, /window\.location\.href = "\/tutorials"/);
   assert.doesNotMatch(topbar, /openCenter/);
 });
+
+test("admin model uploads use presigned storage flow instead of the legacy multipart proxy", () => {
+  const adminService = readRepoFile("app/admin/admin.js");
+  const modelsRoute = readRepoFile("app/adminBFF/models/route.js");
+  const uploadRoute = readRepoFile("app/adminBFF/models/uploads/route.js");
+  const finalizeRoute = readRepoFile("app/adminBFF/models/uploads/finalize/route.js");
+
+  assert.match(adminService, /\/models\/uploads/);
+  assert.match(adminService, /\/models\/uploads\/finalize/);
+  assert.doesNotMatch(adminService, /fetch\(`\/community\/adminBFF\/models`/);
+  assert.doesNotMatch(modelsRoute, /http\.request/);
+  assert.match(uploadRoute, /proxyAdminJson/);
+  assert.match(finalizeRoute, /proxyAdminJson/);
+});

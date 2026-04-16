@@ -64,6 +64,28 @@ async function fetchLocal(endpoint, options = {}) {
   return res.json();
 }
 
+async function uploadFileToPresignedUrl(uploadSession, file) {
+  const uploadHeaders = {
+    ...(uploadSession?.uploadHeaders || {}),
+  };
+
+  if (!Object.keys(uploadHeaders).some((key) => key.toLowerCase() === "content-type")) {
+    uploadHeaders["Content-Type"] = file.type || "application/octet-stream";
+  }
+
+  const res = await fetch(uploadSession.uploadUrl, {
+    method: uploadSession.uploadMethod || "PUT",
+    headers: uploadHeaders,
+    body: file,
+    credentials: "omit",
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(detail || `Storage upload failed: ${res.status}`);
+  }
+}
+
 export const adminService = {
   getModels: async () => fetchLocal("/models"),
   getCurrentModel: async () => fetchLocal("/models/current"),
@@ -162,18 +184,48 @@ export const adminService = {
     return res.json();
   },
 
-  uploadModel: async (formData) => {
-    const res = await fetch(`/community/adminBFF/models`, {
+  uploadModel: async ({ file, version, ...metadata }) => {
+    if (!file) {
+      throw new Error("Model file is required");
+    }
+
+    const normalizedVersion = String(version || "").trim();
+    if (!normalizedVersion) {
+      throw new Error("Model version is required");
+    }
+
+    const uploadSession = await fetchLocal("/models/uploads", {
       method: "POST",
-      body: formData,
-      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        version: normalizedVersion,
+        fileName: file?.name,
+        fileSize: file?.size,
+        contentType: file?.type || "application/octet-stream",
+      }),
     });
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "Upload failed");
+    if (!uploadSession) {
+      throw new Error("Unauthorized");
     }
-    return res.json();
+
+    await uploadFileToPresignedUrl(uploadSession, file);
+
+    const finalized = await fetchLocal("/models/uploads/finalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uploadId: uploadSession.uploadId,
+        version: normalizedVersion,
+        ...metadata,
+      }),
+    });
+
+    if (!finalized) {
+      throw new Error("Unauthorized");
+    }
+
+    return finalized;
   },
 
   getReportedPosts: async () => {

@@ -1,7 +1,6 @@
 import httpx
 import logging
-import anyio
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.core.settings import require_setting
 from app.deps import get_current_admin 
@@ -12,6 +11,33 @@ router = APIRouter()
 def get_cycle_url(request: Request) -> str:
     s = request.app.state.settings
     return require_setting("MODEL_CYCLE_URI", s.model_cycle_uri)
+
+
+async def proxy_cycle_json_post(
+    request: Request,
+    *,
+    path: str,
+    timeout: float = 30.0,
+) -> Response:
+    base_url = get_cycle_url(request)
+    url = f"{base_url}{path}"
+    client: httpx.AsyncClient = request.app.state.http
+    body = await request.body()
+    headers = {
+        "Content-Type": request.headers.get("Content-Type", "application/json"),
+    }
+
+    try:
+        resp = await client.post(url, content=body, headers=headers, timeout=timeout)
+    except httpx.RequestError as exc:
+        logging.error("Model Cycle connection failed: %s", exc)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
+
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        media_type=resp.headers.get("content-type", "application/json"),
+    )
 
 # ---------------------------------------------------------
 # 1. TRIGGER TRAINING
@@ -81,70 +107,28 @@ async def gateway_get_training_images(
     return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
 
 # ---------------------------------------------------------
-# 4. UPLOAD NEW MODEL
+# 4. CREATE MODEL UPLOAD SESSION
 # ---------------------------------------------------------
-async def async_file_generator(file_obj, chunk_size=65536):
-    while True:
-        # We wrap the synchronous read in a thread to keep the event loop free
-        chunk = await anyio.to_thread.run_sync(file_obj.read, chunk_size)
-        if not chunk:
-            break
-        yield chunk
-
-@router.post("/models/upload")
-async def gateway_upload_model(
+@router.post("/models/uploads")
+async def gateway_create_model_upload(
     request: Request,
     user: UserContext = Depends(get_current_admin),
 ):
-    """
-    Acts as a pure proxy stream. We don't parse the form here (which avoids the 
-    RuntimeError); we just forward the raw bytes to the Model Cycle service.
-    """
-    base_url = get_cycle_url(request)
-    url = f"{base_url}/api/models/upload"
-    
-    # 1. Grab the headers from the incoming request to preserve the boundary
-    headers = {
-        "Content-Type": request.headers.get("Content-Type"),
-        "Authorization": request.headers.get("Authorization"),
-    }
-    
-    # 2. Use a stream to pipe the request body directly
-    client: httpx.AsyncClient = request.app.state.http
-    
-    try:
-        # We pass request.stream() directly as the content
-        # This is the most efficient 'Zero-RAM' way to proxy in FastAPI/httpx
-        resp = await client.post(
-            url,
-            content=request.stream(),
-            headers=headers,
-            timeout=600.0
-        )
-        resp.raise_for_status()
+    return await proxy_cycle_json_post(request, path="/api/models/uploads")
 
-    except httpx.HTTPStatusError as exc:
-        logging.error("Downstream error: %s", exc.response.text)
-        return Response(
-            content=exc.response.content,
-            status_code=exc.response.status_code,
-            media_type="application/json"
-        )
-    except Exception as exc:
-        logging.error("Gateway proxy failure: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Downstream pipe failed"
-        )
-
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        media_type=resp.headers.get("content-type", "application/json"),
-    )
 
 # ---------------------------------------------------------
-# 5. LIST ALL MODELS
+# 5. FINALIZE MODEL UPLOAD
+# ---------------------------------------------------------
+@router.post("/models/uploads/finalize")
+async def gateway_finalize_model_upload(
+    request: Request,
+    user: UserContext = Depends(get_current_admin),
+):
+    return await proxy_cycle_json_post(request, path="/api/models/uploads/finalize")
+
+# ---------------------------------------------------------
+# 6. LIST ALL MODELS
 # ---------------------------------------------------------
 @router.get("/models")
 async def gateway_list_models(
@@ -163,7 +147,7 @@ async def gateway_list_models(
     return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
 
 # ---------------------------------------------------------
-# 6. DELETE MODEL
+# 7. DELETE MODEL
 # ---------------------------------------------------------
 @router.delete("/models/{version}")
 async def gateway_delete_model(

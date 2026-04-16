@@ -12,14 +12,14 @@ namespace ModelCycle.Controllers;
 [Route("api/[controller]")]
 public class ModelsController : ControllerBase
 {
-    private readonly BlobStorageService _blobService;
+    private readonly IBlobStorageService _blobService;
     private readonly AppDbContext _dbContext;
     private readonly TrainingJobQueue _jobQueue;
 
     private readonly IModelDeploymentService _deploymentService;
 
     public ModelsController(
-    BlobStorageService blobService,
+    IBlobStorageService blobService,
     AppDbContext dbContext,
     TrainingJobQueue jobQueue,
     IModelDeploymentService deploymentService)
@@ -86,73 +86,43 @@ public class ModelsController : ControllerBase
         });
     }
 
-    [HttpPost("upload")]
-    [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadModel([FromForm] UploadModelRequest request)
+    [HttpPost("uploads")]
+    public async Task<IActionResult> CreateUploadSession([FromBody] CreateModelUploadSessionRequest request)
     {
-        if (request.File == null || request.File.Length == 0)
-            return BadRequest("No file provided.");
-
-        var modelId = Guid.NewGuid();
-        var modelWeight = new ModelWeights
+        try
         {
-            Id = modelId,
-            Version = request.Version,
-            NewImagesCount = request.NewImagesCount,
-            ReplayBufferCount = request.ReplayBufferCount,
-            ValidationAccuracy = request.ValidationAccuracy,
-            ValidationPrecision = request.ValidationPrecision,
-            ValidationRecall = request.ValidationRecall,
-            ValidationF1Score = request.ValidationF1Score,
-            GoldenTestAccuracy = request.GoldenTestAccuracy,
-            GoldenTestPrecision = request.GoldenTestPrecision,
-            GoldenTestRecall = request.GoldenTestRecall,
-            GoldenTestF1Score = request.GoldenTestF1Score,
-            GoldenFakeToRealMisclassifications = request.GoldenFakeToRealMisclassifications,
-            GoldenRealToFakeMisclassifications = request.GoldenRealToFakeMisclassifications
-        };
-
-        var links = new List<ModelImageLink>();
-
-        void AddLinks(List<Guid>? ids, ImageUsageType usage)
-        {
-            if (ids == null) return;
-            foreach (var imgId in ids)
-            {
-                links.Add(new ModelImageLink
-                {
-                    ModelWeightId = modelId,
-                    TrainingImageId = imgId,
-                    UsageType = usage
-                });
-            }
+            var session = await _deploymentService.CreateUploadSessionAsync(request);
+            return Ok(session);
         }
-
-        AddLinks(request.NewTrainingImageIds, ImageUsageType.NewTraining);
-        AddLinks(request.ReplayImageIds, ImageUsageType.Replay);
-        AddLinks(request.GoldenTestImageIds, ImageUsageType.GoldenTest);
-
-        var extension = Path.GetExtension(request.File.FileName);
-        var fileName = $"{request.Version}{extension}";
-
-        using var stream = request.File.OpenReadStream();
-        var deployedModel = await _deploymentService.UploadAndDeployModelAsync(
-            stream,
-            fileName,
-            request.File.ContentType,
-            modelWeight,
-            links
-        );
-
-        return Ok(new
+        catch (ModelUploadException ex)
         {
-            Message = "Model uploaded, deployed, and lineage tracked.",
-            Id = deployedModel.Id,
-            Version = deployedModel.Version,
-            ImagesLinked = links.Count
-        });
+            return StatusCode(ex.StatusCode, new { detail = ex.Message });
+        }
     }
 
+    [HttpPost("uploads/finalize")]
+    public async Task<IActionResult> FinalizeUpload([FromBody] FinalizeModelUploadRequest request)
+    {
+        try
+        {
+            var deployedModel = await _deploymentService.FinalizeUploadedModelAsync(request);
+            var linkedImages = (request.NewTrainingImageIds?.Count ?? 0)
+                               + (request.ReplayImageIds?.Count ?? 0)
+                               + (request.GoldenTestImageIds?.Count ?? 0);
+
+            return Ok(new
+            {
+                Message = "Model uploaded, deployed, and lineage tracked.",
+                Id = deployedModel.Id,
+                Version = deployedModel.Version,
+                ImagesLinked = linkedImages,
+            });
+        }
+        catch (ModelUploadException ex)
+        {
+            return StatusCode(ex.StatusCode, new { detail = ex.Message });
+        }
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetModels()
@@ -186,11 +156,7 @@ public class ModelsController : ControllerBase
         {
             try
             {
-                var fileName = Path.GetFileName(model.MinioObjectPath);
-                if (!string.IsNullOrEmpty(fileName))
-                {
-                    await _blobService.DeleteFileAsync("models", fileName);
-                }
+                await _blobService.DeleteFileAsync(model.MinioObjectPath);
             }
             catch (Exception ex)
             {

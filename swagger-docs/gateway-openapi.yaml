@@ -1332,26 +1332,114 @@ paths:
         "403":
           description: Admin privileges required
 
-  /admin/models/upload:
+  /admin/models/uploads:
     post:
-      summary: Upload new model (admin)
+      summary: Create model upload session (admin)
       tags: [Models]
-      description: Upload model weights with training metadata. Max 750 MB. Timeout 10 minutes.
+      description: >
+        Authenticated admin control-plane call. Returns a presigned object-storage
+        PUT URL so the browser can upload model bytes directly without proxying
+        through Gateway. Model Cycle may also reap expired abandoned staging
+        objects older than the upload-session TTL while creating the session.
       security:
         - bearerAuth: []
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
-              required: [File, Version]
+              required: [version, fileName, fileSize]
               properties:
-                File:
+                version:
                   type: string
-                  format: binary
-                Version:
+                fileName:
                   type: string
+                fileSize:
+                  type: integer
+                  format: int64
+                contentType:
+                  type: string
+      responses:
+        "200":
+          description: Upload session created
+        "400":
+          description: Invalid request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "409":
+          description: Model version already exists
+        "502":
+          description: Model-cycle service error
+
+  /admin/models/uploads/finalize:
+    post:
+      summary: Finalize direct-uploaded model (admin)
+      tags: [Models]
+      description: >
+        Authenticated admin control-plane call. Finalizes a previously created
+        direct upload session, promotes the staged object to the canonical
+        release key, and deploys the uploaded model via model-cycle.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [uploadId, version]
+              properties:
+                uploadId:
+                  type: string
+                version:
+                  type: string
+                newImagesCount:
+                  type: integer
+                replayBufferCount:
+                  type: integer
+                validationAccuracy:
+                  type: number
+                  format: double
+                validationPrecision:
+                  type: number
+                  format: double
+                validationRecall:
+                  type: number
+                  format: double
+                validationF1Score:
+                  type: number
+                  format: double
+                goldenTestAccuracy:
+                  type: number
+                  format: double
+                goldenTestPrecision:
+                  type: number
+                  format: double
+                goldenTestRecall:
+                  type: number
+                  format: double
+                goldenTestF1Score:
+                  type: number
+                  format: double
+                goldenFakeToRealMisclassifications:
+                  type: integer
+                goldenRealToFakeMisclassifications:
+                  type: integer
+                newTrainingImageIds:
+                  type: array
+                  items:
+                    type: string
+                replayImageIds:
+                  type: array
+                  items:
+                    type: string
+                goldenTestImageIds:
+                  type: array
+                  items:
+                    type: string
       responses:
         "200":
           description: Model uploaded and deployed
@@ -1359,6 +1447,8 @@ paths:
           description: Unauthorized
         "403":
           description: Admin privileges required
+        "409":
+          description: Upload missing, size mismatch, or version conflict
         "502":
           description: Model-cycle service error
 

@@ -184,6 +184,7 @@ def gateway_mod():
     os.environ.setdefault("COMMUNITY_URI", "http://community")
     os.environ.setdefault("DETECTOR_URI", "http://detector")
     os.environ.setdefault("MEDIA_URI", "http://media")
+    os.environ.setdefault("MODEL_CYCLE_URI", "http://model-cycle")
     os.environ.setdefault("DETECTION_TOKEN_SECRET", "test-detection-secret")
     os.environ.setdefault("INTERNAL_AUTH_TOKEN", "test-internal-token")
     os.environ.setdefault("CPU_POOL_WORKERS", "4")

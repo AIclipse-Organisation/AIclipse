@@ -37,13 +37,22 @@ export default function ModelManagement() {
 
     try {
       setIsUploading(true);
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("version", uploadVersion);
-      formData.append("NewImagesCount", "0");
-      formData.append("ValidationAccuracy", "0.0");
-
-      await adminService.uploadModel(formData);
+      await adminService.uploadModel({
+        file,
+        version: uploadVersion,
+        newImagesCount: 0,
+        replayBufferCount: 0,
+        validationAccuracy: 0.0,
+        validationPrecision: 0.0,
+        validationRecall: 0.0,
+        validationF1Score: 0.0,
+        goldenTestAccuracy: 0.0,
+        goldenTestPrecision: 0.0,
+        goldenTestRecall: 0.0,
+        goldenTestF1Score: 0.0,
+        goldenFakeToRealMisclassifications: 0,
+        goldenRealToFakeMisclassifications: 0,
+      });
       setUploadVersion("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       loadModels();
@@ -135,6 +144,7 @@ export default function ModelManagement() {
                       <input
                         type="file"
                         ref={fileInputRef}
+                        accept=".pt,.bin,.safetensors,application/octet-stream"
                         className="block text-sm font-black uppercase text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-white/10 file:text-[#CFB87C] cursor-pointer"
                       />
                     </div>
