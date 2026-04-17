@@ -167,3 +167,34 @@ test("admin BFF routes always pass the incoming request into proxyAdminJson", ()
     assert.match(routeSource, /request:\s*(req|_req)/);
   }
 });
+
+test("internal moderation-status route requires trusted internal auth", () => {
+  const routeSource = readRepoFile("app/internal/posts/moderation-status/route.js");
+  const handlerSource = readRepoFile("app/lib/routes/moderationStatusRoute.js");
+
+  assert.match(routeSource, /requireInternalRequest/);
+  assert.match(routeSource, /createModerationStatusPostHandler/);
+  assert.match(handlerSource, /await requireInternalRequest\(req\)/);
+  assert.match(handlerSource, /error: "Unauthorized"/);
+});
+
+test("browser-facing community routes do not expose raw exception strings", () => {
+  const files = [
+    "app/lib/adminGateway.js",
+    "app/lib/routes/clickRoute.js",
+    "app/lib/routes/commentsRoute.js",
+    "app/lib/routes/moderationStatusRoute.js",
+    "app/lib/routes/notificationsRoute.js",
+    "app/lib/routes/postsRoute.js",
+    "app/lib/routes/reportRoute.js",
+    "app/lib/routes/voteRoute.js",
+  ];
+
+  for (const relativePath of files) {
+    const source = readRepoFile(relativePath);
+    assert.doesNotMatch(source, /detail:\s*String\(error\)/);
+    assert.doesNotMatch(source, /detail:\s*String\(err\)/);
+    assert.doesNotMatch(source, /error\?\.message \|\| String\(error\)/);
+    assert.doesNotMatch(source, /err\?\.message \|\| String\(err\)/);
+  }
+});

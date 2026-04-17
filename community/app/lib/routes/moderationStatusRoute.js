@@ -3,41 +3,53 @@ import { getDb } from "@/lib/mongo/mongo.js";
 
 const POSTS_COLLECTION = "community.posts";
 
-export async function handleModerationStatusPost(req) {
-  try {
-    const body = await req.json().catch(() => null);
-    const image_ids = body?.image_ids || [];
+function unauthorized() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
 
-    if (!Array.isArray(image_ids) || image_ids.length === 0) {
-      return NextResponse.json({ items: [] }, { status: 200 });
+export function createModerationStatusPostHandler({ requireInternalRequest }) {
+  return async function handleModerationStatusPost(req) {
+    try {
+      await requireInternalRequest(req);
+    } catch {
+      return unauthorized();
     }
 
-    const db = await getDb();
-    const postsCol = db.collection(POSTS_COLLECTION);
+    try {
+      const body = await req.json().catch(() => null);
+      const image_ids = body?.image_ids || [];
 
-    const removedPosts = await postsCol
-      .find({
-        image_id: { $in: image_ids },
-        is_removed: true,
-        moderation_status: "removed",
-      })
-      .toArray();
+      if (!Array.isArray(image_ids) || image_ids.length === 0) {
+        return NextResponse.json({ items: [] }, { status: 200 });
+      }
 
-    const items = removedPosts.map((post) => {
-      const lastLog = post.moderation_log?.[post.moderation_log.length - 1];
-      return {
-        image_id: post.image_id,
-        moderation_status: post.moderation_status,
-        moderation_reason: lastLog?.note || "Removed by moderation",
-      };
-    });
+      const db = await getDb();
+      const postsCol = db.collection(POSTS_COLLECTION);
 
-    return NextResponse.json({ items }, { status: 200 });
-  } catch (err) {
-    console.error("Error fetching moderation status:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch moderation status", detail: String(err) },
-      { status: 500 },
-    );
-  }
+      const removedPosts = await postsCol
+        .find({
+          image_id: { $in: image_ids },
+          is_removed: true,
+          moderation_status: "removed",
+        })
+        .toArray();
+
+      const items = removedPosts.map((post) => {
+        const lastLog = post.moderation_log?.[post.moderation_log.length - 1];
+        return {
+          image_id: post.image_id,
+          moderation_status: post.moderation_status,
+          moderation_reason: lastLog?.note || "Removed by moderation",
+        };
+      });
+
+      return NextResponse.json({ items }, { status: 200 });
+    } catch (err) {
+      console.error("Error fetching moderation status:", err);
+      return NextResponse.json(
+        { error: "Failed to fetch moderation status" },
+        { status: 500 },
+      );
+    }
+  };
 }

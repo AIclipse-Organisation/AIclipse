@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { readForwardedTrustedUser } from "../app/lib/forwardedUser.js";
+import { hasTrustedInternalToken, readForwardedTrustedUser } from "../app/lib/forwardedUser.js";
 
 function makeHeaders(values) {
   const normalized = new Map(
@@ -54,5 +54,27 @@ test("rejects forwarded identity when token mismatches or user id is missing", (
       "internal-secret",
     ),
     null,
+  );
+});
+
+test("recognizes trusted internal requests without forwarded user context", () => {
+  assert.equal(
+    hasTrustedInternalToken(
+      makeHeaders({
+        "x-internal-token": "internal-secret",
+      }),
+      "internal-secret",
+    ),
+    true,
+  );
+
+  assert.equal(
+    hasTrustedInternalToken(
+      makeHeaders({
+        "x-internal-token": "wrong",
+      }),
+      "internal-secret",
+    ),
+    false,
   );
 });

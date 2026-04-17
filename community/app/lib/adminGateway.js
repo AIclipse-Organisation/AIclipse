@@ -108,6 +108,15 @@ export async function proxyAdminJson({
       if (override) {
         return override;
       }
+      if (response.status === 401) {
+        return buildAdminError(401, "Unauthorized");
+      }
+      if (response.status === 403) {
+        return buildAdminError(403, "Forbidden");
+      }
+      if (response.status >= 500) {
+        return buildAdminError(response.status, "Gateway Error");
+      }
       return buildAdminError(response.status, "Gateway Error", payload || text);
     }
 
@@ -117,6 +126,6 @@ export async function proxyAdminJson({
 
     return NextResponse.json(payload ?? {}, { status: response.status });
   } catch (error) {
-    return buildAdminError(500, "Internal Error", error?.message || String(error));
+    return buildAdminError(500, "Internal Error");
   }
 }

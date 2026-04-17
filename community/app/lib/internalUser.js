@@ -1,4 +1,4 @@
-import { readForwardedTrustedUser } from "./forwardedUser";
+import { hasTrustedInternalToken, readForwardedTrustedUser } from "./forwardedUser";
 
 function normalizeForwardedUser(user) {
   const user_id = String(user?.user_id || "").trim();
@@ -31,6 +31,17 @@ export async function getOptionalForwardedUser(req) {
   } catch {
     return null;
   }
+}
+
+export async function requireInternalRequest(req) {
+  const isTrusted = hasTrustedInternalToken(
+    req?.headers,
+    process.env.INTERNAL_AUTH_TOKEN,
+  );
+  if (!isTrusted) {
+    throw new Error("Missing internal auth token");
+  }
+  return true;
 }
 
 export function buildGatewayIdentityHeaders(user) {

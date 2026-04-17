@@ -58,11 +58,8 @@ function makePostId() {
   return `post_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-function unauthorized(error) {
-  return NextResponse.json(
-    { error: "Unauthorized", detail: String(error) },
-    { status: 401 },
-  );
+function unauthorized() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 
@@ -80,8 +77,8 @@ export function createPostsRouteHandlers({
       let currentUser;
       try {
         currentUser = await requireUser(req);
-      } catch (authErr) {
-        return unauthorized(authErr);
+      } catch {
+        return unauthorized();
       }
 
       try {
@@ -158,7 +155,7 @@ export function createPostsRouteHandlers({
           });
         } catch (imageUpdateErr) {
           return NextResponse.json(
-            { error: "Failed to create post", detail: imageUpdateErr?.message || String(imageUpdateErr) },
+            { error: "Failed to create post" },
             { status: imageUpdateErr?.status || 502 },
           );
         }
@@ -173,7 +170,7 @@ export function createPostsRouteHandlers({
       } catch (err) {
         console.error("ERROR IN POST ROUTE:", err);
         return NextResponse.json(
-          { error: "Failed to create post", detail: String(err) },
+          { error: "Failed to create post" },
           { status: 500 },
         );
       }
@@ -183,8 +180,8 @@ export function createPostsRouteHandlers({
       let currentUser;
       try {
         currentUser = await requireUser(req);
-      } catch (authErr) {
-        return unauthorized(authErr);
+      } catch {
+        return unauthorized();
       }
       const authenticatedUserId = currentUser.user_id;
 
@@ -248,8 +245,8 @@ export function createPostsRouteHandlers({
         );
       } catch (err) {
         return NextResponse.json(
-          { error: "Failed to update post", detail: String(err) },
-          { status: 500 },
+          { error: "Failed to update post" },
+          { status: err?.status || 500 },
         );
       }
     },
@@ -258,8 +255,8 @@ export function createPostsRouteHandlers({
       let currentUser;
       try {
         currentUser = await requireUser(req);
-      } catch (authErr) {
-        return unauthorized(authErr);
+      } catch {
+        return unauthorized();
       }
       const authenticatedUserId = currentUser.user_id;
       const isAdmin = currentUser.is_admin === true;
@@ -359,8 +356,8 @@ export function createPostsRouteHandlers({
       } catch (err) {
         console.error("DELETE ERROR:", err);
         return NextResponse.json(
-          { error: "Server error", detail: String(err) },
-          { status: 500 },
+          { error: "Server error" },
+          { status: err?.status || 500 },
         );
       }
     },
@@ -584,7 +581,7 @@ export function createPostsRouteHandlers({
         );
       } catch (err) {
         return NextResponse.json(
-          { error: "Failed to list posts", detail: err?.message || String(err) },
+          { error: "Failed to list posts" },
           { status: err?.status || 500 },
         );
       }

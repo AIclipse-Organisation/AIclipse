@@ -8,11 +8,8 @@ import { updatePostStateWithImageSyncOrRollback } from "@/app/lib/postStateSync"
 
 const POSTS_COLLECTION = "community.posts";
 
-function unauthorized(error) {
-  return NextResponse.json(
-    { error: "Unauthorized", detail: String(error) },
-    { status: 401 },
-  );
+function unauthorized() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 
@@ -78,7 +75,7 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
         );
       } catch (err) {
         return NextResponse.json(
-          { error: "Failed to report", detail: String(err) },
+          { error: "Failed to report" },
           { status: 500 },
         );
       }
@@ -88,8 +85,8 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
       let currentUser;
       try {
         currentUser = await requireUser(req);
-      } catch (authErr) {
-        return unauthorized(authErr);
+      } catch {
+        return unauthorized();
       }
       if (!currentUser.is_admin) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -189,7 +186,7 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
         return NextResponse.json({ message: `Post ${action}ed.` });
       } catch (err) {
         return NextResponse.json(
-          { error: "Action failed", detail: String(err) },
+          { error: "Action failed" },
           { status: 500 },
         );
       }
@@ -199,8 +196,8 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
       let currentUser;
       try {
         currentUser = await requireUser(req);
-      } catch (authErr) {
-        return unauthorized(authErr);
+      } catch {
+        return unauthorized();
       }
       if (!currentUser.is_admin) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -247,7 +244,7 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
         return NextResponse.json({ items }, { status: 200 });
       } catch (err) {
         return NextResponse.json(
-          { error: "Failed to fetch reporting queue", detail: err?.message || String(err) },
+          { error: "Failed to fetch reporting queue" },
           { status: err?.status || 500 },
         );
       }

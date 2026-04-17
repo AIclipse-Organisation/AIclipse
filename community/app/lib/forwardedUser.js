@@ -12,10 +12,10 @@ function safeTokenCompare(a, b) {
   return timingSafeEqual(bufA, bufB);
 }
 
-export function readForwardedTrustedUser(headersLike, expectedInternalToken) {
+export function hasTrustedInternalToken(headersLike, expectedInternalToken) {
   const requiredToken = String(expectedInternalToken || "").trim();
   if (!requiredToken) {
-    return null;
+    return false;
   }
 
   const readHeader = (name) => {
@@ -26,7 +26,18 @@ export function readForwardedTrustedUser(headersLike, expectedInternalToken) {
   };
 
   const providedToken = readHeader("x-internal-token");
-  if (!safeTokenCompare(providedToken, requiredToken)) {
+  return safeTokenCompare(providedToken, requiredToken);
+}
+
+export function readForwardedTrustedUser(headersLike, expectedInternalToken) {
+  const readHeader = (name) => {
+    if (!headersLike || typeof headersLike.get !== "function") {
+      return "";
+    }
+    return String(headersLike.get(name) || "").trim();
+  };
+
+  if (!hasTrustedInternalToken(headersLike, expectedInternalToken)) {
     return null;
   }
 
