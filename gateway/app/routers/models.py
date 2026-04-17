@@ -2,6 +2,7 @@ import httpx
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
+from app.core.external_request import build_external_proto_headers
 from app.core.settings import require_setting
 from app.deps import get_current_admin 
 from app.models import UserContext
@@ -13,22 +14,30 @@ def get_cycle_url(request: Request) -> str:
     return require_setting("MODEL_CYCLE_URI", s.model_cycle_uri)
 
 
-async def proxy_cycle_json_post(
+async def proxy_cycle_request(
     request: Request,
     *,
+    method: str,
     path: str,
     timeout: float = 30.0,
+    include_body: bool = False,
 ) -> Response:
     base_url = get_cycle_url(request)
     url = f"{base_url}{path}"
     client: httpx.AsyncClient = request.app.state.http
-    body = await request.body()
-    headers = {
-        "Content-Type": request.headers.get("Content-Type", "application/json"),
-    }
+    headers = build_external_proto_headers(request)
+    body = await request.body() if include_body else None
+    if include_body:
+        headers["Content-Type"] = request.headers.get("Content-Type", "application/json")
 
     try:
-        resp = await client.post(url, content=body, headers=headers, timeout=timeout)
+        resp = await client.request(
+            method,
+            url,
+            content=body,
+            headers=headers or None,
+            timeout=timeout,
+        )
     except httpx.RequestError as exc:
         logging.error("Model Cycle connection failed: %s", exc)
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
@@ -47,21 +56,11 @@ async def gateway_trigger_training(
     request: Request,
     user: UserContext = Depends(get_current_admin), 
 ):
-    base_url = get_cycle_url(request)
-    url = f"{base_url}/api/models/train"
-    
-    client: httpx.AsyncClient = request.app.state.http
-    
-    try:
-        resp = await client.post(url, timeout=10.0)
-    except httpx.RequestError as exc:
-        logging.error("Model Cycle connection failed: %s", exc)
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
-
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        media_type=resp.headers.get("content-type", "application/json"),
+    return await proxy_cycle_request(
+        request,
+        method="POST",
+        path="/api/models/train",
+        timeout=10.0,
     )
 
 # ---------------------------------------------------------
@@ -72,20 +71,17 @@ async def gateway_get_current_model(
     request: Request,
     user: UserContext = Depends(get_current_admin),
 ):
-    base_url = get_cycle_url(request)
-    url = f"{base_url}/api/models/current"
-    
-    client: httpx.AsyncClient = request.app.state.http
-    
-    try:
-        resp = await client.get(url, timeout=5.0)
-    except httpx.RequestError:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
+    resp = await proxy_cycle_request(
+        request,
+        method="GET",
+        path="/api/models/current",
+        timeout=5.0,
+    )
 
     if resp.status_code == 404:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No active model found")
 
-    return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+    return resp
 
 # ---------------------------------------------------------
 # 3. GET TRAINING IMAGES
@@ -95,16 +91,12 @@ async def gateway_get_training_images(
     request: Request,
     user: UserContext = Depends(get_current_admin),
 ):
-    base_url = get_cycle_url(request)
-    url = f"{base_url}/images" 
-    
-    client: httpx.AsyncClient = request.app.state.http
-    try:
-        resp = await client.get(url, timeout=10.0)
-    except httpx.RequestError:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
-
-    return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+    return await proxy_cycle_request(
+        request,
+        method="GET",
+        path="/images",
+        timeout=10.0,
+    )
 
 # ---------------------------------------------------------
 # 4. CREATE MODEL UPLOAD SESSION
@@ -114,7 +106,12 @@ async def gateway_create_model_upload(
     request: Request,
     user: UserContext = Depends(get_current_admin),
 ):
-    return await proxy_cycle_json_post(request, path="/api/models/uploads")
+    return await proxy_cycle_request(
+        request,
+        method="POST",
+        path="/api/models/uploads",
+        include_body=True,
+    )
 
 
 # ---------------------------------------------------------
@@ -125,7 +122,12 @@ async def gateway_finalize_model_upload(
     request: Request,
     user: UserContext = Depends(get_current_admin),
 ):
-    return await proxy_cycle_json_post(request, path="/api/models/uploads/finalize")
+    return await proxy_cycle_request(
+        request,
+        method="POST",
+        path="/api/models/uploads/finalize",
+        include_body=True,
+    )
 
 # ---------------------------------------------------------
 # 6. LIST ALL MODELS
@@ -135,16 +137,12 @@ async def gateway_list_models(
     request: Request,
     user: UserContext = Depends(get_current_admin),
 ):
-    base_url = get_cycle_url(request)
-    url = f"{base_url}/api/models"
-    
-    client: httpx.AsyncClient = request.app.state.http
-    try:
-        resp = await client.get(url, timeout=5.0)
-    except httpx.RequestError:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
-
-    return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+    return await proxy_cycle_request(
+        request,
+        method="GET",
+        path="/api/models",
+        timeout=5.0,
+    )
 
 # ---------------------------------------------------------
 # 7. DELETE MODEL
@@ -155,14 +153,10 @@ async def gateway_delete_model(
     version: str,
     user: UserContext = Depends(get_current_admin),
 ):
-    base_url = get_cycle_url(request)
-    url = f"{base_url}/api/models/{version}"
-    
-    client: httpx.AsyncClient = request.app.state.http
-    try:
-        resp = await client.delete(url, timeout=10.0)
-    except httpx.RequestError:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Model Cycle unreachable")
-
-    return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+    return await proxy_cycle_request(
+        request,
+        method="DELETE",
+        path=f"/api/models/{version}",
+        timeout=10.0,
+    )
 

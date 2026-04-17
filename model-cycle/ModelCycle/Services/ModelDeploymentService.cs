@@ -49,7 +49,9 @@ public class ModelDeploymentService : IModelDeploymentService
         _uploadProtector = dataProtectionProvider.CreateProtector("model-cycle.admin-upload-session.v1");
     }
 
-    public async Task<CreateModelUploadSessionResponse> CreateUploadSessionAsync(CreateModelUploadSessionRequest request)
+    public async Task<CreateModelUploadSessionResponse> CreateUploadSessionAsync(
+        CreateModelUploadSessionRequest request,
+        string? externalProto = null)
     {
         var normalizedVersion = NormalizeVersion(request.Version);
         await EnsureVersionAvailableAsync(normalizedVersion);
@@ -75,7 +77,11 @@ public class ModelDeploymentService : IModelDeploymentService
         };
 
         var uploadId = _uploadProtector.Protect(JsonSerializer.Serialize(payload));
-        var uploadUrl = await _blobService.CreatePresignedUploadUrlAsync(objectName, UploadSessionTtlSeconds);
+        var uploadUrl = await _blobService.CreatePresignedUploadUrlAsync(
+            objectName,
+            UploadSessionTtlSeconds,
+            externalProto
+        );
 
         return new CreateModelUploadSessionResponse
         {

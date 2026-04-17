@@ -207,6 +207,14 @@ class FakeUsersColl:
         if "is_admin" in flt and doc.get("is_admin") is not flt["is_admin"]:
             return False
 
+        if "user_id" in flt:
+            user_id_filter = flt["user_id"]
+            if isinstance(user_id_filter, dict) and "$in" in user_id_filter:
+                if doc.get("user_id") not in set(user_id_filter["$in"]):
+                    return False
+            elif doc.get("user_id") != user_id_filter:
+                return False
+
         if "$or" in flt:
             matched = False
             for clause in flt["$or"]:
@@ -224,11 +232,17 @@ class FakeUsersColl:
 
         return True
 
-    def find(self, flt: Optional[dict] = None) -> _FakeCursor:
+    def find(self, flt: Optional[dict] = None, projection: Optional[dict] = None) -> _FakeCursor:
         flt = flt or {}
         docs = list(self.docs.values())
 
         docs = [d for d in docs if self._matches_filter(d, flt)]
+        if projection is not None:
+            included_keys = {key for key, enabled in projection.items() if enabled}
+            docs = [
+                {key: value for key, value in d.items() if key in included_keys}
+                for d in docs
+            ]
 
         return _FakeCursor([dict(d) for d in docs])
 

@@ -40,12 +40,35 @@ export function sanitizeLogMessage(value) {
   return String(value).replace(/[\r\n]/g, "");
 }
 
+function normalizeExternalProto(value) {
+  const proto = String(value || "")
+    .split(",", 1)[0]
+    .trim()
+    .toLowerCase();
+  if (proto === "http" || proto === "https") {
+    return proto;
+  }
+  return null;
+}
+
+function resolveExternalProto(request) {
+  if (!request) {
+    return null;
+  }
+
+  return normalizeExternalProto(
+    request.headers?.get("x-forwarded-proto") ||
+      new URL(request.url).protocol.replace(":", ""),
+  );
+}
+
 export async function proxyAdminJson({
   path,
   method = "GET",
   query,
   body,
   headers,
+  request,
   successTextKey,
   onError,
 }) {
@@ -59,6 +82,10 @@ export async function proxyAdminJson({
       Authorization: `Bearer ${token}`,
       ...(headers || {}),
     };
+    const externalProto = resolveExternalProto(request);
+    if (externalProto) {
+      requestHeaders["X-External-Proto"] = externalProto;
+    }
     const init = {
       method,
       headers: requestHeaders,

@@ -6,6 +6,12 @@ namespace ModelCycle.Services;
 
 public sealed class BlobStorageService : IBlobStorageService, IDisposable
 {
+    private static readonly HashSet<string> ValidExternalProtos = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "http",
+        "https",
+    };
+
     private readonly IMinioClient _internalMinioClient;
     private readonly IMinioClient _publicMinioClient;
     private readonly string _bucketName;
@@ -80,6 +86,33 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
             .Build();
     }
 
+    private static string? NormalizeExternalProto(string? value)
+    {
+        var proto = (value ?? string.Empty).Split(',', 2)[0].Trim().ToLowerInvariant();
+        return ValidExternalProtos.Contains(proto) ? proto : null;
+    }
+
+    private static string ApplyExternalProto(string url, string? externalProto)
+    {
+        var proto = NormalizeExternalProto(externalProto);
+        if (proto == null || string.IsNullOrWhiteSpace(url))
+        {
+            return url;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || string.Equals(parsed.Scheme, proto, StringComparison.OrdinalIgnoreCase))
+        {
+            return url;
+        }
+
+        var builder = new UriBuilder(parsed)
+        {
+            Scheme = proto,
+            Port = parsed.IsDefaultPort ? -1 : parsed.Port,
+        };
+        return builder.Uri.ToString();
+    }
+
     public async Task InitializeAsync()
     {
         try
@@ -137,14 +170,15 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
         }
     }
 
-    public async Task<string> CreatePresignedUploadUrlAsync(string objectName, int expiresSeconds)
+    public async Task<string> CreatePresignedUploadUrlAsync(string objectName, int expiresSeconds, string? externalProto = null)
     {
         var args = new PresignedPutObjectArgs()
             .WithBucket(_bucketName)
             .WithObject(objectName)
             .WithExpiry(expiresSeconds);
 
-        return await _publicMinioClient.PresignedPutObjectAsync(args);
+        var url = await _publicMinioClient.PresignedPutObjectAsync(args);
+        return ApplyExternalProto(url, externalProto);
     }
 
     public async Task CopyObjectAsync(string sourceObjectName, string destinationObjectName, string? bucketName = null)

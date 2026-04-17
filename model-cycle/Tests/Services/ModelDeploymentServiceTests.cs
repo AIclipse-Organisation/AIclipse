@@ -56,7 +56,7 @@ public class ModelDeploymentServiceTests
 
         var blobStorage = new Mock<IBlobStorageService>();
         blobStorage
-            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>()))
+            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null))
             .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
         blobStorage
             .Setup(b => b.StatObjectAsync(It.IsAny<string>(), null))
@@ -139,7 +139,7 @@ public class ModelDeploymentServiceTests
 
         var blobStorage = new Mock<IBlobStorageService>();
         blobStorage
-            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>()))
+            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null))
             .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
         blobStorage
             .Setup(b => b.DeleteObjectsOlderThanAsync("models/uploads/", It.IsAny<DateTime>(), null))
@@ -188,7 +188,7 @@ public class ModelDeploymentServiceTests
             .Setup(b => b.DeleteObjectsOlderThanAsync("models/uploads/", It.IsAny<DateTime>(), null))
             .ReturnsAsync(2);
         blobStorage
-            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>()))
+            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null))
             .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
 
         var detectorClient = new Mock<IDetectorClientService>();
@@ -215,6 +215,43 @@ public class ModelDeploymentServiceTests
     }
 
     [Fact]
+    public async Task CreateUploadSession_ForwardsExternalProtoToBlobStorage()
+    {
+        await using var db = CreateDbContext();
+
+        var blobStorage = new Mock<IBlobStorageService>();
+        blobStorage
+            .Setup(b => b.DeleteObjectsOlderThanAsync("models/uploads/", It.IsAny<DateTime>(), null))
+            .ReturnsAsync(0);
+        blobStorage
+            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), "https"))
+            .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
+
+        var detectorClient = new Mock<IDetectorClientService>();
+        var service = CreateService(db, blobStorage, detectorClient);
+
+        var session = await service.CreateUploadSessionAsync(
+            new CreateModelUploadSessionRequest
+            {
+                Version = "v2.0.1",
+                FileName = "weights.pt",
+                FileSize = 123,
+            },
+            "https"
+        );
+
+        Assert.Equal("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt", session.UploadUrl);
+        blobStorage.Verify(
+            b => b.CreatePresignedUploadUrlAsync(
+                It.Is<string>(path => path.StartsWith("models/uploads/", StringComparison.Ordinal)),
+                3600,
+                "https"
+            ),
+            Times.Once
+        );
+    }
+
+    [Fact]
     public async Task CreateUploadSession_ContinuesWhenCleanupFails()
     {
         await using var db = CreateDbContext();
@@ -224,7 +261,7 @@ public class ModelDeploymentServiceTests
             .Setup(b => b.DeleteObjectsOlderThanAsync("models/uploads/", It.IsAny<DateTime>(), null))
             .ThrowsAsync(new InvalidOperationException("cleanup failed"));
         blobStorage
-            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>()))
+            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null))
             .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
 
         var detectorClient = new Mock<IDetectorClientService>();
@@ -238,6 +275,6 @@ public class ModelDeploymentServiceTests
         });
 
         Assert.Equal("PUT", session.UploadMethod);
-        blobStorage.Verify(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Once);
+        blobStorage.Verify(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null), Times.Once);
     }
 }

@@ -4,7 +4,7 @@ public interface IBlobStorageService
 {
     Task InitializeAsync();
     Task<string> UploadFileAsync(Stream fileStream, string folder, string fileName, string contentType);
-    Task<string> CreatePresignedUploadUrlAsync(string objectName, int expiresSeconds);
+    Task<string> CreatePresignedUploadUrlAsync(string objectName, int expiresSeconds, string? externalProto = null);
     Task CopyObjectAsync(string sourceObjectName, string destinationObjectName, string? bucketName = null);
     Task<int> DeleteObjectsOlderThanAsync(string prefix, DateTime olderThanUtc, string? bucketName = null);
     Task<BlobObjectInfo?> StatObjectAsync(string objectName, string? bucketName = null);

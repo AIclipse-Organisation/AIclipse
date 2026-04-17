@@ -56,6 +56,7 @@ async def test_admin_model_upload_session_proxies_json_payload(client, patch_ups
 
     def create_session_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers["content-type"].startswith("application/json")
+        assert req.headers.get("x-external-proto") == "https"
         assert req.content == b'{"version":"v2.0.1","fileName":"model.pt","fileSize":123}'
         return httpx.Response(
             status_code=200,
@@ -66,12 +67,44 @@ async def test_admin_model_upload_session_proxies_json_payload(client, patch_ups
 
     r = await client.post(
         "/admin/models/uploads",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-Forwarded-Proto": "https",
+        },
         content=b'{"version":"v2.0.1","fileName":"model.pt","fileSize":123}',
     )
 
     assert r.status_code == 200
     assert r.json()["uploadId"] == "upload-token"
+
+
+@pytest.mark.asyncio
+async def test_admin_model_training_images_forward_external_proto_for_get_requests(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_admin",
+        email="admin@example.com",
+        is_admin=True,
+        plan=0,
+    )
+
+    def training_images_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("x-external-proto") == "https"
+        return httpx.Response(status_code=200, json=[{"id": 1, "label": "real"}])
+
+    patch_upstreams.add(host="model-cycle", method="GET", path="/images", handler=training_images_handler)
+
+    r = await client.get(
+        "/admin/models/training-images",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Forwarded-Proto": "https",
+        },
+    )
+
+    assert r.status_code == 200
+    assert r.json()[0]["label"] == "real"
 
 
 @pytest.mark.asyncio
@@ -111,13 +144,13 @@ async def test_admin_model_upload_session_returns_502_when_model_cycle_is_unreac
         plan=0,
     )
 
-    async def fail_post(*args, **kwargs):
+    async def fail_request(*args, **kwargs):
         raise httpx.RequestError(
             "boom",
             request=httpx.Request("POST", "http://model-cycle/api/models/uploads"),
         )
 
-    monkeypatch.setattr(gateway_mod.app.state.http, "post", fail_post)
+    monkeypatch.setattr(gateway_mod.app.state.http, "request", fail_request)
 
     r = await client.post(
         "/admin/models/uploads",

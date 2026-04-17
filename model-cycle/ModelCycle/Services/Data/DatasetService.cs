@@ -2,10 +2,10 @@ namespace ModelCycle.Services.Data;
 
 public class DatasetService : IDatasetService
 {
-    private readonly BlobStorageService _blobService;
+    private readonly IBlobStorageService _blobService;
     private readonly string _storagePath; 
     
-    public DatasetService(BlobStorageService blobService, IConfiguration config)
+    public DatasetService(IBlobStorageService blobService, IConfiguration config)
     {
         _blobService = blobService;
         

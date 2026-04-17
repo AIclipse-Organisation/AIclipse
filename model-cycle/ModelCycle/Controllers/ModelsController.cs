@@ -87,11 +87,13 @@ public class ModelsController : ControllerBase
     }
 
     [HttpPost("uploads")]
-    public async Task<IActionResult> CreateUploadSession([FromBody] CreateModelUploadSessionRequest request)
+    public async Task<IActionResult> CreateUploadSession(
+        [FromBody] CreateModelUploadSessionRequest request,
+        [FromHeader(Name = "X-External-Proto")] string? xExternalProto)
     {
         try
         {
-            var session = await _deploymentService.CreateUploadSessionAsync(request);
+            var session = await _deploymentService.CreateUploadSessionAsync(request, xExternalProto);
             return Ok(session);
         }
         catch (ModelUploadException ex)

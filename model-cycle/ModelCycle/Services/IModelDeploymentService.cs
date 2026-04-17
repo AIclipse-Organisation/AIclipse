@@ -5,7 +5,7 @@ namespace ModelCycle.Services;
 
 public interface IModelDeploymentService
 {
-    Task<CreateModelUploadSessionResponse> CreateUploadSessionAsync(CreateModelUploadSessionRequest request);
+    Task<CreateModelUploadSessionResponse> CreateUploadSessionAsync(CreateModelUploadSessionRequest request, string? externalProto = null);
     Task<ModelWeights> FinalizeUploadedModelAsync(FinalizeModelUploadRequest request);
     Task<ModelWeights> UploadAndDeployModelAsync(
         Stream modelStream,
