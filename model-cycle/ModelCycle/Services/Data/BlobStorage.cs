@@ -4,27 +4,57 @@ using Minio.Exceptions;
 
 namespace ModelCycle.Services;
 
-public class BlobStorageService : IBlobStorageService
+public sealed class BlobStorageService : IBlobStorageService, IDisposable
 {
     private readonly IMinioClient _internalMinioClient;
     private readonly IMinioClient _publicMinioClient;
     private readonly string _bucketName;
     private readonly ILogger<BlobStorageService> _logger;
+    private bool _disposed;
 
     public BlobStorageService(IConfiguration configuration, ILogger<BlobStorageService> logger)
+        : this(BuildDependencies(configuration), logger)
     {
-        _logger = logger;
-        _bucketName = configuration["MINIO_BUCKET_NAME"] ?? "model-cycle-storage";
+    }
+
+    private BlobStorageService(
+        (IMinioClient InternalClient, IMinioClient PublicClient, string BucketName) dependencies,
+        ILogger<BlobStorageService> logger)
+        : this(dependencies.InternalClient, dependencies.PublicClient, dependencies.BucketName, logger)
+    {
+    }
+
+    internal BlobStorageService(
+        IMinioClient internalMinioClient,
+        IMinioClient publicMinioClient,
+        string bucketName,
+        ILogger<BlobStorageService> logger)
+    {
+        _internalMinioClient = internalMinioClient ?? throw new ArgumentNullException(nameof(internalMinioClient));
+        _publicMinioClient = publicMinioClient ?? throw new ArgumentNullException(nameof(publicMinioClient));
+        _bucketName = string.IsNullOrWhiteSpace(bucketName)
+            ? throw new InvalidOperationException("MINIO_BUCKET_NAME is required")
+            : bucketName;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    private static (IMinioClient InternalClient, IMinioClient PublicClient, string BucketName) BuildDependencies(
+        IConfiguration configuration)
+    {
         var accessKey = configuration["AWS_ACCESS_KEY_ID"]
                         ?? throw new InvalidOperationException("AWS_ACCESS_KEY_ID is required");
         var secretKey = configuration["AWS_SECRET_ACCESS_KEY"]
                         ?? throw new InvalidOperationException("AWS_SECRET_ACCESS_KEY is required");
+        var bucketName = configuration["MINIO_BUCKET_NAME"] ?? "model-cycle-storage";
 
-        _internalMinioClient = BuildClient(configuration["S3_ENDPOINT"] ?? "s3-srv:9000", accessKey, secretKey);
-        _publicMinioClient = BuildClient(
-            configuration["S3_PUBLIC_ENDPOINT"] ?? throw new InvalidOperationException("S3_PUBLIC_ENDPOINT is required"),
-            accessKey,
-            secretKey
+        return (
+            BuildClient(configuration["S3_ENDPOINT"] ?? "s3-srv:9000", accessKey, secretKey),
+            BuildClient(
+                configuration["S3_PUBLIC_ENDPOINT"] ?? throw new InvalidOperationException("S3_PUBLIC_ENDPOINT is required"),
+                accessKey,
+                secretKey
+            ),
+            bucketName
         );
     }
 
@@ -225,5 +255,21 @@ public class BlobStorageService : IBlobStorageService
             .WithObject(objectName);
 
         await _internalMinioClient.RemoveObjectAsync(args);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _internalMinioClient.Dispose();
+        if (!ReferenceEquals(_publicMinioClient, _internalMinioClient))
+        {
+            _publicMinioClient.Dispose();
+        }
+
+        _disposed = true;
     }
 }
