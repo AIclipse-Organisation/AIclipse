@@ -10,6 +10,10 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   ingressClassName: nginx
+  tls:
+    - secretName: aiclipse-local-tls
+      hosts:
+        - storage.aiclipse.local
   rules:
     - host: storage.aiclipse.local
       http:

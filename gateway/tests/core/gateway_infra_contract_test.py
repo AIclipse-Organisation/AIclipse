@@ -22,4 +22,12 @@ def test_dev_app_configmap_defines_allowed_origins_for_gateway_cors():
 
     assert "kind: ConfigMap" in dev_config
     assert "name: app-configmap" in dev_config
-    assert 'ALLOWED_ORIGINS: "http://aiclipse.local"' in dev_config
+    assert 'ALLOWED_ORIGINS: "http://aiclipse.local,https://aiclipse.local"' in dev_config
+
+
+def test_skaffold_dev_syncs_optional_local_tls_secret_before_deploy():
+    skaffold_config = _read_repo_text("skaffold.yaml")
+
+    assert "hooks:" in skaffold_config
+    assert 'command: ["python", "infra/k8s-dev/sync_local_tls_secret.py"]' in skaffold_config
+    assert 'command: ["python3", "infra/k8s-dev/sync_local_tls_secret.py"]' in skaffold_config

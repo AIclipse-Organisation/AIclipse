@@ -39,6 +39,7 @@ async def test_billing_checkout_proxies_internal_user_context_without_cookie_for
         assert req.headers.get("x-user-id") == "u_123"
         assert req.headers.get("x-user-email") == "x@example.com"
         assert req.headers.get("x-user-is-admin") == "false"
+        assert req.headers.get("x-external-proto") == "https"
         return httpx.Response(status_code=200, json={"checkout_url": "https://stripe.test/checkout"})
 
     patch_upstreams.add(
@@ -50,7 +51,7 @@ async def test_billing_checkout_proxies_internal_user_context_without_cookie_for
 
     r = await client.post(
         "/billing/create-checkout-session",
-        headers=_auth_headers(auth_keypair),
+        headers={**_auth_headers(auth_keypair), "X-Forwarded-Proto": "https"},
         json={"plan_id": 2, "user_id": "ignore-me", "email": "ignore@example.com"},
     )
     assert r.status_code == 200

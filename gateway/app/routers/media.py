@@ -5,6 +5,7 @@ import httpx
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Path, Query, Request, UploadFile, status
 from fastapi.responses import Response
 
+from app.core.external_request import build_external_proto_headers
 from app.core.image_safety import sniff_and_validate_image
 from app.core.media_url import build_media_image_url
 from app.core.tokens import validate_detection_token
@@ -56,6 +57,7 @@ async def gateway_upload_image(
         headers = {
             "X-Request-Id": str(uuid.uuid4()),
             "X-User-Id": user.user_id,
+            **build_external_proto_headers(request),
         }
 
         safe_name = file.filename or f"upload{ext}"
@@ -114,7 +116,12 @@ async def gateway_get_my_images(
     client: httpx.AsyncClient = request.app.state.http
 
     try:
-        resp = await client.get(url, params=params, timeout=10.0)
+        resp = await client.get(
+            url,
+            params=params,
+            headers=build_external_proto_headers(request),
+            timeout=10.0,
+        )
     except httpx.RequestError:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
 
@@ -142,7 +149,12 @@ async def gateway_lookup_public_images(
     url = s.media_uri.rstrip("/") + "/images/lookup"
     client: httpx.AsyncClient = request.app.state.http
     try:
-        resp = await client.post(url, json=body, timeout=10.0)
+        resp = await client.post(
+            url,
+            json=body,
+            headers=build_external_proto_headers(request),
+            timeout=10.0,
+        )
     except httpx.RequestError:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
 
@@ -172,7 +184,12 @@ async def gateway_get_image(
 
     client: httpx.AsyncClient = request.app.state.http
     try:
-        resp = await client.get(url, params=params, timeout=10.0)
+        resp = await client.get(
+            url,
+            params=params,
+            headers=build_external_proto_headers(request),
+            timeout=10.0,
+        )
     except httpx.RequestError:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Media service unreachable")
 
@@ -209,6 +226,7 @@ async def gateway_update_image(
     headers = {
         "X-Request-Id": str(uuid.uuid4()),
         **_media_admin_headers(user),
+        **build_external_proto_headers(request),
     }
 
     client: httpx.AsyncClient = request.app.state.http

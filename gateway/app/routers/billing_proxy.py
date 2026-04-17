@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Body, Depends, Request
 
+from app.core.external_request import build_external_proto_headers
 from app.core.http_proxy import proxy_json, proxy_raw
 from app.core.settings import require_setting
 from app.deps import get_current_user
@@ -26,6 +27,7 @@ def _billing_internal_headers(request: Request, user: UserContext) -> dict[str, 
         "X-Internal-Token": internal_token,
         "X-User-Id": user.user_id,
         "X-User-Is-Admin": "true" if user.is_admin else "false",
+        **build_external_proto_headers(request),
     }
     if user.email:
         headers["X-User-Email"] = user.email

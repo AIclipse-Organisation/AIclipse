@@ -77,7 +77,15 @@ manifests:
       - infra
 
 deploy:
-  kubectl: {}
+  kubectl:
+    hooks:
+      before:
+        - host:
+            command: ["python", "infra/k8s-dev/sync_local_tls_secret.py"]
+            os: [windows]
+        - host:
+            command: ["python3", "infra/k8s-dev/sync_local_tls_secret.py"]
+            os: [darwin, linux]
 
 profiles:
   - name: dev

@@ -95,6 +95,19 @@ def test_create_checkout_session_success(client, state):
     state["checkout_create"].assert_called_once()
 
 
+def test_create_checkout_session_uses_forwarded_https_for_return_urls(client, state):
+    response = client.post(
+        "/create-checkout-session",
+        json={"plan_id": 1},
+        headers={**_internal_headers(), "X-External-Proto": "https"},
+    )
+
+    assert response.status_code == 200
+    checkout_kwargs = state["checkout_create"].call_args.kwargs
+    assert checkout_kwargs["success_url"] == "https://localhost:5000/plan?success=true"
+    assert checkout_kwargs["cancel_url"] == "https://localhost:5000/plan?canceled=true"
+
+
 def test_create_checkout_session_invalid_plan(client, state):
     payload = {"plan_id": 99}
 

@@ -65,6 +65,11 @@ function unauthorized(error) {
   );
 }
 
+
+function getExternalProto(req) {
+  return req.headers.get("x-forwarded-proto") || new URL(req.url).protocol.replace(":", "");
+}
+
 export function createPostsRouteHandlers({
   requireUser,
   optionalUser,
@@ -550,6 +555,7 @@ export function createPostsRouteHandlers({
 
         const resolvedImages = await fetchPublicImagesByIds(
           ranked.map((post) => post.image_id),
+          { externalProto: getExternalProto(req) },
         );
         const { items: visibleItems, missingImageIds } = resolveRenderableItemsWithPublicImages(
           ranked,

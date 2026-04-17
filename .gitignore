@@ -261,3 +261,4 @@ walkthrough.md
 
 .agents/
 AGENTS.md
+infra/k8s-dev/certs/

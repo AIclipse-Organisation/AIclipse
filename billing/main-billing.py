@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 import stripe
@@ -72,6 +73,7 @@ billing_coll = None
 # interpolation boundary stops path traversal (e.g. "../admin") from routing
 # the internal call to an unintended auth endpoint.
 _USER_ID_RE = re.compile(r"^u_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_VALID_EXTERNAL_PROTOS = {"http", "https"}
 
 
 def _require_valid_user_id(user_id: str) -> str:
@@ -82,6 +84,29 @@ def _require_valid_user_id(user_id: str) -> str:
 
 def _auth_headers() -> dict:
     return {"X-Internal-Token": INTERNAL_AUTH_TOKEN} if INTERNAL_AUTH_TOKEN else {}
+
+
+def _normalize_external_proto(value: str | None) -> str | None:
+    proto = str(value or "").split(",", 1)[0].strip().lower()
+    if proto in _VALID_EXTERNAL_PROTOS:
+        return proto
+    return None
+
+
+def _resolve_public_client_url(external_proto: str | None) -> str:
+    base_url = str(CLIENT_URL or "").strip()
+    if not base_url:
+        return base_url
+
+    proto = _normalize_external_proto(external_proto)
+    if not proto:
+        return base_url
+
+    parsed = urlsplit(base_url)
+    if not parsed.scheme or parsed.scheme == proto:
+        return base_url
+
+    return urlunsplit((proto, parsed.netloc, parsed.path, parsed.query, parsed.fragment))
 
 
 async def _read_user_plan(user_id: str) -> dict:
@@ -323,6 +348,7 @@ async def get_subscription_status(user: ForwardedUserContext = Depends(_require_
 async def create_checkout_session(
     plan_id: int = Body(..., embed=True),
     user: ForwardedUserContext = Depends(_require_forwarded_user),
+    x_external_proto: str | None = Header(None, alias="X-External-Proto"),
 ):
     if not user.email:
         raise HTTPException(status_code=400, detail="Missing forwarded user email")
@@ -355,6 +381,7 @@ async def create_checkout_session(
     logger.info("create-checkout-session called plan=%s", plan["name"])
 
     try:
+        public_client_url = _resolve_public_client_url(x_external_proto)
         # Reuse Stripe customer id from latest plan record if any
         customer_id = None
         last_plan = plan_coll.find_one(
@@ -398,8 +425,8 @@ async def create_checkout_session(
                 "quantity": 1,
             }],
             mode="subscription",
-            success_url=f"{CLIENT_URL}/plan?success=true",
-            cancel_url=f"{CLIENT_URL}/plan?canceled=true",
+            success_url=f"{public_client_url}/plan?success=true",
+            cancel_url=f"{public_client_url}/plan?canceled=true",
             metadata={
                 "user_id": safe_user_id,
                 "plan_id": str(safe_plan_id),

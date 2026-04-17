@@ -15,6 +15,11 @@ function unauthorized(error) {
   );
 }
 
+
+function getExternalProto(req) {
+  return req.headers.get("x-forwarded-proto") || new URL(req.url).protocol.replace(":", "");
+}
+
 export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHeaders }) {
   return {
     async POST(req) {
@@ -220,6 +225,7 @@ export function createReportRouteHandlers({ requireUser, buildGatewayIdentityHea
 
         const images = await fetchPublicImagesByIds(
           reportedPosts.map((post) => post.image_id),
+          { externalProto: getExternalProto(req) },
         );
         const { items, missingImageIds } = resolveRenderableItemsWithPublicImages(
           reportedPosts,
