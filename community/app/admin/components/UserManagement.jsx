@@ -477,14 +477,14 @@ export default function UserManagement() {
     }
 
     const rows = users.map((user) => (
-        <div key={user.user_id} className="grid grid-cols-12 gap-4 p-3 items-center hover:bg-white/5 transition-colors">
-            <div className="col-span-5">
+        <div key={user.user_id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 p-3 items-start md:items-center hover:bg-white/5 transition-colors">
+            <div className="md:col-span-5">
                 <div className="text-sm font-semibold text-white leading-tight">{user.user_name}</div>
                 <div className="text-xs text-white/60 leading-tight">{user.email}</div>
                 <div className="text-[11px] text-white/50 mt-1">Created {formatDate(user.created_at)}</div>
             </div>
 
-            <div className="col-span-2">
+            <div className="md:col-span-2">
                 <Chip
                     size="sm"
                     variant="flat"
@@ -502,15 +502,15 @@ export default function UserManagement() {
                 </Chip>
             </div>
 
-            <div className="col-span-2 text-sm text-white/70">
+            <div className="md:col-span-2 text-sm text-white/70">
                 Plan {user.plan ?? 0}
             </div>
 
-            <div className="col-span-2 text-sm text-white/70">
+            <div className="md:col-span-2 text-sm text-white/70">
                 Usage {user.monthly_usage_count ?? 0}
             </div>
 
-            <div className="col-span-1 flex justify-end">
+            <div className="md:col-span-1 flex md:justify-end">
                 <button
                     className={GOLD_BUTTON_SM}
                     onClick={() => openDelete(user)}
@@ -546,11 +546,11 @@ export default function UserManagement() {
     }
 
     return (
-        <div className="flex flex-col gap-6 h-full overflow-y-scroll px-4 md:px-8 pb-10 bg-[#0f0f0f] text-white [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex flex-col gap-6 h-full overflow-y-scroll px-3 md:px-8 pb-10 bg-[#0f0f0f] text-white [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <div className="flex flex-col items-center gap-4 pt-4 text-center">
-                <div className="w-full flex items-center justify-between gap-4">
+                <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-2xl font-black tracking-tight text-[#CFB87C]">User Management</h2>
-                    <div className="flex bg-black/40 p-1 rounded-2xl border border-white/10">
+                    <div className="flex w-full sm:w-auto overflow-x-auto bg-black/40 p-1 rounded-2xl border border-white/10">
                         <button
                             type="button"
                             onClick={() => setActiveTab("users")}
@@ -611,7 +611,7 @@ export default function UserManagement() {
                         />
                         <Select
                             size="sm"
-                            className="w-[180px]"
+                            className="w-full sm:w-[180px]"
                             selectedKeys={new Set([sort])}
                             onSelectionChange={(selection) => {
                                 setSort(getSelectedKey(selection, "created_at_desc"));
@@ -641,7 +641,7 @@ export default function UserManagement() {
 
                         <Select
                             size="sm"
-                            className="w-[180px]"
+                            className="w-full sm:w-[180px]"
                             selectedKeys={new Set([accessStatusFilter])}
                             onSelectionChange={(selection) => {
                                 setAccessStatusFilter(getSelectedKey(selection, "all"));
@@ -701,7 +701,7 @@ export default function UserManagement() {
                         </div>
                     )}
                     <CardBody className="p-0">
-                        <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
+                        <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
                             <div className="col-span-5">User</div>
                             <div className="col-span-2">Role</div>
                             <div className="col-span-2">Plan</div>
@@ -718,7 +718,7 @@ export default function UserManagement() {
                         )}
                     </CardBody>
 
-                    <div className="p-4 border-t border-white/10 flex items-center justify-between text-sm text-white/70">
+                    <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-white/70">
                         <span>
                             Page {page} of {totalPages} · {total} users
                         </span>
@@ -737,7 +737,7 @@ export default function UserManagement() {
             {activeTab === "deleted" && (
                 <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
                     <CardBody className="p-0">
-                        <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
+                        <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
                             <div className="col-span-4">Deleted User</div>
                             <div className="col-span-3">Deleted By</div>
                             <div className="col-span-2">Reason</div>
@@ -755,18 +755,18 @@ export default function UserManagement() {
                             <div className="divide-y divide-white/5">
                                 {auditLogs.map((log) => (
                                     <div key={log.log_id} className="p-3">
-                                        <div className="grid grid-cols-12 gap-4 items-center">
-                                            <div className="col-span-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-start md:items-center">
+                                            <div className="md:col-span-4">
                                                 <div className="text-sm font-semibold text-white leading-tight">{log.deleted_user_name || "-"}</div>
                                                 <div className="text-xs text-white/60 leading-tight">{log.deleted_user_email || log.deleted_user_id}</div>
                                             </div>
-                                            <div className="col-span-3 text-sm text-white/80">{log.deleted_by_email || log.deleted_by_user_id}</div>
-                                            <div className="col-span-2 text-sm text-white/80">{log.reason_code}</div>
-                                            <div className="col-span-2 text-sm text-white/70">{formatDate(log.deleted_at)}</div>
-                                            <div className="col-span-1 text-right">
+                                            <div className="md:col-span-3 text-sm text-white/80">{log.deleted_by_email || log.deleted_by_user_id}</div>
+                                            <div className="md:col-span-2 text-sm text-white/80">{log.reason_code}</div>
+                                            <div className="md:col-span-2 text-sm text-white/70">{formatDate(log.deleted_at)}</div>
+                                            <div className="md:col-span-1 md:text-right">
                                                 <details className="text-xs text-white/70 inline-block text-left">
                                                     <summary className="cursor-pointer font-semibold text-white/80 list-none">View</summary>
-                                                    <pre className="mt-2 w-[420px] max-w-[70vw] bg-[#0f0f0f] border border-white/10 rounded p-2 overflow-auto text-[11px] leading-tight text-white/80">
+                                                    <pre className="mt-2 w-[260px] sm:w-[320px] md:w-[420px] max-w-[80vw] bg-[#0f0f0f] border border-white/10 rounded p-2 overflow-auto text-[11px] leading-tight text-white/80">
                                                         {JSON.stringify(log.user_snapshot, null, 2)}
                                                     </pre>
                                                 </details>
@@ -778,7 +778,7 @@ export default function UserManagement() {
                         )}
                     </CardBody>
 
-                    <div className="p-4 border-t border-white/10 flex items-center justify-between text-sm text-white/70">
+                    <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-white/70">
                         <span>Page {logPage}</span>
                         <div className="flex gap-2">
                             <Button size="sm" className={GOLD_BUTTON_SM} isDisabled={loadingLogs || logPage === 1} onPress={() => loadLogs(logPage - 1)}>
@@ -795,7 +795,7 @@ export default function UserManagement() {
             {activeTab === "access-requests" && (
                 <Card className="border border-white/5 bg-[#111] shadow-xl overflow-visible" radius="lg">
                     <CardBody className="p-0">
-                        <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
+                        <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-white/10 bg-[#161616] text-[11px] font-black uppercase tracking-[0.08em] text-white/60">
                             <div className="col-span-4">Applicant</div>
                             <div className="col-span-3">Found Us Via</div>
                             <div className="col-span-3">Requested At</div>
@@ -813,14 +813,14 @@ export default function UserManagement() {
                                 {accessRequests.map((user) => {
                                     const isBusy = accessActionBusyUserId === user.user_id;
                                     return (
-                                        <div key={user.user_id} className="grid grid-cols-12 gap-4 p-3 items-center hover:bg-white/5 transition-colors">
-                                            <div className="col-span-4">
+                                        <div key={user.user_id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 p-3 items-start md:items-center hover:bg-white/5 transition-colors">
+                                            <div className="md:col-span-4">
                                                 <div className="text-sm font-semibold text-white leading-tight">{user.user_name}</div>
                                                 <div className="text-xs text-white/60 leading-tight">{user.email}</div>
                                             </div>
-                                            <div className="col-span-3 text-sm text-white/70">{FOUND_US_LABELS[user.how_did_you_find_us] ?? user.how_did_you_find_us ?? "-"}</div>
-                                            <div className="col-span-3 text-sm text-white/70">{formatDate(user.created_at)}</div>
-                                            <div className="col-span-2 flex justify-end gap-2">
+                                            <div className="md:col-span-3 text-sm text-white/70">{FOUND_US_LABELS[user.how_did_you_find_us] ?? user.how_did_you_find_us ?? "-"}</div>
+                                            <div className="md:col-span-3 text-sm text-white/70">{formatDate(user.created_at)}</div>
+                                            <div className="md:col-span-2 flex md:justify-end gap-2">
                                                 <button
                                                     className={GOLD_BUTTON_SM}
                                                     disabled={isBusy}
@@ -843,7 +843,7 @@ export default function UserManagement() {
                         )}
                     </CardBody>
 
-                    <div className="p-4 border-t border-white/10 flex items-center justify-between text-sm text-white/70">
+                    <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-white/70">
                         <span>
                             Page {accessPage} of {accessTotalPages} · {accessTotal} requests
                         </span>
@@ -868,7 +868,7 @@ export default function UserManagement() {
                 hideCloseButton
                 classNames={{ base: "bg-transparent", wrapper: "backdrop-blur" }}
             >
-                <ModalContent className="relative bg-[#111] border border-white/10 shadow-2xl text-white rounded-3xl w-[75vw] max-w-3xl mx-auto">
+                <ModalContent className="relative bg-[#111] border border-white/10 shadow-2xl text-white rounded-3xl w-[94vw] sm:w-[85vw] md:w-[75vw] max-w-3xl mx-auto max-h-[90vh] overflow-y-auto">
                     {() => (
                         <>
                             <button
@@ -1035,7 +1035,7 @@ export default function UserManagement() {
                                     </div>
                                 )}
                             </ModalBody>
-                            <ModalFooter className="border-t border-white/10 px-6 pb-6">
+                            <ModalFooter className="border-t border-white/10 px-6 pb-6 flex-wrap">
                                 <Button className={GOLD_BUTTON_SM} onPress={() => { setCreateModalOpen(false); resetCreateState(); }}>
                                     Close
                                 </Button>
@@ -1057,7 +1057,7 @@ export default function UserManagement() {
                 hideCloseButton
                 classNames={{ base: "bg-transparent", wrapper: "backdrop-blur" }}
             >
-                <ModalContent className="relative bg-[#111] border border-white/10 shadow-2xl text-white rounded-3xl w-[70vw] max-w-2xl mx-auto">
+                <ModalContent className="relative bg-[#111] border border-white/10 shadow-2xl text-white rounded-3xl w-[94vw] sm:w-[85vw] md:w-[70vw] max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
                     {() => (
                         <>
                             <button
@@ -1130,7 +1130,7 @@ export default function UserManagement() {
                                     </div>
                                 )}
                             </ModalBody>
-                            <ModalFooter className="border-t border-white/10 px-6 pb-6">
+                            <ModalFooter className="border-t border-white/10 px-6 pb-6 flex-wrap">
                                 <Button className={GOLD_BUTTON_SM} onPress={() => setDeleteModalOpen(false)}>
                                     Cancel
                                 </Button>
