@@ -132,7 +132,7 @@ def main():
     if os.path.exists(load_target_path) and load_target_path.endswith(".bin"):
         try:
             print(f"[Auto-Fix] Inspecting '{load_target_path}'...")
-            state_dict = torch.load(load_target_path, map_location="cpu")
+            state_dict = torch.load(load_target_path, map_location="cpu", weights_only=False)
             if "model_state" in state_dict:
                 print("[Auto-Fix] Unpacking nested weights...")
                 torch.save(state_dict["model_state"], load_target_path)
