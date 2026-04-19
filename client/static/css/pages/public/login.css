@@ -627,6 +627,12 @@ input:-webkit-autofill:active {
   color: #CFB87C; /* Your gold brand color */
 }
 
+
+.hidden {
+  display: none;
+}
+ 
+
 .password-toggle svg {
   width: 20px;
   height: 20px;
