@@ -271,7 +271,7 @@
   aspect-ratio: 1;
   -o-object-fit: cover;
   object-fit: cover;
-  cursor: pointer;
+  cursor: zoom-in;
   background: rgba(255, 255, 255, .05);
   width: 100%;
   height: auto;

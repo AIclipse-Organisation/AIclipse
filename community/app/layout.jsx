@@ -1,6 +1,7 @@
 import "./styles/appShell.css";
 import "./global.css";
 import "./styles/modal/modal.css";
+import "./styles/imageZoom.css";
 
 import ShellWrapper from "./components/ShellWrapper";
 import { headers } from "next/headers";
