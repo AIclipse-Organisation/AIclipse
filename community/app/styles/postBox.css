@@ -265,20 +265,21 @@
   width: min(100vw, 480px);
   left: 50%;
   transform: translateX(-50%);
+  background: #222222; /* prevents white flash while image is opacity:0 */
 }
 
 .comm_postImage {
   aspect-ratio: 1;
-  -o-object-fit: cover;
   object-fit: cover;
   cursor: zoom-in;
+  opacity: 0; /* start hidden — prevents FOUC before Framer Motion hydrates */
   background: rgba(255, 255, 255, .05);
+  color: transparent;
   width: 100%;
   height: auto;
   display: block;
   margin-bottom: 12px;
 }
-
 /* =========================
    ACTION ROW (like/dislike/comment)
    ========================= */
@@ -664,23 +665,18 @@
 }
 
 .comm_vote_prompt {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 10;
-
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: #fff;
-
-  /* background: rgba(0, 0, 0, 0.7); */
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(4px);
-  pointer-events: none;
-  white-space: nowrap;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    font-weight: 500;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    white-space: nowrap;
 }
 
 .comm_bars {

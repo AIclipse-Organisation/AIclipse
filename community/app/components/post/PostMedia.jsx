@@ -10,11 +10,12 @@ export default function PostMedia({
   isUserCorrect,
   groundTruth,
 }) {
+  const [isLoaded, setIsLoaded] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
 
   return (
     <div className="comm_postImageWrap">
-      <img
+      <motion.img
         className="comm_postImage"
         src={url}
         alt={label || "Community image"}
@@ -22,6 +23,10 @@ export default function PostMedia({
           onClick?.();
           setZoomOpen(true);
         }}
+        onLoad={() => setIsLoaded(true)}
+        animate={{ opacity: isLoaded ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+        style={{ color: "transparent" }}
       />
 
       {zoomOpen && (
