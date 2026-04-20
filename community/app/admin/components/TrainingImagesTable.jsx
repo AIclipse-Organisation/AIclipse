@@ -5,11 +5,11 @@ import { adminService } from "../admin.js";
 
 function StatCard({ title, value, titleColor = "text-gray-300", bgStyle = "bg-[#2a2a2a]", borderStyle = "border-white/10" }) {
   return (
-    <Card className={`p-6 shadow-xl rounded-[2.5rem] border ${borderStyle} ${bgStyle}`}>
+    <Card className={`p-4 md:p-6 shadow-xl rounded-[1.75rem] md:rounded-[2.5rem] border ${borderStyle} ${bgStyle}`}>
       <div className={`text-sm font-black uppercase tracking-wide mb-2 ${titleColor}`}>
         {title}
       </div>
-      <div className="text-4xl font-black text-white italic tracking-tighter">
+      <div className="text-3xl md:text-4xl font-black text-white italic tracking-tighter">
         {value}
       </div>
     </Card>
@@ -56,23 +56,23 @@ export default function TrainingImagesTable() {
   }
 
   if (error) {
-    return <div className="p-6 text-danger bg-danger/10 border border-danger/20 rounded-[2.5rem] italic font-black">Error: {error}</div>;
+    return <div className="p-6 text-danger bg-danger/10 border border-danger/20 rounded-[1.75rem] md:rounded-[2.5rem] italic font-black">Error: {error}</div>;
   }
 
   return (
     <div className="flex flex-col gap-8">
 
       {/* HEADER ACTIONS */}
-      <div className="flex justify-between items-center bg-[#2a2a2a] p-6 px-8 rounded-[2.5rem] shadow-xl border border-white/10">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-[#2a2a2a] p-4 md:p-6 md:px-8 rounded-[1.75rem] md:rounded-[2.5rem] shadow-xl border border-white/10">
         <div>
-          <h3 className="text-xl font-black text-white italic tracking-tighter uppercase">Dataset Candidates</h3>
-          <p className="text-sm text-gray-300 font-bold uppercase tracking-wide mt-1">
+          <h3 className="text-lg md:text-xl font-black text-white italic tracking-tighter uppercase">Dataset Candidates</h3>
+          <p className="text-xs md:text-sm text-gray-300 font-bold uppercase tracking-wide mt-1">
             {images.length} total images accumulating
           </p>
         </div>
         <Button
           onPress={fetchImages}
-          className="bg-white/10 text-white border border-white/20 font-black uppercase text-xs tracking-wide h-12 px-8 rounded-2xl hover:bg-white/20 transition-all"
+          className="w-full sm:w-auto bg-white/10 text-white border border-white/20 font-black uppercase text-xs tracking-wide h-11 md:h-12 px-6 md:px-8 rounded-2xl hover:bg-white/20 transition-all"
         >
           Refresh Data
         </Button>
@@ -83,7 +83,7 @@ export default function TrainingImagesTable() {
         <h4 className="text-sm font-black text-gray-400 uppercase tracking-wide mb-4 px-2">
           Available for Next Cycle
         </h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           <StatCard
             title="Total Available"
             value={availableImages.length}
@@ -122,7 +122,7 @@ export default function TrainingImagesTable() {
         <h4 className="text-sm font-black text-gray-400 uppercase tracking-wide mb-4 px-2">
           Used in Previous Cycles
         </h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           <StatCard
             title="Total Used"
             value={usedImages.length}
