@@ -12,6 +12,10 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
+  tls:
+    - secretName: aiclipse-local-tls
+      hosts:
+        - aiclipse.local
   rules:
     - host: aiclipse.local
       http:

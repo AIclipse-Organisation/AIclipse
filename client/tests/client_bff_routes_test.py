@@ -19,10 +19,8 @@ def test_billing_checkout_rejects_invalid_plan_id_before_any_gateway_call(main_c
     assert resp.get_json() == {"detail": "Invalid plan_id"}
 
 
-def test_billing_checkout_fetches_missing_user_and_forwards_normalized_payload(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(
-        return_value=({"user_id": 77, "email": "bill@example.com", "is_admin": False}, 200)
-    )
+def test_billing_checkout_proxies_validated_plan_id_without_revalidating_user(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
     main_client_module.gateway.call_json = Mock(return_value=({"checkout_url": "https://pay.example/session"}, 200))
 
     client = main_client_module.app.test_client()
@@ -32,22 +30,17 @@ def test_billing_checkout_fetches_missing_user_and_forwards_normalized_payload(m
 
     assert resp.status_code == 200
     assert resp.get_json() == {"checkout_url": "https://pay.example/session"}
-    main_client_module.gateway.fetch_me.assert_called_once_with("billing-token")
     main_client_module.gateway.call_json.assert_called_once_with(
         "POST",
         "/billing/create-checkout-session",
         token="billing-token",
-        json_data={"user_id": 77, "plan_id": 2, "email": "bill@example.com"},
+        json_data={"plan_id": 2},
     )
 
-    with client.session_transaction() as sess:
-        assert sess["current_user"]["user_id"] == 77
-        assert sess["is_admin"] is False
 
-
-def test_billing_checkout_clears_session_and_cookie_when_revalidation_fails(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(return_value=(None, 401))
-    main_client_module.gateway.call_json = Mock(side_effect=AssertionError("call_json must not be called"))
+def test_billing_checkout_clears_session_and_cookie_when_gateway_returns_401(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
+    main_client_module.gateway.call_json = Mock(return_value=({"detail": "Unauthorized"}, 401))
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "expired-token")
@@ -98,10 +91,8 @@ def test_checks_returns_502_when_gateway_answers_with_non_json(main_client_modul
     }
 
 
-def test_billing_subscription_status_uses_session_user_and_proxies(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(
-        return_value=({"user_id": "u_42", "email": "u42@example.com", "is_admin": False}, 200)
-    )
+def test_billing_subscription_status_proxies_without_revalidating_user(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
     main_client_module.gateway.call_json = Mock(
         return_value=({"status": "active", "cancel_at_period_end": False}, 200)
     )
@@ -117,7 +108,7 @@ def test_billing_subscription_status_uses_session_user_and_proxies(main_client_m
     assert resp.get_json() == {"status": "active", "cancel_at_period_end": False}
     main_client_module.gateway.call_json.assert_called_once_with(
         "GET",
-        "/api/billing/subscription/status?user_id=u_42",
+        "/billing/subscription/status",
         token="billing-token",
     )
 
@@ -142,10 +133,8 @@ def test_get_image_proxies_through_gateway_media_service(main_client_module, mon
     )
 
 
-def test_billing_subscription_status_fetches_user_when_missing(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(
-        return_value=({"user_id": "u_99", "email": "u99@example.com", "is_admin": False}, 200)
-    )
+def test_billing_subscription_status_passes_through_gateway_payload(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
     main_client_module.gateway.call_json = Mock(
         return_value=({"status": "active", "billing_period_end": "2026-06-01T00:00:00+00:00"}, 200)
     )
@@ -157,17 +146,16 @@ def test_billing_subscription_status_fetches_user_when_missing(main_client_modul
 
     assert resp.status_code == 200
     assert resp.get_json()["status"] == "active"
-    main_client_module.gateway.fetch_me.assert_called_once_with("billing-token")
     main_client_module.gateway.call_json.assert_called_once_with(
         "GET",
-        "/api/billing/subscription/status?user_id=u_99",
+        "/billing/subscription/status",
         token="billing-token",
     )
 
 
-def test_billing_subscription_status_clears_session_on_revalidation_401(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(return_value=(None, 401))
-    main_client_module.gateway.call_json = Mock(side_effect=AssertionError("call_json must not be called"))
+def test_billing_subscription_status_clears_session_on_gateway_401(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
+    main_client_module.gateway.call_json = Mock(return_value=({"detail": "Unauthorized"}, 401))
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "expired-token")
@@ -201,10 +189,8 @@ def test_billing_cancel_subscription_requires_reason(main_client_module):
     main_client_module.gateway.call_json.assert_not_called()
 
 
-def test_billing_cancel_subscription_fetches_user_and_proxies_reason(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(
-        return_value=({"user_id": "u_42", "email": "u42@example.com", "is_admin": False}, 200)
-    )
+def test_billing_cancel_subscription_proxies_reason_without_revalidating_user(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
     main_client_module.gateway.call_json = Mock(
         return_value=({"ok": True, "status": "cancel_scheduled"}, 200)
     )
@@ -219,18 +205,17 @@ def test_billing_cancel_subscription_fetches_user_and_proxies_reason(main_client
 
     assert resp.status_code == 200
     assert resp.get_json() == {"ok": True, "status": "cancel_scheduled"}
-    main_client_module.gateway.fetch_me.assert_called_once_with("billing-token")
     main_client_module.gateway.call_json.assert_called_once_with(
         "POST",
-        "/api/billing/subscription/cancel-at-period-end",
+        "/billing/subscription/cancel-at-period-end",
         token="billing-token",
-        json_data={"user_id": "u_42", "reason": "Too expensive"},
+        json_data={"reason": "Too expensive"},
     )
 
 
-def test_billing_cancel_subscription_clears_session_on_revalidation_401(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(return_value=(None, 401))
-    main_client_module.gateway.call_json = Mock(side_effect=AssertionError("call_json must not be called"))
+def test_billing_cancel_subscription_clears_session_on_gateway_401(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
+    main_client_module.gateway.call_json = Mock(return_value=({"detail": "Unauthorized"}, 401))
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "expired-token")

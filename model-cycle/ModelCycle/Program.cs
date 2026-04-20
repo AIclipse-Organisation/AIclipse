@@ -139,8 +139,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IModelDeploymentService, ModelDeploymentService>();
 builder.Services.AddSingleton<IBetaDistribution, BetaDistribution>();
 builder.Services.AddSingleton<IConfidenceService, ConfidenceService>();
-
-builder.Services.AddSingleton<BlobStorageService>();
+builder.Services.AddDataProtection();
 
 string mediaServiceUrl = builder.Configuration["MediaServiceUrl"] ?? "http://media-srv:3000";
 builder.Services.AddHttpClient<IMediaService, MediaService>(client =>
@@ -160,6 +159,7 @@ builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ITrainingJobManager, TrainingJobManager>();
 builder.Services.AddScoped<IPythonExecutor, PythonExecutor>();
 builder.Services.AddScoped<IModelTrainingService, ModelTrainingService>();
+builder.Services.AddMemoryCache();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -179,7 +179,7 @@ using (var scope = app.Services.CreateScope())
     {
         Directory.CreateDirectory("/app/data");
 
-        var blobService = services.GetRequiredService<BlobStorageService>();
+        var blobService = services.GetRequiredService<IBlobStorageService>();
         await blobService.InitializeAsync();
 
         var context = services.GetRequiredService<AppDbContext>();

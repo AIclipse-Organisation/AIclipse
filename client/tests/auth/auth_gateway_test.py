@@ -5,6 +5,31 @@ from services.integrations import gateway as gateway_integration
 from tests.conftest import ResponseStub
 
 
+def test_build_gateway_headers_forwards_https_external_proto(flask_app):
+    with flask_app.test_request_context(
+        "/images",
+        base_url="http://aiclipse.local",
+        headers={"X-Forwarded-Proto": "https, http"},
+    ):
+        headers = gateway_integration.build_gateway_headers(token="token-123")
+
+    assert headers == {
+        "Accept": "application/json",
+        "Authorization": "Bearer token-123",
+        "X-External-Proto": "https",
+    }
+
+
+def test_build_gateway_headers_omits_external_proto_outside_https(flask_app):
+    with flask_app.test_request_context("/images", base_url="http://aiclipse.local"):
+        headers = gateway_integration.build_gateway_headers(token="token-123")
+
+    assert headers == {
+        "Accept": "application/json",
+        "Authorization": "Bearer token-123",
+    }
+
+
 def test_fetch_me_sends_bearer_token_and_uses_fixed_timeout(monkeypatch):
     captured = {}
 

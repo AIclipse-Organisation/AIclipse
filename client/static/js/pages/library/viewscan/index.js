@@ -315,6 +315,9 @@
       imageEl.src = img.url;
       imageEl.alt = title || "Selected scan image";
       imageEl.hidden = false;
+      if (typeof window.attachImageZoom === "function") {
+        window.attachImageZoom(imageEl);
+      }
     } else {
       imageEl.removeAttribute("src");
       imageEl.alt = "No image available.";

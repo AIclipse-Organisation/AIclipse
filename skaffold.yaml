@@ -7,7 +7,7 @@ build:
   artifacts:
     - image: aiclipse/auth
       context: auth
-      docker: { dockerfile: Dockerfile.dev }
+      docker: { dockerfile: Dockerfile }
       sync:
         manual:
           - src: "**/*.py"
@@ -21,7 +21,7 @@ build:
             dest: .
     - image: aiclipse/gateway
       context: gateway
-      docker: { dockerfile: Dockerfile.dev }
+      docker: { dockerfile: Dockerfile }
       sync:
         manual:
           - src: "**/*.py"
@@ -42,7 +42,7 @@ build:
             dest: .
     - image: aiclipse/model-cycle
       context: model-cycle
-      docker: { dockerfile: Dockerfile.dev }
+      docker: { dockerfile: Dockerfile }
     - image: aiclipse/billing
       context: billing
       docker: { dockerfile: Dockerfile }
@@ -52,7 +52,7 @@ build:
             dest: .
     - image: aiclipse/client
       context: client
-      docker: { dockerfile: Dockerfile.dev }
+      docker: { dockerfile: Dockerfile }
       sync:
         manual:
           - src: "**/*.py"
@@ -65,7 +65,7 @@ build:
             dest: .
     - image: aiclipse/community
       context: community
-      docker: { dockerfile: Dockerfile.dev }
+      docker: { dockerfile: Dockerfile }
       sync:
         manual:
           - src: "**/*.{js,jsx,ts,tsx,json,css,scss,html}"
@@ -77,7 +77,15 @@ manifests:
       - infra
 
 deploy:
-  kubectl: {}
+  kubectl:
+    hooks:
+      before:
+        - host:
+            command: ["python", "infra/k8s-dev/sync_local_tls_secret.py"]
+            os: [windows]
+        - host:
+            command: ["python3", "infra/k8s-dev/sync_local_tls_secret.py"]
+            os: [darwin, linux]
 
 profiles:
   - name: dev

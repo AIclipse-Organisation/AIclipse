@@ -8,7 +8,6 @@ from flask import jsonify, make_response, redirect, request, session
 
 from auth.cookies import clear_access_cookie, get_access_token
 from auth.gateway import GatewayClient
-from services.plan.subscription import resolve_billing_user
 from services.auth.session import resolve_current_user
 
 _SAFE_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
@@ -119,19 +118,6 @@ def call_gateway_json_or_error(
     if status == 401:
         return None, clear_session_and_return_unauthorized_json(data)
     return (data, status), None
-
-
-def resolve_billing_user_or_error(*, deps: RouteDeps, token: str):
-    user, user_status = resolve_billing_user(
-        gateway=deps.gateway,
-        token=token,
-    )
-    if user_status == 401:
-        return None, clear_session_and_return_unauthorized_json()
-    if not user:
-        return None, (jsonify({"detail": "Service Temporarily Unavailable"}), 502)
-    return user, None
-
 
 def get_required_file_or_error(*, field: str = "file"):
     if field not in request.files:

@@ -7,6 +7,7 @@ from botocore.config import Config
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+_SUPPORTED_MODEL_EXTENSIONS = {".pt", ".bin", ".safetensors"}
 
 def _get_s3_client_and_bucket():
     endpoint = os.getenv("S3_ENDPOINT", "http://minio:9000")
@@ -35,7 +36,8 @@ def download_model_weights(object_key: str, version: str) -> str:
     
     local_dir = Path(__file__).resolve().parents[2] / "models" / "updates"
     local_dir.mkdir(parents=True, exist_ok=True)
-    local_file_path = local_dir / f"{version}.pt"
+    extension = Path(object_key).suffix or ".pt"
+    local_file_path = local_dir / f"{version}{extension}"
     
     try:
         logger.info(f"[Boto3] Downloading '{object_key}' from bucket '{bucket_name}' to '{local_file_path}'")
@@ -62,9 +64,16 @@ def fetch_latest_model_from_minio() -> str | None:
         if 'Contents' not in response or not response['Contents']:
             logger.info("[Boto3] No models found in MinIO. Will use local default model.")
             return None
-            
-        # Sort objects by LastModified date to find the newest
-        objects = response['Contents']
+
+        objects = [
+            obj for obj in response['Contents']
+            if _is_canonical_model_key(obj.get('Key', ''))
+        ]
+        if not objects:
+            logger.info("[Boto3] No canonical models found in MinIO. Will use local default model.")
+            return None
+
+        # Sort objects by LastModified date to find the newest canonical model
         latest_obj = max(objects, key=lambda obj: obj['LastModified'])
         
         object_key = latest_obj['Key']
@@ -79,3 +88,14 @@ def fetch_latest_model_from_minio() -> str | None:
     except Exception as e:
         logger.warning(f"[Boto3] Could not fetch latest model from MinIO, falling back to local: {e}")
         return None
+
+
+def _is_canonical_model_key(object_key: str) -> bool:
+    if not object_key.startswith("models/"):
+        return False
+
+    relative_key = object_key[len("models/"):]
+    if "/" in relative_key:
+        return False
+
+    return Path(relative_key).suffix.lower() in _SUPPORTED_MODEL_EXTENSIONS

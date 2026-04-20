@@ -14,6 +14,20 @@ def _post_webhook(client, event):
     )
 
 
+def _internal_headers(
+    *,
+    user_id: str = "u_11111111-1111-1111-1111-111111111111",
+    email: str = "alice@example.com",
+    is_admin: str = "false",
+):
+    return {
+        "X-Internal-Token": "internal-token",
+        "X-User-Id": user_id,
+        "X-User-Email": email,
+        "X-User-Is-Admin": is_admin,
+    }
+
+
 def test_healthz_ok(client, state):
     response = client.get("/healthz")
 
@@ -32,7 +46,7 @@ def test_subscription_status_returns_default_when_no_billing_doc(client, state):
     state["auth_read"].return_value = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan": 1, "stripe_customer_id": "cus_123"}
     state["billing_coll"].find_one.return_value = None
 
-    response = client.get("/subscription/status", params={"user_id": "u_11111111-1111-1111-1111-111111111111"})
+    response = client.get("/subscription/status", headers=_internal_headers())
 
     assert response.status_code == 200
     assert response.json() == {
@@ -56,7 +70,7 @@ def test_subscription_status_returns_active_with_period_end(client, state):
         "cancellation_reason": None,
     }
 
-    response = client.get("/subscription/status", params={"user_id": "u_11111111-1111-1111-1111-111111111111"})
+    response = client.get("/subscription/status", headers=_internal_headers())
 
     assert response.status_code == 200
     assert response.json() == {
@@ -69,9 +83,9 @@ def test_subscription_status_returns_active_with_period_end(client, state):
 
 
 def test_create_checkout_session_success(client, state):
-    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 1, "email": "alice@example.com"}
+    payload = {"plan_id": 1}
 
-    response = client.post("/create-checkout-session", json=payload)
+    response = client.post("/create-checkout-session", json=payload, headers=_internal_headers())
 
     assert response.status_code == 200
     assert response.json()["session_id"] == "cs_123"
@@ -81,10 +95,23 @@ def test_create_checkout_session_success(client, state):
     state["checkout_create"].assert_called_once()
 
 
-def test_create_checkout_session_invalid_plan(client, state):
-    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 99, "email": "alice@example.com"}
+def test_create_checkout_session_uses_forwarded_https_for_return_urls(client, state):
+    response = client.post(
+        "/create-checkout-session",
+        json={"plan_id": 1},
+        headers={**_internal_headers(), "X-External-Proto": "https"},
+    )
 
-    response = client.post("/create-checkout-session", json=payload)
+    assert response.status_code == 200
+    checkout_kwargs = state["checkout_create"].call_args.kwargs
+    assert checkout_kwargs["success_url"] == "https://localhost:5000/plan?success=true"
+    assert checkout_kwargs["cancel_url"] == "https://localhost:5000/plan?canceled=true"
+
+
+def test_create_checkout_session_invalid_plan(client, state):
+    payload = {"plan_id": 99}
+
+    response = client.post("/create-checkout-session", json=payload, headers=_internal_headers())
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid plan ID"
@@ -93,8 +120,8 @@ def test_create_checkout_session_invalid_plan(client, state):
 def test_create_checkout_session_reuses_existing_customer(client, state):
     state["plan_coll"].find_one.return_value = {"stripe_customer_id": "cus_existing"}
 
-    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 2, "email": "alice@example.com"}
-    response = client.post("/create-checkout-session", json=payload)
+    payload = {"plan_id": 2}
+    response = client.post("/create-checkout-session", json=payload, headers=_internal_headers())
 
     assert response.status_code == 200
     state["customer_modify"].assert_called_once()
@@ -104,8 +131,8 @@ def test_create_checkout_session_reuses_existing_customer(client, state):
 def test_create_checkout_session_stripe_not_configured(client, state, monkeypatch, billing_module):
     monkeypatch.setattr(billing_module, "STRIPE_SECRET_KEY", None, raising=False)
 
-    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 1, "email": "alice@example.com"}
-    response = client.post("/create-checkout-session", json=payload)
+    payload = {"plan_id": 1}
+    response = client.post("/create-checkout-session", json=payload, headers=_internal_headers())
 
     assert response.status_code == 503
     assert response.json()["detail"] == "Stripe not configured"
@@ -114,11 +141,43 @@ def test_create_checkout_session_stripe_not_configured(client, state, monkeypatc
 def test_create_checkout_session_db_unavailable(client, state, monkeypatch, billing_module):
     monkeypatch.setattr(billing_module, "plan_coll", None, raising=False)
 
-    payload = {"user_id": "u_11111111-1111-1111-1111-111111111111", "plan_id": 1, "email": "alice@example.com"}
-    response = client.post("/create-checkout-session", json=payload)
+    payload = {"plan_id": 1}
+    response = client.post("/create-checkout-session", json=payload, headers=_internal_headers())
 
     assert response.status_code == 503
     assert response.json()["detail"] == "Database not available"
+
+
+def test_create_checkout_session_requires_internal_auth(client, state):
+    response = client.post("/create-checkout-session", json={"plan_id": 1})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid internal auth token"
+
+
+def test_create_checkout_session_requires_forwarded_email(client, state):
+    response = client.post(
+        "/create-checkout-session",
+        json={"plan_id": 1},
+        headers={
+            "X-Internal-Token": "internal-token",
+            "X-User-Id": "u_11111111-1111-1111-1111-111111111111",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Missing forwarded user email"
+
+
+def test_create_checkout_session_rejects_invalid_forwarded_admin_header(client, state):
+    response = client.post(
+        "/create-checkout-session",
+        json={"plan_id": 1},
+        headers=_internal_headers(is_admin="yes"),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["header", "X-User-Is-Admin"]
 
 
 def test_cancel_subscription_schedules_period_end_and_records_reason(client, state):
@@ -136,7 +195,8 @@ def test_cancel_subscription_schedules_period_end_and_records_reason(client, sta
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
+        json={"reason": "Too expensive"},
+        headers=_internal_headers(),
     )
 
     assert response.status_code == 200
@@ -152,7 +212,8 @@ def test_cancel_subscription_schedules_period_end_and_records_reason(client, sta
 def test_cancel_subscription_requires_reason(client, state):
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "   "},
+        json={"reason": "   "},
+        headers=_internal_headers(),
     )
 
     assert response.status_code == 400
@@ -164,7 +225,8 @@ def test_cancel_subscription_requires_paid_plan(client, state):
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
+        json={"reason": "Too expensive"},
+        headers=_internal_headers(),
     )
 
     assert response.status_code == 400
@@ -177,7 +239,8 @@ def test_cancel_subscription_returns_404_when_no_active_subscription_record(clie
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
+        json={"reason": "Too expensive"},
+        headers=_internal_headers(),
     )
 
     assert response.status_code == 404
@@ -196,7 +259,8 @@ def test_cancel_subscription_returns_404_when_subscription_id_missing(client, st
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
+        json={"reason": "Too expensive"},
+        headers=_internal_headers(),
     )
 
     assert response.status_code == 404
@@ -220,7 +284,8 @@ def test_cancel_subscription_uses_existing_period_end_when_stripe_period_missing
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Other"},
+        json={"reason": "Other"},
+        headers=_internal_headers(),
     )
 
     assert response.status_code == 200
@@ -242,7 +307,8 @@ def test_cancel_subscription_is_idempotent_when_already_scheduled(client, state)
 
     response = client.post(
         "/subscription/cancel-at-period-end",
-        json={"user_id": "u_11111111-1111-1111-1111-111111111111", "reason": "Too expensive"},
+        json={"reason": "Too expensive"},
+        headers=_internal_headers(),
     )
 
     assert response.status_code == 200
@@ -256,6 +322,13 @@ def test_cancel_subscription_is_idempotent_when_already_scheduled(client, state)
     state["billing_coll"].update_many.assert_not_called()
     state["plan_coll"].insert_one.assert_not_called()
     state["billing_coll"].insert_one.assert_not_called()
+
+
+def test_subscription_status_requires_internal_auth(client, state):
+    response = client.get("/subscription/status")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid internal auth token"
 
 
 def test_webhook_missing_secret_returns_500(client, state, monkeypatch, billing_module):

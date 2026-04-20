@@ -37,13 +37,22 @@ export default function ModelManagement() {
 
     try {
       setIsUploading(true);
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("version", uploadVersion);
-      formData.append("NewImagesCount", "0");
-      formData.append("ValidationAccuracy", "0.0");
-
-      await adminService.uploadModel(formData);
+      await adminService.uploadModel({
+        file,
+        version: uploadVersion,
+        newImagesCount: 0,
+        replayBufferCount: 0,
+        validationAccuracy: 0.0,
+        validationPrecision: 0.0,
+        validationRecall: 0.0,
+        validationF1Score: 0.0,
+        goldenTestAccuracy: 0.0,
+        goldenTestPrecision: 0.0,
+        goldenTestRecall: 0.0,
+        goldenTestF1Score: 0.0,
+        goldenFakeToRealMisclassifications: 0,
+        goldenRealToFakeMisclassifications: 0,
+      });
       setUploadVersion("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       loadModels();
@@ -72,25 +81,24 @@ export default function ModelManagement() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* UNIFIED HEADER SECTION WITH TABS */}
-      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
+      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-end justify-between gap-4 mb-5 md:mb-10">
         <div className="flex flex-col gap-2">
-          <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
+          <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
             {activeView === "models" ? "Model Versions" : "Training Data"}
           </h2>
-          <p className="text-gray-400 font-semibold uppercase text-sm tracking-wide">
+          <p className="text-gray-400 font-semibold uppercase text-xs md:text-sm tracking-wide">
             {activeView === "models"
               ? "Manage and deploy model versions"
               : "Review accumulating dataset candidates"}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex bg-black/40 p-2 rounded-3xl border border-white/5 shadow-xl">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex bg-black/40 p-1.5 md:p-2 rounded-2xl md:rounded-3xl border border-white/5 shadow-xl w-full md:w-auto">
             <Button
               size="sm"
               onPress={() => setActiveView("models")}
-              className={`font-black px-8 rounded-2xl transition-all uppercase text-sm tracking-wide h-12 ${activeView === "models" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
+              className={`flex-1 md:flex-initial font-black px-4 md:px-8 rounded-xl md:rounded-2xl transition-all uppercase text-xs md:text-sm tracking-wide h-11 md:h-12 ${activeView === "models" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
                 }`}
             >
               Models
@@ -98,7 +106,7 @@ export default function ModelManagement() {
             <Button
               size="sm"
               onPress={() => setActiveView("data")}
-              className={`font-black px-8 rounded-2xl transition-all uppercase text-sm tracking-wide h-12 ${activeView === "data" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
+              className={`flex-1 md:flex-initial font-black px-4 md:px-8 rounded-xl md:rounded-2xl transition-all uppercase text-xs md:text-sm tracking-wide h-11 md:h-12 ${activeView === "data" ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-transparent text-gray-500 hover:text-white"
                 }`}
             >
               Data
@@ -108,13 +116,13 @@ export default function ModelManagement() {
       </div>
 
       <div className="flex-grow overflow-hidden relative">
-        <ScrollShadow className="h-full pr-4 scrollbar-hide" size={40}>
+        <ScrollShadow className="h-full pr-1 md:pr-4 scrollbar-hide" size={40}>
 
           {activeView === "models" && (
             <div className="flex flex-col gap-8 pb-12">
-              <Card className="border border-white/5 shadow-2xl bg-[#1a1a1a] rounded-[2.5rem] overflow-hidden flex-shrink-0">
-                <CardBody className="p-8 text-white">
-                  <form onSubmit={handleUploadSubmit} className="flex flex-col md:flex-row gap-8 items-center justify-between">
+              <Card className="border border-white/5 shadow-2xl bg-[#1a1a1a] rounded-[1.75rem] md:rounded-[2.5rem] overflow-hidden flex-shrink-0">
+                <CardBody className="p-4 md:p-8 text-white">
+                  <form onSubmit={handleUploadSubmit} className="flex flex-col md:flex-row gap-5 md:gap-8 items-stretch md:items-center justify-between">
                     <div className="flex flex-col gap-2 w-full md:w-1/3">
                       <label className="text-sm font-black text-gray-400 uppercase tracking-wide px-2">Version</label>
                       <Input
@@ -130,19 +138,20 @@ export default function ModelManagement() {
                       />
                     </div>
 
-                    <div className="flex flex-col gap-2 w-full md:w-1/3 items-center">
+                    <div className="flex flex-col gap-2 w-full md:w-1/3 md:items-center">
                       <label className="text-sm font-black text-gray-400 uppercase tracking-wide">Model File</label>
                       <input
                         type="file"
                         ref={fileInputRef}
-                        className="block text-sm font-black uppercase text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-white/10 file:text-[#CFB87C] cursor-pointer"
+                        accept=".pt,.bin,.safetensors,application/octet-stream"
+                        className="block w-full text-sm font-black uppercase text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-white/10 file:text-[#CFB87C] cursor-pointer"
                       />
                     </div>
 
                     <Button
                       type="submit"
                       isLoading={isUploading}
-                      className={`font-black uppercase text-sm tracking-wide h-12 px-10 rounded-2xl transition-all ${uploadVersion ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-white/5 text-gray-400"
+                      className={`w-full md:w-auto font-black uppercase text-sm tracking-wide h-12 px-6 md:px-10 rounded-2xl transition-all ${uploadVersion ? "bg-[#CFB87C] text-[#222222] shadow-lg shadow-[#CFB87C]/10" : "bg-white/5 text-gray-400"
                         }`}
                     >
                       Upload Model
@@ -152,9 +161,9 @@ export default function ModelManagement() {
               </Card>
 
               {/* VERSION GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8">
                 {models.map((model) => (
-                  <Card key={model.id} className="border border-white/5 bg-[#1a1a1a] shadow-xl rounded-[2.5rem] p-4 text-white">
+                  <Card key={model.id} className="border border-white/5 bg-[#1a1a1a] shadow-xl rounded-[1.75rem] md:rounded-[2.5rem] p-2 md:p-4 text-white">
                     <CardHeader className="p-4 pb-0 flex justify-between items-start">
                       <div>
                         <h4 className="text-2xl font-black text-white italic tracking-tighter">{model.version}</h4>
@@ -194,7 +203,7 @@ export default function ModelManagement() {
 
                         <Divider className="my-3 bg-white/10" />
 
-                        <div className="flex justify-between text-xs font-bold italic">
+                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-xs font-bold italic">
                           <div className="text-gray-300">
                             Fake → <span className="text-danger">Real</span>: {model.goldenFakeToRealMisclassifications}
                           </div>

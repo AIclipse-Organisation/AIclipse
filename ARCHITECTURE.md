@@ -127,9 +127,12 @@ feature. Before merging, re-read the relevant section.
 
 ### 5.5 Model training
 1. Admin triggers via `community` adminBFF `/community/adminBFF/models/train` → gateway `/admin/models/train` → `model-cycle` `POST /api/models/train` (enqueues one job).
-2. Worker picks balanced Ready images, runs Python training, evaluates on validation + golden set.
-3. If improved, `model-cycle` uploads weights to MinIO, updates SQLite, deactivates prior version, posts to `detector` `POST /internal/reload-model` for hot-swap.
-4. Vote-driven retraining: `community` votes → `model-cycle` `POST /api/imageconfidence/evaluate` (Bayesian Beta aggregation) → images flip to Ready when confident.
+2. Manual admin upload is control-plane only through app services: browser → `community` `POST /community/adminBFF/models/uploads` → gateway `/admin/models/uploads` → `model-cycle` `POST /api/models/uploads`.
+3. `model-cycle` returns a short-lived presigned PUT URL for the storage host. Browser uploads bytes directly to MinIO at `storage.*` under a staging key in `models/uploads/` and does **not** stream the file through `community` or `gateway`.
+4. Browser finalizes via `community` `POST /community/adminBFF/models/uploads/finalize` → gateway `/admin/models/uploads/finalize` → `model-cycle` `POST /api/models/uploads/finalize`.
+5. `model-cycle` validates the signed upload session and staged object, promotes it to a canonical release key under `models/`, updates SQLite, deactivates the prior version, and posts to `detector` `POST /internal/reload-model` for hot-swap.
+6. Worker-driven training still picks balanced Ready images, runs Python training, evaluates on validation + golden set, then deploys through the same `model-cycle` deployment path.
+7. Vote-driven retraining: `community` votes → `model-cycle` `POST /api/imageconfidence/evaluate` (Bayesian Beta aggregation) → images flip to Ready when confident.
 
 ---
 
@@ -164,15 +167,17 @@ feature. Before merging, re-read the relevant section.
 3. **Webhook signature before body parse.** `billing` verifies `stripe-signature` on raw bytes; parsing before verification is a vulnerability.
 4. **Detection token required for upload.** `/upload/image` and `/results/save` must carry the token minted by `/checks`. No bypass.
 5. **Image bytes never transit app servers on read.** Media returns presigned S3 URLs (public=1h, private=5min TTL). Never proxy image bytes.
-6. **Idempotent webhook processing.** Stripe event dedup by `stripe_event_id` unique-sparse index. Retries land on DuplicateKeyError and continue.
-7. **One source of truth per domain fact.** User plan = `auth.users.plan`; posts = `community.posts`; images = `media.images`. Read from the owner, do not cache cross-service.
-8. **Indexed queries only.** Every Mongo/SQLite query filters on an indexed field.
-9. **No N+1.** List endpoints batch user/actor lookups (see `notificationsRoute.js` actorMap pattern).
-10. **Concurrency bounds on detector.** `/v1.0.1/checks` has max-inflight + max-concurrent-inference slots. 503 at capacity, 504 on inference timeout — do not remove these.
-11. **Redis-only async, HTTP only sync.** Email send is a Redis stream consumer; detection is synchronous HTTP.
-12. **S3 rollback on Mongo insert failure.** Any S3 write followed by a DB write must roll back the object if the DB step fails.
-13. **User-supplied values are sanitized in logs.** Strip `\r\n` before logging any input that could come from a user (see `media/main-media.py:sanitize_for_log`).
-14. **Notification collapsing.** One notification per (recipient, actor, post, type) tuple; `event_count` increments. Never re-insert duplicates.
+6. **Model bytes never transit app servers on manual admin upload.** Admin model upload uses a presigned storage PUT URL issued by `model-cycle`; only the control plane flows through `community` and `gateway`.
+7. **Signed upload session binds manual model finalize.** `model-cycle` must reject finalize calls whose upload token is invalid, expired, missing in storage, or size-mismatched.
+8. **One source of truth per domain fact.** User plan = `auth.users.plan`; posts = `community.posts`; images = `media.images`; model metadata = `model-cycle.ModelWeights`.
+9. **Indexed queries only.** Every Mongo/SQLite query filters on an indexed field.
+10. **No N+1.** List endpoints batch user/actor lookups (see `notificationsRoute.js` actorMap pattern).
+11. **Concurrency bounds on detector.** `/v1.0.1/checks` has max-inflight + max-concurrent-inference slots. 503 at capacity, 504 on inference timeout — do not remove these.
+12. **Redis-only async, HTTP only sync.** Email send is a Redis stream consumer; detection is synchronous HTTP.
+13. **S3 rollback on Mongo insert failure.** Any S3 write followed by a DB write must roll back the object if the DB step fails.
+14. **User-supplied values are sanitized in logs.** Strip `\r\n` before logging any input that could come from a user (see `media/main-media.py:sanitize_for_log`).
+15. **Notification collapsing.** One notification per (recipient, actor, post, type) tuple; `event_count` increments. Never re-insert duplicates.
+16. **Idempotent webhook processing.** Stripe event dedup by `stripe_event_id` unique-sparse index. Retries land on DuplicateKeyError and continue.
 
 ---
 
@@ -182,6 +187,7 @@ feature. Before merging, re-read the relevant section.
 - **Fallback auth paths.** No "try cookie, else Bearer" on the same route. One path per route.
 - **Direct cross-service DB reads.** Never have service A connect to service B's Mongo/SQLite.
 - **Image proxying.** Never read an S3 object and stream it through a FastAPI/Flask handler. Return a presigned URL.
+- **Model upload proxying.** Never stream manual admin model bytes through `community`, `gateway`, or `model-cycle` request bodies when a presigned storage upload can carry the bytes directly.
 - **Unindexed list endpoints.** Never add a list endpoint without a bounded, indexed filter.
 - **Secret in error response.** Never return an env var, stack trace, or token in an HTTP error body.
 - **Mock databases in integration tests.** Use a real DB — mocks hide schema/migration drift.
@@ -202,6 +208,7 @@ feature. Before merging, re-read the relevant section.
 - **Detector concurrency:** inflight semaphore + inference semaphore. 503 = shed load; 504 = timeout; do not silently retry.
 - **Presigned URL TTLs:** public = 3600s, private = 300s.
 - **Max upload sizes:** images = 20 MB, model weights = 750 MB.
+- **Storage upload origin must accept the model-upload body limit.** Do not place a smaller body-limit CDN or ingress path in front of the direct-upload storage origin.
 - **Redis debounce:** votes 5s (60s max wait), clicks 60s cooldown, comments 30s (60s max wait).
 - **Notification cap:** 50 per user, enforced after each write.
 - **Comment list limit:** 100 newest per post.

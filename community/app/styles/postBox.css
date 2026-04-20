@@ -270,14 +270,11 @@
 
 .comm_postImage {
   aspect-ratio: 1;
-  -o-object-fit: cover;
   object-fit: cover;
-  cursor: pointer;
-
-  opacity: 0; /* start hidden at CSS level — prevents FOUC before Framer Motion hydrates */
-  background: transparent;
+  cursor: zoom-in;
+  opacity: 0; /* start hidden — prevents FOUC before Framer Motion hydrates */
+  background: rgba(255, 255, 255, .05);
   color: transparent;
-
   width: 100%;
   height: auto;
   display: block;

@@ -4,10 +4,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from pydantic import BaseModel
 
 from app.deps.authz import require_internal_token
+from app.routers.public import UserAccuracy, UserAccuracyRequest
 
 router = APIRouter(prefix="/internal", tags=["internal"], dependencies=[Depends(require_internal_token)])
 logger = logging.getLogger(__name__)
@@ -183,3 +186,29 @@ async def record_user_activity(
         "current_streak": current_streak,
         "longest_streak": longest_streak,
     }
+
+
+@router.post("/users/accuracy", response_model=List[UserAccuracy])
+async def get_users_accuracy(
+    request: Request,
+    body: UserAccuracyRequest,
+):
+    users_col = request.app.state.user_repo.users
+
+    cursor = users_col.find(
+        {"user_id": {"$in": body.user_ids}},
+        {
+            "user_id": 1,
+            "admin_fake_correct": 1,
+            "admin_fake_total": 1,
+            "admin_real_correct": 1,
+            "admin_real_total": 1,
+            "_id": 0,
+        },
+    )
+
+    results = []
+    async for doc in cursor:
+        results.append(UserAccuracy(**doc))
+
+    return results

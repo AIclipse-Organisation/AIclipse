@@ -4,11 +4,8 @@ import { getDb } from "@/lib/mongo/mongo.js";
 const NOTIFICATIONS_COLLECTION = "community.notifications";
 const USERS_COLLECTION = "auth.users";
 
-function unauthorized(error) {
-  return NextResponse.json(
-    { error: "Unauthorized", detail: String(error) },
-    { status: 401 },
-  );
+function unauthorized() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 export function createNotificationsListHandler({ requireUser }) {
@@ -16,8 +13,8 @@ export function createNotificationsListHandler({ requireUser }) {
     let currentUser;
     try {
       currentUser = await requireUser(req);
-    } catch (authErr) {
-      return unauthorized(authErr);
+    } catch {
+      return unauthorized();
     }
     const authenticatedUserId = currentUser.user_id;
 
@@ -73,7 +70,7 @@ export function createNotificationsListHandler({ requireUser }) {
       return NextResponse.json({ items, unread_count }, { status: 200 });
     } catch (err) {
       return NextResponse.json(
-        { error: "Failed to load notifications", detail: String(err) },
+        { error: "Failed to load notifications" },
         { status: 500 },
       );
     }
@@ -85,8 +82,8 @@ export function createNotificationsUnreadCountHandler({ requireUser }) {
     let currentUser;
     try {
       currentUser = await requireUser(req);
-    } catch (authErr) {
-      return unauthorized(authErr);
+    } catch {
+      return unauthorized();
     }
     const authenticatedUserId = currentUser.user_id;
 
@@ -101,7 +98,7 @@ export function createNotificationsUnreadCountHandler({ requireUser }) {
       return NextResponse.json({ unread_count }, { status: 200 });
     } catch (err) {
       return NextResponse.json(
-        { error: "Failed to load unread count", detail: String(err) },
+        { error: "Failed to load unread count" },
         { status: 500 },
       );
     }
@@ -113,8 +110,8 @@ export function createNotificationsReadHandler({ requireUser }) {
     let currentUser;
     try {
       currentUser = await requireUser(req);
-    } catch (authErr) {
-      return unauthorized(authErr);
+    } catch {
+      return unauthorized();
     }
     const authenticatedUserId = currentUser.user_id;
 
@@ -161,7 +158,7 @@ export function createNotificationsReadHandler({ requireUser }) {
       );
     } catch (err) {
       return NextResponse.json(
-        { error: "Failed to mark notifications read", detail: String(err) },
+        { error: "Failed to mark notifications read" },
         { status: 500 },
       );
     }

@@ -9,6 +9,11 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffering: "on"
 spec:
   ingressClassName: nginx
+  tls:
+    - secretName: aiclipse-local-tls
+      hosts:
+        - aiclipse.local
+        - storage.aiclipse.local
   rules:
     - host: aiclipse.local
       http:

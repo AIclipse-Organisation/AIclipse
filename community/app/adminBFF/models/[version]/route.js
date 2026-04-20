@@ -5,6 +5,7 @@ export const runtime = "nodejs";
 export async function DELETE(req, { params }) {
   const { version } = await params;
   return proxyAdminJson({
+    request: req,
     path: `/admin/models/${encodeURIComponent(version)}`,
     method: "DELETE",
   });

@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:20-slim AS build
 
 WORKDIR /app
 
@@ -7,13 +7,27 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build && npm prune --omit=dev && \
-    chown -R node:node .next
+RUN npm run build && npm prune --omit=dev
+
+# --- runtime ---
+FROM node:20-slim
+
+WORKDIR /app
+
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
+COPY --from=build /app/package.json ./
+COPY --from=build /app/lib ./lib
+COPY --from=build /app/*Worker.js ./
+COPY --from=build /app/node_modules ./node_modules
 
 EXPOSE 3000
 
 ENV APP_ENV=prod
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 
 USER 1000
 
-CMD ["npx", "next", "start", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["node", "server.js"]

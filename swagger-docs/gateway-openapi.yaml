@@ -860,6 +860,10 @@ paths:
     post:
       summary: Create checkout session
       tags: [Billing]
+      description: >
+        Authenticated billing route. Gateway resolves the caller from the
+        Bearer JWT and forwards trusted identity to Billing via
+        X-Internal-Token + X-User-* headers.
       security:
         - bearerAuth: []
       requestBody:
@@ -868,52 +872,22 @@ paths:
           application/json:
             schema:
               type: object
-              required: [user_id, plan_id, email]
+              required: [plan_id]
               properties:
-                user_id:
-                  type: string
                 plan_id:
                   type: integer
                   enum: [1, 2]
-                email:
-                  type: string
-                  format: email
       responses:
         "200":
           description: Checkout session created
         "400":
           description: Invalid input
+        "401":
+          description: Unauthorized
         "503":
           description: Billing service unavailable
 
-  /api/billing/create-checkout-session:
-    post:
-      summary: Create checkout session (API path)
-      tags: [Billing]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [user_id, plan_id, email]
-              properties:
-                user_id:
-                  type: string
-                plan_id:
-                  type: integer
-                email:
-                  type: string
-                  format: email
-      responses:
-        "200":
-          description: Checkout session created
-        "400":
-          description: Invalid input
-
-  /api/billing/config:
+  /billing/config:
     get:
       summary: Get billing config
       tags: [Billing]
@@ -921,26 +895,30 @@ paths:
         "200":
           description: Stripe publishable key
 
-  /api/billing/subscription/status:
+  /billing/subscription/status:
     get:
       summary: Get subscription status
       tags: [Billing]
-      parameters:
-        - in: query
-          name: user_id
-          required: true
-          schema:
-            type: string
+      description: >
+        Authenticated billing route. Gateway resolves the caller from the
+        Bearer JWT and forwards trusted identity to Billing via
+        X-Internal-Token + X-User-* headers.
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Subscription status
-        "400":
-          description: Invalid user_id
+        "401":
+          description: Unauthorized
 
-  /api/billing/subscription/cancel-at-period-end:
+  /billing/subscription/cancel-at-period-end:
     post:
       summary: Cancel subscription at period end
       tags: [Billing]
+      description: >
+        Authenticated billing route. Gateway resolves the caller from the
+        Bearer JWT and forwards trusted identity to Billing via
+        X-Internal-Token + X-User-* headers.
       security:
         - bearerAuth: []
       requestBody:
@@ -949,10 +927,8 @@ paths:
           application/json:
             schema:
               type: object
-              required: [user_id, reason]
+              required: [reason]
               properties:
-                user_id:
-                  type: string
                 reason:
                   type: string
       responses:
@@ -960,6 +936,8 @@ paths:
           description: Cancellation scheduled
         "400":
           description: Invalid input or no active subscription
+        "401":
+          description: Unauthorized
         "404":
           description: No subscription found
 
@@ -969,31 +947,8 @@ paths:
       tags: [Billing]
       description: >
         Proxied as raw bytes to preserve Stripe signature verification.
-        Exact same behavior is also exposed at /api/billing/webhook.
-      parameters:
-        - in: header
-          name: stripe-signature
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/octet-stream:
-            schema:
-              type: string
-              format: binary
-      responses:
-        "200":
-          description: Webhook processed
-        "400":
-          description: Invalid payload or signature
-
-  /api/billing/webhook:
-    post:
-      summary: Stripe webhook (alias)
-      tags: [Billing]
-      description: Identical to /billing/webhook. Both paths are registered on the same handler.
+        Public ingress may prepend /api before rewrite, but the canonical
+        Gateway service route is /billing/webhook.
       parameters:
         - in: header
           name: stripe-signature
@@ -1377,26 +1332,114 @@ paths:
         "403":
           description: Admin privileges required
 
-  /admin/models/upload:
+  /admin/models/uploads:
     post:
-      summary: Upload new model (admin)
+      summary: Create model upload session (admin)
       tags: [Models]
-      description: Upload model weights with training metadata. Max 750 MB. Timeout 10 minutes.
+      description: >
+        Authenticated admin control-plane call. Returns a presigned object-storage
+        PUT URL so the browser can upload model bytes directly without proxying
+        through Gateway. Model Cycle may also reap expired abandoned staging
+        objects older than the upload-session TTL while creating the session.
       security:
         - bearerAuth: []
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
-              required: [File, Version]
+              required: [version, fileName, fileSize]
               properties:
-                File:
+                version:
                   type: string
-                  format: binary
-                Version:
+                fileName:
                   type: string
+                fileSize:
+                  type: integer
+                  format: int64
+                contentType:
+                  type: string
+      responses:
+        "200":
+          description: Upload session created
+        "400":
+          description: Invalid request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "409":
+          description: Model version already exists
+        "502":
+          description: Model-cycle service error
+
+  /admin/models/uploads/finalize:
+    post:
+      summary: Finalize direct-uploaded model (admin)
+      tags: [Models]
+      description: >
+        Authenticated admin control-plane call. Finalizes a previously created
+        direct upload session, promotes the staged object to the canonical
+        release key, and deploys the uploaded model via model-cycle.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [uploadId, version]
+              properties:
+                uploadId:
+                  type: string
+                version:
+                  type: string
+                newImagesCount:
+                  type: integer
+                replayBufferCount:
+                  type: integer
+                validationAccuracy:
+                  type: number
+                  format: double
+                validationPrecision:
+                  type: number
+                  format: double
+                validationRecall:
+                  type: number
+                  format: double
+                validationF1Score:
+                  type: number
+                  format: double
+                goldenTestAccuracy:
+                  type: number
+                  format: double
+                goldenTestPrecision:
+                  type: number
+                  format: double
+                goldenTestRecall:
+                  type: number
+                  format: double
+                goldenTestF1Score:
+                  type: number
+                  format: double
+                goldenFakeToRealMisclassifications:
+                  type: integer
+                goldenRealToFakeMisclassifications:
+                  type: integer
+                newTrainingImageIds:
+                  type: array
+                  items:
+                    type: string
+                replayImageIds:
+                  type: array
+                  items:
+                    type: string
+                goldenTestImageIds:
+                  type: array
+                  items:
+                    type: string
       responses:
         "200":
           description: Model uploaded and deployed
@@ -1404,6 +1447,8 @@ paths:
           description: Unauthorized
         "403":
           description: Admin privileges required
+        "409":
+          description: Upload missing, size mismatch, or version conflict
         "502":
           description: Model-cycle service error
 
