@@ -30,6 +30,17 @@ function getInternalHeaders() {
   };
 }
 
+function normalizeExternalProto(value) {
+  const proto = String(value || "")
+    .split(",", 1)[0]
+    .trim()
+    .toLowerCase();
+  if (proto === "http" || proto === "https") {
+    return proto;
+  }
+  return null;
+}
+
 function normalizeImageIds(imageIds) {
   const seen = new Set();
   const ids = [];
@@ -78,17 +89,23 @@ export function resolveRenderableItemsWithPublicImages(items, imageItems) {
   };
 }
 
-export async function fetchPublicImagesByIds(imageIds) {
+export async function fetchPublicImagesByIds(imageIds, options = {}) {
   const ids = normalizeImageIds(imageIds);
   if (!ids.length) {
     return [];
+  }
+
+  const headers = getInternalHeaders();
+  const externalProto = normalizeExternalProto(options.externalProto);
+  if (externalProto) {
+    headers["X-External-Proto"] = externalProto;
   }
 
   const payload = await fetchGatewayJson(
     getGatewayLookupUrl(),
     {
       method: "POST",
-      headers: getInternalHeaders(),
+      headers,
       body: JSON.stringify({ image_ids: ids }),
     },
     {

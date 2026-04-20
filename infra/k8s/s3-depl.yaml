@@ -57,6 +57,13 @@ spec:
             - name: MINIO_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef: { name: s3-sec, key: MINIO_ROOT_PASSWORD }
+            - name: MINIO_API_CORS_ALLOW_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: app-configmap
+                  key: ALLOWED_ORIGINS
+            - name: MINIO_API_CORS_ALLOW_CREDENTIALS_WITH_WILDCARD
+              value: "off"
           volumeMounts:
             - { name: data, mountPath: /data }
           ports:

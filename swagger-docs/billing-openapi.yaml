@@ -9,18 +9,12 @@ components:
   schemas:
     CheckoutRequest:
       type: object
-      required: [user_id, plan_id, email]
+      required: [plan_id]
       properties:
-        user_id:
-          type: string
-          maxLength: 64
         plan_id:
           type: integer
           enum: [1, 2]
           description: "1 = AIclipse Plus (9.99 EUR/mo), 2 = Premium (19.99 EUR/mo)"
-        email:
-          type: string
-          format: email
 
     CheckoutResponse:
       type: object
@@ -54,10 +48,8 @@ components:
 
     CancelSubscriptionRequest:
       type: object
-      required: [user_id, reason]
+      required: [reason]
       properties:
-        user_id:
-          type: string
         reason:
           type: string
           description: Non-empty cancellation reason (required).
@@ -113,9 +105,29 @@ paths:
     post:
       summary: Create Stripe checkout session
       description: >
-        Creates a Stripe checkout session for a monthly subscription.
-        Reuses existing Stripe customer if available, otherwise creates one.
-        Success/cancel redirects go to CLIENT_URL/plan.
+        Internal gateway-only route. Billing trusts the forwarded user identity
+        from Gateway via X-Internal-Token + X-User-* headers instead of
+        accepting user_id/email in the JSON body. Creates a Stripe checkout
+        session for a monthly subscription. Reuses existing Stripe customer
+        if available, otherwise creates one. Success/cancel redirects go to
+        CLIENT_URL/plan.
+      parameters:
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-User-Email
+          required: true
+          schema:
+            type: string
+            format: email
       requestBody:
         required: true
         content:
@@ -130,16 +142,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/CheckoutResponse"
         "400":
-          description: Invalid user_id, plan_id, or email
+          description: Invalid forwarded email or invalid plan_id
+        "401":
+          description: Invalid internal auth token or missing forwarded user id
         "503":
           description: Stripe not configured or database unavailable
 
   /subscription/status:
     get:
       summary: Get subscription status
+      description: >
+        Internal gateway-only route. Caller identity is forwarded by Gateway
+        via X-Internal-Token + X-User-Id headers.
       parameters:
-        - in: query
-          name: user_id
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-User-Id
           required: true
           schema:
             type: string
@@ -150,8 +172,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SubscriptionStatus"
-        "400":
-          description: Invalid user_id
+        "401":
+          description: Invalid internal auth token or missing forwarded user id
         "503":
           description: Database unavailable
 
@@ -159,9 +181,23 @@ paths:
     post:
       summary: Schedule subscription cancellation
       description: >
+        Internal gateway-only route. Billing trusts the forwarded user identity
+        from Gateway via X-Internal-Token + X-User-* headers instead of
+        accepting user_id in the JSON body.
         Schedules cancellation at the end of the current billing period.
         Idempotent: returns 200 if already scheduled.
         Calls Stripe API to set cancel_at_period_end=true.
+      parameters:
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-User-Id
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -176,7 +212,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/CancelSubscriptionResponse"
         "400":
-          description: Invalid user_id, missing reason, or no active paid subscription
+          description: Missing reason or no active paid subscription
+        "401":
+          description: Invalid internal auth token or missing forwarded user id
         "404":
           description: No active subscription found
         "503":

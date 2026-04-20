@@ -1321,29 +1321,72 @@ paths:
       responses:
         "200":
           description: Model list
+
+  /community/adminBFF/models/uploads:
     post:
-      summary: Upload model (admin)
+      summary: Create model upload session (admin)
       tags: [Admin BFF]
       description: >
-        Streams multipart upload to Gateway /admin/models/upload via
-        native HTTP. Body size limit 750 MB.
+        Proxies to Gateway /admin/models/uploads. Returns a presigned storage
+        PUT URL so the browser can upload model bytes directly to object storage.
+        Model Cycle may also reap expired abandoned staging objects older than
+        the upload-session TTL while creating the session.
       security:
         - cookieAuth: []
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
+              required: [version, fileName, fileSize]
+              properties:
+                version:
+                  type: string
+                fileName:
+                  type: string
+                fileSize:
+                  type: integer
+                  format: int64
+                contentType:
+                  type: string
       responses:
         "200":
-          description: Model uploaded
-        "400":
-          description: Invalid Content-Type
+          description: Upload session created
         "401":
           description: Not admin
-        "502":
-          description: Gateway proxy error
+        "409":
+          description: Model version already exists
+
+  /community/adminBFF/models/uploads/finalize:
+    post:
+      summary: Finalize direct-uploaded model (admin)
+      tags: [Admin BFF]
+      description: >
+        Proxies to Gateway /admin/models/uploads/finalize. Validates the
+        staged upload, promotes it to the canonical release key, and deploys
+        the model once storage upload has completed.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [uploadId, version]
+              properties:
+                uploadId:
+                  type: string
+                version:
+                  type: string
+      responses:
+        "200":
+          description: Model uploaded and deployed
+        "401":
+          description: Not admin
+        "409":
+          description: Upload missing, size mismatch, or version conflict
 
   /community/adminBFF/models/current:
     get:

@@ -262,3 +262,4 @@ walkthrough.md
 .agents/
 AGENTS.md
 .cursorrules
+infra/k8s-dev/certs/

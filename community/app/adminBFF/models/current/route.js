@@ -4,6 +4,7 @@ export const runtime = "nodejs";
 
 export async function GET(req) {
   return proxyAdminJson({
+    request: req,
     path: "/admin/models/current",
     onError: (response) => {
       if (response.status === 404) {

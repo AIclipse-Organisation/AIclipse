@@ -7,6 +7,7 @@ export async function DELETE(_req, { params }) {
   if (!userId) return buildAdminError(400, "Bad Request", "Missing userId");
 
   return proxyAdminJson({
+    request: _req,
     path: `/auth/admin/access-requests/${encodeURIComponent(userId)}/reject`,
     method: "DELETE",
   });

@@ -7,14 +7,16 @@ from routes.common import (
     call_gateway_json_or_error,
     get_required_token,
     parse_json_body_or_400,
-    resolve_billing_user_or_error,
 )
-from services.plan.subscription import (
-    build_cancel_subscription_payload,
-    build_checkout_payload,
-    build_subscription_status_path,
-    parse_plan_id,
-)
+
+
+def _parse_plan_id(raw_plan_id) -> int | None:
+    try:
+        plan_id = int(raw_plan_id)
+    except Exception:
+        return None
+
+    return plan_id if plan_id in (1, 2) else None
 
 
 def build_plan_blueprint(*, deps: RouteDeps):
@@ -52,24 +54,16 @@ def build_plan_blueprint(*, deps: RouteDeps):
         if body_error:
             return body_error
 
-        plan_id = parse_plan_id(payload.get("plan_id"))
+        plan_id = _parse_plan_id(payload.get("plan_id"))
         if plan_id is None:
             return jsonify({"detail": "Invalid plan_id"}), 400
-
-        user, user_error = resolve_billing_user_or_error(deps=deps, token=token)
-        if user_error:
-            return user_error
-
-        checkout_payload = build_checkout_payload(user=user, plan_id=plan_id)
-        if not checkout_payload:
-            return jsonify({"detail": "Missing user info for billing"}), 502
 
         response, gateway_error = call_gateway_json_or_error(
             deps=deps,
             method="POST",
             path="/billing/create-checkout-session",
             token=token,
-            json_data=checkout_payload,
+            json_data={"plan_id": plan_id},
         )
         if gateway_error:
             return gateway_error
@@ -83,18 +77,10 @@ def build_plan_blueprint(*, deps: RouteDeps):
         if auth_error:
             return auth_error
 
-        user, user_error = resolve_billing_user_or_error(deps=deps, token=token)
-        if user_error:
-            return user_error
-
-        user_id = user.get("user_id")
-        if not user_id:
-            return jsonify({"detail": "Missing user info for billing"}), 502
-
         response, gateway_error = call_gateway_json_or_error(
             deps=deps,
             method="GET",
-            path=build_subscription_status_path(user_id=str(user_id)),
+            path="/billing/subscription/status",
             token=token,
         )
         if gateway_error:
@@ -117,20 +103,12 @@ def build_plan_blueprint(*, deps: RouteDeps):
         if not isinstance(reason, str) or not reason.strip():
             return jsonify({"detail": "Cancellation reason is required"}), 400
 
-        user, user_error = resolve_billing_user_or_error(deps=deps, token=token)
-        if user_error:
-            return user_error
-
-        user_id = user.get("user_id")
-        if not user_id:
-            return jsonify({"detail": "Missing user info for billing"}), 502
-
         response, gateway_error = call_gateway_json_or_error(
             deps=deps,
             method="POST",
-            path="/api/billing/subscription/cancel-at-period-end",
+            path="/billing/subscription/cancel-at-period-end",
             token=token,
-            json_data=build_cancel_subscription_payload(user_id=str(user_id), reason=reason),
+            json_data={"reason": reason.strip()},
         )
         if gateway_error:
             return gateway_error

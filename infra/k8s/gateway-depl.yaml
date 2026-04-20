@@ -35,6 +35,11 @@ spec:
               value: "http://detector-srv:3000"
             - name: MODEL_CYCLE_URI
               value: "http://model-cycle-srv:3000"
+            - name: ALLOWED_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-configmap
+                  key: ALLOWED_ORIGINS
           ports: [{ name: http, containerPort: 8080 }]
           readinessProbe:
             httpGet: { path: /healthz, port: 8080, scheme: HTTP }

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import requests
+from flask import has_request_context, request
 
 _gateway_session: requests.Session | None = None
 
@@ -11,12 +12,27 @@ def build_gateway_url(*, base_url: str, path: str) -> str:
     return base_url.rstrip("/") + path
 
 
+def _resolve_external_proto() -> str | None:
+    if not has_request_context():
+        return None
+
+    raw_proto = request.headers.get("X-Forwarded-Proto", request.scheme or "")
+    external_proto = str(raw_proto or "").split(",", 1)[0].strip().lower()
+    if external_proto == "https":
+        return "https"
+
+    return None
+
+
 def build_gateway_headers(*, token: str | None = None, json_body: bool = False) -> dict[str, str]:
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     if json_body:
         headers["Content-Type"] = "application/json"
+    external_proto = _resolve_external_proto()
+    if external_proto is not None:
+        headers["X-External-Proto"] = external_proto
     return headers
 
 

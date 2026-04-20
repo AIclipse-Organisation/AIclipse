@@ -17,7 +17,7 @@ INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN", "")
 
 # Whitelist for minio_path: alphanumeric, dots, slashes, underscores, hyphens.
 # Blocks path traversal ("../"), absolute paths, and non-model extensions.
-_MINIO_PATH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./-]{0,254}\.pt$")
+_MINIO_PATH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./-]{0,254}\.(pt|bin|safetensors)$")
 
 
 def _require_internal_token(x_internal_token: str | None) -> None:

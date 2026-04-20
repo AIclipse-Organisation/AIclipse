@@ -127,3 +127,74 @@ test("community tutorial entry routes to the shared tutorials page", () => {
   assert.match(topbar, /window\.location\.href = "\/tutorials"/);
   assert.doesNotMatch(topbar, /openCenter/);
 });
+
+test("admin model uploads use presigned storage flow instead of the legacy multipart proxy", () => {
+  const adminService = readRepoFile("app/admin/admin.js");
+  const modelsRoute = readRepoFile("app/adminBFF/models/route.js");
+  const uploadRoute = readRepoFile("app/adminBFF/models/uploads/route.js");
+  const finalizeRoute = readRepoFile("app/adminBFF/models/uploads/finalize/route.js");
+
+  assert.match(adminService, /\/models\/uploads/);
+  assert.match(adminService, /\/models\/uploads\/finalize/);
+  assert.doesNotMatch(adminService, /fetch\(`\/community\/adminBFF\/models`/);
+  assert.doesNotMatch(modelsRoute, /http\.request/);
+  assert.match(uploadRoute, /proxyAdminJson/);
+  assert.match(uploadRoute, /request:\s*req/);
+  assert.match(finalizeRoute, /proxyAdminJson/);
+  assert.match(finalizeRoute, /request:\s*req/);
+});
+
+test("admin BFF routes always pass the incoming request into proxyAdminJson", () => {
+  const routeFiles = [
+    "app/adminBFF/access-requests/route.js",
+    "app/adminBFF/access-requests/[userId]/approve/route.js",
+    "app/adminBFF/access-requests/[userId]/reject/route.js",
+    "app/adminBFF/models/route.js",
+    "app/adminBFF/models/current/route.js",
+    "app/adminBFF/models/train/route.js",
+    "app/adminBFF/models/training-images/route.js",
+    "app/adminBFF/models/uploads/route.js",
+    "app/adminBFF/models/uploads/finalize/route.js",
+    "app/adminBFF/models/[version]/route.js",
+    "app/adminBFF/user-deletion-logs/route.js",
+    "app/adminBFF/users/route.js",
+    "app/adminBFF/users/[userId]/route.js",
+  ];
+
+  for (const routeFile of routeFiles) {
+    const routeSource = readRepoFile(routeFile);
+    assert.match(routeSource, /proxyAdminJson/);
+    assert.match(routeSource, /request:\s*(req|_req)/);
+  }
+});
+
+test("internal moderation-status route requires trusted internal auth", () => {
+  const routeSource = readRepoFile("app/internal/posts/moderation-status/route.js");
+  const handlerSource = readRepoFile("app/lib/routes/moderationStatusRoute.js");
+
+  assert.match(routeSource, /requireInternalRequest/);
+  assert.match(routeSource, /createModerationStatusPostHandler/);
+  assert.match(handlerSource, /await requireInternalRequest\(req\)/);
+  assert.match(handlerSource, /error: "Unauthorized"/);
+});
+
+test("browser-facing community routes do not expose raw exception strings", () => {
+  const files = [
+    "app/lib/adminGateway.js",
+    "app/lib/routes/clickRoute.js",
+    "app/lib/routes/commentsRoute.js",
+    "app/lib/routes/moderationStatusRoute.js",
+    "app/lib/routes/notificationsRoute.js",
+    "app/lib/routes/postsRoute.js",
+    "app/lib/routes/reportRoute.js",
+    "app/lib/routes/voteRoute.js",
+  ];
+
+  for (const relativePath of files) {
+    const source = readRepoFile(relativePath);
+    assert.doesNotMatch(source, /detail:\s*String\(error\)/);
+    assert.doesNotMatch(source, /detail:\s*String\(err\)/);
+    assert.doesNotMatch(source, /error\?\.message \|\| String\(error\)/);
+    assert.doesNotMatch(source, /err\?\.message \|\| String\(err\)/);
+  }
+});

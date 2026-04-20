@@ -22,7 +22,11 @@ spec.loader.exec_module(main_media)
 @pytest.fixture()
 def client(monkeypatch):
     monkeypatch.setattr(main_media, "ensure_bucket", lambda: None)
-    monkeypatch.setattr(main_media, "presigned_get_url_for_key", lambda key, is_public: f"https://cdn.test/{key}")
+    monkeypatch.setattr(
+        main_media,
+        "presigned_get_url_for_key",
+        lambda key, is_public, external_proto=None: f"https://cdn.test/{key}",
+    )
     return TestClient(main_media.app)
 
 
@@ -213,6 +217,22 @@ def test_lookup_images_returns_public_items_with_presigned_urls(client, monkeypa
     }
 
 
+def test_presigned_get_url_for_key_rewrites_scheme_from_forwarded_proto(monkeypatch):
+    monkeypatch.setattr(
+        main_media.s3_public,
+        "generate_presigned_url",
+        lambda **_kwargs: "http://storage.aiclipse.local/images/img_a.png?sig=abc",
+    )
+
+    url = main_media.presigned_get_url_for_key(
+        "img_a.png",
+        is_public=True,
+        external_proto="https",
+    )
+
+    assert url == "https://storage.aiclipse.local/images/img_a.png?sig=abc"
+
+
 def test_get_images_collection_throttles_repeated_mongo_outage_logs(monkeypatch):
     warning_messages = []
 
@@ -244,3 +264,14 @@ def test_get_images_collection_throttles_repeated_mongo_outage_logs(monkeypatch)
     assert main_media.get_images_collection() is None
     assert main_media.get_images_collection() is None
     assert warning_messages == ["mongo connection unavailable: mongo down"]
+
+
+def test_update_image_rejects_invalid_admin_header(client):
+    response = client.patch(
+        "/image/img_123",
+        params={"user_id": "u_1", "is_public": "true"},
+        headers={"X-User-Is-Admin": "yes"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["header", "X-User-Is-Admin"]

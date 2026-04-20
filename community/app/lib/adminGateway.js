@@ -40,12 +40,35 @@ export function sanitizeLogMessage(value) {
   return String(value).replace(/[\r\n]/g, "");
 }
 
+function normalizeExternalProto(value) {
+  const proto = String(value || "")
+    .split(",", 1)[0]
+    .trim()
+    .toLowerCase();
+  if (proto === "http" || proto === "https") {
+    return proto;
+  }
+  return null;
+}
+
+function resolveExternalProto(request) {
+  if (!request) {
+    return null;
+  }
+
+  return normalizeExternalProto(
+    request.headers?.get("x-forwarded-proto") ||
+      new URL(request.url).protocol.replace(":", ""),
+  );
+}
+
 export async function proxyAdminJson({
   path,
   method = "GET",
   query,
   body,
   headers,
+  request,
   successTextKey,
   onError,
 }) {
@@ -59,6 +82,10 @@ export async function proxyAdminJson({
       Authorization: `Bearer ${token}`,
       ...(headers || {}),
     };
+    const externalProto = resolveExternalProto(request);
+    if (externalProto) {
+      requestHeaders["X-External-Proto"] = externalProto;
+    }
     const init = {
       method,
       headers: requestHeaders,
@@ -81,6 +108,15 @@ export async function proxyAdminJson({
       if (override) {
         return override;
       }
+      if (response.status === 401) {
+        return buildAdminError(401, "Unauthorized");
+      }
+      if (response.status === 403) {
+        return buildAdminError(403, "Forbidden");
+      }
+      if (response.status >= 500) {
+        return buildAdminError(response.status, "Gateway Error");
+      }
       return buildAdminError(response.status, "Gateway Error", payload || text);
     }
 
@@ -90,6 +126,6 @@ export async function proxyAdminJson({
 
     return NextResponse.json(payload ?? {}, { status: response.status });
   } catch (error) {
-    return buildAdminError(500, "Internal Error", error?.message || String(error));
+    return buildAdminError(500, "Internal Error");
   }
 }
