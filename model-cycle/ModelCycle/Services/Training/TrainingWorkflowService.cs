@@ -11,7 +11,6 @@ public class TrainingWorkflowService : ITrainingWorkflowService
 {
     private readonly AppDbContext _db;
     private readonly IConfidenceService _confidenceService;
-    private readonly IMediaService _mediaService;
     private readonly IDatasetService _datasetService;
     private readonly ILogger<TrainingWorkflowService> _logger;
     private readonly TrainingJobQueue _jobQueue;
@@ -21,7 +20,6 @@ public class TrainingWorkflowService : ITrainingWorkflowService
     public TrainingWorkflowService(
         AppDbContext db,
         IConfidenceService confidenceService,
-        IMediaService mediaService,
         IDatasetService datasetService,
         TrainingJobQueue jobQueue,
         ILogger<TrainingWorkflowService> logger,
@@ -30,7 +28,6 @@ public class TrainingWorkflowService : ITrainingWorkflowService
     {
         _db = db;
         _confidenceService = confidenceService;
-        _mediaService = mediaService;
         _datasetService = datasetService;
         _jobQueue = jobQueue;
         _logger = logger;
@@ -151,26 +148,43 @@ public class TrainingWorkflowService : ITrainingWorkflowService
         if (image == null)
         {
             isNew = true;
-            var mediaMetadata = await _mediaService.GetImageMetadataAsync(request.MediaImageId);
-            if (mediaMetadata == null)
+            var requestedS3Key = string.IsNullOrWhiteSpace(request.S3Key) ? null : request.S3Key.Trim();
+            var requestedModelVersion = string.IsNullOrWhiteSpace(request.ModelVersion) ? null : request.ModelVersion.Trim();
+            if (requestedS3Key == null || requestedModelVersion == null)
             {
-                _logger.LogError("Media ID not found in Media Service");
-                throw new Exception($"Image not found in Media Module");
+                _logger.LogError("Training image metadata missing for media ID {MediaImageId}", request.MediaImageId);
+                throw new Exception("Training image metadata missing");
             }
 
             image = new TrainingImage
             {
                 Id = Guid.NewGuid(),
                 PostId = request.PostId,
-                MediaImageId = mediaMetadata.ImageId,
-                S3Key = mediaMetadata.S3Key,
-                Label = request.Label?.ToLowerInvariant(),
+                MediaImageId = request.MediaImageId,
+                S3Key = requestedS3Key,
+                Label = NormalizeLabel(request.Label),
                 UploadedAt = DateTime.UtcNow,
                 Status = TrainingStatus.Pending,
-                ModelVersion = mediaMetadata.ModelVersion,
+                ModelVersion = requestedModelVersion,
             };
             _db.TrainingImages.Add(image);
-            url = mediaMetadata.Url;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(image.S3Key) && !string.IsNullOrWhiteSpace(request.S3Key))
+            {
+                image.S3Key = request.S3Key.Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(image.ModelVersion) && !string.IsNullOrWhiteSpace(request.ModelVersion))
+            {
+                image.ModelVersion = request.ModelVersion.Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(image.Label))
+            {
+                image.Label = NormalizeLabel(request.Label);
+            }
         }
 
         return (image, url, isNew);
@@ -221,4 +235,9 @@ public class TrainingWorkflowService : ITrainingWorkflowService
     }
 
     private record PreviousImageState(TrainingStatus Status, string? Label);
+
+    private static string NormalizeLabel(string? label)
+    {
+        return string.IsNullOrWhiteSpace(label) ? "unknown" : label.Trim().ToLowerInvariant();
+    }
 }

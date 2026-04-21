@@ -15,6 +15,7 @@ from app.routers.billing_proxy import router as billing_proxy_router
 from app.routers.checks import router as checks_router
 from app.routers.community_proxy import router as community_proxy_router
 from app.routers.media import router as media_router
+from app.routers.model_cycle_internal import router as model_cycle_internal_router
 from app.routers.models import router as models_router
 
 
@@ -68,4 +69,5 @@ app.include_router(billing_proxy_router)
 app.include_router(checks_router)
 app.include_router(community_proxy_router)
 app.include_router(media_router)
+app.include_router(model_cycle_internal_router)
 app.include_router(models_router, prefix="/admin")

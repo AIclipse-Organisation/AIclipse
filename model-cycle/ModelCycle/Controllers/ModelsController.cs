@@ -4,6 +4,7 @@ using ModelCycle.Data;
 using ModelCycle.DTOs;
 using ModelCycle.Models;
 using ModelCycle.Services;
+using ModelCycle.Security;
 using ModelCycle.Services.Training;
 
 namespace ModelCycle.Controllers;
@@ -15,24 +16,32 @@ public class ModelsController : ControllerBase
     private readonly IBlobStorageService _blobService;
     private readonly AppDbContext _dbContext;
     private readonly TrainingJobQueue _jobQueue;
-
     private readonly IModelDeploymentService _deploymentService;
+    private readonly IInternalRequestAuthorizer _requestAuthorizer;
 
     public ModelsController(
     IBlobStorageService blobService,
     AppDbContext dbContext,
     TrainingJobQueue jobQueue,
-    IModelDeploymentService deploymentService)
+    IModelDeploymentService deploymentService,
+    IInternalRequestAuthorizer requestAuthorizer)
     {
         _blobService = blobService;
         _dbContext = dbContext;
         _jobQueue = jobQueue;
         _deploymentService = deploymentService;
+        _requestAuthorizer = requestAuthorizer;
     }
 
     [HttpPost("train")]
     public async Task<IActionResult> TriggerManualTraining()
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         await _jobQueue.QueueJobAsync();
 
         return Accepted(new { Message = "Training signal sent to background queue." });
@@ -41,6 +50,12 @@ public class ModelsController : ControllerBase
     [HttpGet("/images")]
     public async Task<IActionResult> GetModelImages()
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         var images = await _dbContext.TrainingImages
             .AsNoTracking()
             .OrderByDescending(i => i.UploadedAt)
@@ -65,6 +80,12 @@ public class ModelsController : ControllerBase
     [HttpGet("current")]
     public async Task<IActionResult> GetCurrentModel()
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         var activeModel = await _dbContext.ModelWeights
             .AsNoTracking()
             .Where(m => m.IsDeployed)
@@ -91,6 +112,12 @@ public class ModelsController : ControllerBase
         [FromBody] CreateModelUploadSessionRequest request,
         [FromHeader(Name = "X-External-Proto")] string? xExternalProto)
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         try
         {
             var session = await _deploymentService.CreateUploadSessionAsync(request, xExternalProto);
@@ -105,6 +132,12 @@ public class ModelsController : ControllerBase
     [HttpPost("uploads/finalize")]
     public async Task<IActionResult> FinalizeUpload([FromBody] FinalizeModelUploadRequest request)
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         try
         {
             var deployedModel = await _deploymentService.FinalizeUploadedModelAsync(request);
@@ -129,6 +162,12 @@ public class ModelsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetModels()
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         var models = await _dbContext.ModelWeights
             .OrderByDescending(m => m.CreatedAt)
             .AsNoTracking()
@@ -141,6 +180,12 @@ public class ModelsController : ControllerBase
     [HttpDelete("{version}")]
     public async Task<IActionResult> DeleteModel(string version)
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         if (!version.StartsWith("v", StringComparison.OrdinalIgnoreCase))
         {
             version = $"v{version}";

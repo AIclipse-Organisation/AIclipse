@@ -57,6 +57,9 @@ async def test_admin_model_upload_session_proxies_json_payload(client, patch_ups
     def create_session_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers["content-type"].startswith("application/json")
         assert req.headers.get("x-external-proto") == "https"
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_admin"
+        assert req.headers.get("x-user-is-admin") == "true"
         assert req.content == b'{"version":"v2.0.1","fileName":"model.pt","fileSize":123}'
         return httpx.Response(
             status_code=200,
@@ -91,6 +94,9 @@ async def test_admin_model_training_images_forward_external_proto_for_get_reques
 
     def training_images_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers.get("x-external-proto") == "https"
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_admin"
+        assert req.headers.get("x-user-is-admin") == "true"
         return httpx.Response(status_code=200, json=[{"id": 1, "label": "real"}])
 
     patch_upstreams.add(host="model-cycle", method="GET", path="/images", handler=training_images_handler)
@@ -119,6 +125,9 @@ async def test_admin_model_upload_finalize_proxies_json_payload(client, patch_up
 
     def finalize_handler(req: httpx.Request) -> httpx.Response:
         assert req.headers["content-type"].startswith("application/json")
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_admin"
+        assert req.headers.get("x-user-is-admin") == "true"
         assert req.content == b'{"uploadId":"upload-token","version":"v2.0.1"}'
         return httpx.Response(status_code=200, json={"version": "v2.0.1", "imagesLinked": 0})
 

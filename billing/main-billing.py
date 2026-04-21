@@ -13,7 +13,7 @@ import httpx
 import stripe
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
 from pymongo import MongoClient
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 
 @asynccontextmanager
@@ -64,6 +64,77 @@ logger.info("MONGO_DB=%s", MONGO_DB)
 # Collections (billing's own data — user data is read/written via auth internal API)
 plan_coll = None
 billing_coll = None
+PLAN_INDEX_SPECS = [
+    ([("stripe_event_id", 1)], {"unique": True, "sparse": True, "name": "uniq_plan_stripe_event_id"}),
+    ([("user_id", 1), ("timestamp", -1)], {"name": "plan_user_latest"}),
+    ([("stripe_customer_id", 1), ("timestamp", -1)], {"name": "plan_customer_latest"}),
+]
+BILLING_INDEX_SPECS = [
+    ([("stripe_event_id", 1)], {"unique": True, "sparse": True, "name": "uniq_billing_stripe_event_id"}),
+    ([("user_id", 1), ("status", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_user_status_latest"}),
+    ([("user_id", 1), ("stripe_subscription_id", 1), ("status", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_user_subscription_status_latest"}),
+    ([("stripe_subscription_id", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_by_subscription_latest"}),
+    ([("stripe_customer_id", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_by_customer_latest"}),
+]
+
+
+def ensure_billing_indexes(plan_collection, billing_collection):
+    for keys, options in PLAN_INDEX_SPECS:
+        _ensure_collection_index(plan_collection, keys, options)
+
+    for keys, options in BILLING_INDEX_SPECS:
+        _ensure_collection_index(billing_collection, keys, options)
+
+
+def _read_collection_indexes(collection) -> list[dict]:
+    if not hasattr(collection, "list_indexes"):
+        return []
+    try:
+        return list(collection.list_indexes())
+    except OperationFailure as exc:
+        details = exc.details or {}
+        if exc.code == 26 or details.get("codeName") == "NamespaceNotFound":
+            return []
+        raise
+
+
+def _same_key_pattern(existing: dict, desired_keys: list[tuple[str, int]]) -> bool:
+    existing_items = list((existing or {}).items())
+    return existing_items == list(desired_keys)
+
+
+def _same_optional_bool(existing: dict, desired: dict, option_name: str) -> bool:
+    return bool(existing.get(option_name)) == bool(desired.get(option_name))
+
+
+def _is_equivalent_index(existing: dict, desired_keys: list[tuple[str, int]], desired_options: dict) -> bool:
+    return (
+        _same_key_pattern(existing.get("key", {}), desired_keys)
+        and _same_optional_bool(existing, desired_options, "unique")
+        and _same_optional_bool(existing, desired_options, "sparse")
+    )
+
+
+def _ensure_collection_index(collection, keys: list[tuple[str, int]], options: dict) -> str:
+    indexes = _read_collection_indexes(collection)
+    equivalent = next((index for index in indexes if _is_equivalent_index(index, keys, options)), None)
+    if equivalent is not None:
+        return equivalent["name"]
+
+    named = next((index for index in indexes if index.get("name") == options["name"]), None)
+    if named is not None:
+        raise RuntimeError(
+            f"Index '{options['name']}' conflicts with existing incompatible index '{named['name']}'"
+        )
+
+    try:
+        return collection.create_index(keys, **options)
+    except OperationFailure:
+        refreshed = _read_collection_indexes(collection)
+        equivalent = next((index for index in refreshed if _is_equivalent_index(index, keys, options)), None)
+        if equivalent is not None:
+            return equivalent["name"]
+        raise
 
 # -------------------------
 # AUTH INTERNAL API
@@ -180,12 +251,9 @@ try:
     plan_coll = db.plan
     billing_coll = db.billing
 
-    # Unique-sparse indexes give us atomic, retry-safe webhook handling:
-    # Stripe retries deliver the same event_id; a second insert fails with
-    # DuplicateKeyError, which each step catches to preserve forward progress
-    # without needing transactions or pre-checks.
-    plan_coll.create_index("stripe_event_id", unique=True, sparse=True)
-    billing_coll.create_index("stripe_event_id", unique=True, sparse=True)
+    # Unique-sparse indexes give us atomic, retry-safe webhook handling, and
+    # the latest-state queries must stay on indexed filters as data grows.
+    ensure_billing_indexes(plan_coll, billing_coll)
 
     logger.info("Mongo connected OK. DB=%s", MONGO_DB)
 

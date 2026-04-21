@@ -41,19 +41,6 @@ spec:
           env:
             - name: INTERNAL_AUTH_TOKEN
               valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
-            - name: MONGO_URI
-              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
-            - name: MONGO_DB
-              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
-            - name: REDIS_HOST
-              value: "redis-srv"    
-            - name: REDIS_PORT
-              value: "6379"
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-sec      
-                  key: REDIS_PASSWORD
             - name: APP_ENV
               value: "dev"
             - name: CENTRAL_CONFIG_URL
@@ -63,8 +50,6 @@ spec:
                   key: CONFIG_URL
             - name: TRAINING_DATA_PATH
               value: "/app/data"
-            - name: MediaServiceUrl
-              value: "http://media-srv:3000"
             - name: S3_ENDPOINT 
               valueFrom: { secretKeyRef: { name: s3-sec, key: S3_ENDPOINT } } 
             - name: S3_PUBLIC_ENDPOINT

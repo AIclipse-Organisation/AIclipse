@@ -1,4 +1,5 @@
 import { fetchGatewayJson } from "./gatewayFetch.js";
+import { buildInternalGatewayHeaders, buildInternalGatewayUrl } from "./internalGateway.js";
 
 function buildLookupError(status, detail) {
   const error = new Error(detail || `Gateway image lookup failed (${status})`);
@@ -7,27 +8,11 @@ function buildLookupError(status, detail) {
 }
 
 function getGatewayLookupUrl() {
-  const gatewayBase = String(process.env.GATEWAY_URI || "").trim();
-  if (!gatewayBase) {
-    throw buildLookupError(500, "Missing GATEWAY_URI");
+  try {
+    return buildInternalGatewayUrl("internal/images/lookup");
+  } catch (error) {
+    throw buildLookupError(error?.status || 500, error?.message || "Missing GATEWAY_URI");
   }
-
-  return new URL(
-    "internal/images/lookup",
-    gatewayBase.endsWith("/") ? gatewayBase : `${gatewayBase}/`,
-  );
-}
-
-function getInternalHeaders() {
-  const internalToken = String(process.env.INTERNAL_AUTH_TOKEN || "").trim();
-  if (!internalToken) {
-    throw buildLookupError(500, "Missing INTERNAL_AUTH_TOKEN");
-  }
-
-  return {
-    "Content-Type": "application/json",
-    "X-Internal-Token": internalToken,
-  };
 }
 
 function normalizeExternalProto(value) {
@@ -95,7 +80,12 @@ export async function fetchPublicImagesByIds(imageIds, options = {}) {
     return [];
   }
 
-  const headers = getInternalHeaders();
+  let headers;
+  try {
+    headers = buildInternalGatewayHeaders();
+  } catch (error) {
+    throw buildLookupError(error?.status || 500, error?.message || "Missing INTERNAL_AUTH_TOKEN");
+  }
   const externalProto = normalizeExternalProto(options.externalProto);
   if (externalProto) {
     headers["X-External-Proto"] = externalProto;

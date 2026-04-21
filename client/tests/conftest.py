@@ -68,6 +68,7 @@ def main_client_module(monkeypatch):
     monkeypatch.setenv("APP_ENV", "dev")
     monkeypatch.setenv("GATEWAY_URI", "http://gateway.test")
     monkeypatch.setenv("COMMUNITY_URI", "http://community.test")
+    monkeypatch.setenv("S3_PUBLIC_ENDPOINT", "http://storage.aiclipse.local")
     monkeypatch.delenv("CENTRAL_CONFIG_URL", raising=False)
 
     sys.modules.pop("config", None)

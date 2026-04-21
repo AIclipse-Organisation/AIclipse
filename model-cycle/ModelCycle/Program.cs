@@ -4,28 +4,16 @@ using Microsoft.EntityFrameworkCore;
 using ModelCycle;
 using ModelCycle.Data;
 using ModelCycle.Repositories;
+using ModelCycle.Security;
 using ModelCycle.Services.ImageConfidence;
 using ModelCycle.Services.Data;
 using ModelCycle.Services.Training;
 using ModelCycle.Services;
-using ModelCycle.Services.External;
-using StackExchange.Redis;
-using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var mongoUri = Environment.GetEnvironmentVariable("MONGO_URI") ?? "mongodb://localhost:27017";
-var mongoDbName = Environment.GetEnvironmentVariable("MONGO_DB") ?? "aiclipse";
-
 var authUri = Environment.GetEnvironmentVariable("AUTH_URI");
-
 var detectorUri = Environment.GetEnvironmentVariable("DETECTOR_URI");
-
-Console.WriteLine($"[Mongo] Connecting to {mongoDbName}...");
-
-builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoUri));
-builder.Services.AddScoped<IMongoDatabase>(sp =>
-    sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDbName));
 
 
 builder.Services.AddHttpClient<IDetectorClientService, DetectorClientService>((serviceProvider, client) =>
@@ -50,28 +38,6 @@ builder.Services.AddHttpClient<IAuthService, AuthService>(client =>
 
     client.BaseAddress = baseUri;
 });
-
-var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST") ?? "localhost";
-var redisPortStr = Environment.GetEnvironmentVariable("REDIS_PORT") ?? "6379";
-var redisPassword = Environment.GetEnvironmentVariable("REDIS_PASSWORD");
-
-int.TryParse(redisPortStr, out var redisPort);
-
-var configOptions = new ConfigurationOptions
-{
-    EndPoints = { { redisHost, redisPort } },
-    Password = string.IsNullOrEmpty(redisPassword) ? null : redisPassword,
-    AbortOnConnectFail = false,
-    ConnectRetry = 5,
-    KeepAlive = 60
-};
-
-Console.WriteLine($"[Redis] Connecting to {redisHost}:{redisPort}...");
-
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    ConnectionMultiplexer.Connect(configOptions));
-
-builder.Services.AddHostedService<VoteReceiver>();
 
 string configUrl = Environment.GetEnvironmentVariable("CENTRAL_CONFIG_URL")
                    ?? throw new Exception("CENTRAL_CONFIG_URL env var is missing!");
@@ -123,15 +89,6 @@ builder.Services.Configure<FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 786432000;
 });
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-        policy.AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader());
-});
-
-
 var dbPath = Path.Join("/app/data", "modelcycle.db");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
@@ -139,13 +96,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IModelDeploymentService, ModelDeploymentService>();
 builder.Services.AddSingleton<IBetaDistribution, BetaDistribution>();
 builder.Services.AddSingleton<IConfidenceService, ConfidenceService>();
+builder.Services.AddSingleton<IInternalRequestAuthorizer, InternalRequestAuthorizer>();
 builder.Services.AddDataProtection();
-
-string mediaServiceUrl = builder.Configuration["MediaServiceUrl"] ?? "http://media-srv:3000";
-builder.Services.AddHttpClient<IMediaService, MediaService>(client =>
-{
-    client.BaseAddress = new Uri(mediaServiceUrl);
-});
 
 builder.Services.AddScoped<IDatasetService, DatasetService>();
 

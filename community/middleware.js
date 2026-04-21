@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLoginUrlFromHeaders, isHttpsFromHeaders } from "./externalOrigin";
+import { applySecurityHeaders } from "./lib/securityHeaders.js";
 
 function isPublicPath(pathname) {
   return (
@@ -49,18 +50,18 @@ function redirectToLogin(request, reason = "auth_failed") {
     secure,
   });
 
-  return res;
+  return applySecurityHeaders(res);
 }
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  if (isPublicPath(pathname)) return NextResponse.next();
-  if (isTrustedInternalRequest(request)) return NextResponse.next();
+  if (isPublicPath(pathname)) return applySecurityHeaders(NextResponse.next());
+  if (isTrustedInternalRequest(request)) return applySecurityHeaders(NextResponse.next());
 
   const token = request.cookies.get("access_token")?.value;
   if (!token) return redirectToLogin(request, "missing_access_token");
-  return NextResponse.next();
+  return applySecurityHeaders(NextResponse.next());
 }
 
 export const config = {

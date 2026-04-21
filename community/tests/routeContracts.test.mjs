@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -63,6 +63,30 @@ test("community routes do not read raw images collection directly", () => {
   assert.doesNotMatch(reportRoute, /collection\("images"\)/);
   assert.match(postsRoute, /fetchPublicImagesByIds/);
   assert.match(reportRoute, /fetchPublicImagesByIds/);
+});
+
+test("community vote flush uses gateway model-cycle evaluation instead of the legacy redis stream bridge", () => {
+  const voteFlushWorker = readRepoFile("voteFlushWorker.js");
+
+  assert.match(voteFlushWorker, /evaluateCommunityVotes/);
+  assert.match(voteFlushWorker, /fetchPublicImagesByIds/);
+  assert.doesNotMatch(voteFlushWorker, /events:model_cycle/);
+  assert.doesNotMatch(voteFlushWorker, /xadd\(/);
+});
+
+test("community runtime image copies app/lib so standalone workers can resolve shared helpers", () => {
+  const dockerfile = readRepoFile("Dockerfile");
+
+  assert.match(dockerfile, /COPY --from=build \/app\/app\/lib \.\/app\/lib/);
+});
+
+test("community middleware applies runtime security headers instead of build-time next.config headers", () => {
+  const middleware = readRepoFile("middleware.js");
+  const nextConfig = readRepoFile("next.config.js");
+
+  assert.match(middleware, /applySecurityHeaders/);
+  assert.doesNotMatch(nextConfig, /Content-Security-Policy/);
+  assert.doesNotMatch(nextConfig, /async headers\(\)/);
 });
 
 test("community post and moderation routes use canonical gateway image sync helpers", () => {
@@ -165,6 +189,45 @@ test("admin BFF routes always pass the incoming request into proxyAdminJson", ()
     const routeSource = readRepoFile(routeFile);
     assert.match(routeSource, /proxyAdminJson/);
     assert.match(routeSource, /request:\s*(req|_req)/);
+  }
+});
+
+test("community runtime CSP allows exact local storage origin and upload connect-src", async () => {
+  const previousAppEnv = process.env.APP_ENV;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousStorageEndpoint = process.env.S3_PUBLIC_ENDPOINT;
+  process.env.S3_PUBLIC_ENDPOINT = "http://storage.aiclipse.local";
+
+  try {
+    process.env.APP_ENV = "prod";
+    process.env.NODE_ENV = "production";
+    const securityModule = await import(`${pathToFileURL(path.join(repoRoot, "lib/securityHeaders.js")).href}?runtime-csp`);
+    const headers = securityModule.buildSecurityHeaders(process.env);
+    const headerMap = Object.fromEntries(headers.map((header) => [header.key, header.value]));
+
+    assert.match(headerMap["Content-Security-Policy"], /default-src 'self'/);
+    assert.match(headerMap["Content-Security-Policy"], /img-src[^;]*https:\/\/storage\.aiclipse\.local/);
+    assert.match(headerMap["Content-Security-Policy"], /img-src[^;]*http:\/\/storage\.aiclipse\.local/);
+    assert.match(headerMap["Content-Security-Policy"], /connect-src[^;]*https:\/\/storage\.aiclipse\.local/);
+    assert.match(headerMap["Content-Security-Policy"], /connect-src[^;]*http:\/\/storage\.aiclipse\.local/);
+    assert.equal(headerMap["X-Content-Type-Options"], "nosniff");
+    assert.equal(headerMap["X-Frame-Options"], "DENY");
+  } finally {
+    if (previousAppEnv === undefined) {
+      delete process.env.APP_ENV;
+    } else {
+      process.env.APP_ENV = previousAppEnv;
+    }
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+    if (previousStorageEndpoint === undefined) {
+      delete process.env.S3_PUBLIC_ENDPOINT;
+    } else {
+      process.env.S3_PUBLIC_ENDPOINT = previousStorageEndpoint;
+    }
   }
 });
 

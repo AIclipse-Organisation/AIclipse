@@ -675,3 +675,73 @@ def test_webhook_subscription_deleted_duplicate_plan_insert_skipped(client, stat
     state["auth_update"].assert_called_once()
     state["billing_coll"].update_many.assert_called_once()
     state["billing_coll"].insert_one.assert_called_once()
+
+
+def test_ensure_billing_indexes_bootstraps_latest_state_query_indexes(billing_module):
+    plan_calls = []
+    billing_calls = []
+
+    class _PlanCollection:
+        def create_index(self, keys, **options):
+            plan_calls.append((keys, options))
+            return options["name"]
+
+    class _BillingCollection:
+        def create_index(self, keys, **options):
+            billing_calls.append((keys, options))
+            return options["name"]
+
+    billing_module.ensure_billing_indexes(_PlanCollection(), _BillingCollection())
+
+    assert plan_calls == [
+        ([("stripe_event_id", 1)], {"unique": True, "sparse": True, "name": "uniq_plan_stripe_event_id"}),
+        ([("user_id", 1), ("timestamp", -1)], {"name": "plan_user_latest"}),
+        ([("stripe_customer_id", 1), ("timestamp", -1)], {"name": "plan_customer_latest"}),
+    ]
+    assert billing_calls == [
+        ([("stripe_event_id", 1)], {"unique": True, "sparse": True, "name": "uniq_billing_stripe_event_id"}),
+        ([("user_id", 1), ("status", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_user_status_latest"}),
+        ([("user_id", 1), ("stripe_subscription_id", 1), ("status", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_user_subscription_status_latest"}),
+        ([("stripe_subscription_id", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_by_subscription_latest"}),
+        ([("stripe_customer_id", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_by_customer_latest"}),
+    ]
+
+
+def test_ensure_billing_indexes_reuses_equivalent_legacy_index_names(billing_module):
+    class _Collection:
+        def __init__(self, indexes):
+            self._indexes = indexes
+            self.create_calls = []
+
+        def list_indexes(self):
+            return list(self._indexes)
+
+        def create_index(self, keys, **options):
+            self.create_calls.append((keys, options))
+            return options["name"]
+
+    plan_collection = _Collection(
+        [
+            {"name": "_id_", "key": {"_id": 1}},
+            {"name": "stripe_event_id_1", "key": {"stripe_event_id": 1}, "unique": True, "sparse": True},
+        ]
+    )
+    billing_collection = _Collection(
+        [
+            {"name": "_id_", "key": {"_id": 1}},
+            {"name": "stripe_event_id_1", "key": {"stripe_event_id": 1}, "unique": True, "sparse": True},
+        ]
+    )
+
+    billing_module.ensure_billing_indexes(plan_collection, billing_collection)
+
+    assert plan_collection.create_calls == [
+        ([("user_id", 1), ("timestamp", -1)], {"name": "plan_user_latest"}),
+        ([("stripe_customer_id", 1), ("timestamp", -1)], {"name": "plan_customer_latest"}),
+    ]
+    assert billing_collection.create_calls == [
+        ([("user_id", 1), ("status", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_user_status_latest"}),
+        ([("user_id", 1), ("stripe_subscription_id", 1), ("status", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_user_subscription_status_latest"}),
+        ([("stripe_subscription_id", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_by_subscription_latest"}),
+        ([("stripe_customer_id", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_by_customer_latest"}),
+    ]

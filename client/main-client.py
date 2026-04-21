@@ -2,6 +2,7 @@ import logging
 import os
 import requests
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import Flask, request, session, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -54,13 +55,50 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 31536000
 gateway = GatewayClient(GATEWAY_URI)
 
 
+def _normalize_origin(value: str | None) -> str | None:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return None
+
+    parsed = urlsplit(raw_value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _configured_storage_origins() -> list[str]:
+    seen: set[str] = set()
+    origins: list[str] = []
+
+    def _add(origin: str | None) -> None:
+        normalized = _normalize_origin(origin)
+        if normalized is None or normalized in seen:
+            return
+        seen.add(normalized)
+        origins.append(normalized)
+
+    configured_origin = _normalize_origin(os.getenv("S3_PUBLIC_ENDPOINT"))
+    if configured_origin is None:
+        return origins
+
+    parsed = urlsplit(configured_origin)
+    host = parsed.netloc
+    _add(f"https://{host}")
+    _add(f"http://{host}")
+
+    return origins
+
+
 def _build_img_src_directive() -> str:
-    # Dev environments often serve presigned or internal media URLs over plain HTTP.
-    # Keep production strict while allowing local development to render those images.
-    schemes = ["'self'", "data:", "blob:", "https:"]
-    if not is_prod:
-        schemes.append("http:")
-    return "img-src " + " ".join(schemes)
+    # Storage is the only cross-origin image source we intentionally render.
+    sources = [
+        "'self'",
+        "data:",
+        "blob:",
+    ]
+    sources.extend(_configured_storage_origins())
+    return "img-src " + " ".join(sources)
 
 
 def is_signup_enabled() -> bool:

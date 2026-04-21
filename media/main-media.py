@@ -12,6 +12,7 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Query
 from pymongo import MongoClient
+from pymongo.errors import OperationFailure
 from bson import ObjectId
 
 from pydantic import BaseModel, Field, ConfigDict
@@ -63,6 +64,13 @@ _mongo_connection_state = {
     "last_error_at": 0.0,
     "last_error_message": None,
 }
+_image_indexes_ready = False
+_IMAGE_INDEX_SPECS = [
+    (("image_id", 1), {"unique": True, "name": "uniq_image_id"}),
+    (("user_id", 1), ("uploaded_at", -1), {"name": "by_user_uploaded"}),
+    (("is_public", 1), ("uploaded_at", -1), {"name": "by_public_uploaded"}),
+    (("user_id", 1), ("is_public", 1), ("uploaded_at", -1), {"name": "by_user_public_uploaded"}),
+]
 
 
 def _build_mongo_client() -> MongoClient:
@@ -97,6 +105,69 @@ def _note_mongo_unavailable(exc: Exception) -> None:
     _mongo_connection_state["available"] = False
 
 
+def ensure_image_indexes(images_collection) -> None:
+    global _image_indexes_ready
+
+    if _image_indexes_ready:
+        return
+
+    for spec in _IMAGE_INDEX_SPECS:
+        *fields, options = spec
+        _ensure_collection_index(images_collection, list(fields), options)
+
+    _image_indexes_ready = True
+
+
+def _read_collection_indexes(collection) -> list[dict]:
+    if not hasattr(collection, "list_indexes"):
+        return []
+    try:
+        return list(collection.list_indexes())
+    except OperationFailure as exc:
+        details = exc.details or {}
+        if exc.code == 26 or details.get("codeName") == "NamespaceNotFound":
+            return []
+        raise
+
+
+def _same_key_pattern(existing: dict, desired_keys: list[tuple[str, int]]) -> bool:
+    existing_items = list((existing or {}).items())
+    return existing_items == desired_keys
+
+
+def _same_optional_bool(existing: dict, desired: dict, option_name: str) -> bool:
+    return bool(existing.get(option_name)) == bool(desired.get(option_name))
+
+
+def _is_equivalent_index(existing: dict, desired_keys: list[tuple[str, int]], desired_options: dict) -> bool:
+    return (
+        _same_key_pattern(existing.get("key", {}), desired_keys)
+        and _same_optional_bool(existing, desired_options, "unique")
+    )
+
+
+def _ensure_collection_index(collection, keys: list[tuple[str, int]], options: dict) -> str:
+    indexes = _read_collection_indexes(collection)
+    equivalent = next((index for index in indexes if _is_equivalent_index(index, keys, options)), None)
+    if equivalent is not None:
+        return equivalent["name"]
+
+    named = next((index for index in indexes if index.get("name") == options["name"]), None)
+    if named is not None:
+        raise RuntimeError(
+            f"Index '{options['name']}' conflicts with existing incompatible index '{named['name']}'"
+        )
+
+    try:
+        return collection.create_index(keys, **options)
+    except OperationFailure:
+        refreshed = _read_collection_indexes(collection)
+        equivalent = next((index for index in refreshed if _is_equivalent_index(index, keys, options)), None)
+        if equivalent is not None:
+            return equivalent["name"]
+        raise
+
+
 def get_images_collection():
     global mc
 
@@ -109,7 +180,9 @@ def get_images_collection():
                 mc = _build_mongo_client()
             mc.admin.command("ping")
             _note_mongo_available()
-            return mc[MONGO_DB].images
+            collection = mc[MONGO_DB].images
+            ensure_image_indexes(collection)
+            return collection
         except Exception as exc:
             _note_mongo_unavailable(exc)
             if mc is not None:
