@@ -1,7 +1,7 @@
 name: prod-deploy
 on:
   push:
-    branches: [main]
+    branches: [ftr/architecture/ImproveTrustBoundaries]
   workflow_dispatch: {}
 
 concurrency:
