@@ -9,6 +9,7 @@ using ModelCycle.Services.ImageConfidence;
 using ModelCycle.Services.Data;
 using ModelCycle.Services.Training;
 using ModelCycle.Services;
+using ModelCycle.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -115,7 +116,10 @@ builder.Services.AddMemoryCache();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.OperationFilter<ModelUploadPartOperationFilter>();
+});
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();

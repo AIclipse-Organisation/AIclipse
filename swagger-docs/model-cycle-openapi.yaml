@@ -84,27 +84,58 @@ components:
 
     CreateModelUploadSessionResponse:
       type: object
-      required: [UploadId, UploadUrl, UploadMethod, UploadHeaders, ExpiresAt]
+      required: [uploadId, uploadMethod, partSizeBytes, totalParts, expiresAt]
       properties:
-        UploadId:
+        uploadId:
           type: string
-          description: Opaque signed upload session token used when finalizing the model.
-        UploadUrl:
-          type: string
-          format: uri
-          description: Presigned object-storage URL for the direct PUT upload.
-        UploadMethod:
+          description: Opaque signed upload session token used for chunk uploads and finalize.
+        uploadMethod:
           type: string
           example: PUT
-        UploadHeaders:
-          type: object
-          additionalProperties:
-            type: string
-          description: Headers the browser must send to the presigned upload URL.
-        ExpiresAt:
+        partSizeBytes:
+          type: integer
+          format: int32
+          description: Exact chunk size for every part except the last one.
+        totalParts:
+          type: integer
+          format: int32
+          minimum: 1
+          description: Total number of sequential parts required for this upload.
+        expiresAt:
           type: string
           format: date-time
           description: Upload session expiry timestamp in UTC.
+
+    UploadModelPartResponse:
+      type: object
+      required: [partNumber]
+      properties:
+        partNumber:
+          type: integer
+          format: int32
+          minimum: 1
+          description: 1-based part number acknowledged by the server.
+
+    FinalizeModelUploadResponse:
+      type: object
+      required: [message, id, version, imagesLinked]
+      properties:
+        message:
+          type: string
+        id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        imagesLinked:
+          type: integer
+
+    ModelUploadErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
 
     FinalizeModelUploadRequest:
       type: object
@@ -378,13 +409,14 @@ paths:
 
   /api/models/uploads:
     post:
-      summary: Create a direct-upload session for a model
+      summary: Create a chunked upload session for a model
       tags: [Models]
       description: >
-        Returns a presigned object-storage PUT URL for browser-direct upload.
-        The control plane stays on the authenticated admin path, but the
-        model bytes bypass application servers. The service may also reap
-        expired abandoned staging objects older than the upload-session TTL.
+        Creates an authenticated upload session for a manual admin model
+        upload. The response defines the bounded chunk contract
+        (`uploadMethod`, `partSizeBytes`, `totalParts`, `expiresAt`).
+        Model Cycle may also reap expired abandoned staging directories
+        older than the upload-session TTL while creating the session.
       requestBody:
         required: true
         content:
@@ -400,17 +432,73 @@ paths:
                 $ref: "#/components/schemas/CreateModelUploadSessionResponse"
         "400":
           description: Invalid version, file size, or file extension
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
         "409":
           description: Model version already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
+
+  /api/models/uploads/parts/{partNumber}:
+    put:
+      summary: Upload one staged model chunk
+      tags: [Models]
+      description: >
+        Streams one numbered chunk into the active upload session. Chunks
+        must arrive in order and match the approved size for the session.
+      parameters:
+        - in: path
+          name: partNumber
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: 1-based sequential part number for this upload.
+        - in: header
+          name: X-Upload-Id
+          required: true
+          schema:
+            type: string
+          description: Opaque upload session token returned by POST /api/models/uploads.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Chunk accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadModelPartResponse"
+        "400":
+          description: Invalid upload session, part number, content type, or part size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
+        "409":
+          description: Out-of-order chunk or staged size mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
 
   /api/models/uploads/finalize:
     post:
-      summary: Finalize a direct-uploaded model and deploy it
+      summary: Finalize a staged model upload and deploy it
       tags: [Models]
       description: >
-        Validates the uploaded object against the signed upload session,
-        promotes the staged upload to the canonical release key
-        `models/{version}.{ext}`, stores model lineage in SQLite,
+        Validates the staged file against the signed upload session,
+        uploads the canonical release key `models/{version}.{ext}`,
+        stores model lineage in SQLite,
         deactivates prior deployments, and notifies Detector Service for hot-swap.
       requestBody:
         required: true
@@ -424,21 +512,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  Message:
-                    type: string
-                  Id:
-                    type: string
-                    format: uuid
-                  Version:
-                    type: string
-                  ImagesLinked:
-                    type: integer
+                $ref: "#/components/schemas/FinalizeModelUploadResponse"
         "400":
           description: Invalid or expired upload session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
         "409":
           description: Upload missing, size mismatch, or version conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
 
   /api/models:
     get:

@@ -92,6 +92,23 @@ async def gateway_finalize_model_upload(
         user=user,
     )
 
+
+@router.put("/models/uploads/parts/{part_number}")
+async def gateway_upload_model_part(
+    part_number: int,
+    request: Request,
+    user: UserContext = Depends(get_current_admin),
+):
+    return await proxy_cycle_request(
+        request,
+        method="PUT",
+        path=f"/api/models/uploads/parts/{part_number}",
+        timeout=300.0,
+        include_body=True,
+        forward_headers=("x-upload-id",),
+        user=user,
+    )
+
 # ---------------------------------------------------------
 # 6. LIST ALL MODELS
 # ---------------------------------------------------------

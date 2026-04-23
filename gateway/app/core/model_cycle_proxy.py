@@ -37,6 +37,7 @@ async def proxy_cycle_request(
     path: str,
     timeout: float = 30.0,
     include_body: bool = False,
+    forward_headers: tuple[str, ...] = (),
     user: UserContext | None = None,
 ) -> Response:
     url = f"{get_cycle_url(request)}{path}"
@@ -45,6 +46,11 @@ async def proxy_cycle_request(
         **_internal_cycle_headers(request, user),
         **build_external_proto_headers(request),
     }
+    for header_name in forward_headers:
+        header_value = request.headers.get(header_name)
+        if header_value:
+            headers[header_name] = header_value
+
     body = await request.body() if include_body else None
     if include_body:
         headers["Content-Type"] = request.headers.get("Content-Type", "application/json")

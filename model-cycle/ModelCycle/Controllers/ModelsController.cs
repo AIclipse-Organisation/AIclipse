@@ -108,9 +108,11 @@ public class ModelsController : ControllerBase
     }
 
     [HttpPost("uploads")]
-    public async Task<IActionResult> CreateUploadSession(
-        [FromBody] CreateModelUploadSessionRequest request,
-        [FromHeader(Name = "X-External-Proto")] string? xExternalProto)
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(CreateModelUploadSessionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateUploadSession([FromBody] CreateModelUploadSessionRequest request)
     {
         var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
         if (authFailure != null)
@@ -120,16 +122,52 @@ public class ModelsController : ControllerBase
 
         try
         {
-            var session = await _deploymentService.CreateUploadSessionAsync(request, xExternalProto);
+            var session = await _deploymentService.CreateUploadSessionAsync(request);
             return Ok(session);
         }
         catch (ModelUploadException ex)
         {
-            return StatusCode(ex.StatusCode, new { detail = ex.Message });
+            return StatusCode(ex.StatusCode, new ModelUploadErrorResponse { Detail = ex.Message });
+        }
+    }
+
+    [HttpPut("uploads/parts/{partNumber:int}")]
+    [Consumes("application/octet-stream")]
+    [ProducesResponseType(typeof(UploadModelPartResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UploadPart(
+        int partNumber,
+        [FromHeader(Name = "X-Upload-Id")] string uploadId)
+    {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
+        try
+        {
+            var part = await _deploymentService.UploadPartAsync(
+                uploadId,
+                partNumber,
+                Request.Body,
+                Request.ContentLength,
+                Request.ContentType
+            );
+            return Ok(part);
+        }
+        catch (ModelUploadException ex)
+        {
+            return StatusCode(ex.StatusCode, new ModelUploadErrorResponse { Detail = ex.Message });
         }
     }
 
     [HttpPost("uploads/finalize")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(FinalizeModelUploadResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> FinalizeUpload([FromBody] FinalizeModelUploadRequest request)
     {
         var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
@@ -145,7 +183,7 @@ public class ModelsController : ControllerBase
                                + (request.ReplayImageIds?.Count ?? 0)
                                + (request.GoldenTestImageIds?.Count ?? 0);
 
-            return Ok(new
+            return Ok(new FinalizeModelUploadResponse
             {
                 Message = "Model uploaded, deployed, and lineage tracked.",
                 Id = deployedModel.Id,
@@ -155,7 +193,7 @@ public class ModelsController : ControllerBase
         }
         catch (ModelUploadException ex)
         {
-            return StatusCode(ex.StatusCode, new { detail = ex.Message });
+            return StatusCode(ex.StatusCode, new ModelUploadErrorResponse { Detail = ex.Message });
         }
     }
 

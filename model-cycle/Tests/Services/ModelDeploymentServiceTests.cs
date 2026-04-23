@@ -1,8 +1,12 @@
+#nullable enable
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelCycle.Data;
 using ModelCycle.DTOs;
@@ -15,6 +19,8 @@ namespace Tests.Services;
 
 public class ModelDeploymentServiceTests
 {
+    private const int MultipartPartSizeBytes = 16 * 1024 * 1024;
+
     private static AppDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -23,10 +29,21 @@ public class ModelDeploymentServiceTests
         return new AppDbContext(options);
     }
 
+    private static IConfiguration CreateConfiguration(string stagingRootPath)
+    {
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["TRAINING_DATA_PATH"] = stagingRootPath,
+            })
+            .Build();
+    }
+
     private static ModelDeploymentService CreateService(
         AppDbContext db,
         Mock<IBlobStorageService> blobStorage,
-        Mock<IDetectorClientService> detectorClient)
+        Mock<IDetectorClientService> detectorClient,
+        string stagingRootPath)
     {
         var dataProtectionProvider = new EphemeralDataProtectionProvider();
         var memoryCache = new MemoryCache(new MemoryCacheOptions());
@@ -36,12 +53,13 @@ public class ModelDeploymentServiceTests
             detectorClient.Object,
             memoryCache,
             dataProtectionProvider,
+            CreateConfiguration(stagingRootPath),
             NullLogger<ModelDeploymentService>.Instance
         );
     }
 
     [Fact]
-    public async Task CreateAndFinalizeUpload_DeploysStoredModelAndDeactivatesPreviousVersion()
+    public async Task CreateUploadSession_UploadPart_AndFinalize_DeploysStoredModelAndDeactivatesPreviousVersion()
     {
         await using var db = CreateDbContext();
         db.ModelWeights.Add(new ModelWeights
@@ -55,81 +73,84 @@ public class ModelDeploymentServiceTests
         await db.SaveChangesAsync();
 
         var blobStorage = new Mock<IBlobStorageService>();
+        long? uploadedLength = null;
         blobStorage
-            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null))
-            .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
+            .Setup(b => b.StatObjectAsync("models/v2.0.1.pt", null))
+            .ReturnsAsync((BlobObjectInfo?)null);
         blobStorage
-            .Setup(b => b.StatObjectAsync(It.IsAny<string>(), null))
-            .ReturnsAsync((string objectName, string _) =>
-            {
-                if (objectName == "models/v2.0.1.pt")
-                {
-                    return null;
-                }
-
-                return new BlobObjectInfo(objectName, 123);
-            });
-        blobStorage
-            .Setup(b => b.CopyObjectAsync(It.IsAny<string>(), It.IsAny<string>(), null))
-            .Returns(Task.CompletedTask);
-        blobStorage
-            .Setup(b => b.DeleteObjectsOlderThanAsync("models/uploads/", It.IsAny<DateTime>(), null))
-            .ReturnsAsync(0);
-        blobStorage
-            .Setup(b => b.DeleteFileAsync(It.IsAny<string>(), null))
-            .Returns(Task.CompletedTask);
+            .Setup(b => b.UploadFileAsync(It.IsAny<Stream>(), "models", "v2.0.1.pt", "application/octet-stream"))
+            .Callback<Stream, string, string, string>((stream, _, _, _) => uploadedLength = stream.Length)
+            .ReturnsAsync("models/v2.0.1.pt");
 
         var detectorClient = new Mock<IDetectorClientService>();
         detectorClient
             .Setup(d => d.NotifyModelUpdateAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(true);
 
-        var service = CreateService(db, blobStorage, detectorClient);
+        var stagingRootPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
 
-        var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
+        try
         {
-            Version = "2.0.1",
-            FileName = "weights.pt",
-            FileSize = 123,
-            ContentType = "application/octet-stream",
-        });
+            var service = CreateService(db, blobStorage, detectorClient, stagingRootPath);
 
-        var deployed = await service.FinalizeUploadedModelAsync(new FinalizeModelUploadRequest
+            var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
+            {
+                Version = "2.0.1",
+                FileName = "weights.pt",
+                FileSize = 123,
+                ContentType = "application/octet-stream",
+            });
+
+            Assert.Equal("PUT", session.UploadMethod);
+            Assert.Equal(1, session.TotalParts);
+            Assert.Equal(MultipartPartSizeBytes, session.PartSizeBytes);
+
+            await using var partStream = new MemoryStream(new byte[123]);
+            var uploadedPart = await service.UploadPartAsync(
+                session.UploadId,
+                1,
+                partStream,
+                123,
+                "application/octet-stream"
+            );
+
+            Assert.Equal(1, uploadedPart.PartNumber);
+
+            var deployed = await service.FinalizeUploadedModelAsync(new FinalizeModelUploadRequest
+            {
+                UploadId = session.UploadId,
+                Version = "2.0.1",
+                NewImagesCount = 1,
+            });
+
+            Assert.Equal("v2.0.1", deployed.Version);
+            Assert.True(deployed.IsDeployed);
+            Assert.Equal("models/v2.0.1.pt", deployed.MinioObjectPath);
+            Assert.Equal(2, await db.ModelWeights.CountAsync());
+            Assert.Equal(1, await db.ModelWeights.CountAsync(m => m.IsDeployed));
+            Assert.False((await db.ModelWeights.SingleAsync(m => m.Version == "v1.0.0")).IsDeployed);
+            Assert.Equal(123, uploadedLength);
+            blobStorage.Verify(
+                b => b.UploadFileAsync(
+                    It.IsAny<Stream>(),
+                    "models",
+                    "v2.0.1.pt",
+                    "application/octet-stream"
+                ),
+                Times.Once
+            );
+            detectorClient.Verify(
+                d => d.NotifyModelUpdateAsync("v2.0.1", "models/v2.0.1.pt"),
+                Times.Once
+            );
+        }
+        finally
         {
-            UploadId = session.UploadId,
-            Version = "2.0.1",
-            NewImagesCount = 1,
-        });
-
-        Assert.Equal("v2.0.1", deployed.Version);
-        Assert.True(deployed.IsDeployed);
-        Assert.Equal("models/v2.0.1.pt", deployed.MinioObjectPath);
-        Assert.Equal(2, await db.ModelWeights.CountAsync());
-        Assert.Equal(1, await db.ModelWeights.CountAsync(m => m.IsDeployed));
-        Assert.False((await db.ModelWeights.SingleAsync(m => m.Version == "v1.0.0")).IsDeployed);
-        blobStorage.Verify(
-            b => b.CopyObjectAsync(
-                It.Is<string>(path => path.StartsWith("models/uploads/", StringComparison.Ordinal)),
-                "models/v2.0.1.pt",
-                null
-            ),
-            Times.Once
-        );
-        blobStorage.Verify(
-            b => b.DeleteFileAsync(
-                It.Is<string>(path => path.StartsWith("models/uploads/", StringComparison.Ordinal)),
-                null
-            ),
-            Times.Once
-        );
-
-        detectorClient.Verify(
-            d => d.NotifyModelUpdateAsync(
-                "v2.0.1",
-                "models/v2.0.1.pt"
-            ),
-            Times.Once
-        );
+            if (Directory.Exists(stagingRootPath))
+            {
+                Directory.Delete(stagingRootPath, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -139,43 +160,138 @@ public class ModelDeploymentServiceTests
 
         var blobStorage = new Mock<IBlobStorageService>();
         blobStorage
-            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null))
-            .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
-        blobStorage
-            .Setup(b => b.DeleteObjectsOlderThanAsync("models/uploads/", It.IsAny<DateTime>(), null))
-            .ReturnsAsync(0);
-        blobStorage
-            .Setup(b => b.StatObjectAsync(It.IsAny<string>(), null))
-            .ReturnsAsync((string objectName, string _) =>
-            {
-                if (objectName == "models/v2.0.1.pt")
-                {
-                    return null;
-                }
-
-                return new BlobObjectInfo(objectName, 99);
-            });
+            .Setup(b => b.StatObjectAsync("models/v2.0.1.pt", null))
+            .ReturnsAsync((BlobObjectInfo?)null);
 
         var detectorClient = new Mock<IDetectorClientService>();
-        var service = CreateService(db, blobStorage, detectorClient);
+        var stagingRootPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
 
-        var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
+        try
         {
-            Version = "v2.0.1",
-            FileName = "weights.pt",
-            FileSize = 123,
-            ContentType = "application/octet-stream",
-        });
+            var service = CreateService(db, blobStorage, detectorClient, stagingRootPath);
 
-        var ex = await Assert.ThrowsAsync<ModelUploadException>(() => service.FinalizeUploadedModelAsync(new FinalizeModelUploadRequest
+            var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
+            {
+                Version = "v2.0.1",
+                FileName = "weights.pt",
+                FileSize = MultipartPartSizeBytes + 1L,
+                ContentType = "application/octet-stream",
+            });
+
+            await using var partStream = new MemoryStream(new byte[MultipartPartSizeBytes]);
+            await service.UploadPartAsync(
+                session.UploadId,
+                1,
+                partStream,
+                MultipartPartSizeBytes,
+                "application/octet-stream"
+            );
+
+            var ex = await Assert.ThrowsAsync<ModelUploadException>(() => service.FinalizeUploadedModelAsync(new FinalizeModelUploadRequest
+            {
+                UploadId = session.UploadId,
+                Version = "v2.0.1",
+            }));
+
+            Assert.Equal(409, ex.StatusCode);
+            Assert.Contains("size", ex.Message, StringComparison.OrdinalIgnoreCase);
+            detectorClient.Verify(d => d.NotifyModelUpdateAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        }
+        finally
         {
-            UploadId = session.UploadId,
-            Version = "v2.0.1",
-        }));
+            if (Directory.Exists(stagingRootPath))
+            {
+                Directory.Delete(stagingRootPath, recursive: true);
+            }
+        }
+    }
 
-        Assert.Equal(409, ex.StatusCode);
-        Assert.Contains("size", ex.Message, StringComparison.OrdinalIgnoreCase);
-        detectorClient.Verify(d => d.NotifyModelUpdateAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    [Fact]
+    public async Task UploadPart_RejectsUnexpectedPartSize()
+    {
+        await using var db = CreateDbContext();
+
+        var blobStorage = new Mock<IBlobStorageService>();
+        var detectorClient = new Mock<IDetectorClientService>();
+        var stagingRootPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = CreateService(db, blobStorage, detectorClient, stagingRootPath);
+
+            var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
+            {
+                Version = "v2.0.1",
+                FileName = "weights.pt",
+                FileSize = MultipartPartSizeBytes + 1L,
+                ContentType = "application/octet-stream",
+            });
+
+            await using var partStream = new MemoryStream(new byte[1]);
+            var ex = await Assert.ThrowsAsync<ModelUploadException>(() => service.UploadPartAsync(
+                session.UploadId,
+                1,
+                partStream,
+                1,
+                "application/octet-stream"
+            ));
+
+            Assert.Equal(400, ex.StatusCode);
+            Assert.Contains("size", ex.Message, StringComparison.OrdinalIgnoreCase);
+            blobStorage.Verify(
+                b => b.UploadFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()),
+                Times.Never
+            );
+        }
+        finally
+        {
+            if (Directory.Exists(stagingRootPath))
+            {
+                Directory.Delete(stagingRootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task UploadPart_RejectsOutOfOrderUploads()
+    {
+        await using var db = CreateDbContext();
+
+        var blobStorage = new Mock<IBlobStorageService>();
+        var detectorClient = new Mock<IDetectorClientService>();
+        var stagingRootPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = CreateService(db, blobStorage, detectorClient, stagingRootPath);
+
+            var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
+            {
+                Version = "v2.0.1",
+                FileName = "weights.pt",
+                FileSize = MultipartPartSizeBytes + 1L,
+                ContentType = "application/octet-stream",
+            });
+
+            await using var partStream = new MemoryStream(new byte[1]);
+            var ex = await Assert.ThrowsAsync<ModelUploadException>(() => service.UploadPartAsync(
+                session.UploadId,
+                2,
+                partStream,
+                1,
+                "application/octet-stream"
+            ));
+
+            Assert.Equal(409, ex.StatusCode);
+            Assert.Contains("order", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(stagingRootPath))
+            {
+                Directory.Delete(stagingRootPath, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -184,97 +300,35 @@ public class ModelDeploymentServiceTests
         await using var db = CreateDbContext();
 
         var blobStorage = new Mock<IBlobStorageService>();
-        blobStorage
-            .Setup(b => b.DeleteObjectsOlderThanAsync("models/uploads/", It.IsAny<DateTime>(), null))
-            .ReturnsAsync(2);
-        blobStorage
-            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null))
-            .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
-
         var detectorClient = new Mock<IDetectorClientService>();
-        var service = CreateService(db, blobStorage, detectorClient);
+        var stagingRootPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
 
-        var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
+        try
         {
-            Version = "v2.0.1",
-            FileName = "weights.pt",
-            FileSize = 123,
-        });
+            Directory.CreateDirectory(Path.Combine(stagingRootPath, "admin-upload-staging", "expired"));
+            var marker = Path.Combine(stagingRootPath, "admin-upload-staging", "expired", ".upload-session");
+            File.WriteAllText(marker, string.Empty);
+            File.SetLastWriteTimeUtc(marker, DateTime.UtcNow.AddHours(-2));
 
-        Assert.Equal("PUT", session.UploadMethod);
-        blobStorage.Verify(
-            b => b.DeleteObjectsOlderThanAsync(
-                "models/uploads/",
-                It.Is<DateTime>(cutoff =>
-                    cutoff <= DateTime.UtcNow.AddMinutes(-59) &&
-                    cutoff >= DateTime.UtcNow.AddMinutes(-61)),
-                null
-            ),
-            Times.Once
-        );
-    }
+            var service = CreateService(db, blobStorage, detectorClient, stagingRootPath);
 
-    [Fact]
-    public async Task CreateUploadSession_ForwardsExternalProtoToBlobStorage()
-    {
-        await using var db = CreateDbContext();
-
-        var blobStorage = new Mock<IBlobStorageService>();
-        blobStorage
-            .Setup(b => b.DeleteObjectsOlderThanAsync("models/uploads/", It.IsAny<DateTime>(), null))
-            .ReturnsAsync(0);
-        blobStorage
-            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), "https"))
-            .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
-
-        var detectorClient = new Mock<IDetectorClientService>();
-        var service = CreateService(db, blobStorage, detectorClient);
-
-        var session = await service.CreateUploadSessionAsync(
-            new CreateModelUploadSessionRequest
+            var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
             {
                 Version = "v2.0.1",
                 FileName = "weights.pt",
                 FileSize = 123,
-            },
-            "https"
-        );
+            });
 
-        Assert.Equal("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt", session.UploadUrl);
-        blobStorage.Verify(
-            b => b.CreatePresignedUploadUrlAsync(
-                It.Is<string>(path => path.StartsWith("models/uploads/", StringComparison.Ordinal)),
-                3600,
-                "https"
-            ),
-            Times.Once
-        );
-    }
-
-    [Fact]
-    public async Task CreateUploadSession_ContinuesWhenCleanupFails()
-    {
-        await using var db = CreateDbContext();
-
-        var blobStorage = new Mock<IBlobStorageService>();
-        blobStorage
-            .Setup(b => b.DeleteObjectsOlderThanAsync("models/uploads/", It.IsAny<DateTime>(), null))
-            .ThrowsAsync(new InvalidOperationException("cleanup failed"));
-        blobStorage
-            .Setup(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null))
-            .ReturnsAsync("https://storage.test/model-cycle-storage/models/uploads/abc/v2.0.1.pt");
-
-        var detectorClient = new Mock<IDetectorClientService>();
-        var service = CreateService(db, blobStorage, detectorClient);
-
-        var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
+            Assert.Equal("PUT", session.UploadMethod);
+            Assert.False(Directory.Exists(Path.Combine(stagingRootPath, "admin-upload-staging", "expired")));
+        }
+        finally
         {
-            Version = "v2.0.1",
-            FileName = "weights.pt",
-            FileSize = 123,
-        });
-
-        Assert.Equal("PUT", session.UploadMethod);
-        blobStorage.Verify(b => b.CreatePresignedUploadUrlAsync(It.IsAny<string>(), It.IsAny<int>(), null), Times.Once);
+            if (Directory.Exists(stagingRootPath))
+            {
+                Directory.Delete(stagingRootPath, recursive: true);
+            }
+        }
     }
+
 }

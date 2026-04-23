@@ -63,7 +63,7 @@ async def test_admin_model_upload_session_proxies_json_payload(client, patch_ups
         assert req.content == b'{"version":"v2.0.1","fileName":"model.pt","fileSize":123}'
         return httpx.Response(
             status_code=200,
-            json={"uploadId": "upload-token", "uploadUrl": "https://storage.test/model.pt"},
+            json={"uploadId": "upload-token", "partSizeBytes": 16777216, "totalParts": 1},
         )
 
     patch_upstreams.add(host="model-cycle", method="POST", path="/api/models/uploads", handler=create_session_handler)
@@ -141,6 +141,41 @@ async def test_admin_model_upload_finalize_proxies_json_payload(client, patch_up
 
     assert r.status_code == 200
     assert r.json()["version"] == "v2.0.1"
+
+
+@pytest.mark.asyncio
+async def test_admin_model_upload_part_proxies_raw_body_and_upload_id(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_admin",
+        email="admin@example.com",
+        is_admin=True,
+        plan=0,
+    )
+
+    def upload_part_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers["content-type"] == "application/octet-stream"
+        assert req.headers.get("x-upload-id") == "upload-token"
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_admin"
+        assert req.headers.get("x-user-is-admin") == "true"
+        assert req.content == b"chunk-1"
+        return httpx.Response(status_code=200, json={"partNumber": 1})
+
+    patch_upstreams.add(host="model-cycle", method="PUT", path="/api/models/uploads/parts/1", handler=upload_part_handler)
+
+    r = await client.put(
+        "/admin/models/uploads/parts/1",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/octet-stream",
+            "X-Upload-Id": "upload-token",
+        },
+        content=b"chunk-1",
+    )
+
+    assert r.status_code == 200
+    assert r.json()["partNumber"] == 1
 
 
 @pytest.mark.asyncio

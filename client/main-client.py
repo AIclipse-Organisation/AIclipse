@@ -114,7 +114,7 @@ deps = RouteDeps(
 app.register_blueprint(build_auth_blueprint(gateway, is_signup_enabled=is_signup_enabled))
 register_auth_middleware(app, gateway)
 
-app.register_blueprint(build_public_blueprint(deps=deps))
+app.register_blueprint(build_public_blueprint())
 app.register_blueprint(build_detection_blueprint(deps=deps))
 app.register_blueprint(build_library_blueprint(deps=deps))
 app.register_blueprint(build_library_viewscan_blueprint(deps=deps))

@@ -152,23 +152,27 @@ test("community tutorial entry routes to the shared tutorials page", () => {
   assert.doesNotMatch(topbar, /openCenter/);
 });
 
-test("admin model uploads use presigned storage flow instead of the legacy multipart proxy", () => {
+test("admin model uploads use chunked multipart flow through the admin BFF", () => {
   const adminService = readRepoFile("app/admin/admin.js");
   const modelsRoute = readRepoFile("app/adminBFF/models/route.js");
   const uploadRoute = readRepoFile("app/adminBFF/models/uploads/route.js");
+  const uploadPartRoute = readRepoFile("app/adminBFF/models/uploads/parts/[partNumber]/route.js");
   const finalizeRoute = readRepoFile("app/adminBFF/models/uploads/finalize/route.js");
 
   assert.match(adminService, /\/models\/uploads/);
+  assert.match(adminService, /\/models\/uploads\/parts\//);
   assert.match(adminService, /\/models\/uploads\/finalize/);
-  assert.doesNotMatch(adminService, /fetch\(`\/community\/adminBFF\/models`/);
+  assert.doesNotMatch(adminService, /storage\.aiclipse/);
   assert.doesNotMatch(modelsRoute, /http\.request/);
   assert.match(uploadRoute, /proxyAdminJson/);
   assert.match(uploadRoute, /request:\s*req/);
+  assert.match(uploadPartRoute, /proxyAdminUploadPart/);
+  assert.match(uploadPartRoute, /request:\s*req/);
   assert.match(finalizeRoute, /proxyAdminJson/);
   assert.match(finalizeRoute, /request:\s*req/);
 });
 
-test("admin BFF routes always pass the incoming request into proxyAdminJson", () => {
+test("admin BFF routes always pass the incoming request into the admin proxy helper", () => {
   const routeFiles = [
     "app/adminBFF/access-requests/route.js",
     "app/adminBFF/access-requests/[userId]/approve/route.js",
@@ -178,6 +182,7 @@ test("admin BFF routes always pass the incoming request into proxyAdminJson", ()
     "app/adminBFF/models/train/route.js",
     "app/adminBFF/models/training-images/route.js",
     "app/adminBFF/models/uploads/route.js",
+    "app/adminBFF/models/uploads/parts/[partNumber]/route.js",
     "app/adminBFF/models/uploads/finalize/route.js",
     "app/adminBFF/models/[version]/route.js",
     "app/adminBFF/user-deletion-logs/route.js",
@@ -187,9 +192,12 @@ test("admin BFF routes always pass the incoming request into proxyAdminJson", ()
 
   for (const routeFile of routeFiles) {
     const routeSource = readRepoFile(routeFile);
-    assert.match(routeSource, /proxyAdminJson/);
+    assert.match(routeSource, /proxyAdmin(Json|UploadPart)/);
     assert.match(routeSource, /request:\s*(req|_req)/);
   }
+
+  const uploadPartRoute = readRepoFile("app/adminBFF/models/uploads/parts/[partNumber]/route.js");
+  assert.match(uploadPartRoute, /proxyAdminUploadPart/);
 });
 
 test("community runtime CSP allows exact local storage origin and upload connect-src", async () => {
