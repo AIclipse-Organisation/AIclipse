@@ -175,7 +175,8 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[Error] Initialization failed: {ex.Message}");
+        Console.Error.WriteLine($"[Error] Initialization failed: {ex}");
+        throw;
     }
 }
 

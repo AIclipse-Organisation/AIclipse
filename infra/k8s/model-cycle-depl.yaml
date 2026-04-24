@@ -14,6 +14,12 @@ spec:
       labels:
         app: model-cycle
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       volumes: 
         - name: model-data
           persistentVolumeClaim:
@@ -24,11 +30,19 @@ spec:
           - name: wait-for-minio
             image: busybox
             command: ['sh', '-c', 'until nc -z s3-srv 9000; do echo waiting for minio; sleep 2; done;']
+          - name: prepare-model-data
+            image: busybox
+            command:
+              - sh
+              - -c
+              - mkdir -p /app/data && chown -R 1000:1000 /app/data && chmod -R u+rwX,g+rwX /app/data
+            volumeMounts:
+              - name: model-data
+                mountPath: /app/data
       containers:
         - name: model-cycle
           image: aiclipse/model-cycle
           securityContext:
-            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
