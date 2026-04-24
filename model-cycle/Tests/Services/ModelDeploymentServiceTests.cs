@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,14 @@ public class ModelDeploymentServiceTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new AppDbContext(options);
+    }
+
+    private static AppDbContext CreateFailingDbContext()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        return new FailingSaveChangesDbContext(options);
     }
 
     private static IConfiguration CreateConfiguration(string stagingRootPath)
@@ -207,6 +216,63 @@ public class ModelDeploymentServiceTests
     }
 
     [Fact]
+    public async Task FinalizeUpload_RollsBackStoredObject_WhenMetadataPersistenceFails()
+    {
+        await using var db = CreateFailingDbContext();
+
+        var blobStorage = new Mock<IBlobStorageService>();
+        blobStorage
+            .Setup(b => b.StatObjectAsync("models/v2.0.1.pt", null))
+            .ReturnsAsync((BlobObjectInfo?)null);
+        blobStorage
+            .Setup(b => b.UploadFileAsync(It.IsAny<Stream>(), "models", "v2.0.1.pt", "application/octet-stream"))
+            .ReturnsAsync("models/v2.0.1.pt");
+
+        var detectorClient = new Mock<IDetectorClientService>();
+        var stagingRootPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = CreateService(db, blobStorage, detectorClient, stagingRootPath);
+
+            var session = await service.CreateUploadSessionAsync(new CreateModelUploadSessionRequest
+            {
+                Version = "v2.0.1",
+                FileName = "weights.pt",
+                FileSize = 123,
+                ContentType = "application/octet-stream",
+            });
+
+            await using var partStream = new MemoryStream(new byte[123]);
+            await service.UploadPartAsync(
+                session.UploadId,
+                1,
+                partStream,
+                123,
+                "application/octet-stream"
+            );
+
+            var ex = await Assert.ThrowsAsync<ModelUploadException>(() => service.FinalizeUploadedModelAsync(new FinalizeModelUploadRequest
+            {
+                UploadId = session.UploadId,
+                Version = "v2.0.1",
+            }));
+
+            Assert.Equal(500, ex.StatusCode);
+            Assert.Contains("persist", ex.Message, StringComparison.OrdinalIgnoreCase);
+            blobStorage.Verify(b => b.DeleteFileAsync("models/v2.0.1.pt", null), Times.Once);
+            detectorClient.Verify(d => d.NotifyModelUpdateAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        }
+        finally
+        {
+            if (Directory.Exists(stagingRootPath))
+            {
+                Directory.Delete(stagingRootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task UploadPart_RejectsUnexpectedPartSize()
     {
         await using var db = CreateDbContext();
@@ -331,4 +397,16 @@ public class ModelDeploymentServiceTests
         }
     }
 
+    private sealed class FailingSaveChangesDbContext : AppDbContext
+    {
+        public FailingSaveChangesDbContext(DbContextOptions<AppDbContext> options)
+            : base(options)
+        {
+        }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Simulated persistence failure.");
+        }
+    }
 }

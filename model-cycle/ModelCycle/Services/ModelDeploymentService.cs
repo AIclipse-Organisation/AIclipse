@@ -199,8 +199,32 @@ public class ModelDeploymentService : IModelDeploymentService
         };
 
         var links = BuildImageLinks(modelId, request);
-        var deployed = await ActivateStoredModelAsync(storedObjectPath, modelWeight, links);
-        DeleteStagingDirectory(upload);
+        ModelWeights deployed;
+        try
+        {
+            deployed = await ActivateStoredModelAsync(storedObjectPath, modelWeight, links);
+        }
+        catch (ModelUploadException)
+        {
+            await RollbackUploadedObjectBestEffortAsync(storedObjectPath);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await RollbackUploadedObjectBestEffortAsync(storedObjectPath);
+            _logger.LogError(
+                ex,
+                "Failed to persist uploaded model version {Version} after storing object {ObjectPath}.",
+                normalizedVersion,
+                storedObjectPath
+            );
+            throw new ModelUploadException(
+                StatusCodes.Status500InternalServerError,
+                "Failed to persist uploaded model metadata after storing the model file."
+            );
+        }
+
+        TryDeleteStagingDirectory(upload);
         return deployed;
     }
 
@@ -379,12 +403,50 @@ public class ModelDeploymentService : IModelDeploymentService
         return deletedCount;
     }
 
-    private void DeleteStagingDirectory(UploadSessionPayload upload)
+    private void TryDeleteStagingDirectory(UploadSessionPayload upload)
     {
         var stagingDirectory = GetStagingDirectory(upload);
-        if (Directory.Exists(stagingDirectory))
+        if (!Directory.Exists(stagingDirectory))
+        {
+            return;
+        }
+
+        try
         {
             Directory.Delete(stagingDirectory, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to delete staged upload directory {StagingDirectory} after successful model finalize.",
+                stagingDirectory
+            );
+        }
+    }
+
+    private async Task RollbackUploadedObjectBestEffortAsync(string objectPath)
+    {
+        if (string.IsNullOrWhiteSpace(objectPath))
+        {
+            return;
+        }
+
+        try
+        {
+            await _blobService.DeleteFileAsync(objectPath);
+            _logger.LogWarning(
+                "Rolled back uploaded model object {ObjectPath} after finalize failed before persistence.",
+                objectPath
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to roll back uploaded model object {ObjectPath} after finalize failure.",
+                objectPath
+            );
         }
     }
 
