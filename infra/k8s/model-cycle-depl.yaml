@@ -32,6 +32,11 @@ spec:
             command: ['sh', '-c', 'until nc -z s3-srv 9000; do echo waiting for minio; sleep 2; done;']
           - name: prepare-model-data
             image: busybox
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+              runAsGroup: 0
+              allowPrivilegeEscalation: false
             command:
               - sh
               - -c
