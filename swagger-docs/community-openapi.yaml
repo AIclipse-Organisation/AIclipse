@@ -1327,10 +1327,11 @@ paths:
       summary: Create model upload session (admin)
       tags: [Admin BFF]
       description: >
-        Proxies to Gateway /admin/models/uploads. Returns a presigned storage
-        PUT URL so the browser can upload model bytes directly to object storage.
-        Model Cycle may also reap expired abandoned staging objects older than
-        the upload-session TTL while creating the session.
+        Proxies to Gateway /admin/models/uploads. Returns the bounded chunk
+        contract for a manual model upload (`uploadId`, `uploadMethod`,
+        `partSizeBytes`, `totalParts`, `expiresAt`). Model Cycle may also
+        reap expired abandoned staging directories older than the
+        upload-session TTL while creating the session.
       security:
         - cookieAuth: []
       requestBody:
@@ -1353,19 +1354,81 @@ paths:
       responses:
         "200":
           description: Upload session created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uploadId, uploadMethod, partSizeBytes, totalParts, expiresAt]
+                properties:
+                  uploadId:
+                    type: string
+                  uploadMethod:
+                    type: string
+                    example: PUT
+                  partSizeBytes:
+                    type: integer
+                  totalParts:
+                    type: integer
+                  expiresAt:
+                    type: string
+                    format: date-time
         "401":
           description: Not admin
         "409":
           description: Model version already exists
 
+  /community/adminBFF/models/uploads/parts/{partNumber}:
+    put:
+      summary: Upload one staged model chunk (admin)
+      tags: [Admin BFF]
+      description: >
+        Proxies to Gateway /admin/models/uploads/parts/{partNumber}. Sends one
+        binary chunk from the browser to the active upload session.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: partNumber
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: header
+          name: X-Upload-Id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Chunk accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [partNumber]
+                properties:
+                  partNumber:
+                    type: integer
+        "401":
+          description: Not admin
+        "409":
+          description: Invalid upload order or size mismatch
+
   /community/adminBFF/models/uploads/finalize:
     post:
-      summary: Finalize direct-uploaded model (admin)
+      summary: Finalize staged model upload (admin)
       tags: [Admin BFF]
       description: >
         Proxies to Gateway /admin/models/uploads/finalize. Validates the
         staged upload, promotes it to the canonical release key, and deploys
-        the model once storage upload has completed.
+        the model once all chunks have been accepted.
       security:
         - cookieAuth: []
       requestBody:

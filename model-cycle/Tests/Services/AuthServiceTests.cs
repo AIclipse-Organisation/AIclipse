@@ -11,6 +11,7 @@ using Xunit;
 
 namespace Tests.Services;
 
+[Collection(global::Tests.EnvironmentVariableCollection.Name)]
 public sealed class AuthServiceTests
 {
     [Fact]

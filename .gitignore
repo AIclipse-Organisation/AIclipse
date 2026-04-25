@@ -22,6 +22,9 @@ lib/
 !community/app/lib/**
 lib64/
 parts/
+!community/app/adminBFF/models/uploads/parts/
+!community/app/adminBFF/models/uploads/parts/[partNumber]/
+!community/app/adminBFF/models/uploads/parts/[partNumber]/route.js
 sdist/
 var/
 wheels/

@@ -6,14 +6,7 @@ namespace ModelCycle.Services;
 
 public sealed class BlobStorageService : IBlobStorageService, IDisposable
 {
-    private static readonly HashSet<string> ValidExternalProtos = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "http",
-        "https",
-    };
-
     private readonly IMinioClient _internalMinioClient;
-    private readonly IMinioClient _publicMinioClient;
     private readonly string _bucketName;
     private readonly ILogger<BlobStorageService> _logger;
     private bool _disposed;
@@ -23,29 +16,24 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
     {
     }
 
-    private BlobStorageService(
-        (IMinioClient InternalClient, IMinioClient PublicClient, string BucketName) dependencies,
-        ILogger<BlobStorageService> logger)
-        : this(dependencies.InternalClient, dependencies.PublicClient, dependencies.BucketName, logger)
+    private BlobStorageService((IMinioClient InternalClient, string BucketName) dependencies, ILogger<BlobStorageService> logger)
+        : this(dependencies.InternalClient, dependencies.BucketName, logger)
     {
     }
 
     internal BlobStorageService(
         IMinioClient internalMinioClient,
-        IMinioClient publicMinioClient,
         string bucketName,
         ILogger<BlobStorageService> logger)
     {
         _internalMinioClient = internalMinioClient ?? throw new ArgumentNullException(nameof(internalMinioClient));
-        _publicMinioClient = publicMinioClient ?? throw new ArgumentNullException(nameof(publicMinioClient));
         _bucketName = string.IsNullOrWhiteSpace(bucketName)
             ? throw new InvalidOperationException("MINIO_BUCKET_NAME is required")
             : bucketName;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    private static (IMinioClient InternalClient, IMinioClient PublicClient, string BucketName) BuildDependencies(
-        IConfiguration configuration)
+    private static (IMinioClient InternalClient, string BucketName) BuildDependencies(IConfiguration configuration)
     {
         var accessKey = configuration["AWS_ACCESS_KEY_ID"]
                         ?? throw new InvalidOperationException("AWS_ACCESS_KEY_ID is required");
@@ -53,20 +41,14 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
                         ?? throw new InvalidOperationException("AWS_SECRET_ACCESS_KEY is required");
         var bucketName = configuration["MINIO_BUCKET_NAME"] ?? "model-cycle-storage";
 
-        return (
-            BuildClient(configuration["S3_ENDPOINT"] ?? "s3-srv:9000", accessKey, secretKey),
-            BuildClient(
-                configuration["S3_PUBLIC_ENDPOINT"] ?? throw new InvalidOperationException("S3_PUBLIC_ENDPOINT is required"),
-                accessKey,
-                secretKey
-            ),
-            bucketName
-        );
+        return (BuildClient(configuration["S3_ENDPOINT"] ?? "s3-srv:9000", accessKey, secretKey), bucketName);
     }
 
     private static IMinioClient BuildClient(string rawEndpoint, string accessKey, string secretKey)
     {
-        var endpointValue = string.IsNullOrWhiteSpace(rawEndpoint) ? throw new InvalidOperationException("S3 endpoint is required") : rawEndpoint.Trim();
+        var endpointValue = string.IsNullOrWhiteSpace(rawEndpoint)
+            ? throw new InvalidOperationException("S3 endpoint is required")
+            : rawEndpoint.Trim();
         if (!endpointValue.Contains("://", StringComparison.Ordinal))
         {
             endpointValue = $"http://{endpointValue}";
@@ -86,39 +68,12 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
             .Build();
     }
 
-    private static string? NormalizeExternalProto(string? value)
-    {
-        var proto = (value ?? string.Empty).Split(',', 2)[0].Trim().ToLowerInvariant();
-        return ValidExternalProtos.Contains(proto) ? proto : null;
-    }
-
-    private static string ApplyExternalProto(string url, string? externalProto)
-    {
-        var proto = NormalizeExternalProto(externalProto);
-        if (proto == null || string.IsNullOrWhiteSpace(url))
-        {
-            return url;
-        }
-
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || string.Equals(parsed.Scheme, proto, StringComparison.OrdinalIgnoreCase))
-        {
-            return url;
-        }
-
-        var builder = new UriBuilder(parsed)
-        {
-            Scheme = proto,
-            Port = parsed.IsDefaultPort ? -1 : parsed.Port,
-        };
-        return builder.Uri.ToString();
-    }
-
     public async Task InitializeAsync()
     {
         try
         {
             var existsArgs = new BucketExistsArgs().WithBucket(_bucketName);
-            bool found = await _internalMinioClient.BucketExistsAsync(existsArgs);
+            var found = await _internalMinioClient.BucketExistsAsync(existsArgs);
 
             if (!found)
             {
@@ -135,7 +90,7 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
         catch (MinioException e)
         {
             _logger.LogCritical(e, "[MinIO] Failed to initialize bucket '{Bucket}'. Check connection or credentials.", _bucketName);
-            throw; 
+            throw;
         }
         catch (Exception e)
         {
@@ -146,7 +101,7 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
 
     public async Task<string> UploadFileAsync(Stream fileStream, string folder, string fileName, string contentType)
     {
-        string objectName = $"{folder}/{fileName}";
+        var objectName = $"{folder}/{fileName}";
 
         try
         {
@@ -165,20 +120,9 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "[MinIO] Failed to upload  to bucket '{Bucket}'", _bucketName);
+            _logger.LogError(e, "[MinIO] Failed to upload to bucket '{Bucket}'", _bucketName);
             throw;
         }
-    }
-
-    public async Task<string> CreatePresignedUploadUrlAsync(string objectName, int expiresSeconds, string? externalProto = null)
-    {
-        var args = new PresignedPutObjectArgs()
-            .WithBucket(_bucketName)
-            .WithObject(objectName)
-            .WithExpiry(expiresSeconds);
-
-        var url = await _publicMinioClient.PresignedPutObjectAsync(args);
-        return ApplyExternalProto(url, externalProto);
     }
 
     public async Task CopyObjectAsync(string sourceObjectName, string destinationObjectName, string? bucketName = null)
@@ -249,23 +193,23 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
 
     public async Task DownloadFileAsync(string s3Key, string destinationPath, string? bucketName = null)
     {
-        string targetBucket = bucketName ?? _bucketName;
+        var targetBucket = bucketName ?? _bucketName;
 
         try
         {
             var directory = Path.GetDirectoryName(destinationPath);
-
-            if (!Directory.Exists(directory) && !string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+            if (!Directory.Exists(directory) && !string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
 
             var args = new GetObjectArgs()
                 .WithBucket(targetBucket)
                 .WithObject(s3Key)
-                .WithCallbackStream((stream) =>
+                .WithCallbackStream(stream =>
                 {
-                    using (var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write))
-                    {
-                        stream.CopyTo(fileStream);
-                    }
+                    using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write);
+                    stream.CopyTo(fileStream);
                 });
 
             await _internalMinioClient.GetObjectAsync(args);
@@ -276,7 +220,11 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
         {
             _logger.LogError(e, "[MinIO] Failed to download '{Key}' from bucket '{Bucket}'", s3Key, targetBucket);
 
-            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+            if (File.Exists(destinationPath))
+            {
+                File.Delete(destinationPath);
+            }
+
             throw;
         }
     }
@@ -299,11 +247,6 @@ public sealed class BlobStorageService : IBlobStorageService, IDisposable
         }
 
         _internalMinioClient.Dispose();
-        if (!ReferenceEquals(_publicMinioClient, _internalMinioClient))
-        {
-            _publicMinioClient.Dispose();
-        }
-
         _disposed = true;
     }
 }

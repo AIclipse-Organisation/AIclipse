@@ -72,6 +72,52 @@ export async function proxyAdminJson({
   successTextKey,
   onError,
 }) {
+  const payload = body === undefined
+    ? undefined
+    : (typeof body === "string" ? body : JSON.stringify(body));
+
+  return proxyAdminRequest({
+    path,
+    method,
+    query,
+    body: payload,
+    headers,
+    request,
+    successTextKey,
+    onError,
+    defaultContentType: "application/json",
+  });
+}
+
+export async function proxyAdminUploadPart({ path, request }) {
+  const uploadId = request.headers?.get("x-upload-id");
+  if (!uploadId) {
+    return buildAdminError(400, "Gateway Error", "Missing upload id");
+  }
+
+  return proxyAdminRequest({
+    path,
+    method: "PUT",
+    body: await request.arrayBuffer(),
+    headers: {
+      "X-Upload-Id": uploadId,
+    },
+    request,
+    defaultContentType: request.headers?.get("content-type") || "application/octet-stream",
+  });
+}
+
+async function proxyAdminRequest({
+  path,
+  method = "GET",
+  query,
+  body,
+  headers,
+  request,
+  successTextKey,
+  onError,
+  defaultContentType,
+}) {
   try {
     const token = await getAdminAccessToken();
     if (!token) {
@@ -94,9 +140,9 @@ export async function proxyAdminJson({
 
     if (body !== undefined) {
       if (!Object.keys(requestHeaders).some((key) => key.toLowerCase() === "content-type")) {
-        requestHeaders["Content-Type"] = "application/json";
+        requestHeaders["Content-Type"] = defaultContentType || "application/octet-stream";
       }
-      init.body = typeof body === "string" ? body : JSON.stringify(body);
+      init.body = body;
     }
 
     const response = await fetch(resolveGatewayUrl(path, query), init);

@@ -6,11 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ModelCycle.Data;
 using ModelCycle.Domain;
-using ModelCycle.DTOs;
 using ModelCycle.Models;
 using ModelCycle.Repositories;
 using ModelCycle.Services;
-using ModelCycle.Services.External;
 using ModelCycle.Services.ImageConfidence;
 using ModelCycle.Services.Training;
 using Moq;
@@ -22,7 +20,6 @@ public class TrainingWorkflowServiceTests
 {
     private readonly AppDbContext _db;
     private readonly Mock<IConfidenceService> _mockConfidence;
-    private readonly Mock<IMediaService> _mockMedia;
     private readonly Mock<IDatasetService> _mockDataset;
     private readonly Mock<ILogger<TrainingWorkflowService>> _mockLogger;
     private readonly Mock<IModelWeightsRepository> _mockModelRepo;
@@ -40,7 +37,6 @@ public class TrainingWorkflowServiceTests
         _db = new AppDbContext(options);
 
         _mockConfidence = new Mock<IConfidenceService>();
-        _mockMedia = new Mock<IMediaService>();
         _mockDataset = new Mock<IDatasetService>();
         _mockLogger = new Mock<ILogger<TrainingWorkflowService>>();
         _mockModelRepo = new Mock<IModelWeightsRepository>();
@@ -56,7 +52,6 @@ public class TrainingWorkflowServiceTests
         _service = new TrainingWorkflowService(
             _db,
             _mockConfidence.Object,
-            _mockMedia.Object,
             _mockDataset.Object,
             _jobQueue,
             _mockLogger.Object,
@@ -72,22 +67,10 @@ public class TrainingWorkflowServiceTests
         {
             MediaImageId = "img_new",
             PostId = Guid.NewGuid().ToString(),
-            S3Key = "images/img_new.jpg"
+            S3Key = "images/img_new.jpg",
+            ModelVersion = "v1.0.0",
+            Label = "real",
         };
-
-        _mockMedia.Setup(m => m.GetImageMetadataAsync("img_new"))
-            .ReturnsAsync(new MediaImageResponse
-            {
-                ImageId = "img_new",
-                Url = "http://fake/url.jpg",
-                S3Key = "images/img_new.jpg",
-                UserId = "user_123",
-                Verdict = "real",
-                Label = "real",
-                Confidence = 1,
-                IsPublic = true,
-                ModelVersion = "v1.0.0"
-            });
 
         _mockConfidence.Setup(c => c.Evaluate(It.IsAny<WeightedVoteData>(), It.IsAny<ModelWeights>()))
                        .Returns(new ConfidenceResult { IsReadyForTraining = true, TrainingLabel = "ai" });
@@ -125,7 +108,8 @@ public class TrainingWorkflowServiceTests
         var request = new EvaluateImageRequest
         {
             MediaImageId = "img_existing",
-            S3Key = "test_images/img_existing.jpg"
+            S3Key = "test_images/img_existing.jpg",
+            ModelVersion = "v1.0.0",
         };
 
         _mockConfidence.Setup(c => c.Evaluate(It.IsAny<WeightedVoteData>(), It.IsAny<ModelWeights>()))
@@ -160,7 +144,8 @@ public class TrainingWorkflowServiceTests
         var request = new EvaluateImageRequest
         {
             MediaImageId = "img_stable",
-            S3Key = "test_images/img_stable.jpg"
+            S3Key = "test_images/img_stable.jpg",
+            ModelVersion = "v1.0.0",
         };
 
         await _service.ProcessVoteAsync(request);
@@ -174,5 +159,19 @@ public class TrainingWorkflowServiceTests
         {
             await reader.MoveNextAsync();
         });
+    }
+
+    [Fact]
+    public async Task ProcessVoteAsync_NewImage_RequiresCanonicalMetadataInRequest()
+    {
+        var request = new EvaluateImageRequest
+        {
+            MediaImageId = "img_missing_meta",
+            PostId = Guid.NewGuid().ToString(),
+        };
+
+        var error = await Assert.ThrowsAsync<Exception>(() => _service.ProcessVoteAsync(request));
+
+        Assert.Equal("Training image metadata missing", error.Message);
     }
 }

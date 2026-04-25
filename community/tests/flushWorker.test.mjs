@@ -36,9 +36,10 @@ test("runFlushWorker retries startup after an initial db/index failure", async (
       log: (...args) => events.push(args.join(" ")),
       error: (...args) => events.push(args.join(" ")),
     },
-    flushOnce: async ({ redis, collection }) => {
+    flushOnce: async ({ redis, db, collection }) => {
       flushCalls += 1;
       assert.equal(redis, redisClient);
+      assert.equal(typeof db.collection, "function");
       assert.equal(collection.name, "community.posts");
       return 1;
     },
@@ -50,4 +51,41 @@ test("runFlushWorker retries startup after an initial db/index failure", async (
   assert.ok(events.some((entry) => entry.includes("legacy index conflict")));
   assert.ok(events.includes("sleep"));
   assert.ok(events.some((entry) => entry.includes("[testFlushWorker] started")));
+});
+
+test("runFlushWorker stops retrying and rethrows fatal configuration errors", async () => {
+  const events = [];
+  let attempts = 0;
+
+  await assert.rejects(
+    runFlushWorker({
+      name: "fatalFlushWorker",
+      collectionName: "community.posts",
+      redisFactory: () => ({ id: "redis-client" }),
+      dbFactory: async () => {
+        attempts += 1;
+        return {
+          collection() {
+            return { name: "community.posts" };
+          },
+        };
+      },
+      sleepFn: async () => {
+        events.push("sleep");
+      },
+      logger: {
+        log: (...args) => events.push(args.join(" ")),
+        error: (...args) => events.push(args.join(" ")),
+      },
+      flushOnce: async () => {
+        throw new Error("Missing INTERNAL_AUTH_TOKEN");
+      },
+      isFatalError: (error) => String(error?.message || "") === "Missing INTERNAL_AUTH_TOKEN",
+    }),
+    /Missing INTERNAL_AUTH_TOKEN/,
+  );
+
+  assert.equal(attempts, 1);
+  assert.ok(events.some((entry) => entry.includes("[fatalFlushWorker] error: Missing INTERNAL_AUTH_TOKEN")));
+  assert.ok(!events.includes("sleep"));
 });

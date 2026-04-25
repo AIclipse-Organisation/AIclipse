@@ -29,6 +29,36 @@ async def test_images_proxies_media_list(client, patch_upstreams, auth_keypair):
 
 
 @pytest.mark.asyncio
+async def test_images_forward_external_proto_to_media(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_imgs",
+        email="u_imgs@example.com",
+        is_admin=False,
+        plan=0,
+    )
+
+    def media_images_handler(req: httpx.Request) -> httpx.Response:
+        assert req.url.params.get("user_id") == "u_imgs"
+        assert req.headers.get("x-external-proto") == "https"
+        return httpx.Response(
+            status_code=200,
+            json={"items": [{"image_id": "img_https", "url": "https://storage.aiclipse.local/images/img_https.png"}]},
+        )
+
+    patch_upstreams.add(host="media", method="GET", path="/images", handler=media_images_handler)
+
+    r = await client.get(
+        "/images",
+        headers={"Authorization": f"Bearer {token}", "X-Forwarded-Proto": "https"},
+    )
+    assert r.status_code == 200
+    assert r.json() == {
+        "items": [{"image_id": "img_https", "url": "https://storage.aiclipse.local/images/img_https.png"}]
+    }
+
+
+@pytest.mark.asyncio
 async def test_images_returns_503_when_media_returns_service_unavailable(client, patch_upstreams, auth_keypair):
     token = make_auth_token(
         keypair=auth_keypair,

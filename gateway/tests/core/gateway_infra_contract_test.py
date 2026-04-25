@@ -25,6 +25,12 @@ def test_dev_app_configmap_defines_allowed_origins_for_gateway_cors():
     assert 'ALLOWED_ORIGINS: "http://aiclipse.local,https://aiclipse.local"' in dev_config
 
 
+def test_dev_s3_public_endpoint_keeps_http_storage_origin_for_http_fallback():
+    dev_config = _read_repo_text("infra/k8s-dev/dev-secrets.yaml")
+
+    assert 'S3_PUBLIC_ENDPOINT: "http://storage.aiclipse.local"' in dev_config
+
+
 def test_skaffold_dev_syncs_optional_local_tls_secret_before_deploy():
     skaffold_config = _read_repo_text("skaffold.yaml")
 

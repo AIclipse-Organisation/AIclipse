@@ -14,6 +14,12 @@ spec:
       labels:
         app: model-cycle
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       volumes: 
         - name: model-data
           persistentVolumeClaim:
@@ -24,11 +30,24 @@ spec:
           - name: wait-for-minio
             image: busybox
             command: ['sh', '-c', 'until nc -z s3-srv 9000; do echo waiting for minio; sleep 2; done;']
+          - name: prepare-model-data
+            image: busybox
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+              runAsGroup: 0
+              allowPrivilegeEscalation: false
+            command:
+              - sh
+              - -c
+              - mkdir -p /app/data && chown -R 1000:1000 /app/data && chmod -R u+rwX,g+rwX /app/data
+            volumeMounts:
+              - name: model-data
+                mountPath: /app/data
       containers:
         - name: model-cycle
           image: aiclipse/model-cycle
           securityContext:
-            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
@@ -41,19 +60,6 @@ spec:
           env:
             - name: INTERNAL_AUTH_TOKEN
               valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
-            - name: MONGO_URI
-              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
-            - name: MONGO_DB
-              valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
-            - name: REDIS_HOST
-              value: "redis-srv"    
-            - name: REDIS_PORT
-              value: "6379"
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-sec      
-                  key: REDIS_PASSWORD
             - name: APP_ENV
               value: "dev"
             - name: CENTRAL_CONFIG_URL
@@ -63,8 +69,6 @@ spec:
                   key: CONFIG_URL
             - name: TRAINING_DATA_PATH
               value: "/app/data"
-            - name: MediaServiceUrl
-              value: "http://media-srv:3000"
             - name: S3_ENDPOINT 
               valueFrom: { secretKeyRef: { name: s3-sec, key: S3_ENDPOINT } } 
             - name: S3_PUBLIC_ENDPOINT

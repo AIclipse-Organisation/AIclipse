@@ -1371,7 +1371,19 @@ def test_public_html_routes_include_hardened_security_headers(main_client_module
     assert directives["form-action"] == "form-action 'self'"
     assert directives["style-src-elem"] == "style-src-elem 'self'"
     assert directives["style-src-attr"] == "style-src-attr 'unsafe-inline'"
-    assert directives["img-src"] == "img-src 'self' data: blob: https: http:"
+    assert (
+        directives["img-src"]
+        == "img-src 'self' data: blob: https://storage.aiclipse.local http://storage.aiclipse.local"
+    )
+
+
+def test_prod_img_src_policy_still_allows_exact_local_storage_origin(main_client_module):
+    main_client_module.is_prod = True
+
+    assert (
+        main_client_module._build_img_src_directive()
+        == "img-src 'self' data: blob: https://storage.aiclipse.local http://storage.aiclipse.local"
+    )
 
 
 def test_versioned_static_assets_are_cacheable_and_immutable(main_client_module):
@@ -1401,3 +1413,37 @@ def test_images_api_is_sent_with_no_store_cache_policy(main_client_module, monke
         gateway_base_url="http://gateway.test",
         params={},
     )
+
+
+def test_images_route_forwards_https_external_proto_to_gateway(main_client_module, monkeypatch):
+    captured = {}
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        captured.update(url=url, headers=headers, params=params, timeout=timeout)
+        return ResponseStub(200, {"items": []})
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "img-token")
+
+    resp = client.get(
+        "/images",
+        headers={
+            "X-Forwarded-Proto": "https",
+            "X-Requested-With": "XMLHttpRequest",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json() == {"items": []}
+    assert captured == {
+        "url": "http://gateway.test/images",
+        "headers": {
+            "Accept": "application/json",
+            "Authorization": "Bearer img-token",
+            "X-External-Proto": "https",
+        },
+        "params": {},
+        "timeout": 10,
+    }

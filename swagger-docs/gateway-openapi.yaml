@@ -1337,10 +1337,11 @@ paths:
       summary: Create model upload session (admin)
       tags: [Models]
       description: >
-        Authenticated admin control-plane call. Returns a presigned object-storage
-        PUT URL so the browser can upload model bytes directly without proxying
-        through Gateway. Model Cycle may also reap expired abandoned staging
-        objects older than the upload-session TTL while creating the session.
+        Authenticated admin control-plane call. Returns the bounded chunk
+        contract for a manual model upload (`uploadId`, `uploadMethod`,
+        `partSizeBytes`, `totalParts`, `expiresAt`). Model Cycle may also
+        reap expired abandoned staging directories older than the
+        upload-session TTL while creating the session.
       security:
         - bearerAuth: []
       requestBody:
@@ -1363,6 +1364,24 @@ paths:
       responses:
         "200":
           description: Upload session created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uploadId, uploadMethod, partSizeBytes, totalParts, expiresAt]
+                properties:
+                  uploadId:
+                    type: string
+                  uploadMethod:
+                    type: string
+                    example: PUT
+                  partSizeBytes:
+                    type: integer
+                  totalParts:
+                    type: integer
+                  expiresAt:
+                    type: string
+                    format: date-time
         "400":
           description: Invalid request
         "401":
@@ -1374,14 +1393,65 @@ paths:
         "502":
           description: Model-cycle service error
 
-  /admin/models/uploads/finalize:
-    post:
-      summary: Finalize direct-uploaded model (admin)
+  /admin/models/uploads/parts/{partNumber}:
+    put:
+      summary: Upload one staged model chunk (admin)
       tags: [Models]
       description: >
-        Authenticated admin control-plane call. Finalizes a previously created
-        direct upload session, promotes the staged object to the canonical
-        release key, and deploys the uploaded model via model-cycle.
+        Authenticated admin data-plane call. Proxies one binary chunk of a
+        manual model upload to Model Cycle. Chunks must arrive in order and
+        use the upload token from the session-creation call.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: partNumber
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: header
+          name: X-Upload-Id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Chunk accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [partNumber]
+                properties:
+                  partNumber:
+                    type: integer
+        "400":
+          description: Invalid request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Admin privileges required
+        "409":
+          description: Invalid upload order or size mismatch
+        "502":
+          description: Model-cycle service error
+
+  /admin/models/uploads/finalize:
+    post:
+      summary: Finalize staged model upload (admin)
+      tags: [Models]
+      description: >
+        Authenticated admin control-plane call. Finalizes a previously
+        created staged upload session, uploads the canonical model object,
+        and deploys the uploaded model via model-cycle.
       security:
         - bearerAuth: []
       requestBody:

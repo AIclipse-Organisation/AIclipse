@@ -275,3 +275,48 @@ def test_update_image_rejects_invalid_admin_header(client):
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["header", "X-User-Is-Admin"]
+
+
+def test_ensure_image_indexes_bootstraps_runtime_query_indexes(monkeypatch):
+    create_calls = []
+
+    class _Collection:
+        def create_index(self, keys, **options):
+            create_calls.append((keys, options))
+            return options["name"]
+
+    monkeypatch.setattr(main_media, "_image_indexes_ready", False)
+
+    main_media.ensure_image_indexes(_Collection())
+
+    assert create_calls == [
+        ([("image_id", 1)], {"unique": True, "name": "uniq_image_id"}),
+        ([("user_id", 1), ("uploaded_at", -1)], {"name": "by_user_uploaded"}),
+        ([("is_public", 1), ("uploaded_at", -1)], {"name": "by_public_uploaded"}),
+        ([("user_id", 1), ("is_public", 1), ("uploaded_at", -1)], {"name": "by_user_public_uploaded"}),
+    ]
+
+
+def test_ensure_image_indexes_reuses_equivalent_legacy_index_names(monkeypatch):
+    create_calls = []
+
+    class _Collection:
+        def list_indexes(self):
+            return [
+                {"name": "_id_", "key": {"_id": 1}},
+                {"name": "image_id_1", "key": {"image_id": 1}, "unique": True},
+            ]
+
+        def create_index(self, keys, **options):
+            create_calls.append((keys, options))
+            return options["name"]
+
+    monkeypatch.setattr(main_media, "_image_indexes_ready", False)
+
+    main_media.ensure_image_indexes(_Collection())
+
+    assert create_calls == [
+        ([("user_id", 1), ("uploaded_at", -1)], {"name": "by_user_uploaded"}),
+        ([("is_public", 1), ("uploaded_at", -1)], {"name": "by_public_uploaded"}),
+        ([("user_id", 1), ("is_public", 1), ("uploaded_at", -1)], {"name": "by_user_public_uploaded"}),
+    ]
