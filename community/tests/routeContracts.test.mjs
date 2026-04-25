@@ -220,6 +220,13 @@ test("community runtime CSP allows exact local storage origin and upload connect
     assert.match(headerMap["Content-Security-Policy"], /connect-src[^;]*http:\/\/storage\.aiclipse\.local/);
     assert.equal(headerMap["X-Content-Type-Options"], "nosniff");
     assert.equal(headerMap["X-Frame-Options"], "DENY");
+    assert.equal(headerMap["Cross-Origin-Opener-Policy"], "same-origin");
+    assert.equal(headerMap["Cross-Origin-Resource-Policy"], "same-origin");
+    assert.equal(headerMap["Permissions-Policy"], "camera=(), microphone=(), geolocation=()");
+    assert.equal(
+      headerMap["Strict-Transport-Security"],
+      "max-age=31536000; includeSubDomains; preload",
+    );
   } finally {
     if (previousAppEnv === undefined) {
       delete process.env.APP_ENV;

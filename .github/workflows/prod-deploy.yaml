@@ -491,9 +491,10 @@ jobs:
           OK='^2|^3'
 
           for i in {1..30}; do
-            code=$(curl -sS -o /dev/null -w '%{http_code}' "https://${PUBLIC_DOMAIN}" || echo 000)
-            printf '%s  try %02d  -> %s\n' "$(date +%H:%M:%S)" "$i" "$code"
-            if echo "$code" | grep -Eq "$OK"; then
+            app_code=$(curl -sS -o /dev/null -w '%{http_code}' "https://${PUBLIC_DOMAIN}" || echo 000)
+            storage_code=$(curl -sS -o /dev/null -w '%{http_code}' "https://${PUBLIC_STORAGE_DOMAIN}/robots.txt" || echo 000)
+            printf '%s  try %02d  -> app %s, storage %s\n' "$(date +%H:%M:%S)" "$i" "$app_code" "$storage_code"
+            if echo "$app_code" | grep -Eq "$OK" && [ "$storage_code" = "200" ]; then
               echo "ready"
               exit 0
             fi

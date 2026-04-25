@@ -1364,6 +1364,10 @@ def test_public_html_routes_include_hardened_security_headers(main_client_module
 
     assert resp.headers["X-Content-Type-Options"] == "nosniff"
     assert resp.headers["X-Frame-Options"] == "DENY"
+    assert resp.headers["Referrer-Policy"] == "same-origin"
+    assert resp.headers["Cross-Origin-Opener-Policy"] == "same-origin"
+    assert resp.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+    assert resp.headers["Permissions-Policy"] == "geolocation=()"
     assert directives["script-src"] == "script-src 'self'"
     assert directives["script-src-elem"] == "script-src-elem 'self'"
     assert directives["script-src-attr"] == "script-src-attr 'none'"
@@ -1377,6 +1381,18 @@ def test_public_html_routes_include_hardened_security_headers(main_client_module
     )
 
 
+def test_prod_security_headers_include_hsts(main_client_module):
+    main_client_module.is_prod = True
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/")
+
+    assert (
+        resp.headers["Strict-Transport-Security"]
+        == "max-age=31536000; includeSubDomains; preload"
+    )
+
+
 def test_prod_img_src_policy_still_allows_exact_local_storage_origin(main_client_module):
     main_client_module.is_prod = True
 
@@ -1384,6 +1400,68 @@ def test_prod_img_src_policy_still_allows_exact_local_storage_origin(main_client
         main_client_module._build_img_src_directive()
         == "img-src 'self' data: blob: https://storage.aiclipse.local http://storage.aiclipse.local"
     )
+
+
+def test_robots_txt_is_served_as_a_cacheable_plain_text_contract(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/robots.txt")
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/plain"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert resp.headers["X-Content-Type-Options"] == "nosniff"
+    assert "Disallow: /api/" in resp.get_data(as_text=True)
+
+
+def test_storage_host_robots_txt_disallows_all_crawling(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/robots.txt", headers={"Host": "storage.aiclipse.local"})
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/plain"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert resp.get_data(as_text=True) == "User-agent: *\nDisallow: /\n"
+
+
+def test_sitemap_xml_is_served_as_a_cacheable_xml_contract(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/sitemap.xml")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/xml"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert resp.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+    assert "<loc>http://localhost/</loc>" in body
+    assert "<loc>http://localhost/community</loc>" in body
+    assert body.startswith('<?xml version="1.0" encoding="UTF-8"?>')
+
+
+def test_storage_host_sitemap_is_empty_and_public(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/sitemap.xml", headers={"Host": "storage.aiclipse.local"})
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/xml"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert "<url><loc>" not in body
+    assert '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>' in body
+
+
+def test_crossdomain_xml_is_public_and_returns_404(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/crossdomain.xml", headers={"Host": "storage.aiclipse.local"})
+
+    assert resp.status_code == 404
+    assert resp.mimetype == "text/plain"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert resp.get_data(as_text=True) == "Not Found\n"
 
 
 def test_versioned_static_assets_are_cacheable_and_immutable(main_client_module):
