@@ -35,6 +35,9 @@ def register_auth_middleware(app: Flask, gateway: GatewayClient) -> None:
             path == "/"
             or path == "/login"
             or path == "/healthz"
+            or path == "/robots.txt"
+            or path == "/sitemap.xml"
+            or path == "/crossdomain.xml"
             or path.startswith("/static/")
             or path.startswith("/static")
             or path.startswith("/favicon.ico")

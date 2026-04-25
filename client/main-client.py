@@ -141,6 +141,12 @@ def inject_common_context():
 def apply_security_and_cache_headers(resp):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "same-origin"
+    resp.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    resp.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    resp.headers["Permissions-Policy"] = "geolocation=()"
+    if is_prod:
+        resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
     resp.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "base-uri 'self'; "
