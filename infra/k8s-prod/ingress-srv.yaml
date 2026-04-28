@@ -32,21 +32,21 @@ spec:
       http:
         paths:
           - path: /crossdomain.xml
-            pathType: Exact
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: client-srv
                 port:
                   number: 3000
           - path: /robots.txt
-            pathType: Exact
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: client-srv
                 port:
                   number: 3000
           - path: /sitemap.xml
-            pathType: Exact
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: client-srv
@@ -81,21 +81,21 @@ spec:
       http:
         paths:
           - path: /crossdomain.xml
-            pathType: Exact
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: client-srv
                 port:
                   number: 3000
           - path: /robots.txt
-            pathType: Exact
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: client-srv
                 port:
                   number: 3000
           - path: /sitemap.xml
-            pathType: Exact
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: client-srv
