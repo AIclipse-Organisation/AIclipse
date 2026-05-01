@@ -36,11 +36,11 @@ export default function Topbar({ isAdmin, showBack }) {
         // Scrolling down - hide bar
         setOffset((prev) => Math.max(-TOPBAR_HEIGHT, prev - dampenedDelta));
         // Reset scroll up accumulator when moving down
-        scrollUpAccum.current = 0; 
+        scrollUpAccum.current = 0;
       } else {
         // Scrolling up - show bar
-        scrollUpAccum.current -= delta; 
-        
+        scrollUpAccum.current -= delta;
+
         // TRIGGER LOGIC:
         // 1. If fully hidden: wait for threshold to trigger appearance
         // 2. If already partially visible: move immediately with scroll for smoothness
@@ -73,7 +73,10 @@ export default function Topbar({ isAdmin, showBack }) {
 
   return (
     <>
-      <div className="topbar" style={{ transform: `translateX(-50%) translateY(${offset}px)` }}>
+      <div
+        className="topbar"
+        style={{ transform: `translateX(-50%) translateY(${offset}px)` }}
+      >
         {showBack ? (
           <button
             className="topbar-back-btn"
@@ -87,7 +90,16 @@ export default function Topbar({ isAdmin, showBack }) {
               }
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CFB87C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#CFB87C"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
@@ -326,6 +338,41 @@ export default function Topbar({ isAdmin, showBack }) {
               <span>Admin Dashboard</span>
             </a>
           )}
+
+          <div className="drawer-footer-cta">
+            <a
+              href="https://www.gofundme.com/f/aiclipse-dkit-expo-2026"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="coffee-link"
+            >
+              <div className="coffee-icon-bg">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#222"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                  <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+                  <line x1="6" y1="1" x2="6" y2="4"></line>
+                  <line x1="10" y1="1" x2="10" y2="4"></line>
+                  <line x1="14" y1="1" x2="14" y2="4"></line>
+                </svg>
+              </div>
+              <div className="coffee-text">
+                <span className="coffee-title">Buy us a coffee</span>
+                <span className="coffee-subtitle">
+                  Support AIclipse development
+                </span>
+              </div>
+            </a>
+          </div>
 
           <div className="drawer-separator"></div>
 

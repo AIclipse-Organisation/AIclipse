@@ -14,30 +14,40 @@
   display: none !important;
 }
 
+/* comments.css */
+
 .comm_bottomSheet {
   position: fixed;
-  bottom: var(--kb-offset, 0px);
+  /* Ensure this is HIGHER than the navbar (1000) */
+  z-index: 2000; 
+  
+  /* Reset bottom to 0 to ensure it anchors to the floor */
+  bottom: 0;
+  
+  /* Use the keyboard offset for mobile support */
+  transform: translateY(100%);
+  margin-bottom: var(--kb-offset, 0px); 
+  
   left: max(0px, calc(50vw - 240px));
   right: max(0px, calc(50vw - 240px));
   width: min(100%, 480px);
-  height: calc(80dvh - var(--kb-offset, 0px));
-  max-height: calc(80dvh - var(--kb-offset, 0px));
+  
+  /* Use dynamic viewport height to prevent overflow issues */
+  height: 80dvh; 
+  display: flex;
+  flex-direction: column;
   background: #141414;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: none;
   border-radius: 20px 20px 0 0;
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
-  z-index: 1501;
-  transform: translateY(100%);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   touch-action: none;
 }
 
 .comm_bottomSheet.comm_bottomSheet--open {
+  /* Translate to 0, but the margin-bottom (kb-offset) will push it up */
   transform: translateY(0);
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
 }
 
 .comm_bottomSheet.comm_bottomSheet--keyboard {

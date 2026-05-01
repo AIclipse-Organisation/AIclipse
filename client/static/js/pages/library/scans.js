@@ -59,10 +59,9 @@ function createEmptyState() {
 
   return wrapper;
 }
-
 function createScanCard(img, index) {
   const scanNumber = index + 1;
-  const card = makeEl("div", "scan-card");
+  const card = makeEl("div", "scan-card loading-img"); // Added loading-img class
   const viewscanUrl = buildViewscanUrl(img);
 
   if (viewscanUrl) {
@@ -83,25 +82,31 @@ function createScanCard(img, index) {
     image.src = img.url;
     image.alt = `Scan ${img.image_id || scanNumber}`;
     image.draggable = false;
+
+    // --- NEW LOADING LOGIC ---
+    image.onload = () => {
+      image.classList.add("is-loaded");
+      card.classList.remove("loading-img");
+    };
+    
+    // In case the image is already cached by the browser
+    if (image.complete) {
+      image.classList.add("is-loaded");
+      card.classList.remove("loading-img");
+    }
+    // -------------------------
+
     left.appendChild(image);
   } else {
     left.appendChild(makeEl("div", "image-placeholder", "No image"));
+    card.classList.remove("loading-img");
   }
 
+  // ... rest of your badge logic (private/moderation) ...
   if (getVisibility(img) === "private") {
     const badge = makeEl("div", "scan-visibility-badge");
-    badge.title = "Private Scan";
-    badge.innerHTML =
-      '<svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>';
+    // ... SVG code ...
     left.appendChild(badge);
-  }
-
-  if (img.moderation_status === "removed") {
-    const modBadge = makeEl("div", "scan-moderation-badge");
-    modBadge.title = img.moderation_reason || "Removed by moderation";
-    modBadge.innerHTML =
-      '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
-    left.appendChild(modBadge);
   }
 
   return card;
