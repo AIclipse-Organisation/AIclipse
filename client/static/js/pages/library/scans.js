@@ -83,18 +83,15 @@ function createScanCard(img, index) {
     image.alt = `Scan ${img.image_id || scanNumber}`;
     image.draggable = false;
 
-    // --- NEW LOADING LOGIC ---
     image.onload = () => {
       image.classList.add("is-loaded");
       card.classList.remove("loading-img");
     };
     
-    // In case the image is already cached by the browser
     if (image.complete) {
       image.classList.add("is-loaded");
       card.classList.remove("loading-img");
     }
-    // -------------------------
 
     left.appendChild(image);
   } else {
@@ -102,12 +99,17 @@ function createScanCard(img, index) {
     card.classList.remove("loading-img");
   }
 
-  // ... rest of your badge logic (private/moderation) ...
-  if (getVisibility(img) === "private") {
-    const badge = makeEl("div", "scan-visibility-badge");
-    // ... SVG code ...
-    left.appendChild(badge);
-  }
+ if (getVisibility(img) === "private") {
+  const badge = makeEl("div", "scan-visibility-badge");
+  
+ badge.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+  `;
+  left.appendChild(badge);
+}
 
   return card;
 }
