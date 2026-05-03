@@ -99,17 +99,21 @@ function createScanCard(img, index) {
     card.classList.remove("loading-img");
   }
 
- if (getVisibility(img) === "private") {
-  const badge = makeEl("div", "scan-visibility-badge");
-  
- badge.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-    </svg>
-  `;
-  left.appendChild(badge);
-}
+  if (getVisibility(img) === "private") {
+    const badge = makeEl("div", "scan-visibility-badge");
+    badge.title = "Private Scan";
+    badge.innerHTML =
+      '<svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>';
+    left.appendChild(badge);
+  }
+
+  if (img.moderation_status === "removed") {
+    const modBadge = makeEl("div", "scan-moderation-badge");
+    modBadge.title = img.moderation_reason || "Removed by moderation";
+    modBadge.innerHTML =
+      '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
+    left.appendChild(modBadge);
+  }
 
   return card;
 }
