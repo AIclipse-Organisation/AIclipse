@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from urllib.parse import urlsplit
 
-from flask import Flask, jsonify, make_response, redirect, request, session
+from flask import Flask, jsonify, make_response, request, session
 
 from .cookies import clear_access_cookie, get_access_token
 from .gateway import GatewayClient
@@ -44,10 +44,11 @@ def register_auth_middleware(app: Flask, gateway: GatewayClient) -> None:
         )
 
     def redirect_to_login(*, clear_cookie: bool):
-        resp = make_response(redirect("/login"))
+        resp = make_response("", 302)
+        resp.headers["Location"] = "/login"
         if clear_cookie:
             clear_access_cookie(resp, request)
-        resp.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate"
+        resp.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate, no-transform"
         resp.headers["Pragma"] = "no-cache"
         return resp
 

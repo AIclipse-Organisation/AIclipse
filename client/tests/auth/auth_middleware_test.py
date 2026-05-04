@@ -21,6 +21,8 @@ def test_middleware_redirects_and_clears_session_when_cookie_is_missing(auth_app
     assert resp.status_code == 302
     assert resp.headers["Location"].endswith("/login")
     assert "Cache-Control" in resp.headers
+    assert resp.headers["Cache-Control"] == "no-store, max-age=0, must-revalidate, no-transform"
+    assert resp.get_data() == b""
     assert "access_token=" not in "\n".join(resp.headers.getlist("Set-Cookie"))
     gateway.fetch_me.assert_not_called()
 
@@ -70,6 +72,7 @@ def test_middleware_revalidates_stale_session_and_clears_cookie_on_failure(auth_
 
     assert resp.status_code == 302
     assert resp.headers["Location"].endswith("/login")
+    assert resp.get_data() == b""
     assert "access_token=" in clear_cookie_header
     assert "Expires=Thu, 01 Jan 1970" in clear_cookie_header
     assert "Secure" in clear_cookie_header
@@ -116,3 +119,34 @@ def test_middleware_allows_same_origin_mutation_when_auth_cookie_is_present(auth
     assert resp.status_code == 200
     assert resp.get_data(as_text=True) == "OK"
     gateway.fetch_me.assert_called_once_with("user-token")
+
+
+def test_middleware_requires_cookie_for_support_pages(auth_app_factory):
+    gateway = Mock()
+    app, _ = auth_app_factory(gateway=gateway, with_blueprint=False, with_middleware=True)
+
+    @app.get("/docs")
+    def docs():
+        return "Docs", 200
+
+    @app.get("/contact")
+    def contact():
+        return "Contact", 200
+
+    @app.get("/dev")
+    def dev():
+        return "Dev", 200
+
+    @app.get("/tutorials")
+    def tutorials():
+        return "Tutorials", 200
+
+    client = app.test_client()
+
+    for path in ("/docs", "/contact", "/dev", "/tutorials"):
+        resp = client.get(path)
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith("/login")
+        assert resp.get_data() == b""
+
+    gateway.fetch_me.assert_not_called()

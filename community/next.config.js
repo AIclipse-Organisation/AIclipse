@@ -1,6 +1,7 @@
 const nextConfig = {
   basePath: "/community",
   output: "standalone",
+  poweredByHeader: false,
   logging: {
     incomingRequests: {
       ignore: [/^\/healthz$/, /^\/api\/healthz$/],
