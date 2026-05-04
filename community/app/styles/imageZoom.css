@@ -1,0 +1,75 @@
+/* =========================
+   IMAGE ZOOM MODAL
+   ========================= */
+
+.imgzoom-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.imgzoom-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10000;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.imgzoom-close:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.imgzoom-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.imgzoom-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  transform-origin: center center;
+  will-change: transform;
+  display: block;
+}
+
+.imgzoom-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}

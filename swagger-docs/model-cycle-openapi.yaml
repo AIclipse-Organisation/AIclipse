@@ -62,17 +62,90 @@ components:
           type: string
           enum: ["Added to Training Set", "Waiting for more votes"]
 
-    UploadModelRequest:
+    CreateModelUploadSessionRequest:
       type: object
-      required: [File, Version]
+      required: [Version, FileName, FileSize]
       properties:
-        File:
-          type: string
-          format: binary
-          description: Model weights file (max 750 MB).
         Version:
           type: string
-          description: Semantic version (e.g. v1.0.0).
+          description: Semantic version (e.g. v1.0.0). Auto-prefixes "v" if omitted.
+        FileName:
+          type: string
+          description: "Original model filename. Supported extensions: .pt, .bin, .safetensors."
+        FileSize:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 786432000
+          description: Exact file size in bytes (max 750 MB).
+        ContentType:
+          type: string
+          description: Browser-provided MIME type. Defaults to application/octet-stream.
+
+    CreateModelUploadSessionResponse:
+      type: object
+      required: [uploadId, uploadMethod, partSizeBytes, totalParts, expiresAt]
+      properties:
+        uploadId:
+          type: string
+          description: Opaque signed upload session token used for chunk uploads and finalize.
+        uploadMethod:
+          type: string
+          example: PUT
+        partSizeBytes:
+          type: integer
+          format: int32
+          description: Exact chunk size for every part except the last one.
+        totalParts:
+          type: integer
+          format: int32
+          minimum: 1
+          description: Total number of sequential parts required for this upload.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Upload session expiry timestamp in UTC.
+
+    UploadModelPartResponse:
+      type: object
+      required: [partNumber]
+      properties:
+        partNumber:
+          type: integer
+          format: int32
+          minimum: 1
+          description: 1-based part number acknowledged by the server.
+
+    FinalizeModelUploadResponse:
+      type: object
+      required: [message, id, version, imagesLinked]
+      properties:
+        message:
+          type: string
+        id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        imagesLinked:
+          type: integer
+
+    ModelUploadErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+
+    FinalizeModelUploadRequest:
+      type: object
+      required: [UploadId, Version]
+      properties:
+        UploadId:
+          type: string
+        Version:
+          type: string
+          description: Semantic version (e.g. v1.0.0). Auto-prefixes "v" if omitted.
         NewImagesCount:
           type: integer
         ReplayBufferCount:
@@ -334,40 +407,124 @@ paths:
         "404":
           description: No deployed model found
 
-  /api/models/upload:
+  /api/models/uploads:
     post:
-      summary: Upload and deploy a model
+      summary: Create a chunked upload session for a model
       tags: [Models]
       description: >
-        Upload model weights with training metadata and image lineage.
-        Uploads to MinIO, stores metadata in SQLite, deactivates previous
-        models, and notifies Detector Service for hot-swap.
-        Max upload: 750 MB.
+        Creates an authenticated upload session for a manual admin model
+        upload. The response defines the bounded chunk contract
+        (`uploadMethod`, `partSizeBytes`, `totalParts`, `expiresAt`).
+        Model Cycle may also reap expired abandoned staging directories
+        older than the upload-session TTL while creating the session.
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
-              $ref: "#/components/schemas/UploadModelRequest"
+              $ref: "#/components/schemas/CreateModelUploadSessionRequest"
+      responses:
+        "200":
+          description: Upload session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateModelUploadSessionResponse"
+        "400":
+          description: Invalid version, file size, or file extension
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
+        "409":
+          description: Model version already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
+
+  /api/models/uploads/parts/{partNumber}:
+    put:
+      summary: Upload one staged model chunk
+      tags: [Models]
+      description: >
+        Streams one numbered chunk into the active upload session. Chunks
+        must arrive in order and match the approved size for the session.
+      parameters:
+        - in: path
+          name: partNumber
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: 1-based sequential part number for this upload.
+        - in: header
+          name: X-Upload-Id
+          required: true
+          schema:
+            type: string
+          description: Opaque upload session token returned by POST /api/models/uploads.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Chunk accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadModelPartResponse"
+        "400":
+          description: Invalid upload session, part number, content type, or part size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
+        "409":
+          description: Out-of-order chunk or staged size mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
+
+  /api/models/uploads/finalize:
+    post:
+      summary: Finalize a staged model upload and deploy it
+      tags: [Models]
+      description: >
+        Validates the staged file against the signed upload session,
+        uploads the canonical release key `models/{version}.{ext}`,
+        stores model lineage in SQLite,
+        deactivates prior deployments, and notifies Detector Service for hot-swap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizeModelUploadRequest"
       responses:
         "200":
           description: Model uploaded and deployed
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  Message:
-                    type: string
-                  Id:
-                    type: string
-                    format: uuid
-                  Version:
-                    type: string
-                  ImagesLinked:
-                    type: integer
+                $ref: "#/components/schemas/FinalizeModelUploadResponse"
         "400":
-          description: No file provided
+          description: Invalid or expired upload session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
+        "409":
+          description: Upload missing, size mismatch, or version conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelUploadErrorResponse"
 
   /api/models:
     get:
@@ -408,4 +565,3 @@ paths:
                     type: string
         "404":
           description: Model version not found
-

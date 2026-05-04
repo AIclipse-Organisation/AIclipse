@@ -2,16 +2,18 @@ import json
 import logging
 import os
 import re
+import hmac
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 import stripe
-from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
 from pymongo import MongoClient
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 
 @asynccontextmanager
@@ -62,6 +64,77 @@ logger.info("MONGO_DB=%s", MONGO_DB)
 # Collections (billing's own data — user data is read/written via auth internal API)
 plan_coll = None
 billing_coll = None
+PLAN_INDEX_SPECS = [
+    ([("stripe_event_id", 1)], {"unique": True, "sparse": True, "name": "uniq_plan_stripe_event_id"}),
+    ([("user_id", 1), ("timestamp", -1)], {"name": "plan_user_latest"}),
+    ([("stripe_customer_id", 1), ("timestamp", -1)], {"name": "plan_customer_latest"}),
+]
+BILLING_INDEX_SPECS = [
+    ([("stripe_event_id", 1)], {"unique": True, "sparse": True, "name": "uniq_billing_stripe_event_id"}),
+    ([("user_id", 1), ("status", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_user_status_latest"}),
+    ([("user_id", 1), ("stripe_subscription_id", 1), ("status", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_user_subscription_status_latest"}),
+    ([("stripe_subscription_id", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_by_subscription_latest"}),
+    ([("stripe_customer_id", 1), ("timestamp", -1), ("billing_period_end", -1)], {"name": "billing_by_customer_latest"}),
+]
+
+
+def ensure_billing_indexes(plan_collection, billing_collection):
+    for keys, options in PLAN_INDEX_SPECS:
+        _ensure_collection_index(plan_collection, keys, options)
+
+    for keys, options in BILLING_INDEX_SPECS:
+        _ensure_collection_index(billing_collection, keys, options)
+
+
+def _read_collection_indexes(collection) -> list[dict]:
+    if not hasattr(collection, "list_indexes"):
+        return []
+    try:
+        return list(collection.list_indexes())
+    except OperationFailure as exc:
+        details = exc.details or {}
+        if exc.code == 26 or details.get("codeName") == "NamespaceNotFound":
+            return []
+        raise
+
+
+def _same_key_pattern(existing: dict, desired_keys: list[tuple[str, int]]) -> bool:
+    existing_items = list((existing or {}).items())
+    return existing_items == list(desired_keys)
+
+
+def _same_optional_bool(existing: dict, desired: dict, option_name: str) -> bool:
+    return bool(existing.get(option_name)) == bool(desired.get(option_name))
+
+
+def _is_equivalent_index(existing: dict, desired_keys: list[tuple[str, int]], desired_options: dict) -> bool:
+    return (
+        _same_key_pattern(existing.get("key", {}), desired_keys)
+        and _same_optional_bool(existing, desired_options, "unique")
+        and _same_optional_bool(existing, desired_options, "sparse")
+    )
+
+
+def _ensure_collection_index(collection, keys: list[tuple[str, int]], options: dict) -> str:
+    indexes = _read_collection_indexes(collection)
+    equivalent = next((index for index in indexes if _is_equivalent_index(index, keys, options)), None)
+    if equivalent is not None:
+        return equivalent["name"]
+
+    named = next((index for index in indexes if index.get("name") == options["name"]), None)
+    if named is not None:
+        raise RuntimeError(
+            f"Index '{options['name']}' conflicts with existing incompatible index '{named['name']}'"
+        )
+
+    try:
+        return collection.create_index(keys, **options)
+    except OperationFailure:
+        refreshed = _read_collection_indexes(collection)
+        equivalent = next((index for index in refreshed if _is_equivalent_index(index, keys, options)), None)
+        if equivalent is not None:
+            return equivalent["name"]
+        raise
 
 # -------------------------
 # AUTH INTERNAL API
@@ -71,6 +144,7 @@ billing_coll = None
 # interpolation boundary stops path traversal (e.g. "../admin") from routing
 # the internal call to an unintended auth endpoint.
 _USER_ID_RE = re.compile(r"^u_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_VALID_EXTERNAL_PROTOS = {"http", "https"}
 
 
 def _require_valid_user_id(user_id: str) -> str:
@@ -81,6 +155,29 @@ def _require_valid_user_id(user_id: str) -> str:
 
 def _auth_headers() -> dict:
     return {"X-Internal-Token": INTERNAL_AUTH_TOKEN} if INTERNAL_AUTH_TOKEN else {}
+
+
+def _normalize_external_proto(value: str | None) -> str | None:
+    proto = str(value or "").split(",", 1)[0].strip().lower()
+    if proto in _VALID_EXTERNAL_PROTOS:
+        return proto
+    return None
+
+
+def _resolve_public_client_url(external_proto: str | None) -> str:
+    base_url = str(CLIENT_URL or "").strip()
+    if not base_url:
+        return base_url
+
+    proto = _normalize_external_proto(external_proto)
+    if not proto:
+        return base_url
+
+    parsed = urlsplit(base_url)
+    if not parsed.scheme or parsed.scheme == proto:
+        return base_url
+
+    return urlunsplit((proto, parsed.netloc, parsed.path, parsed.query, parsed.fragment))
 
 
 async def _read_user_plan(user_id: str) -> dict:
@@ -154,12 +251,9 @@ try:
     plan_coll = db.plan
     billing_coll = db.billing
 
-    # Unique-sparse indexes give us atomic, retry-safe webhook handling:
-    # Stripe retries deliver the same event_id; a second insert fails with
-    # DuplicateKeyError, which each step catches to preserve forward progress
-    # without needing transactions or pre-checks.
-    plan_coll.create_index("stripe_event_id", unique=True, sparse=True)
-    billing_coll.create_index("stripe_event_id", unique=True, sparse=True)
+    # Unique-sparse indexes give us atomic, retry-safe webhook handling, and
+    # the latest-state queries must stay on indexed filters as data grows.
+    ensure_billing_indexes(plan_coll, billing_coll)
 
     logger.info("Mongo connected OK. DB=%s", MONGO_DB)
 
@@ -169,17 +263,47 @@ except Exception as e:
     billing_coll = None
 
 # -------------------------
-# MODELS
+# FORWARDED USER
 # -------------------------
-class CheckoutRequest(BaseModel):
+@dataclass(frozen=True)
+class ForwardedUserContext:
     user_id: str
-    plan_id: int
-    email: str
+    email: str | None = None
+    user_name: str | None = None
+    is_admin: bool = False
 
 
-class CancelSubscriptionRequest(BaseModel):
-    user_id: str
-    reason: str
+def _normalize_optional_header(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    return normalized or None
+
+
+def _require_forwarded_user(
+    x_internal_token: str | None = Header(None, alias="X-Internal-Token"),
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
+    x_user_email: str | None = Header(None, alias="X-User-Email"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    x_user_is_admin: Literal["true", "false"] | None = Header(None, alias="X-User-Is-Admin"),
+) -> ForwardedUserContext:
+    if not INTERNAL_AUTH_TOKEN:
+        raise HTTPException(status_code=503, detail="Internal auth not configured")
+
+    if not hmac.compare_digest(x_internal_token or "", INTERNAL_AUTH_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid internal auth token")
+
+    user_id = _normalize_optional_header(x_user_id)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Missing forwarded user id")
+
+    return ForwardedUserContext(
+        user_id=_require_valid_user_id(user_id),
+        email=_normalize_optional_header(x_user_email),
+        user_name=_normalize_optional_header(x_user_name),
+        is_admin=x_user_is_admin == "true",
+    )
 
 
 class RequestLogSanitizer:
@@ -251,13 +375,11 @@ def get_config():
 
 
 @app.get("/subscription/status")
-async def get_subscription_status(user_id: str):
+async def get_subscription_status(user: ForwardedUserContext = Depends(_require_forwarded_user)):
     if billing_coll is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    safe_user_id = RequestLogSanitizer.user_id(user_id)
-    if not safe_user_id:
-        raise HTTPException(status_code=400, detail="Invalid user_id")
+    safe_user_id = user.user_id
 
     user_info = await _read_user_plan(safe_user_id)
     current_plan = int(user_info.get("plan", 0) or 0)
@@ -291,11 +413,18 @@ async def get_subscription_status(user_id: str):
 # CHECKOUT
 # -------------------------
 @app.post("/create-checkout-session")
-async def create_checkout_session(request: CheckoutRequest):
+async def create_checkout_session(
+    plan_id: int = Body(..., embed=True),
+    user: ForwardedUserContext = Depends(_require_forwarded_user),
+    x_external_proto: str | None = Header(None, alias="X-External-Proto"),
+):
+    if not user.email:
+        raise HTTPException(status_code=400, detail="Missing forwarded user email")
+
     safe_user_id, safe_plan_id, safe_email = RequestLogSanitizer.sanitize_checkout_input(
-        request.user_id,
-        request.plan_id,
-        request.email,
+        user.user_id,
+        plan_id,
+        user.email,
     )
 
     if not STRIPE_SECRET_KEY:
@@ -320,6 +449,7 @@ async def create_checkout_session(request: CheckoutRequest):
     logger.info("create-checkout-session called plan=%s", plan["name"])
 
     try:
+        public_client_url = _resolve_public_client_url(x_external_proto)
         # Reuse Stripe customer id from latest plan record if any
         customer_id = None
         last_plan = plan_coll.find_one(
@@ -363,8 +493,8 @@ async def create_checkout_session(request: CheckoutRequest):
                 "quantity": 1,
             }],
             mode="subscription",
-            success_url=f"{CLIENT_URL}/plan?success=true",
-            cancel_url=f"{CLIENT_URL}/plan?canceled=true",
+            success_url=f"{public_client_url}/plan?success=true",
+            cancel_url=f"{public_client_url}/plan?canceled=true",
             metadata={
                 "user_id": safe_user_id,
                 "plan_id": str(safe_plan_id),
@@ -382,18 +512,19 @@ async def create_checkout_session(request: CheckoutRequest):
 
 
 @app.post("/subscription/cancel-at-period-end")
-async def cancel_subscription_at_period_end(request: CancelSubscriptionRequest):
+async def cancel_subscription_at_period_end(
+    reason: str = Body(..., embed=True),
+    user: ForwardedUserContext = Depends(_require_forwarded_user),
+):
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Stripe not configured")
 
     if plan_coll is None or billing_coll is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    safe_user_id = RequestLogSanitizer.user_id(request.user_id)
-    cancellation_reason = RequestLogSanitizer._clean_text(request.reason, max_len=120)
+    safe_user_id = user.user_id
+    cancellation_reason = RequestLogSanitizer._clean_text(reason, max_len=120)
 
-    if not safe_user_id:
-        raise HTTPException(status_code=400, detail="Invalid user_id")
     if not cancellation_reason:
         raise HTTPException(status_code=400, detail="Cancellation reason is required")
 

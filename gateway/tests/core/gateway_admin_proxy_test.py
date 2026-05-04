@@ -42,3 +42,165 @@ async def test_admin_users_ok_proxies(client, patch_upstreams, auth_keypair):
     r = await client.get("/auth/admin/users?user_name=ali", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     assert r.json()["items"][0]["user_id"] == "u_a"
+
+
+@pytest.mark.asyncio
+async def test_admin_model_upload_session_proxies_json_payload(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_admin",
+        email="admin@example.com",
+        is_admin=True,
+        plan=0,
+    )
+
+    def create_session_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers["content-type"].startswith("application/json")
+        assert req.headers.get("x-external-proto") == "https"
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_admin"
+        assert req.headers.get("x-user-is-admin") == "true"
+        assert req.content == b'{"version":"v2.0.1","fileName":"model.pt","fileSize":123}'
+        return httpx.Response(
+            status_code=200,
+            json={"uploadId": "upload-token", "partSizeBytes": 16777216, "totalParts": 1},
+        )
+
+    patch_upstreams.add(host="model-cycle", method="POST", path="/api/models/uploads", handler=create_session_handler)
+
+    r = await client.post(
+        "/admin/models/uploads",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-Forwarded-Proto": "https",
+        },
+        content=b'{"version":"v2.0.1","fileName":"model.pt","fileSize":123}',
+    )
+
+    assert r.status_code == 200
+    assert r.json()["uploadId"] == "upload-token"
+
+
+@pytest.mark.asyncio
+async def test_admin_model_training_images_forward_external_proto_for_get_requests(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_admin",
+        email="admin@example.com",
+        is_admin=True,
+        plan=0,
+    )
+
+    def training_images_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers.get("x-external-proto") == "https"
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_admin"
+        assert req.headers.get("x-user-is-admin") == "true"
+        return httpx.Response(status_code=200, json=[{"id": 1, "label": "real"}])
+
+    patch_upstreams.add(host="model-cycle", method="GET", path="/images", handler=training_images_handler)
+
+    r = await client.get(
+        "/admin/models/training-images",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Forwarded-Proto": "https",
+        },
+    )
+
+    assert r.status_code == 200
+    assert r.json()[0]["label"] == "real"
+
+
+@pytest.mark.asyncio
+async def test_admin_model_upload_finalize_proxies_json_payload(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_admin",
+        email="admin@example.com",
+        is_admin=True,
+        plan=0,
+    )
+
+    def finalize_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers["content-type"].startswith("application/json")
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_admin"
+        assert req.headers.get("x-user-is-admin") == "true"
+        assert req.content == b'{"uploadId":"upload-token","version":"v2.0.1"}'
+        return httpx.Response(status_code=200, json={"version": "v2.0.1", "imagesLinked": 0})
+
+    patch_upstreams.add(host="model-cycle", method="POST", path="/api/models/uploads/finalize", handler=finalize_handler)
+
+    r = await client.post(
+        "/admin/models/uploads/finalize",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        content=b'{"uploadId":"upload-token","version":"v2.0.1"}',
+    )
+
+    assert r.status_code == 200
+    assert r.json()["version"] == "v2.0.1"
+
+
+@pytest.mark.asyncio
+async def test_admin_model_upload_part_proxies_raw_body_and_upload_id(client, patch_upstreams, auth_keypair):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_admin",
+        email="admin@example.com",
+        is_admin=True,
+        plan=0,
+    )
+
+    def upload_part_handler(req: httpx.Request) -> httpx.Response:
+        assert req.headers["content-type"] == "application/octet-stream"
+        assert req.headers.get("x-upload-id") == "upload-token"
+        assert req.headers.get("x-internal-token") == "test-internal-token"
+        assert req.headers.get("x-user-id") == "u_admin"
+        assert req.headers.get("x-user-is-admin") == "true"
+        assert req.content == b"chunk-1"
+        return httpx.Response(status_code=200, json={"partNumber": 1})
+
+    patch_upstreams.add(host="model-cycle", method="PUT", path="/api/models/uploads/parts/1", handler=upload_part_handler)
+
+    r = await client.put(
+        "/admin/models/uploads/parts/1",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/octet-stream",
+            "X-Upload-Id": "upload-token",
+        },
+        content=b"chunk-1",
+    )
+
+    assert r.status_code == 200
+    assert r.json()["partNumber"] == 1
+
+
+@pytest.mark.asyncio
+async def test_admin_model_upload_session_returns_502_when_model_cycle_is_unreachable(client, patch_upstreams, auth_keypair, gateway_mod, monkeypatch):
+    token = make_auth_token(
+        keypair=auth_keypair,
+        user_id="u_admin",
+        email="admin@example.com",
+        is_admin=True,
+        plan=0,
+    )
+
+    async def fail_request(*args, **kwargs):
+        raise httpx.RequestError(
+            "boom",
+            request=httpx.Request("POST", "http://model-cycle/api/models/uploads"),
+        )
+
+    monkeypatch.setattr(gateway_mod.app.state.http, "request", fail_request)
+
+    r = await client.post(
+        "/admin/models/uploads",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        content=b'{"version":"v2.0.1","fileName":"model.pt","fileSize":123}',
+    )
+
+    assert r.status_code == 502
+    assert r.json()["detail"] == "Model Cycle unreachable"

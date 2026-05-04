@@ -3,6 +3,7 @@ kind: Ingress
 metadata:
   name: ingress-srv
   annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-body-size: "20m"
@@ -30,6 +31,27 @@ spec:
     - host: storage.aiclipse.online
       http:
         paths:
+          - path: /crossdomain.xml
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
+          - path: /robots.txt
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
+          - path: /sitemap.xml
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
           - path: /
             pathType: Prefix
             backend:
@@ -58,6 +80,27 @@ spec:
     - host: storage.aiclipse.site
       http:
         paths:
+          - path: /crossdomain.xml
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
+          - path: /robots.txt
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
+          - path: /sitemap.xml
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
           - path: /
             pathType: Prefix
             backend:

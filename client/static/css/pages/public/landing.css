@@ -498,3 +498,194 @@ body.app main.screen.landing-screen {
   .site-footer-links { gap: 18px; }
   .site-footer-column a { font-size: 16px; }
 }
+
+
+/* ── GoFundMe Banner ───────────────────────────────────────── */
+.landing-gofundme {
+  margin: 0 18px;
+  background: #111111;
+  border: 1px solid rgba(207, 184, 124, 0.25);
+  border-radius: 16px;
+  padding: 20px 22px;
+  position: relative;
+  overflow: hidden;
+
+  opacity: 0;
+  transform: translateY(-12px);
+  animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards;
+}
+
+/* Animated gold shimmer bar across the top edge */
+.landing-gofundme::before {
+  content: "";
+  position: absolute;
+  top: 0; left: -60%; right: -60%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #CFB87C 40%,
+    #f0d98a 50%,
+    #CFB87C 60%,
+    transparent 100%
+  );
+  animation: goldSweep 3s ease-in-out infinite;
+}
+
+@keyframes goldSweep {
+  0%   { transform: translateX(-50%); opacity: 0.4; }
+  50%  { transform: translateX(50%);  opacity: 1;   }
+  100% { transform: translateX(-50%); opacity: 0.4; }
+}
+
+/* Soft radial glow behind the QR */
+.landing-gofundme::after {
+  content: "";
+  position: absolute;
+  right: -20px; top: 50%;
+  transform: translateY(-50%);
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(207, 184, 124, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.landing-gofundme-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.landing-gofundme-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.landing-gofundme-eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #CFB87C;
+}
+
+.landing-gofundme-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 200px;
+}
+
+.landing-gofundme-qr-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.landing-gofundme-qr {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 2px solid rgba(207, 184, 124, 0.4);
+  background: #fff;
+  padding: 4px;
+  box-shadow: 0 0 0 0 rgba(207, 184, 124, 0.35);
+  animation: qrPulse 2.8s ease-in-out infinite;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.35s ease;
+}
+
+.landing-gofundme-qr:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 24px rgba(207, 184, 124, 0.3);
+}
+
+@keyframes qrPulse {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(207, 184, 124, 0.35); }
+  50%       { box-shadow: 0 0 0 8px rgba(207, 184, 124, 0);    }
+}
+
+.landing-gofundme-scan {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .landing-gofundme,
+  .landing-gofundme::before,
+  .landing-gofundme-qr {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Small screens */
+@media (max-width: 380px) {
+  .landing-gofundme-label { font-size: 13px; }
+  .landing-gofundme-qr   { width: 76px; height: 76px; }
+}
+
+
+/* Coffee Banner Layout */
+.landing-coffee-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  text-decoration: none;
+  width: 100%;
+}
+
+.landing-coffee-icon-bg {
+  background: #CFB87C;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(207, 184, 124, 0.3);
+}
+
+.landing-coffee-arrow {
+  margin-left: auto;
+  opacity: 0.6;
+  transition: transform 0.3s ease;
+}
+
+.landing-coffee-wrapper:hover .landing-coffee-arrow {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+.landing-coffee-wrapper:hover .landing-coffee-icon-bg {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}
+
+/* Ensure text doesn't overflow on small screens */
+@media (max-width: 380px) {
+  .landing-coffee-icon-bg {
+    width: 40px;
+    height: 40px;
+  }
+  .landing-gofundme-label {
+    font-size: 12px;
+    max-width: 160px;
+  }
+}

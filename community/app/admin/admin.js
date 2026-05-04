@@ -45,23 +45,75 @@ async function fetchLocal(endpoint, options = {}) {
       return null;
     }
 
-    const errorBody = await res.json().catch(() => ({}));
-    const detail = errorBody?.detail;
-    let detailText = "";
-    if (typeof detail === "string") detailText = detail;
-    else if (Array.isArray(detail)) {
-      detailText = detail
-        .map((d) => (typeof d?.msg === "string" ? d.msg : JSON.stringify(d)))
-        .join("; ");
-    } else if (detail && typeof detail === "object") {
-      detailText = detail.message || detail.code || JSON.stringify(detail);
-    }
-
-    throw new Error(detailText || errorBody.error || `Error: ${res.status}`);
+    throw new Error(await buildResponseError(res));
   }
 
   if (res.status === 204) return null;
   return res.json();
+}
+
+async function buildResponseError(res) {
+  const rawText = await res.text().catch(() => "");
+  let errorBody = {};
+  if (rawText) {
+    try {
+      errorBody = JSON.parse(rawText);
+    } catch {
+      errorBody = {};
+    }
+  }
+  const parsedErrorBody = errorBody || {};
+  const detail = parsedErrorBody?.detail;
+  let detailText = "";
+  if (typeof detail === "string") detailText = detail;
+  else if (Array.isArray(detail)) {
+    detailText = detail
+      .map((d) => (typeof d?.msg === "string" ? d.msg : JSON.stringify(d)))
+      .join("; ");
+  } else if (detail && typeof detail === "object") {
+    detailText = detail.message || detail.code || JSON.stringify(detail);
+  }
+
+  return detailText || parsedErrorBody.error || rawText || `Error: ${res.status}`;
+}
+
+async function uploadModelPart(uploadId, partNumber, chunk) {
+  const res = await fetch(`/community/adminBFF/models/uploads/parts/${partNumber}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "X-Upload-Id": uploadId,
+    },
+    body: chunk,
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Unauthorized");
+    }
+    throw new Error(await buildResponseError(res));
+  }
+
+  return res.json();
+}
+
+async function uploadModelInParts(uploadSession, file) {
+  const partSizeBytes = Number(uploadSession?.partSizeBytes || 0);
+  const totalParts = Number(uploadSession?.totalParts || 0);
+  if (!Number.isInteger(partSizeBytes) || partSizeBytes <= 0) {
+    throw new Error("Upload session is missing a valid part size.");
+  }
+  if (!Number.isInteger(totalParts) || totalParts <= 0) {
+    throw new Error("Upload session is missing a valid part count.");
+  }
+
+  for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+    const start = (partNumber - 1) * partSizeBytes;
+    const end = Math.min(start + partSizeBytes, file.size);
+    const chunk = file.slice(start, end);
+    await uploadModelPart(uploadSession.uploadId, partNumber, chunk);
+  }
 }
 
 export const adminService = {
@@ -162,18 +214,48 @@ export const adminService = {
     return res.json();
   },
 
-  uploadModel: async (formData) => {
-    const res = await fetch(`/community/adminBFF/models`, {
+  uploadModel: async ({ file, version, ...metadata }) => {
+    if (!file) {
+      throw new Error("Model file is required");
+    }
+
+    const normalizedVersion = String(version || "").trim();
+    if (!normalizedVersion) {
+      throw new Error("Model version is required");
+    }
+
+    const uploadSession = await fetchLocal("/models/uploads", {
       method: "POST",
-      body: formData,
-      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        version: normalizedVersion,
+        fileName: file?.name,
+        fileSize: file?.size,
+        contentType: file?.type || "application/octet-stream",
+      }),
     });
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "Upload failed");
+    if (!uploadSession) {
+      throw new Error("Unauthorized");
     }
-    return res.json();
+
+    await uploadModelInParts(uploadSession, file);
+
+    const finalized = await fetchLocal("/models/uploads/finalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uploadId: uploadSession.uploadId,
+        version: normalizedVersion,
+        ...metadata,
+      }),
+    });
+
+    if (!finalized) {
+      throw new Error("Unauthorized");
+    }
+
+    return finalized;
   },
 
   getReportedPosts: async () => {

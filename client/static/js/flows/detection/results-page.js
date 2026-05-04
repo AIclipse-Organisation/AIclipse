@@ -451,6 +451,9 @@
         }
       };
       img.src = pending.previewUrl;
+      if (typeof window.attachImageZoom === "function") {
+        window.attachImageZoom(img);
+      }
 
       if (pending.source === "indexeddb" && pending.previewUrl.startsWith("blob:")) {
         global.addEventListener(

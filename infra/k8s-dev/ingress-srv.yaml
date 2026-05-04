@@ -9,6 +9,11 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffering: "on"
 spec:
   ingressClassName: nginx
+  tls:
+    - secretName: aiclipse-local-tls
+      hosts:
+        - aiclipse.local
+        - storage.aiclipse.local
   rules:
     - host: aiclipse.local
       http:
@@ -61,6 +66,27 @@ spec:
     - host: storage.aiclipse.local
       http:
         paths:
+          - path: /crossdomain.xml
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
+          - path: /robots.txt
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
+          - path: /sitemap.xml
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: client-srv
+                port:
+                  number: 3000
           - path: /
             pathType: Prefix
             backend:

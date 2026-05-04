@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import ImageZoomModal from "./ImageZoomModal";
 
 export default function PostMedia({
   url,
@@ -8,14 +10,32 @@ export default function PostMedia({
   isUserCorrect,
   groundTruth,
 }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
+
   return (
     <div className="comm_postImageWrap">
-      <img
+      <motion.img
         className="comm_postImage"
         src={url}
         alt={label || "Community image"}
-        onClick={onClick}
+        onClick={() => {
+          onClick?.();
+          setZoomOpen(true);
+        }}
+        onLoad={() => setIsLoaded(true)}
+        animate={{ opacity: isLoaded ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+        style={{ color: "transparent" }}
       />
+
+      {zoomOpen && (
+        <ImageZoomModal
+          src={url}
+          alt={label || "Community image"}
+          onClose={() => setZoomOpen(false)}
+        />
+      )}
 
       {/* Full overlay */}
       <AnimatePresence>

@@ -4,6 +4,7 @@ using ModelCycle.Data;
 using ModelCycle.DTOs;
 using ModelCycle.Models;
 using ModelCycle.Services;
+using ModelCycle.Security;
 using ModelCycle.Services.Training;
 
 namespace ModelCycle.Controllers;
@@ -12,27 +13,35 @@ namespace ModelCycle.Controllers;
 [Route("api/[controller]")]
 public class ModelsController : ControllerBase
 {
-    private readonly BlobStorageService _blobService;
+    private readonly IBlobStorageService _blobService;
     private readonly AppDbContext _dbContext;
     private readonly TrainingJobQueue _jobQueue;
-
     private readonly IModelDeploymentService _deploymentService;
+    private readonly IInternalRequestAuthorizer _requestAuthorizer;
 
     public ModelsController(
-    BlobStorageService blobService,
+    IBlobStorageService blobService,
     AppDbContext dbContext,
     TrainingJobQueue jobQueue,
-    IModelDeploymentService deploymentService)
+    IModelDeploymentService deploymentService,
+    IInternalRequestAuthorizer requestAuthorizer)
     {
         _blobService = blobService;
         _dbContext = dbContext;
         _jobQueue = jobQueue;
         _deploymentService = deploymentService;
+        _requestAuthorizer = requestAuthorizer;
     }
 
     [HttpPost("train")]
     public async Task<IActionResult> TriggerManualTraining()
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         await _jobQueue.QueueJobAsync();
 
         return Accepted(new { Message = "Training signal sent to background queue." });
@@ -41,6 +50,12 @@ public class ModelsController : ControllerBase
     [HttpGet("/images")]
     public async Task<IActionResult> GetModelImages()
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         var images = await _dbContext.TrainingImages
             .AsNoTracking()
             .OrderByDescending(i => i.UploadedAt)
@@ -65,6 +80,12 @@ public class ModelsController : ControllerBase
     [HttpGet("current")]
     public async Task<IActionResult> GetCurrentModel()
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         var activeModel = await _dbContext.ModelWeights
             .AsNoTracking()
             .Where(m => m.IsDeployed)
@@ -86,77 +107,105 @@ public class ModelsController : ControllerBase
         });
     }
 
-    [HttpPost("upload")]
-    [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadModel([FromForm] UploadModelRequest request)
+    [HttpPost("uploads")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(CreateModelUploadSessionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateUploadSession([FromBody] CreateModelUploadSessionRequest request)
     {
-        if (request.File == null || request.File.Length == 0)
-            return BadRequest("No file provided.");
-
-        var modelId = Guid.NewGuid();
-        var modelWeight = new ModelWeights
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
         {
-            Id = modelId,
-            Version = request.Version,
-            NewImagesCount = request.NewImagesCount,
-            ReplayBufferCount = request.ReplayBufferCount,
-            ValidationAccuracy = request.ValidationAccuracy,
-            ValidationPrecision = request.ValidationPrecision,
-            ValidationRecall = request.ValidationRecall,
-            ValidationF1Score = request.ValidationF1Score,
-            GoldenTestAccuracy = request.GoldenTestAccuracy,
-            GoldenTestPrecision = request.GoldenTestPrecision,
-            GoldenTestRecall = request.GoldenTestRecall,
-            GoldenTestF1Score = request.GoldenTestF1Score,
-            GoldenFakeToRealMisclassifications = request.GoldenFakeToRealMisclassifications,
-            GoldenRealToFakeMisclassifications = request.GoldenRealToFakeMisclassifications
-        };
-
-        var links = new List<ModelImageLink>();
-
-        void AddLinks(List<Guid>? ids, ImageUsageType usage)
-        {
-            if (ids == null) return;
-            foreach (var imgId in ids)
-            {
-                links.Add(new ModelImageLink
-                {
-                    ModelWeightId = modelId,
-                    TrainingImageId = imgId,
-                    UsageType = usage
-                });
-            }
+            return authFailure;
         }
 
-        AddLinks(request.NewTrainingImageIds, ImageUsageType.NewTraining);
-        AddLinks(request.ReplayImageIds, ImageUsageType.Replay);
-        AddLinks(request.GoldenTestImageIds, ImageUsageType.GoldenTest);
-
-        var extension = Path.GetExtension(request.File.FileName);
-        var fileName = $"{request.Version}{extension}";
-
-        using var stream = request.File.OpenReadStream();
-        var deployedModel = await _deploymentService.UploadAndDeployModelAsync(
-            stream,
-            fileName,
-            request.File.ContentType,
-            modelWeight,
-            links
-        );
-
-        return Ok(new
+        try
         {
-            Message = "Model uploaded, deployed, and lineage tracked.",
-            Id = deployedModel.Id,
-            Version = deployedModel.Version,
-            ImagesLinked = links.Count
-        });
+            var session = await _deploymentService.CreateUploadSessionAsync(request);
+            return Ok(session);
+        }
+        catch (ModelUploadException ex)
+        {
+            return StatusCode(ex.StatusCode, new ModelUploadErrorResponse { Detail = ex.Message });
+        }
     }
 
+    [HttpPut("uploads/parts/{partNumber:int}")]
+    [Consumes("application/octet-stream")]
+    [ProducesResponseType(typeof(UploadModelPartResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UploadPart(
+        int partNumber,
+        [FromHeader(Name = "X-Upload-Id")] string uploadId)
+    {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
+        try
+        {
+            var part = await _deploymentService.UploadPartAsync(
+                uploadId,
+                partNumber,
+                Request.Body,
+                Request.ContentLength,
+                Request.ContentType
+            );
+            return Ok(part);
+        }
+        catch (ModelUploadException ex)
+        {
+            return StatusCode(ex.StatusCode, new ModelUploadErrorResponse { Detail = ex.Message });
+        }
+    }
+
+    [HttpPost("uploads/finalize")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(FinalizeModelUploadResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ModelUploadErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> FinalizeUpload([FromBody] FinalizeModelUploadRequest request)
+    {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
+        try
+        {
+            var deployedModel = await _deploymentService.FinalizeUploadedModelAsync(request);
+            var linkedImages = (request.NewTrainingImageIds?.Count ?? 0)
+                               + (request.ReplayImageIds?.Count ?? 0)
+                               + (request.GoldenTestImageIds?.Count ?? 0);
+
+            return Ok(new FinalizeModelUploadResponse
+            {
+                Message = "Model uploaded, deployed, and lineage tracked.",
+                Id = deployedModel.Id,
+                Version = deployedModel.Version,
+                ImagesLinked = linkedImages,
+            });
+        }
+        catch (ModelUploadException ex)
+        {
+            return StatusCode(ex.StatusCode, new ModelUploadErrorResponse { Detail = ex.Message });
+        }
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetModels()
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         var models = await _dbContext.ModelWeights
             .OrderByDescending(m => m.CreatedAt)
             .AsNoTracking()
@@ -169,6 +218,12 @@ public class ModelsController : ControllerBase
     [HttpDelete("{version}")]
     public async Task<IActionResult> DeleteModel(string version)
     {
+        var authFailure = _requestAuthorizer.RequireForwardedAdmin(Request);
+        if (authFailure != null)
+        {
+            return authFailure;
+        }
+
         if (!version.StartsWith("v", StringComparison.OrdinalIgnoreCase))
         {
             version = $"v{version}";
@@ -186,11 +241,7 @@ public class ModelsController : ControllerBase
         {
             try
             {
-                var fileName = Path.GetFileName(model.MinioObjectPath);
-                if (!string.IsNullOrEmpty(fileName))
-                {
-                    await _blobService.DeleteFileAsync("models", fileName);
-                }
+                await _blobService.DeleteFileAsync(model.MinioObjectPath);
             }
             catch (Exception ex)
             {

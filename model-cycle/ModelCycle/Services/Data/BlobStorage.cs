@@ -1,43 +1,85 @@
 using Minio;
 using Minio.DataModel.Args;
-using Minio.Exceptions;           
+using Minio.Exceptions;
 
 namespace ModelCycle.Services;
 
-public class BlobStorageService : IBlobStorageService
+public sealed class BlobStorageService : IBlobStorageService, IDisposable
 {
-    private readonly IMinioClient _minioClient;
+    private readonly IMinioClient _internalMinioClient;
     private readonly string _bucketName;
     private readonly ILogger<BlobStorageService> _logger;
+    private bool _disposed;
 
     public BlobStorageService(IConfiguration configuration, ILogger<BlobStorageService> logger)
+        : this(BuildDependencies(configuration), logger)
     {
-        _logger = logger;
-        _bucketName = configuration["MINIO_BUCKET_NAME"] ?? "model-cycle-storage";
+    }
 
-        string endpoint = configuration["S3_ENDPOINT"] ?? "minio:9000"; 
-        if (endpoint.StartsWith("http://")) endpoint = endpoint.Substring(7);
-        if (endpoint.StartsWith("https://")) endpoint = endpoint.Substring(8);
+    private BlobStorageService((IMinioClient InternalClient, string BucketName) dependencies, ILogger<BlobStorageService> logger)
+        : this(dependencies.InternalClient, dependencies.BucketName, logger)
+    {
+    }
 
-        _minioClient = new MinioClient()
+    internal BlobStorageService(
+        IMinioClient internalMinioClient,
+        string bucketName,
+        ILogger<BlobStorageService> logger)
+    {
+        _internalMinioClient = internalMinioClient ?? throw new ArgumentNullException(nameof(internalMinioClient));
+        _bucketName = string.IsNullOrWhiteSpace(bucketName)
+            ? throw new InvalidOperationException("MINIO_BUCKET_NAME is required")
+            : bucketName;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    private static (IMinioClient InternalClient, string BucketName) BuildDependencies(IConfiguration configuration)
+    {
+        var accessKey = configuration["AWS_ACCESS_KEY_ID"]
+                        ?? throw new InvalidOperationException("AWS_ACCESS_KEY_ID is required");
+        var secretKey = configuration["AWS_SECRET_ACCESS_KEY"]
+                        ?? throw new InvalidOperationException("AWS_SECRET_ACCESS_KEY is required");
+        var bucketName = configuration["MINIO_BUCKET_NAME"] ?? "model-cycle-storage";
+
+        return (BuildClient(configuration["S3_ENDPOINT"] ?? "s3-srv:9000", accessKey, secretKey), bucketName);
+    }
+
+    private static IMinioClient BuildClient(string rawEndpoint, string accessKey, string secretKey)
+    {
+        var endpointValue = string.IsNullOrWhiteSpace(rawEndpoint)
+            ? throw new InvalidOperationException("S3 endpoint is required")
+            : rawEndpoint.Trim();
+        if (!endpointValue.Contains("://", StringComparison.Ordinal))
+        {
+            endpointValue = $"http://{endpointValue}";
+        }
+
+        if (!Uri.TryCreate(endpointValue, UriKind.Absolute, out var uri))
+        {
+            throw new InvalidOperationException($"Invalid S3 endpoint: {rawEndpoint}");
+        }
+
+        var endpoint = uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}";
+
+        return new MinioClient()
             .WithEndpoint(endpoint)
-            .WithCredentials(configuration["AWS_ACCESS_KEY_ID"], configuration["AWS_SECRET_ACCESS_KEY"])
-            .WithSSL(false)
+            .WithCredentials(accessKey, secretKey)
+            .WithSSL(uri.Scheme == Uri.UriSchemeHttps)
             .Build();
     }
-    
+
     public async Task InitializeAsync()
     {
-        try 
+        try
         {
             var existsArgs = new BucketExistsArgs().WithBucket(_bucketName);
-            bool found = await _minioClient.BucketExistsAsync(existsArgs);
-                
+            var found = await _internalMinioClient.BucketExistsAsync(existsArgs);
+
             if (!found)
             {
                 _logger.LogInformation("[MinIO] Bucket '{Bucket}' does not exist. Creating...", _bucketName);
                 var makeArgs = new MakeBucketArgs().WithBucket(_bucketName);
-                await _minioClient.MakeBucketAsync(makeArgs);
+                await _internalMinioClient.MakeBucketAsync(makeArgs);
                 _logger.LogInformation("[MinIO] Bucket '{Bucket}' created successfully.", _bucketName);
             }
             else
@@ -48,7 +90,7 @@ public class BlobStorageService : IBlobStorageService
         catch (MinioException e)
         {
             _logger.LogCritical(e, "[MinIO] Failed to initialize bucket '{Bucket}'. Check connection or credentials.", _bucketName);
-            throw; 
+            throw;
         }
         catch (Exception e)
         {
@@ -59,9 +101,9 @@ public class BlobStorageService : IBlobStorageService
 
     public async Task<string> UploadFileAsync(Stream fileStream, string folder, string fileName, string contentType)
     {
-        string objectName = $"{folder}/{fileName}";
+        var objectName = $"{folder}/{fileName}";
 
-        try 
+        try
         {
             var putArgs = new PutObjectArgs()
                 .WithBucket(_bucketName)
@@ -70,58 +112,141 @@ public class BlobStorageService : IBlobStorageService
                 .WithObjectSize(fileStream.Length)
                 .WithContentType(contentType);
 
-            await _minioClient.PutObjectAsync(putArgs);
-            
+            await _internalMinioClient.PutObjectAsync(putArgs);
+
             _logger.LogInformation("[MinIO] Successfully uploaded to bucket '{Bucket}'", _bucketName);
-            
-            return objectName; 
+
+            return objectName;
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "[MinIO] Failed to upload  to bucket '{Bucket}'", _bucketName);
+            _logger.LogError(e, "[MinIO] Failed to upload to bucket '{Bucket}'", _bucketName);
             throw;
         }
     }
-    
+
+    public async Task CopyObjectAsync(string sourceObjectName, string destinationObjectName, string? bucketName = null)
+    {
+        var targetBucket = bucketName ?? _bucketName;
+        var source = new CopySourceObjectArgs()
+            .WithBucket(targetBucket)
+            .WithObject(sourceObjectName);
+
+        var args = new CopyObjectArgs()
+            .WithBucket(targetBucket)
+            .WithObject(destinationObjectName)
+            .WithCopyObjectSource(source);
+
+        await _internalMinioClient.CopyObjectAsync(args);
+    }
+
+    public async Task<int> DeleteObjectsOlderThanAsync(string prefix, DateTime olderThanUtc, string? bucketName = null)
+    {
+        var targetBucket = bucketName ?? _bucketName;
+        var deletedCount = 0;
+        var args = new ListObjectsArgs()
+            .WithBucket(targetBucket)
+            .WithPrefix(prefix)
+            .WithRecursive(true);
+
+        await foreach (var item in _internalMinioClient.ListObjectsEnumAsync(args))
+        {
+            if (item.IsDir || string.IsNullOrWhiteSpace(item.Key))
+            {
+                continue;
+            }
+
+            var lastModifiedUtc = item.LastModifiedDateTime?.ToUniversalTime();
+            if (lastModifiedUtc == null || lastModifiedUtc > olderThanUtc)
+            {
+                continue;
+            }
+
+            var deleteArgs = new RemoveObjectArgs()
+                .WithBucket(targetBucket)
+                .WithObject(item.Key);
+
+            await _internalMinioClient.RemoveObjectAsync(deleteArgs);
+            deletedCount++;
+        }
+
+        return deletedCount;
+    }
+
+    public async Task<BlobObjectInfo?> StatObjectAsync(string objectName, string? bucketName = null)
+    {
+        var targetBucket = bucketName ?? _bucketName;
+        try
+        {
+            var args = new StatObjectArgs()
+                .WithBucket(targetBucket)
+                .WithObject(objectName);
+
+            var stat = await _internalMinioClient.StatObjectAsync(args);
+            return new BlobObjectInfo(objectName, stat.Size);
+        }
+        catch (ObjectNotFoundException)
+        {
+            return null;
+        }
+    }
+
     public async Task DownloadFileAsync(string s3Key, string destinationPath, string? bucketName = null)
     {
-        string targetBucket = bucketName ?? _bucketName;
+        var targetBucket = bucketName ?? _bucketName;
 
-        try 
+        try
         {
             var directory = Path.GetDirectoryName(destinationPath);
-
-            if (!Directory.Exists(directory) && !string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+            if (!Directory.Exists(directory) && !string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
 
             var args = new GetObjectArgs()
                 .WithBucket(targetBucket)
                 .WithObject(s3Key)
-                .WithCallbackStream((stream) =>
+                .WithCallbackStream(stream =>
                 {
-                    using (var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write))
-                    {
-                        stream.CopyTo(fileStream);
-                    }
+                    using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write);
+                    stream.CopyTo(fileStream);
                 });
 
-            await _minioClient.GetObjectAsync(args);
-            
+            await _internalMinioClient.GetObjectAsync(args);
+
             _logger.LogInformation("[MinIO] Successfully downloaded '{Key}' from bucket '{Bucket}'", s3Key, targetBucket);
         }
         catch (Exception e)
         {
             _logger.LogError(e, "[MinIO] Failed to download '{Key}' from bucket '{Bucket}'", s3Key, targetBucket);
-            
-            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+
+            if (File.Exists(destinationPath))
+            {
+                File.Delete(destinationPath);
+            }
+
             throw;
         }
     }
-    public async Task DeleteFileAsync(string bucketName, string objectName)
+
+    public async Task DeleteFileAsync(string objectName, string? bucketName = null)
     {
+        var targetBucket = bucketName ?? _bucketName;
         var args = new RemoveObjectArgs()
-            .WithBucket(bucketName)
+            .WithBucket(targetBucket)
             .WithObject(objectName);
 
-        await _minioClient.RemoveObjectAsync(args);
+        await _internalMinioClient.RemoveObjectAsync(args);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _internalMinioClient.Dispose();
+        _disposed = true;
     }
 }

@@ -19,10 +19,8 @@ def test_billing_checkout_rejects_invalid_plan_id_before_any_gateway_call(main_c
     assert resp.get_json() == {"detail": "Invalid plan_id"}
 
 
-def test_billing_checkout_fetches_missing_user_and_forwards_normalized_payload(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(
-        return_value=({"user_id": 77, "email": "bill@example.com", "is_admin": False}, 200)
-    )
+def test_billing_checkout_proxies_validated_plan_id_without_revalidating_user(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
     main_client_module.gateway.call_json = Mock(return_value=({"checkout_url": "https://pay.example/session"}, 200))
 
     client = main_client_module.app.test_client()
@@ -32,22 +30,17 @@ def test_billing_checkout_fetches_missing_user_and_forwards_normalized_payload(m
 
     assert resp.status_code == 200
     assert resp.get_json() == {"checkout_url": "https://pay.example/session"}
-    main_client_module.gateway.fetch_me.assert_called_once_with("billing-token")
     main_client_module.gateway.call_json.assert_called_once_with(
         "POST",
         "/billing/create-checkout-session",
         token="billing-token",
-        json_data={"user_id": 77, "plan_id": 2, "email": "bill@example.com"},
+        json_data={"plan_id": 2},
     )
 
-    with client.session_transaction() as sess:
-        assert sess["current_user"]["user_id"] == 77
-        assert sess["is_admin"] is False
 
-
-def test_billing_checkout_clears_session_and_cookie_when_revalidation_fails(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(return_value=(None, 401))
-    main_client_module.gateway.call_json = Mock(side_effect=AssertionError("call_json must not be called"))
+def test_billing_checkout_clears_session_and_cookie_when_gateway_returns_401(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
+    main_client_module.gateway.call_json = Mock(return_value=({"detail": "Unauthorized"}, 401))
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "expired-token")
@@ -98,10 +91,8 @@ def test_checks_returns_502_when_gateway_answers_with_non_json(main_client_modul
     }
 
 
-def test_billing_subscription_status_uses_session_user_and_proxies(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(
-        return_value=({"user_id": "u_42", "email": "u42@example.com", "is_admin": False}, 200)
-    )
+def test_billing_subscription_status_proxies_without_revalidating_user(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
     main_client_module.gateway.call_json = Mock(
         return_value=({"status": "active", "cancel_at_period_end": False}, 200)
     )
@@ -117,7 +108,7 @@ def test_billing_subscription_status_uses_session_user_and_proxies(main_client_m
     assert resp.get_json() == {"status": "active", "cancel_at_period_end": False}
     main_client_module.gateway.call_json.assert_called_once_with(
         "GET",
-        "/api/billing/subscription/status?user_id=u_42",
+        "/billing/subscription/status",
         token="billing-token",
     )
 
@@ -142,10 +133,8 @@ def test_get_image_proxies_through_gateway_media_service(main_client_module, mon
     )
 
 
-def test_billing_subscription_status_fetches_user_when_missing(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(
-        return_value=({"user_id": "u_99", "email": "u99@example.com", "is_admin": False}, 200)
-    )
+def test_billing_subscription_status_passes_through_gateway_payload(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
     main_client_module.gateway.call_json = Mock(
         return_value=({"status": "active", "billing_period_end": "2026-06-01T00:00:00+00:00"}, 200)
     )
@@ -157,17 +146,16 @@ def test_billing_subscription_status_fetches_user_when_missing(main_client_modul
 
     assert resp.status_code == 200
     assert resp.get_json()["status"] == "active"
-    main_client_module.gateway.fetch_me.assert_called_once_with("billing-token")
     main_client_module.gateway.call_json.assert_called_once_with(
         "GET",
-        "/api/billing/subscription/status?user_id=u_99",
+        "/billing/subscription/status",
         token="billing-token",
     )
 
 
-def test_billing_subscription_status_clears_session_on_revalidation_401(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(return_value=(None, 401))
-    main_client_module.gateway.call_json = Mock(side_effect=AssertionError("call_json must not be called"))
+def test_billing_subscription_status_clears_session_on_gateway_401(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
+    main_client_module.gateway.call_json = Mock(return_value=({"detail": "Unauthorized"}, 401))
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "expired-token")
@@ -201,10 +189,8 @@ def test_billing_cancel_subscription_requires_reason(main_client_module):
     main_client_module.gateway.call_json.assert_not_called()
 
 
-def test_billing_cancel_subscription_fetches_user_and_proxies_reason(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(
-        return_value=({"user_id": "u_42", "email": "u42@example.com", "is_admin": False}, 200)
-    )
+def test_billing_cancel_subscription_proxies_reason_without_revalidating_user(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
     main_client_module.gateway.call_json = Mock(
         return_value=({"ok": True, "status": "cancel_scheduled"}, 200)
     )
@@ -219,18 +205,17 @@ def test_billing_cancel_subscription_fetches_user_and_proxies_reason(main_client
 
     assert resp.status_code == 200
     assert resp.get_json() == {"ok": True, "status": "cancel_scheduled"}
-    main_client_module.gateway.fetch_me.assert_called_once_with("billing-token")
     main_client_module.gateway.call_json.assert_called_once_with(
         "POST",
-        "/api/billing/subscription/cancel-at-period-end",
+        "/billing/subscription/cancel-at-period-end",
         token="billing-token",
-        json_data={"user_id": "u_42", "reason": "Too expensive"},
+        json_data={"reason": "Too expensive"},
     )
 
 
-def test_billing_cancel_subscription_clears_session_on_revalidation_401(main_client_module):
-    main_client_module.gateway.fetch_me = Mock(return_value=(None, 401))
-    main_client_module.gateway.call_json = Mock(side_effect=AssertionError("call_json must not be called"))
+def test_billing_cancel_subscription_clears_session_on_gateway_401(main_client_module):
+    main_client_module.gateway.fetch_me = Mock(side_effect=AssertionError("fetch_me must not be called"))
+    main_client_module.gateway.call_json = Mock(return_value=({"detail": "Unauthorized"}, 401))
 
     client = main_client_module.app.test_client()
     client.set_cookie("access_token", "expired-token")
@@ -1379,6 +1364,10 @@ def test_public_html_routes_include_hardened_security_headers(main_client_module
 
     assert resp.headers["X-Content-Type-Options"] == "nosniff"
     assert resp.headers["X-Frame-Options"] == "DENY"
+    assert resp.headers["Referrer-Policy"] == "same-origin"
+    assert resp.headers["Cross-Origin-Opener-Policy"] == "same-origin"
+    assert resp.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+    assert resp.headers["Permissions-Policy"] == "geolocation=()"
     assert directives["script-src"] == "script-src 'self'"
     assert directives["script-src-elem"] == "script-src-elem 'self'"
     assert directives["script-src-attr"] == "script-src-attr 'none'"
@@ -1386,7 +1375,93 @@ def test_public_html_routes_include_hardened_security_headers(main_client_module
     assert directives["form-action"] == "form-action 'self'"
     assert directives["style-src-elem"] == "style-src-elem 'self'"
     assert directives["style-src-attr"] == "style-src-attr 'unsafe-inline'"
-    assert directives["img-src"] == "img-src 'self' data: blob: https: http:"
+    assert (
+        directives["img-src"]
+        == "img-src 'self' data: blob: https://storage.aiclipse.local http://storage.aiclipse.local"
+    )
+
+
+def test_prod_security_headers_include_hsts(main_client_module):
+    main_client_module.is_prod = True
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/")
+
+    assert (
+        resp.headers["Strict-Transport-Security"]
+        == "max-age=31536000; includeSubDomains; preload"
+    )
+
+
+def test_prod_img_src_policy_still_allows_exact_local_storage_origin(main_client_module):
+    main_client_module.is_prod = True
+
+    assert (
+        main_client_module._build_img_src_directive()
+        == "img-src 'self' data: blob: https://storage.aiclipse.local http://storage.aiclipse.local"
+    )
+
+
+def test_robots_txt_is_served_as_a_cacheable_plain_text_contract(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/robots.txt")
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/plain"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert resp.headers["X-Content-Type-Options"] == "nosniff"
+    assert "Disallow: /api/" in resp.get_data(as_text=True)
+
+
+def test_storage_host_robots_txt_disallows_all_crawling(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/robots.txt", headers={"Host": "storage.aiclipse.local"})
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/plain"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert resp.get_data(as_text=True) == "User-agent: *\nDisallow: /\n"
+
+
+def test_sitemap_xml_is_served_as_a_cacheable_xml_contract(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/sitemap.xml")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/xml"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert resp.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+    assert "<loc>http://localhost/</loc>" in body
+    assert "<loc>http://localhost/community</loc>" in body
+    assert body.startswith('<?xml version="1.0" encoding="UTF-8"?>')
+
+
+def test_storage_host_sitemap_is_empty_and_public(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/sitemap.xml", headers={"Host": "storage.aiclipse.local"})
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/xml"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert "<url><loc>" not in body
+    assert '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>' in body
+
+
+def test_crossdomain_xml_is_public_and_returns_404(main_client_module):
+    client = main_client_module.app.test_client()
+
+    resp = client.get("/crossdomain.xml", headers={"Host": "storage.aiclipse.local"})
+
+    assert resp.status_code == 404
+    assert resp.mimetype == "text/plain"
+    assert resp.headers["Cache-Control"] == "public, max-age=300"
+    assert resp.get_data(as_text=True) == "Not Found\n"
 
 
 def test_versioned_static_assets_are_cacheable_and_immutable(main_client_module):
@@ -1416,3 +1491,37 @@ def test_images_api_is_sent_with_no_store_cache_policy(main_client_module, monke
         gateway_base_url="http://gateway.test",
         params={},
     )
+
+
+def test_images_route_forwards_https_external_proto_to_gateway(main_client_module, monkeypatch):
+    captured = {}
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        captured.update(url=url, headers=headers, params=params, timeout=timeout)
+        return ResponseStub(200, {"items": []})
+
+    monkeypatch.setattr(main_client_module.requests, "get", fake_get)
+
+    client = main_client_module.app.test_client()
+    client.set_cookie("access_token", "img-token")
+
+    resp = client.get(
+        "/images",
+        headers={
+            "X-Forwarded-Proto": "https",
+            "X-Requested-With": "XMLHttpRequest",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json() == {"items": []}
+    assert captured == {
+        "url": "http://gateway.test/images",
+        "headers": {
+            "Accept": "application/json",
+            "Authorization": "Bearer img-token",
+            "X-External-Proto": "https",
+        },
+        "params": {},
+        "timeout": 10,
+    }

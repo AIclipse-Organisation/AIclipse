@@ -11,11 +11,8 @@ const FLUSH_MAX_WAIT_SEC = 60;
 const DELTA_TTL_SECONDS = 60 * 60;
 const CLICK_COOLDOWN_SECONDS = 60;
 
-function unauthorized(error) {
-  return NextResponse.json(
-    { error: "Unauthorized", detail: String(error) },
-    { status: 401 },
-  );
+function unauthorized() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 export function createClickRouteHandler({ requireUser }) {
@@ -23,8 +20,8 @@ export function createClickRouteHandler({ requireUser }) {
     let currentUser;
     try {
       currentUser = await requireUser(req);
-    } catch (authErr) {
-      return unauthorized(authErr);
+    } catch {
+      return unauthorized();
     }
 
     try {
@@ -97,7 +94,7 @@ export function createClickRouteHandler({ requireUser }) {
       );
     } catch (err) {
       return NextResponse.json(
-        { error: "Failed to increment clicks", detail: String(err) },
+        { error: "Failed to increment clicks" },
         { status: 500 },
       );
     }

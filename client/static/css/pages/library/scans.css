@@ -47,12 +47,20 @@
 .scan-left {
   width: 100%;
   aspect-ratio: 1 / 1;
-  height: auto;
-  /* Important: Relative positioning here anchors the absolute bar inside it */
   position: relative;
-  border-radius: 0;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.04);
+  background: #0a0a0a; /* Pure dark background to replace the "white" flash */
+}
+
+.scan-card.loading-img::before {
+  content: "Loading...";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  z-index: 1;
 }
 
 /* image */
@@ -61,6 +69,13 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  opacity: 0; /* Hidden */
+  transition: opacity 0.4s ease-in-out;
+  background-color: transparent; /* Prevents white flash */
+}
+
+.scan-image.is-loaded {
+  opacity: 1;
 }
 
 .image-placeholder {
@@ -171,7 +186,7 @@
 .scan-visibility-badge svg {
   width: 13px;
   height: 13px;
-  fill: currentColor;
+   fill: currentColor; 
 }
 
 /* Moderation Badge (Warning) */

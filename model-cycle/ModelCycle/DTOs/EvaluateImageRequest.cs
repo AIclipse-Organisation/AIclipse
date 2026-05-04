@@ -10,6 +10,8 @@ public class EvaluateImageRequest
 
     public string? S3Key { get; set; }
 
+    public string? ModelVersion { get; set; }
+
     public string Label { get; set; } = "Unknown";
 
     public double ModelConfidence { get; set; }

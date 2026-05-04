@@ -1,4 +1,5 @@
 import { fetchGatewayJson } from "./gatewayFetch.js";
+import { buildInternalGatewayHeaders, buildInternalGatewayUrl } from "./internalGateway.js";
 
 function buildLookupError(status, detail) {
   const error = new Error(detail || `Gateway image lookup failed (${status})`);
@@ -7,27 +8,22 @@ function buildLookupError(status, detail) {
 }
 
 function getGatewayLookupUrl() {
-  const gatewayBase = String(process.env.GATEWAY_URI || "").trim();
-  if (!gatewayBase) {
-    throw buildLookupError(500, "Missing GATEWAY_URI");
+  try {
+    return buildInternalGatewayUrl("internal/images/lookup");
+  } catch (error) {
+    throw buildLookupError(error?.status || 500, error?.message || "Missing GATEWAY_URI");
   }
-
-  return new URL(
-    "internal/images/lookup",
-    gatewayBase.endsWith("/") ? gatewayBase : `${gatewayBase}/`,
-  );
 }
 
-function getInternalHeaders() {
-  const internalToken = String(process.env.INTERNAL_AUTH_TOKEN || "").trim();
-  if (!internalToken) {
-    throw buildLookupError(500, "Missing INTERNAL_AUTH_TOKEN");
+function normalizeExternalProto(value) {
+  const proto = String(value || "")
+    .split(",", 1)[0]
+    .trim()
+    .toLowerCase();
+  if (proto === "http" || proto === "https") {
+    return proto;
   }
-
-  return {
-    "Content-Type": "application/json",
-    "X-Internal-Token": internalToken,
-  };
+  return null;
 }
 
 function normalizeImageIds(imageIds) {
@@ -78,17 +74,28 @@ export function resolveRenderableItemsWithPublicImages(items, imageItems) {
   };
 }
 
-export async function fetchPublicImagesByIds(imageIds) {
+export async function fetchPublicImagesByIds(imageIds, options = {}) {
   const ids = normalizeImageIds(imageIds);
   if (!ids.length) {
     return [];
+  }
+
+  let headers;
+  try {
+    headers = buildInternalGatewayHeaders();
+  } catch (error) {
+    throw buildLookupError(error?.status || 500, error?.message || "Missing INTERNAL_AUTH_TOKEN");
+  }
+  const externalProto = normalizeExternalProto(options.externalProto);
+  if (externalProto) {
+    headers["X-External-Proto"] = externalProto;
   }
 
   const payload = await fetchGatewayJson(
     getGatewayLookupUrl(),
     {
       method: "POST",
-      headers: getInternalHeaders(),
+      headers,
       body: JSON.stringify({ image_ids: ids }),
     },
     {

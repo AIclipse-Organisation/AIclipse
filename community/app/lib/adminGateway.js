@@ -40,14 +40,83 @@ export function sanitizeLogMessage(value) {
   return String(value).replace(/[\r\n]/g, "");
 }
 
+function normalizeExternalProto(value) {
+  const proto = String(value || "")
+    .split(",", 1)[0]
+    .trim()
+    .toLowerCase();
+  if (proto === "http" || proto === "https") {
+    return proto;
+  }
+  return null;
+}
+
+function resolveExternalProto(request) {
+  if (!request) {
+    return null;
+  }
+
+  return normalizeExternalProto(
+    request.headers?.get("x-forwarded-proto") ||
+      new URL(request.url).protocol.replace(":", ""),
+  );
+}
+
 export async function proxyAdminJson({
   path,
   method = "GET",
   query,
   body,
   headers,
+  request,
   successTextKey,
   onError,
+}) {
+  const payload = body === undefined
+    ? undefined
+    : (typeof body === "string" ? body : JSON.stringify(body));
+
+  return proxyAdminRequest({
+    path,
+    method,
+    query,
+    body: payload,
+    headers,
+    request,
+    successTextKey,
+    onError,
+    defaultContentType: "application/json",
+  });
+}
+
+export async function proxyAdminUploadPart({ path, request }) {
+  const uploadId = request.headers?.get("x-upload-id");
+  if (!uploadId) {
+    return buildAdminError(400, "Gateway Error", "Missing upload id");
+  }
+
+  return proxyAdminRequest({
+    path,
+    method: "PUT",
+    body: await request.arrayBuffer(),
+    headers: {
+      "X-Upload-Id": uploadId,
+    },
+    request,
+    defaultContentType: request.headers?.get("content-type") || "application/octet-stream",
+  });
+}
+
+async function proxyAdminRequest({
+  path,
+  method = "GET",
+  query,
+  body,
+  headers,
+  request,
+  successTextKey,
+  onError,
+  defaultContentType,
 }) {
   try {
     const token = await getAdminAccessToken();
@@ -59,6 +128,10 @@ export async function proxyAdminJson({
       Authorization: `Bearer ${token}`,
       ...(headers || {}),
     };
+    const externalProto = resolveExternalProto(request);
+    if (externalProto) {
+      requestHeaders["X-External-Proto"] = externalProto;
+    }
     const init = {
       method,
       headers: requestHeaders,
@@ -67,9 +140,9 @@ export async function proxyAdminJson({
 
     if (body !== undefined) {
       if (!Object.keys(requestHeaders).some((key) => key.toLowerCase() === "content-type")) {
-        requestHeaders["Content-Type"] = "application/json";
+        requestHeaders["Content-Type"] = defaultContentType || "application/octet-stream";
       }
-      init.body = typeof body === "string" ? body : JSON.stringify(body);
+      init.body = body;
     }
 
     const response = await fetch(resolveGatewayUrl(path, query), init);
@@ -81,6 +154,15 @@ export async function proxyAdminJson({
       if (override) {
         return override;
       }
+      if (response.status === 401) {
+        return buildAdminError(401, "Unauthorized");
+      }
+      if (response.status === 403) {
+        return buildAdminError(403, "Forbidden");
+      }
+      if (response.status >= 500) {
+        return buildAdminError(response.status, "Gateway Error");
+      }
       return buildAdminError(response.status, "Gateway Error", payload || text);
     }
 
@@ -90,6 +172,6 @@ export async function proxyAdminJson({
 
     return NextResponse.json(payload ?? {}, { status: response.status });
   } catch (error) {
-    return buildAdminError(500, "Internal Error", error?.message || String(error));
+    return buildAdminError(500, "Internal Error");
   }
 }

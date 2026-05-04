@@ -95,3 +95,29 @@ test("fetchPublicImagesByIds maps gateway timeouts to bounded lookup errors", as
     delete process.env.INTERNAL_AUTH_TOKEN;
   }
 });
+
+test("fetchPublicImagesByIds forwards the external proto when provided", async () => {
+  process.env.GATEWAY_URI = "http://gateway.test";
+  process.env.INTERNAL_AUTH_TOKEN = "secret";
+
+  const fetchCalls = [];
+  const originalFetch = global.fetch;
+  global.fetch = async (url, init) => {
+    fetchCalls.push({ url: String(url), init });
+    return new Response(JSON.stringify({ items: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  try {
+    const items = await fetchPublicImagesByIds(["img_1"], { externalProto: "https" });
+    assert.deepEqual(items, []);
+    assert.equal(fetchCalls.length, 1);
+    assert.equal(fetchCalls[0].init.headers["X-External-Proto"], "https");
+  } finally {
+    global.fetch = originalFetch;
+    delete process.env.GATEWAY_URI;
+    delete process.env.INTERNAL_AUTH_TOKEN;
+  }
+});

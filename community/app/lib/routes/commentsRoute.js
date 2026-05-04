@@ -47,11 +47,8 @@ function normalizeComment(raw) {
   return { ok: true, text };
 }
 
-function unauthorized(error) {
-  return NextResponse.json(
-    { error: "Unauthorized", detail: String(error) },
-    { status: 401 },
-  );
+function unauthorized() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 export function createCommentsRouteHandlers({ requireUser }) {
@@ -82,7 +79,7 @@ export function createCommentsRouteHandlers({ requireUser }) {
         return NextResponse.json({ items }, { status: 200 });
       } catch (err) {
         return NextResponse.json(
-          { error: "Failed to list comments", detail: String(err) },
+          { error: "Failed to list comments" },
           { status: 500 },
         );
       }
@@ -92,8 +89,8 @@ export function createCommentsRouteHandlers({ requireUser }) {
       let currentUser;
       try {
         currentUser = await requireUser(req);
-      } catch (authErr) {
-        return unauthorized(authErr);
+      } catch {
+        return unauthorized();
       }
       const authenticatedUserId = currentUser.user_id;
       const authenticatedUserName = resolveCommentAuthorName(currentUser);
@@ -198,7 +195,7 @@ export function createCommentsRouteHandlers({ requireUser }) {
         );
       } catch (err) {
         return NextResponse.json(
-          { error: "Failed to create comment", detail: String(err) },
+          { error: "Failed to create comment" },
           { status: 500 },
         );
       }
@@ -208,8 +205,8 @@ export function createCommentsRouteHandlers({ requireUser }) {
       let currentUser;
       try {
         currentUser = await requireUser(req);
-      } catch (authErr) {
-        return unauthorized(authErr);
+      } catch {
+        return unauthorized();
       }
       const authenticatedUserId = currentUser.user_id;
 
@@ -289,7 +286,7 @@ export function createCommentsRouteHandlers({ requireUser }) {
         );
       } catch (err) {
         return NextResponse.json(
-          { error: "Failed to delete comment", detail: String(err) },
+          { error: "Failed to delete comment" },
           { status: 500 },
         );
       }

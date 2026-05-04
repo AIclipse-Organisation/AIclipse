@@ -20,8 +20,6 @@ from app.routers.public import (
     UserPublic,
     build_user_public,
     TokenUser,
-    UserAccuracy,
-    UserAccuracyRequest,
     _now_utc,
     normalize_email_or_400,
     validate_date_of_birth,
@@ -257,33 +255,6 @@ async def admin_create_user(
         user=build_user_public(user_doc),
         temporary_password=raw_password if generated_password else None,
     )
-
-
-@router.post("/users/accuracy", response_model=List[UserAccuracy], dependencies=[Depends(require_internal_token)])
-async def admin_get_users_accuracy(
-    request: Request,
-    body: UserAccuracyRequest
-):
-    users_col = request.app.state.user_repo.users
-
-    # Fetch only the users in the provided list
-    cursor = users_col.find(
-        {"user_id": {"$in": body.user_ids}},
-        {
-            "user_id": 1,
-            "admin_fake_correct": 1,
-            "admin_fake_total": 1,
-            "admin_real_correct": 1,
-            "admin_real_total": 1,
-            "_id": 0
-        }
-    )
-
-    results = []
-    async for doc in cursor:
-        results.append(UserAccuracy(**doc))
-
-    return results
 
 
 @router.get("/user/{user_id}", response_model=UserPublic)

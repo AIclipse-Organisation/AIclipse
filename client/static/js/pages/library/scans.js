@@ -59,10 +59,9 @@ function createEmptyState() {
 
   return wrapper;
 }
-
 function createScanCard(img, index) {
   const scanNumber = index + 1;
-  const card = makeEl("div", "scan-card");
+  const card = makeEl("div", "scan-card loading-img"); // Added loading-img class
   const viewscanUrl = buildViewscanUrl(img);
 
   if (viewscanUrl) {
@@ -83,9 +82,21 @@ function createScanCard(img, index) {
     image.src = img.url;
     image.alt = `Scan ${img.image_id || scanNumber}`;
     image.draggable = false;
+
+    image.onload = () => {
+      image.classList.add("is-loaded");
+      card.classList.remove("loading-img");
+    };
+    
+    if (image.complete) {
+      image.classList.add("is-loaded");
+      card.classList.remove("loading-img");
+    }
+
     left.appendChild(image);
   } else {
     left.appendChild(makeEl("div", "image-placeholder", "No image"));
+    card.classList.remove("loading-img");
   }
 
   if (getVisibility(img) === "private") {

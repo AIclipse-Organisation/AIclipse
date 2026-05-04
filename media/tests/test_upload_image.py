@@ -22,7 +22,11 @@ spec.loader.exec_module(main_media)
 @pytest.fixture()
 def client(monkeypatch):
     monkeypatch.setattr(main_media, "ensure_bucket", lambda: None)
-    monkeypatch.setattr(main_media, "presigned_get_url_for_key", lambda key, is_public: f"https://cdn.test/{key}")
+    monkeypatch.setattr(
+        main_media,
+        "presigned_get_url_for_key",
+        lambda key, is_public, external_proto=None: f"https://cdn.test/{key}",
+    )
     return TestClient(main_media.app)
 
 
@@ -213,6 +217,22 @@ def test_lookup_images_returns_public_items_with_presigned_urls(client, monkeypa
     }
 
 
+def test_presigned_get_url_for_key_rewrites_scheme_from_forwarded_proto(monkeypatch):
+    monkeypatch.setattr(
+        main_media.s3_public,
+        "generate_presigned_url",
+        lambda **_kwargs: "http://storage.aiclipse.local/images/img_a.png?sig=abc",
+    )
+
+    url = main_media.presigned_get_url_for_key(
+        "img_a.png",
+        is_public=True,
+        external_proto="https",
+    )
+
+    assert url == "https://storage.aiclipse.local/images/img_a.png?sig=abc"
+
+
 def test_get_images_collection_throttles_repeated_mongo_outage_logs(monkeypatch):
     warning_messages = []
 
@@ -244,3 +264,59 @@ def test_get_images_collection_throttles_repeated_mongo_outage_logs(monkeypatch)
     assert main_media.get_images_collection() is None
     assert main_media.get_images_collection() is None
     assert warning_messages == ["mongo connection unavailable: mongo down"]
+
+
+def test_update_image_rejects_invalid_admin_header(client):
+    response = client.patch(
+        "/image/img_123",
+        params={"user_id": "u_1", "is_public": "true"},
+        headers={"X-User-Is-Admin": "yes"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["header", "X-User-Is-Admin"]
+
+
+def test_ensure_image_indexes_bootstraps_runtime_query_indexes(monkeypatch):
+    create_calls = []
+
+    class _Collection:
+        def create_index(self, keys, **options):
+            create_calls.append((keys, options))
+            return options["name"]
+
+    monkeypatch.setattr(main_media, "_image_indexes_ready", False)
+
+    main_media.ensure_image_indexes(_Collection())
+
+    assert create_calls == [
+        ([("image_id", 1)], {"unique": True, "name": "uniq_image_id"}),
+        ([("user_id", 1), ("uploaded_at", -1)], {"name": "by_user_uploaded"}),
+        ([("is_public", 1), ("uploaded_at", -1)], {"name": "by_public_uploaded"}),
+        ([("user_id", 1), ("is_public", 1), ("uploaded_at", -1)], {"name": "by_user_public_uploaded"}),
+    ]
+
+
+def test_ensure_image_indexes_reuses_equivalent_legacy_index_names(monkeypatch):
+    create_calls = []
+
+    class _Collection:
+        def list_indexes(self):
+            return [
+                {"name": "_id_", "key": {"_id": 1}},
+                {"name": "image_id_1", "key": {"image_id": 1}, "unique": True},
+            ]
+
+        def create_index(self, keys, **options):
+            create_calls.append((keys, options))
+            return options["name"]
+
+    monkeypatch.setattr(main_media, "_image_indexes_ready", False)
+
+    main_media.ensure_image_indexes(_Collection())
+
+    assert create_calls == [
+        ([("user_id", 1), ("uploaded_at", -1)], {"name": "by_user_uploaded"}),
+        ([("is_public", 1), ("uploaded_at", -1)], {"name": "by_public_uploaded"}),
+        ([("user_id", 1), ("is_public", 1), ("uploaded_at", -1)], {"name": "by_user_public_uploaded"}),
+    ]

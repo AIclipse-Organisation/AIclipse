@@ -5,6 +5,7 @@ export const runtime = "nodejs";
 export async function GET(req) {
   const searchParams = new URL(req.url).searchParams;
   return proxyAdminJson({
+    request: req,
     path: "/auth/admin/users",
     query: {
       search: searchParams.get("search"),
@@ -20,6 +21,7 @@ export async function GET(req) {
 
 export async function POST(req) {
   return proxyAdminJson({
+    request: req,
     path: "/auth/admin/users",
     method: "POST",
     body: await req.json(),

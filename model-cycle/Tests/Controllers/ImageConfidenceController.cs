@@ -1,9 +1,11 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using ModelCycle.Controllers;
 using ModelCycle.Domain;
+using ModelCycle.Security;
 using ModelCycle.Services.ImageConfidence;
 using ModelCycle.Services.Training;
 using Moq;
@@ -21,7 +23,18 @@ public class ImageConfidenceControllerTests
     {
         _mockWorkflow = new Mock<ITrainingWorkflowService>();
         _mockLogger = new Mock<ILogger<ImageConfidenceController>>();
-        _controller = new ImageConfidenceController(_mockWorkflow.Object, _mockLogger.Object);
+        var authorizer = new Mock<IInternalRequestAuthorizer>();
+        authorizer.Setup(a => a.RequireInternalRequest(It.IsAny<HttpRequest>())).Returns((IActionResult)null);
+        _controller = new ImageConfidenceController(
+            _mockWorkflow.Object,
+            _mockLogger.Object,
+            authorizer.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext(),
+            },
+        };
     }
 
     [Fact]
@@ -55,5 +68,28 @@ public class ImageConfidenceControllerTests
         // Assert
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("Media not found", badRequest.Value);
+    }
+
+    [Fact]
+    public async Task Evaluate_RejectsMissingInternalToken()
+    {
+        var authorizer = new Mock<IInternalRequestAuthorizer>();
+        authorizer.Setup(a => a.RequireInternalRequest(It.IsAny<HttpRequest>()))
+            .Returns(new UnauthorizedObjectResult(new { detail = "Invalid internal auth token" }));
+        var controller = new ImageConfidenceController(
+            _mockWorkflow.Object,
+            _mockLogger.Object,
+            authorizer.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext(),
+            },
+        };
+
+        var result = await controller.Evaluate(new EvaluateImageRequest { MediaImageId = "test" });
+
+        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Equal(401, unauthorized.StatusCode);
     }
 }

@@ -27,6 +27,8 @@ spec:
               value: "http://auth-srv:3000"
             - name: INTERNAL_AUTH_TOKEN
               valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
+            - name: S3_PUBLIC_ENDPOINT
+              valueFrom: { secretKeyRef: { name: s3-sec, key: S3_PUBLIC_ENDPOINT } }
 
             - name: REDIS_HOST
               value: redis-srv

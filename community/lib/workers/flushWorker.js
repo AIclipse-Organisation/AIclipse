@@ -17,8 +17,10 @@ export async function runFlushWorker({
   sleepFn = sleep,
   logger = console,
   stopWhen = () => false,
+  isFatalError = () => false,
 } = {}) {
   let redis = null;
+  let db = null;
   let collection = null;
   let started = false;
 
@@ -29,7 +31,7 @@ export async function runFlushWorker({
       }
 
       if (!collection) {
-        const db = await dbFactory();
+        db = await dbFactory();
         collection = db.collection(collectionName);
       }
 
@@ -38,13 +40,17 @@ export async function runFlushWorker({
         started = true;
       }
 
-      const processedCount = await flushOnce({ redis, collection });
+      const processedCount = await flushOnce({ redis, db, collection });
       await sleepFn(processedCount ? busySleepMs : idleSleepMs);
     } catch (error) {
       logger.error(`[${name}] error:`, error?.message || error);
       disposeRedis(redis);
       redis = null;
+      db = null;
       collection = null;
+      if (isFatalError(error)) {
+        throw error;
+      }
       await sleepFn(errorSleepMs);
     }
   }

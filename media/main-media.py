@@ -3,14 +3,16 @@ import logging
 import time
 from datetime import datetime, timezone
 from uuid import uuid4
-from typing import Optional, Annotated
+from typing import Annotated, Literal, Optional
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit, urlunsplit
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Query
 from pymongo import MongoClient
+from pymongo.errors import OperationFailure
 from bson import ObjectId
 
 from pydantic import BaseModel, Field, ConfigDict
@@ -45,6 +47,7 @@ S3_ENDPOINT = os.getenv("S3_ENDPOINT")
 S3_PUBLIC_ENDPOINT = os.getenv("S3_PUBLIC_ENDPOINT")
 
 S3_BUCKET = "images"
+_VALID_EXTERNAL_PROTOS = {"http", "https"}
 
 ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png"}
 MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -61,6 +64,13 @@ _mongo_connection_state = {
     "last_error_at": 0.0,
     "last_error_message": None,
 }
+_image_indexes_ready = False
+_IMAGE_INDEX_SPECS = [
+    (("image_id", 1), {"unique": True, "name": "uniq_image_id"}),
+    (("user_id", 1), ("uploaded_at", -1), {"name": "by_user_uploaded"}),
+    (("is_public", 1), ("uploaded_at", -1), {"name": "by_public_uploaded"}),
+    (("user_id", 1), ("is_public", 1), ("uploaded_at", -1), {"name": "by_user_public_uploaded"}),
+]
 
 
 def _build_mongo_client() -> MongoClient:
@@ -95,6 +105,69 @@ def _note_mongo_unavailable(exc: Exception) -> None:
     _mongo_connection_state["available"] = False
 
 
+def ensure_image_indexes(images_collection) -> None:
+    global _image_indexes_ready
+
+    if _image_indexes_ready:
+        return
+
+    for spec in _IMAGE_INDEX_SPECS:
+        *fields, options = spec
+        _ensure_collection_index(images_collection, list(fields), options)
+
+    _image_indexes_ready = True
+
+
+def _read_collection_indexes(collection) -> list[dict]:
+    if not hasattr(collection, "list_indexes"):
+        return []
+    try:
+        return list(collection.list_indexes())
+    except OperationFailure as exc:
+        details = exc.details or {}
+        if exc.code == 26 or details.get("codeName") == "NamespaceNotFound":
+            return []
+        raise
+
+
+def _same_key_pattern(existing: dict, desired_keys: list[tuple[str, int]]) -> bool:
+    existing_items = list((existing or {}).items())
+    return existing_items == desired_keys
+
+
+def _same_optional_bool(existing: dict, desired: dict, option_name: str) -> bool:
+    return bool(existing.get(option_name)) == bool(desired.get(option_name))
+
+
+def _is_equivalent_index(existing: dict, desired_keys: list[tuple[str, int]], desired_options: dict) -> bool:
+    return (
+        _same_key_pattern(existing.get("key", {}), desired_keys)
+        and _same_optional_bool(existing, desired_options, "unique")
+    )
+
+
+def _ensure_collection_index(collection, keys: list[tuple[str, int]], options: dict) -> str:
+    indexes = _read_collection_indexes(collection)
+    equivalent = next((index for index in indexes if _is_equivalent_index(index, keys, options)), None)
+    if equivalent is not None:
+        return equivalent["name"]
+
+    named = next((index for index in indexes if index.get("name") == options["name"]), None)
+    if named is not None:
+        raise RuntimeError(
+            f"Index '{options['name']}' conflicts with existing incompatible index '{named['name']}'"
+        )
+
+    try:
+        return collection.create_index(keys, **options)
+    except OperationFailure:
+        refreshed = _read_collection_indexes(collection)
+        equivalent = next((index for index in refreshed if _is_equivalent_index(index, keys, options)), None)
+        if equivalent is not None:
+            return equivalent["name"]
+        raise
+
+
 def get_images_collection():
     global mc
 
@@ -107,7 +180,9 @@ def get_images_collection():
                 mc = _build_mongo_client()
             mc.admin.command("ping")
             _note_mongo_available()
-            return mc[MONGO_DB].images
+            collection = mc[MONGO_DB].images
+            ensure_image_indexes(collection)
+            return collection
         except Exception as exc:
             _note_mongo_unavailable(exc)
             if mc is not None:
@@ -186,30 +261,59 @@ def healthz():
 # --------------------------------------------------
 # URL helper (presigned)
 # --------------------------------------------------
-def presigned_get_url_for_key(key: str, *, is_public: bool) -> Optional[str]:
+def _normalize_external_proto(value: str | None) -> str | None:
+    proto = str(value or "").split(",", 1)[0].strip().lower()
+    if proto in _VALID_EXTERNAL_PROTOS:
+        return proto
+    return None
+
+
+def _apply_external_proto(url: str, external_proto: str | None) -> str:
+    proto = _normalize_external_proto(external_proto)
+    if not proto:
+        return url
+
+    parsed = urlsplit(url)
+    if not parsed.scheme or parsed.scheme == proto:
+        return url
+
+    return urlunsplit((proto, parsed.netloc, parsed.path, parsed.query, parsed.fragment))
+
+
+def presigned_get_url_for_key(
+    key: str,
+    *,
+    is_public: bool,
+    external_proto: str | None = None,
+) -> Optional[str]:
     expires = PRESIGN_PUBLIC_EXPIRES_S if is_public else PRESIGN_PRIVATE_EXPIRES_S
     try:
-        return s3_public.generate_presigned_url(
+        url = s3_public.generate_presigned_url(
             ClientMethod="get_object",
             Params={"Bucket": S3_BUCKET, "Key": key},
             ExpiresIn=expires,
             HttpMethod="GET",
         )
+        return _apply_external_proto(url, external_proto)
     except Exception:
         logging.exception("presign failed for key=%s", key)
         return None
 
 
-def attach_url(doc: dict) -> dict:
+def attach_url(doc: dict, *, external_proto: str | None = None) -> dict:
     d = dict(doc)
     key = d.get("s3_key")
     if key:
-        d["url"] = presigned_get_url_for_key(key, is_public=bool(d.get("is_public")))
+        d["url"] = presigned_get_url_for_key(
+            key,
+            is_public=bool(d.get("is_public")),
+            external_proto=external_proto,
+        )
     return d
 
 
-def attach_required_url(doc: dict) -> dict:
-    d = attach_url(doc)
+def attach_required_url(doc: dict, *, external_proto: str | None = None) -> dict:
+    d = attach_url(doc, external_proto=external_proto)
     if d.get("s3_key") and not d.get("url"):
         raise HTTPException(status_code=503, detail="Image storage unavailable")
     return d
@@ -283,6 +387,7 @@ async def upload_image(
     is_public: bool = Form(...),
     model_version: str = Form(...),
     x_user_id: str = Header(..., alias="X-User-Id"),
+    x_external_proto: str | None = Header(None, alias="X-External-Proto"),
 ):
     # user_id is forwarded by the gateway from the authenticated JWT; treating
     # it as a header rather than a form field keeps it out of the user-controlled
@@ -333,11 +438,15 @@ async def upload_image(
 
     doc = persist_image_document(doc, s3_key=key)
 
-    return attach_url(doc)
+    return attach_url(doc, external_proto=x_external_proto)
 
 
 @app.get("/images")
-def list_images(user_id: str | None = None, is_public: bool | None = None):
+def list_images(
+    user_id: str | None = None,
+    is_public: bool | None = None,
+    x_external_proto: str | None = Header(None, alias="X-External-Proto"),
+):
     images = get_images_collection()
     if images is None:
         raise HTTPException(status_code=503, detail="Image metadata store unavailable")
@@ -354,12 +463,15 @@ def list_images(user_id: str | None = None, is_public: bool | None = None):
         .limit(200)
     )
 
-    items = [attach_required_url(it) for it in items]
+    items = [attach_required_url(it, external_proto=x_external_proto) for it in items]
     return {"items": items}
 
 
 @app.post("/images/lookup")
-def lookup_images(body: ImageLookupIn):
+def lookup_images(
+    body: ImageLookupIn,
+    x_external_proto: str | None = Header(None, alias="X-External-Proto"),
+):
     images = get_images_collection()
     if images is None:
         raise HTTPException(status_code=503, detail="Image metadata store unavailable")
@@ -385,12 +497,19 @@ def lookup_images(body: ImageLookupIn):
             {"_id": 0},
         )
     )
-    item_map = {item["image_id"]: attach_required_url(item) for item in items}
+    item_map = {
+        item["image_id"]: attach_required_url(item, external_proto=x_external_proto)
+        for item in items
+    }
     return {"items": [item_map[image_id] for image_id in image_ids if image_id in item_map]}
 
 
 @app.get("/image/{image_id}")
-def get_image(image_id: str, user_id: str | None = None):
+def get_image(
+    image_id: str,
+    user_id: str | None = None,
+    x_external_proto: str | None = Header(None, alias="X-External-Proto"),
+):
     images = get_images_collection()
     if images is None:
         raise HTTPException(status_code=503, detail="Image metadata store unavailable")
@@ -400,7 +519,7 @@ def get_image(image_id: str, user_id: str | None = None):
         raise HTTPException(status_code=404, detail="Not found")
 
     if (user_id is not None and doc.get("user_id") == user_id) or doc.get("is_public") is True:
-        return attach_required_url(doc)
+        return attach_required_url(doc, external_proto=x_external_proto)
 
     raise HTTPException(status_code=404, detail="Not found")
 
@@ -410,7 +529,8 @@ def update_image(
     image_id: str,
     user_id: str | None = Query(None),
     is_public: bool | None = Query(None),
-    x_user_is_admin: bool = Header(False, alias="X-User-Is-Admin"),
+    x_user_is_admin: Literal["true", "false"] | None = Header(None, alias="X-User-Is-Admin"),
+    x_external_proto: str | None = Header(None, alias="X-External-Proto"),
 ):
     """
     Update an image's is_public field.
@@ -425,7 +545,9 @@ def update_image(
     if not doc:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    if not can_manage_image(doc, user_id, x_user_is_admin):
+    is_admin = x_user_is_admin == "true"
+
+    if not can_manage_image(doc, user_id, is_admin):
         raise HTTPException(status_code=403, detail="Forbidden: You can only update your own images")
 
     # Build update document
@@ -454,16 +576,16 @@ def update_image(
         "Successfully updated image %s (user: %s, admin: %s)",
         sanitize_for_log(str(image_id)),
         sanitize_for_log(user_id),
-        sanitize_for_log(str(x_user_is_admin)),
+        sanitize_for_log(str(is_admin)),
     )
-    return attach_required_url(updated_doc)
+    return attach_required_url(updated_doc, external_proto=x_external_proto)
 
 
 @app.delete("/image/{image_id}")
 def delete_image(
     image_id: str,
     user_id: str | None = Query(None),
-    x_user_is_admin: bool = Header(False, alias="X-User-Is-Admin"),
+    x_user_is_admin: Literal["true", "false"] | None = Header(None, alias="X-User-Is-Admin"),
 ):
     """
     Delete an image from both MinIO storage and MongoDB.
@@ -478,7 +600,9 @@ def delete_image(
     if not doc:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    if not can_manage_image(doc, user_id, x_user_is_admin):
+    is_admin = x_user_is_admin == "true"
+
+    if not can_manage_image(doc, user_id, is_admin):
         raise HTTPException(status_code=403, detail="Forbidden: You can only delete your own images")
 
     # Delete from MinIO/S3 storage
@@ -503,7 +627,7 @@ def delete_image(
         "Successfully deleted image %s (user: %s, admin: %s)",
         sanitize_for_log(str(image_id)),
         sanitize_for_log(user_id),
-        sanitize_for_log(str(x_user_is_admin)),
+        sanitize_for_log(str(is_admin)),
     )
     return {"message": "Image deleted successfully", "image_id": image_id}
 
