@@ -164,3 +164,62 @@ body {
 }
 
 
+
+
+/* Coffee CTA Styling */
+.drawer-footer-cta {
+  padding: 10px 20px;
+  margin-top: 10px;
+}
+
+.coffee-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 15px;
+  background: rgba(207, 184, 124, 0.05); /* Subtle brand gold tint */
+  border: 1px solid rgba(207, 184, 124, 0.2);
+  border-radius: 12px;
+  padding: 12px 15px !important;
+  text-decoration: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.coffee-link:hover {
+  background: rgba(207, 184, 124, 0.1) !important;
+  border-color: #CFB87C;
+  transform: translateY(-1px);
+}
+
+.coffee-icon-bg {
+  background: #CFB87C;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.coffee-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.coffee-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #CFB87C !important;
+}
+
+.coffee-subtitle {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-weight: 400;
+}
+
+/* Ensure the admin nav drawer has consistent link behavior */
+.admin-nav-drawer .drawer-links a {
+  transition: background 0.2s;
+}

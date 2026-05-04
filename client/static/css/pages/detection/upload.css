@@ -1239,22 +1239,18 @@ textarea {
 
 .crop-controls-overlay {
   position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
-
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  background: rgba(15, 15, 15, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
-  padding: 6px 6px 6px 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgb(15 15 15 / 0%);
+    /* backdrop-filter: blur(8px); */
+    /* border: 1px solid rgba(255, 255, 255, 0.15); */
+    border-radius: 999px;
+    padding: 6px 6px 6px 14px;
 }
 
 .crop-hint {

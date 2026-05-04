@@ -32,15 +32,20 @@
 
   function getInitials(name) {
     if (!name) return "?";
-    return name
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("") || "?";
+    return (
+      name
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join("") || "?"
+    );
   }
 
   function ensureCommentsStylesheet() {
-    return ensureStylesheet("viewscan-comments-css", assetUrl("css/pages/library/viewscan/comments.css"));
+    return ensureStylesheet(
+      "viewscan-comments-css",
+      assetUrl("css/pages/library/viewscan/comments.css"),
+    );
   }
 
   function setHidden(el, shouldHide) {
@@ -70,7 +75,9 @@
     const countEl = document.getElementById("btn-comments-count");
     if (countEl) {
       const initialCount = Number(img?.comment_count);
-      countEl.textContent = Number.isFinite(initialCount) ? String(initialCount) : "0";
+      countEl.textContent = Number.isFinite(initialCount)
+        ? String(initialCount)
+        : "0";
     }
 
     let vvHandler = null;
@@ -81,13 +88,19 @@
 
       vvHandler = () => {
         const currentScroll = body.scrollTop;
+        // Calculate how much the visual viewport has shrunk (the keyboard height)
         const offset = Math.max(0, window.innerHeight - vv.height);
+
+        // Apply the offset
         sheet.style.setProperty("--kb-offset", `${offset}px`);
 
         if (offset > 0) {
           sheet.classList.add("comm_bottomSheet--keyboard");
+          // Ensure navbar is hidden when keyboard is out
+          if (navbar) navbar.style.display = "none";
         } else {
           sheet.classList.remove("comm_bottomSheet--keyboard");
+          // Only show navbar if drawer is closed (logic already in closeDrawer)
         }
 
         requestAnimationFrame(() => {
@@ -112,17 +125,35 @@
     const renderComments = (comments, currentUserId) => {
       clearEl(listEl);
       if (!comments || comments.length === 0) {
-        listEl.appendChild(makeEl("div", "comm_emptyComments", "No comments yet. Start the conversation!"));
+        listEl.appendChild(
+          makeEl(
+            "div",
+            "comm_emptyComments",
+            "No comments yet. Start the conversation!",
+          ),
+        );
         return;
       }
 
       comments.forEach((comment) => {
         const row = makeEl("div", "comm_commentRow");
-        const avatar = makeEl("div", "comm_commentAvatar", getInitials(comment.user_name));
+        const avatar = makeEl(
+          "div",
+          "comm_commentAvatar",
+          getInitials(comment.user_name),
+        );
         const content = makeEl("div", "comm_commentContent");
         const top = makeEl("div", "comm_commentTop");
-        const author = makeEl("span", "comm_commentAuthor", comment.user_name || "Anonymous");
-        const time = makeEl("span", "comm_commentTime", timeAgo(comment.created_at));
+        const author = makeEl(
+          "span",
+          "comm_commentAuthor",
+          comment.user_name || "Anonymous",
+        );
+        const time = makeEl(
+          "span",
+          "comm_commentTime",
+          timeAgo(comment.created_at),
+        );
         const text = makeEl("div", "comm_commentText", comment.text || "");
 
         top.appendChild(author);
@@ -133,7 +164,9 @@
         if (currentUserId && comment.user_id === currentUserId) {
           const deleteBtn = makeEl("button", "comm_commentDeleteBtn", "Delete");
           deleteBtn.type = "button";
-          deleteBtn.addEventListener("click", () => showDeleteCommentModal(comment.comment_id, row));
+          deleteBtn.addEventListener("click", () =>
+            showDeleteCommentModal(comment.comment_id, row),
+          );
           content.appendChild(deleteBtn);
         }
 
@@ -151,7 +184,9 @@
         renderComments(data.items || [], getCurrentViewer()?.user_id || null);
       } catch {
         clearEl(listEl);
-        listEl.appendChild(makeEl("div", "comm_emptyComments", "Failed to load comments."));
+        listEl.appendChild(
+          makeEl("div", "comm_emptyComments", "Failed to load comments."),
+        );
       }
     };
 
@@ -178,11 +213,19 @@
     const openDrawer = async () => {
       const activeImageId = getCurrentScan()?.image_id;
       if (!activeImageId) return;
+
       await ensureCommentsStylesheet();
       backdrop.hidden = false;
       sheet.classList.add("comm_bottomSheet--open");
-      document.getElementById("app-container")?.classList.add("is-comments-open");
-      if (navbar) navbar.hidden = true;
+      document
+        .getElementById("app-container")
+        ?.classList.add("is-comments-open");
+
+      // Consistent hiding
+      if (navbar) {
+        navbar.style.display = "none";
+      }
+
       attachKeyboardListener();
       if (!sheet.dataset.loaded) {
         loadComments(activeImageId);
@@ -193,14 +236,23 @@
     const closeDrawer = () => {
       backdrop.hidden = true;
       sheet.classList.remove("comm_bottomSheet--open");
-      document.getElementById("app-container")?.classList.remove("is-comments-open");
-      if (navbar) navbar.hidden = false;
+      document
+        .getElementById("app-container")
+        ?.classList.remove("is-comments-open");
+
+      // Consistent showing
+      if (navbar) {
+        navbar.style.display = "flex"; // Match the display type in your CSS
+      }
+
       detachKeyboardListener();
     };
 
     const deleteCommentModal = document.getElementById("delete-comment-modal");
     const commentModalCancel = document.getElementById("comment-modal-cancel");
-    const commentModalConfirm = document.getElementById("comment-modal-confirm");
+    const commentModalConfirm = document.getElementById(
+      "comment-modal-confirm",
+    );
     let pendingDeleteCommentId = null;
     let pendingDeleteRowEl = null;
 
@@ -258,7 +310,9 @@
             if (data && typeof data.comment_count === "number") {
               countEl.textContent = String(data.comment_count);
             } else {
-              countEl.textContent = String(listEl.querySelectorAll(".comm_commentRow").length);
+              countEl.textContent = String(
+                listEl.querySelectorAll(".comm_commentRow").length,
+              );
             }
           }
         });
