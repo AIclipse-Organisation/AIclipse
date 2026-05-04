@@ -23,6 +23,8 @@ spec:
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_URI } }
             - name: MONGO_DB
               valueFrom: { secretKeyRef: { name: mongo-sec, key: MONGO_DB } }
+            - name: MONGO_TIMEOUT_MS
+              value: "60000"
             - name: INTERNAL_AUTH_TOKEN
               valueFrom: { secretKeyRef: { name: jwt-sec, key: INTERNAL_AUTH_TOKEN } }
             - name: API_KEY_PEPPER

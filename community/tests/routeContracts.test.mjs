@@ -85,6 +85,9 @@ test("community middleware applies runtime security headers instead of build-tim
   const nextConfig = readRepoFile("next.config.js");
 
   assert.match(middleware, /applySecurityHeaders/);
+  assert.match(middleware, /new NextResponse\(null/);
+  assert.match(middleware, /no-store, max-age=0, must-revalidate, no-transform/);
+  assert.match(nextConfig, /poweredByHeader:\s*false/);
   assert.doesNotMatch(nextConfig, /Content-Security-Policy/);
   assert.doesNotMatch(nextConfig, /async headers\(\)/);
 });
@@ -221,6 +224,7 @@ test("community runtime CSP allows exact local storage origin and upload connect
     assert.equal(headerMap["X-Content-Type-Options"], "nosniff");
     assert.equal(headerMap["X-Frame-Options"], "DENY");
     assert.equal(headerMap["Cross-Origin-Opener-Policy"], "same-origin");
+    assert.equal(headerMap["Cross-Origin-Embedder-Policy"], "credentialless");
     assert.equal(headerMap["Cross-Origin-Resource-Policy"], "same-origin");
     assert.equal(headerMap["Permissions-Policy"], "camera=(), microphone=(), geolocation=()");
     assert.equal(

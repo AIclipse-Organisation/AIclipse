@@ -15,10 +15,8 @@ def assert_storage_routes_live_in_srv_ingress(relative_path: str, expected_host:
 
     assert "name: ingress-srv" in manifest
     assert f"- host: {expected_host}" in manifest
-    assert manifest.count("pathType: Exact") >= 3
-    assert "- path: /crossdomain.xml" in manifest
-    assert "- path: /robots.txt" in manifest
-    assert "- path: /sitemap.xml" in manifest
+    for path in ("/crossdomain.xml", "/robots.txt", "/sitemap.xml"):
+        assert f"- path: {path}\n            pathType: ImplementationSpecific" in manifest
     assert "name: client-srv" in manifest
     assert "name: s3-srv" in manifest
 

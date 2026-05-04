@@ -21,6 +21,7 @@ class Settings:
     API_KEY_PEPPER: str
     INTERNAL_AUTH_TOKEN: str
     REDIS_URI: str
+    MONGO_TIMEOUT_MS: int = 60000
     # Lets each environment use its own stream. Example: auth-events-dev.
     AUTH_EVENT_STREAM: str = "auth-events"
     AUTH_EVENT_PUBLISH_TIMEOUT_S: float = 1.5
@@ -36,6 +37,7 @@ class Settings:
             INTERNAL_AUTH_TOKEN=require_setting("INTERNAL_AUTH_TOKEN", os.getenv("INTERNAL_AUTH_TOKEN")),
             # Needed to publish events after actions like admin delete.
             REDIS_URI=require_setting("REDIS_URI", os.getenv("REDIS_URI")),
+            MONGO_TIMEOUT_MS=int(os.getenv("MONGO_TIMEOUT_MS", "60000")),
             # Example: if unset, this stays "auth-events".
             AUTH_EVENT_STREAM=os.getenv("AUTH_EVENT_STREAM", "auth-events"),
             AUTH_EVENT_PUBLISH_TIMEOUT_S=float(os.getenv("AUTH_EVENT_PUBLISH_TIMEOUT_S", "1.5")),

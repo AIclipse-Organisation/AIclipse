@@ -6,7 +6,12 @@ from app.core.settings import Settings
 
 @asynccontextmanager
 async def mongo_lifespan(settings: Settings):
-    client = AsyncIOMotorClient(settings.MONGO_URI)
+    client = AsyncIOMotorClient(
+        settings.MONGO_URI,
+        connectTimeoutMS=settings.MONGO_TIMEOUT_MS,
+        socketTimeoutMS=settings.MONGO_TIMEOUT_MS,
+        serverSelectionTimeoutMS=settings.MONGO_TIMEOUT_MS,
+    )
     db = client[settings.MONGO_DB]
     try:
         yield db

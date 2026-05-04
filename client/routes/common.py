@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from flask import jsonify, make_response, redirect, request, session
+from flask import jsonify, make_response, request, session
 
 from auth.cookies import clear_access_cookie, get_access_token
 from auth.gateway import GatewayClient
@@ -92,10 +92,11 @@ def resolve_viewer_or_error(*, deps: RouteDeps, token: str, missing_detail: str)
 def resolve_viewer_for_page_or_redirect(*, deps: RouteDeps, token: str):
     viewer, viewer_status = resolve_current_user(deps.gateway, token)
     if viewer_status == 401:
-        resp = make_response(redirect("/login"))
+        resp = make_response("", 302)
+        resp.headers["Location"] = "/login"
         session.clear()
         clear_access_cookie(resp, request)
-        resp.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate"
+        resp.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate, no-transform"
         resp.headers["Pragma"] = "no-cache"
         return None, resp
     return viewer, None

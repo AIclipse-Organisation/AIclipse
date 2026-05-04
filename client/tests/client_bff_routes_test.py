@@ -1346,7 +1346,7 @@ def test_public_html_routes_are_sent_with_no_store_cache_policy(main_client_modu
     resp = client.get("/")
 
     assert resp.status_code == 200
-    assert resp.headers["Cache-Control"] == "no-store, max-age=0, must-revalidate"
+    assert resp.headers["Cache-Control"] == "no-store, max-age=0, must-revalidate, no-transform"
     assert resp.headers["Pragma"] == "no-cache"
 
 
@@ -1366,6 +1366,7 @@ def test_public_html_routes_include_hardened_security_headers(main_client_module
     assert resp.headers["X-Frame-Options"] == "DENY"
     assert resp.headers["Referrer-Policy"] == "same-origin"
     assert resp.headers["Cross-Origin-Opener-Policy"] == "same-origin"
+    assert resp.headers["Cross-Origin-Embedder-Policy"] == "credentialless"
     assert resp.headers["Cross-Origin-Resource-Policy"] == "same-origin"
     assert resp.headers["Permissions-Policy"] == "geolocation=()"
     assert directives["script-src"] == "script-src 'self'"
@@ -1484,7 +1485,7 @@ def test_images_api_is_sent_with_no_store_cache_policy(main_client_module, monke
 
     assert resp.status_code == 200
     assert resp.get_json() == {"items": [{"image_id": "img_123"}]}
-    assert resp.headers["Cache-Control"] == "no-store, max-age=0, must-revalidate"
+    assert resp.headers["Cache-Control"] == "no-store, max-age=0, must-revalidate, no-transform"
     assert resp.headers["Pragma"] == "no-cache"
     list_images.assert_called_once_with(
         token="img-token",
