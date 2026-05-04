@@ -38,8 +38,13 @@ function redirectToLogin(request, reason = "auth_failed") {
     `[community] auth redirect (${reason}) for ${request.method} ${request.nextUrl.pathname}`,
   );
 
-  const res = NextResponse.redirect(loginUrl, 302);
-  res.headers.set("Cache-Control", "no-store, max-age=0, must-revalidate");
+  const res = new NextResponse(null, {
+    status: 302,
+    headers: {
+      Location: loginUrl.toString(),
+    },
+  });
+  res.headers.set("Cache-Control", "no-store, max-age=0, must-revalidate, no-transform");
   res.headers.set("Pragma", "no-cache");
 
   res.cookies.set("access_token", "", {

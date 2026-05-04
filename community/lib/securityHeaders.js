@@ -60,6 +60,7 @@ export function buildSecurityHeaders(env = process.env) {
     { key: "X-Frame-Options", value: "DENY" },
     { key: "Referrer-Policy", value: "same-origin" },
     { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+    { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
     { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
     { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
     ...(isProdEnv(env)

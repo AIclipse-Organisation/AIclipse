@@ -18,10 +18,15 @@
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.14"
+    }
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "autoprefixer": "^10.4.24",
-    "postcss": "^8.5.8",
+    "postcss": "^8.5.10",
     "tailwindcss": "^4.2.2"
   }
 }

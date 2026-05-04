@@ -143,6 +143,7 @@ def apply_security_and_cache_headers(resp):
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["Referrer-Policy"] = "same-origin"
     resp.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    resp.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
     resp.headers["Cross-Origin-Resource-Policy"] = "same-origin"
     resp.headers["Permissions-Policy"] = "geolocation=()"
     if is_prod:
@@ -179,7 +180,7 @@ def apply_security_and_cache_headers(resp):
         return resp
 
     if resp.mimetype in ("text/html", "application/json"):
-        resp.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate"
+        resp.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate, no-transform"
         resp.headers["Pragma"] = "no-cache"
 
     return resp
